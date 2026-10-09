@@ -11,14 +11,27 @@
  *    "eleito" ⇔ Summary.eleito).
  * Os erros são acumulados (sem `expect` no laço quente) e comparados com [] ao fim de cada bloco.
  */
-import { describe, expect, it } from 'vitest';
-import { INICIO_APURACAO } from '../shared/constants';
-import type { FeedEvent, NationalSnapshot, Regiao, SeriePoint, Summary, UF, ZonaMosaico } from '../shared/types';
-import { UF_REGIAO } from '../shared/constants';
-import { createController } from './controller';
-import { estadoMosaico } from './snapshots';
+import { describe, expect, it, vi } from 'vitest';
+import type { AdminCommand } from '../shared/api';
+import { INICIO_APURACAO, UF_REGIAO } from '../shared/constants';
+import type {
+  AdminState,
+  FeedEvent,
+  NationalSnapshot,
+  Regiao,
+  SeriePoint,
+  Summary,
+  UF,
+  ZonaMosaico,
+} from '../shared/types';
+import { CommandError, type Controller } from './api';
+import { createController, ENCERRAMENTO_MS } from './controller';
 import { triple32 } from './rng';
-import { dataset, relogio } from './tests/helpers';
+import { cenarioPadrao } from './scenario';
+import { estadoMosaico } from './snapshots';
+import { estadoPadrao, parseAdminState } from './state';
+import { buildStructure } from './structure';
+import { dataset, relogio, semGeradoEm } from './tests/helpers';
 
 const INI = INICIO_APURACAO;
 const ds = await dataset();
@@ -450,3 +463,216 @@ function checaMosaico(mos: ZonaMosaico[], zonas: Summary[] & { zona: number }[],
     if (tot !== z.secoesTotalizadas) err(e, `${ctx}/z${z.zona}: mosaico ${tot} totalizadas ≠ ${z.secoesTotalizadas}`);
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Comandos do admin em sequência: estado, versão, fase, relógio e dados sempre coerentes
+// ---------------------------------------------------------------------------------------------
+
+const stDs = buildStructure(ds);
+
+/** Coerência entre state(), status() e o snapshot nacional no instante atual. */
+function coerente(c: Controller, ctx: string): void {
+  const s = c.state();
+  const st = c.status();
+  const sim = s.fonte === 'simulacao';
+  expect(st.fonte, ctx).toBe(s.fonte);
+  expect(st.versao, ctx).toBe(s.versao);
+  expect(st.simulacao, ctx).toBe(sim);
+  expect(st.congelado, ctx).toBe(s.congelado);
+  expect(st.pausado, ctx).toBe(sim ? !s.relogio.rodando : false);
+  expect(st.velocidade, ctx).toBe(sim ? s.relogio.velocidade : 1);
+  expect(st.aviso, ctx).toEqual(s.aviso);
+  expect(s.congelado ? s.congeladoEm !== null : s.congeladoEm === null, `${ctx}: congeladoEm`).toBe(true);
+  const relogioSim =
+    s.relogio.ancoraSim + (s.relogio.rodando ? (st.wallNow - s.relogio.ancoraWall) * s.relogio.velocidade : 0);
+  expect(st.simNow, ctx).toBe(sim ? relogioSim : st.wallNow);
+  expect(c.simNow(), ctx).toBe(st.simNow);
+  const n = c.nacional('pres');
+  if (!sim) {
+    expect(n.resumo.secoesTotalizadas, `${ctx}: fonte ${s.fonte} nunca simula`).toBe(0);
+    expect(st.fase, ctx).toBe(s.fonte === 'pre' || st.wallNow < INI ? 'pre' : 'apurando');
+    return;
+  }
+  const tDados = s.congelado ? s.congeladoEm! : st.simNow;
+  expect(n.simNow, ctx).toBe(Math.floor(tDados / 1000) * 1000);
+  const fim = c.fimPrevisto()!;
+  expect(st.fase, ctx).toBe(tDados < INI ? 'pre' : tDados >= fim + ENCERRAMENTO_MS ? 'encerrada' : 'apurando');
+  // % de seções coerente com a régua de marcos do mesmo modelo
+  const pct = (100 * n.resumo.secoesTotalizadas) / n.resumo.secoes;
+  for (const m of c.marcos()) {
+    if (n.simNow >= m.t) expect(pct, `${ctx}: marco ${m.pct}`).toBeGreaterThanOrEqual(m.pct);
+    else expect(pct, `${ctx}: marco ${m.pct}`).toBeLessThan(m.pct);
+  }
+}
+
+describe('comandos combinados', () => {
+  it('pausar → saltar-pct 75 → cenário → retomar → congelar → descongelar → … → reiniciar → iniciar', () => {
+    const r = relogio(Date.UTC(2026, 9, 25, 12, 0));
+    const emitidos: AdminState[] = [];
+    const c = createController(ds, { modo: 'demo', now: r.now, onStateChange: (s) => emitidos.push(s) });
+    coerente(c, 'inicial');
+    const passo = (cmd: AdminCommand, ctx: string) => {
+      const v = c.state().versao;
+      const n = emitidos.length;
+      const snap = c.command(cmd);
+      expect(snap.state.versao, ctx).toBe(v + 1);
+      expect(snap.status.versao, ctx).toBe(v + 1);
+      expect(emitidos.length, `${ctx}: onStateChange 1×`).toBe(n + 1);
+      expect(emitidos.at(-1), ctx).toEqual(c.state());
+      expect(snap.state, ctx).toEqual(c.state());
+      expect(snap.fimPrevisto, ctx).toBe(c.fimPrevisto());
+      expect(snap.marcos, ctx).toEqual(c.marcos());
+      coerente(c, ctx);
+      return snap;
+    };
+    const nacional = () => c.nacional('pres');
+
+    r.add(30_000); // 20× → +10 min simulados
+    expect(c.simNow()).toBe(INI + 9.5 * 60_000);
+    coerente(c, 'rodando');
+
+    passo({ tipo: 'relogio', acao: 'pausar' }, 'pausar');
+    const tPausa = c.simNow();
+    r.add(60_000);
+    expect(c.simNow()).toBe(tPausa);
+
+    passo({ tipo: 'saltar-pct', pct: 75 }, 'saltar-pct 75');
+    const t75 = c.marcos().find((m) => m.pct === 75)!.t;
+    expect(c.simNow()).toBe(Math.ceil(t75 / 1000) * 1000);
+    const a75 = nacional().resumo;
+    expect((100 * a75.secoesTotalizadas) / a75.secoes).toBeGreaterThanOrEqual(75);
+    r.add(10_000);
+    expect(c.simNow()).toBe(Math.ceil(t75 / 1000) * 1000);
+
+    const fimAntes = c.fimPrevisto();
+    passo({ tipo: 'cenario', cenario: { alvoPres: 52, ordemRegional: 'sul-primeiro', ritmo: 'rapido' } }, 'cenario');
+    expect(c.simNow(), 'cenário mantém o relógio').toBe(Math.ceil(t75 / 1000) * 1000);
+    expect(c.state().cenario.preset).toBe('personalizado');
+    expect(c.fimPrevisto()).toBeLessThan(fimAntes!); // ritmo rápido
+    expect(nacional().resumo.secoesTotalizadas).toBeGreaterThan(a75.secoesTotalizadas);
+
+    passo({ tipo: 'relogio', acao: 'retomar' }, 'retomar');
+    const tRet = c.simNow();
+    r.add(1000);
+    expect(c.simNow()).toBe(tRet + 20_000);
+
+    passo({ tipo: 'congelar', congelado: true }, 'congelar');
+    const congeladoEm = c.state().congeladoEm!;
+    expect(congeladoEm).toBe(c.simNow());
+    const fr = nacional();
+    r.add(30_000); // +10 min simulados com os dados parados
+    expect(nacional().resumo).toEqual(fr.resumo);
+    expect(nacional().eventos).toEqual(fr.eventos);
+    passo({ tipo: 'congelar', congelado: true }, 'congelar de novo');
+    expect(c.state().congeladoEm, 'congelar 2× mantém o instante').toBe(congeladoEm);
+    passo({ tipo: 'velocidade', velocidade: 60 }, 'velocidade (congelado)');
+    passo({ tipo: 'saltar-pct', pct: 99 }, 'saltar-pct (congelado)');
+    expect(nacional().resumo).toEqual(fr.resumo);
+
+    passo({ tipo: 'congelar', congelado: false }, 'descongelar');
+    expect(nacional().resumo.secoesTotalizadas).toBeGreaterThan(fr.resumo.secoesTotalizadas);
+
+    passo({ tipo: 'saltar-pct', pct: 100 }, 'saltar-pct 100');
+    const r100 = nacional().resumo;
+    expect(r100.status).toBe('encerrada');
+    expect(Math.abs((100 * r100.votos[0]) / (r100.votos[0] + r100.votos[1]) - 52)).toBeLessThan(0.05);
+    passo({ tipo: 'saltar-tempo', simNow: c.fimPrevisto()! + ENCERRAMENTO_MS }, 'encerrada');
+    expect(c.status().fase).toBe('encerrada');
+
+    passo({ tipo: 'fonte', fonte: 'tse' }, 'fonte tse');
+    passo({ tipo: 'fonte', fonte: 'pre' }, 'fonte pre');
+    passo({ tipo: 'fonte', fonte: 'simulacao' }, 'fonte simulacao');
+    passo({ tipo: 'aviso', aviso: { nivel: 'alerta', texto: 'Instabilidade' } }, 'aviso');
+    passo({ tipo: 'tse', tse: { intervaloSeg: 20, baseUrl: 'https://exemplo.invalid/oficial' } }, 'tse');
+    expect(c.state().tse.intervaloSeg).toBe(20);
+    passo({ tipo: 'preset', preset: 'virada-b' }, 'preset');
+    expect(c.state().cenario).toMatchObject({
+      preset: 'virada-b',
+      alvoPres: 49.6,
+      ordemRegional: 'norte-primeiro',
+      ritmo: 'normal',
+    });
+    passo({ tipo: 'velocidade', velocidade: 7.5 }, 'velocidade fracionária');
+    r.add(333);
+    coerente(c, 'velocidade fracionária, rodando');
+
+    // comandos inválidos: nada muda (nem versão, nem estado, nem onStateChange)
+    const antes = c.toJSON();
+    const nEmit = emitidos.length;
+    const invalidos: unknown[] = [
+      null,
+      { tipo: 'nada' },
+      { tipo: 'relogio', acao: 'voar' },
+      { tipo: 'velocidade', velocidade: 0 },
+      { tipo: 'velocidade', velocidade: 'rápido' },
+      { tipo: 'saltar-tempo', simNow: 'ontem' },
+      { tipo: 'saltar-pct', pct: -1 },
+      { tipo: 'cenario', cenario: { ritmo: 'turbo' } },
+      { tipo: 'cenario', cenario: null },
+      { tipo: 'preset', preset: 'inexistente' },
+      { tipo: 'fonte', fonte: 'ibope' },
+      { tipo: 'aviso', aviso: { nivel: 'info', texto: '' } },
+      { tipo: 'tse', tse: { intervaloSeg: 1 } },
+      { tipo: 'tse', tse: { baseUrl: '' } },
+    ];
+    for (const cmd of invalidos) {
+      expect(() => c.command(cmd as AdminCommand), JSON.stringify(cmd)).toThrow(CommandError);
+      expect(c.toJSON(), JSON.stringify(cmd)).toBe(antes);
+    }
+    expect(emitidos.length).toBe(nEmit);
+
+    passo({ tipo: 'congelar', congelado: true }, 'congelar antes de reiniciar');
+    passo({ tipo: 'relogio', acao: 'reiniciar' }, 'reiniciar');
+    expect(c.status()).toMatchObject({
+      simNow: INI - 30_000,
+      pausado: true,
+      congelado: false,
+      fase: 'pre',
+      velocidade: 7.5,
+    });
+    expect(nacional().resumo.secoesTotalizadas).toBe(0);
+    passo({ tipo: 'relogio', acao: 'iniciar' }, 'iniciar');
+    r.add(4000); // 4 s × 7,5 = 30 s → 17:00:00
+    expect(c.status().simNow).toBe(INI);
+    expect(c.status().fase).toBe('apurando');
+    expect(c.state().versao).toBe(1 + emitidos.length);
+  });
+
+  it('toJSON → parseAdminState → initialState/setState: mesmo estado, status e números (ida e volta)', () => {
+    const r = relogio(Date.UTC(2026, 9, 25, 12, 0));
+    const a = createController(ds, { modo: 'demo', now: r.now });
+    a.command({ tipo: 'cenario', cenario: { alvoPres: 47.25, ufVies: { MG: 1.5 }, ufAtraso: { PA: 15 }, seed: 4242 } });
+    a.command({ tipo: 'saltar-pct', pct: 63 });
+    a.command({ tipo: 'velocidade', velocidade: 3 });
+    a.command({ tipo: 'congelar', congelado: true });
+    a.command({ tipo: 'aviso', aviso: { nivel: 'info', texto: 'ida e volta' } });
+    r.add(12_345);
+    const json = a.toJSON();
+    const fb = estadoPadrao('servidor', 0, cenarioPadrao(stDs), stDs);
+    const parsed = parseAdminState(json, fb, stDs);
+    expect(parsed).toEqual(a.state());
+    expect(JSON.stringify(parsed)).toBe(json); // mesma ordem de chaves (sincronização entre abas compara o JSON)
+    expect(parseAdminState(JSON.parse(json), fb, stDs)).toEqual(parsed);
+
+    const onStateChange = vi.fn();
+    const b = createController(ds, { modo: 'servidor', now: r.now, initialState: parsed, onStateChange });
+    const c = createController(ds, { modo: 'demo', now: r.now, onStateChange });
+    c.setState(JSON.parse(json));
+    for (const x of [b, c]) {
+      expect(x.state()).toEqual(a.state());
+      expect(x.status()).toEqual(a.status());
+      expect(x.adminSnapshot().marcos).toEqual(a.adminSnapshot().marcos);
+      expect(semGeradoEm(x.nacional('pres'))).toEqual(semGeradoEm(a.nacional('pres')));
+      expect(semGeradoEm(x.uf('pres', 'MG'))).toEqual(semGeradoEm(a.uf('pres', 'MG')));
+      expect(semGeradoEm(x.municipio('gov-am', 'AM', '02550'))).toEqual(
+        semGeradoEm(a.municipio('gov-am', 'AM', '02550')),
+      );
+    }
+    expect(onStateChange).not.toHaveBeenCalled();
+    // descongelado depois da restauração: os dois andam juntos
+    a.command({ tipo: 'congelar', congelado: false });
+    b.command({ tipo: 'congelar', congelado: false });
+    r.add(5000);
+    expect(semGeradoEm(b.nacional('pres'))).toEqual(semGeradoEm(a.nacional('pres')));
+  });
+});
