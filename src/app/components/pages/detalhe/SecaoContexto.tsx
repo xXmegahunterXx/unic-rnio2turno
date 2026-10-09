@@ -125,7 +125,7 @@ export function ParticipacaoComparada({
       rotulo: 'Comparecimento',
       f: pctComparecimento,
       ok: (t) => t.eleitoradoTotalizado > 0,
-      abs: (t) => `${fmtInt(t.comparecimento)} de ${fmtInt(t.eleitoradoTotalizado)} eleitores`,
+      abs: (t) => `${fmtInt(t.comparecimento)} de ${fmtInt(t.eleitoradoTotalizado)}`,
     },
     {
       rotulo: 'Brancos',

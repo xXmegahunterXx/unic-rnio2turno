@@ -18,7 +18,7 @@ export function NomesOcultos({ className }: { className?: string }) {
         )}
       >
         <Icon name="olho-fechado" size={14} />
-        Nomes ocultos na simulação
+        Nomes ocultos<span className="sr-only sm:not-sr-only"> na simulação</span>
       </span>
     </Tooltip>
   );
