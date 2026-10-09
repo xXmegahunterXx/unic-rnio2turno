@@ -8,7 +8,7 @@ import { Badge } from '@/app/ui/Badge';
 import { DataTable, type Column, type SortState } from '@/app/ui/DataTable';
 import { SearchBox } from '@/app/ui/SearchBox';
 import { casa } from '@/app/ui/textMatch';
-import { ApuradoCell, CandHeader, MargemCell, PctCell, margemAssinada } from './cells';
+import { ApuradoCell, CandHeader, MargemCell, PctCell, W, margemAssinada } from './cells';
 
 export interface MunicipioTableProps {
   race: Race;
@@ -35,7 +35,9 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
       cell: (m) => (
         <span className="block min-w-0">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className={cn('truncate', m.capital ? 'font-semibold' : 'font-medium')}>{m.nome}</span>
+            <span title={m.nome} className={cn('truncate', m.capital ? 'font-semibold' : 'font-medium')}>
+              {m.nome}
+            </span>
             {m.capital ? (
               <Badge tone="brand" size="xs" className="hidden min-[400px]:inline-flex">
                 Capital
@@ -53,7 +55,7 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
       header: 'Eleitores',
       align: 'right',
       hideBelow: 'md',
-      width: 'w-[1%]',
+      width: W.eleitores,
       sortValue: (m) => m.eleitorado,
       cell: (m) => <span title={fmtInt(m.eleitorado)}>{fmtCompact(m.eleitorado)}</span>,
     },
@@ -62,13 +64,13 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
       header: 'Apurado',
       align: 'right',
       hideBelow: 'sm',
-      width: 'w-[1%]',
+      width: W.apuradoSemBarra,
       sortValue: (m) => pctTotalizadas(m),
-      cell: (m) => <ApuradoCell t={m} />,
+      cell: (m) => <ApuradoCell t={m} bar={false} />,
     },
-    { key: 'a', header: <CandHeader c={ca} />, headerLabel: ca.nomeUrna, align: 'right', width: 'w-[1%]', sortValue: (m) => pctValidos(m, 0), cell: (m) => <PctCell t={m} i={0} race={race} /> },
-    { key: 'b', header: <CandHeader c={cb} />, headerLabel: cb.nomeUrna, align: 'right', width: 'w-[1%]', sortValue: (m) => pctValidos(m, 1), cell: (m) => <PctCell t={m} i={1} race={race} /> },
-    { key: 'margem', header: 'Margem', align: 'right', width: 'w-[1%]', sortValue: margemAssinada, cell: (m) => <MargemCell t={m} race={race} /> },
+    { key: 'a', header: <CandHeader c={ca} />, headerLabel: ca.nomeUrna, align: 'right', width: W.pct, sortValue: (m) => pctValidos(m, 0), cell: (m) => <PctCell t={m} i={0} race={race} /> },
+    { key: 'b', header: <CandHeader c={cb} />, headerLabel: cb.nomeUrna, align: 'right', width: W.pct, sortValue: (m) => pctValidos(m, 1), cell: (m) => <PctCell t={m} i={1} race={race} /> },
+    { key: 'margem', header: 'Margem', align: 'right', width: W.margem, sortValue: margemAssinada, cell: (m) => <MargemCell t={m} race={race} /> },
   ];
   return (
     <div className={className}>

@@ -14,8 +14,24 @@ export type RGB = readonly [number, number, number];
 
 /** Tokens lidos do CSS. */
 export const TOKENS = [
-  'bg', 'surface', 'surface-2', 'surface-3', 'fg', 'fg-muted', 'fg-subtle', 'line', 'brand', 'brand-2',
-  'cand-a', 'cand-a-soft', 'cand-b', 'cand-b-soft', 'cand-outros', 'pending', 'ok', 'alert',
+  'bg',
+  'surface',
+  'surface-2',
+  'surface-3',
+  'fg',
+  'fg-muted',
+  'fg-subtle',
+  'line',
+  'brand',
+  'brand-2',
+  'cand-a',
+  'cand-a-soft',
+  'cand-b',
+  'cand-b-soft',
+  'cand-outros',
+  'pending',
+  'ok',
+  'alert',
 ] as const;
 export type ColorToken = (typeof TOKENS)[number];
 export type TokenColors = Record<ColorToken, RGB> & { lineAlpha: number };
@@ -35,7 +51,10 @@ let observer: MutationObserver | null = null;
 let mql: MediaQueryList | null = null;
 
 function parseTriplet(v: string): RGB {
-  const p = v.trim().split(/[\s,]+/).map(Number);
+  const p = v
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   return [p[0] || 0, p[1] || 0, p[2] || 0];
 }
 

@@ -12,7 +12,9 @@ export function useElementSize<T extends HTMLElement>(inicial = { w: 0, h: 0 }) 
     if (!el) return;
     const medir = () => {
       const r = el.getBoundingClientRect();
-      setSize((s) => (Math.abs(s.w - r.width) < 0.5 && Math.abs(s.h - r.height) < 0.5 ? s : { w: r.width, h: r.height }));
+      setSize((s) =>
+        Math.abs(s.w - r.width) < 0.5 && Math.abs(s.h - r.height) < 0.5 ? s : { w: r.width, h: r.height },
+      );
     };
     medir();
     if (typeof ResizeObserver === 'undefined') return;

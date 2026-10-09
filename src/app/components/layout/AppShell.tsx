@@ -5,7 +5,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { useStatus } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
@@ -20,6 +20,7 @@ import { StatusPill } from './StatusPill';
 
 export function AppShell({ children }: { children?: ReactNode }) {
   return (
+    <MotionConfig reducedMotion="user">
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <FundoNoite />
       <Header />
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <Toaster />
       <ScrollRestoration />
     </div>
+    </MotionConfig>
   );
 }
 
@@ -38,8 +40,8 @@ export function AppShell({ children }: { children?: ReactNode }) {
 function FundoNoite() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[560px] overflow-hidden">
-      <div className="absolute inset-0 bg-noise opacity-100 dark:opacity-100" />
-      <div className="absolute left-1/2 top-[-280px] h-[520px] w-[920px] -translate-x-1/2 rounded-full bg-brand/[0.10] blur-[90px] dark:bg-brand/[0.14]" />
+      <div className="absolute inset-0 bg-noise [mask-image:linear-gradient(to_bottom,black,transparent)]" />
+      <div className="absolute left-1/2 top-[-300px] h-[520px] w-[920px] -translate-x-1/2 rounded-full bg-brand/[0.07] blur-[90px] dark:bg-brand/[0.14]" />
     </div>
   );
 }
@@ -179,7 +181,7 @@ function TabBar() {
   return (
     <nav
       aria-label="Principal"
-      className="glass fixed inset-x-0 bottom-0 z-50 border-t border-line pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.94] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
     >
       <ul className="mx-auto grid h-[60px] max-w-md grid-cols-4">
         {NAV.map((n) => {

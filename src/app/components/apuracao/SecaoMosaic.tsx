@@ -10,7 +10,16 @@
  * - Hover/toque mostra "Zona 1 · Seção 123"; clique/Enter → onSelect(zona, secao).
  * - Teclado: setas percorrem as seções, PageUp/PageDown trocam de zona, Enter seleciona.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react';
 import type { Race, ZonaMosaico } from '@/shared/types';
 import { decodeFaixas, pctTotalizadas } from '@/shared/calc';
 import { fmtInt, fmtPct } from '@/shared/format';
@@ -112,16 +121,27 @@ export function SecaoMosaic({
     return { secoes, tot, presentes };
   }, [zonas]);
 
-  const alvo = alturaAlvo ?? (typeof window !== 'undefined' ? Math.min(900, Math.max(360, window.innerHeight * 0.85)) : 720);
+  // Altura da janela lida uma vez (a barra de endereço do celular muda innerHeight ao rolar).
+  const [hJanela] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 900));
+  const alvo = alturaAlvo ?? Math.min(900, Math.max(360, hJanela * 0.85));
+  // O layout só depende da ESTRUTURA (zonas e nº de seções), não do estado — assim as atualizações
+  // ao vivo reaproveitam a camada-base e repintam apenas as seções que mudaram.
+  const estrutura = useMemo(() => zonas.map((z) => `${z.zona}:${z.secoes.length}`).join(','), [zonas]);
   const layout: MosaicLayout | null = useMemo(() => {
-    if (size.w <= 0) return null;
+    if (size.w <= 0 || !estrutura) return null;
     const estreito = size.w < 480;
-    return layoutMosaico(
-      zonas.map((z) => ({ zona: z.zona, n: z.secoes.length })),
-      size.w,
-      { alturaAlvo: alvo, labelH: 18, gapX: estreito ? 10 : 16, gapY: estreito ? 10 : 14, minBlockW: estreito ? 76 : 110 },
-    );
-  }, [zonas, size.w, alvo]);
+    const tamanhos = estrutura.split(',').map((p) => {
+      const [zona, n] = p.split(':').map(Number);
+      return { zona, n };
+    });
+    return layoutMosaico(tamanhos, size.w, {
+      alturaAlvo: alvo,
+      labelH: 18,
+      gapX: estreito ? 10 : 16,
+      gapY: estreito ? 10 : 14,
+      minBlockW: estreito ? 76 : 110,
+    });
+  }, [estrutura, size.w, alvo]);
 
   // Paleta resolvida (canvas não entende var()).
   const paleta = useMemo(() => {
@@ -146,101 +166,6 @@ export function SecaoMosaic({
     return area > 16e6 ? Math.max(1, Math.sqrt(16e6 / (layout.width * layout.height))) : d;
   }, [layout]);
 
-  const desenharBase = useCallback(
-    (pular?: Set<number>) => {
-      if (!layout || !paleta) return null;
-      const W = Math.ceil(layout.width * dpr);
-      const H = Math.ceil(Math.max(1, layout.height) * dpr);
-      let base = baseRef.current;
-      if (!base) base = baseRef.current = document.createElement('canvas');
-      if (base.width !== W || base.height !== H) {
-        base.width = W;
-        base.height = H;
-      }
-      const ctx = base.getContext('2d')!;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.clearRect(0, 0, layout.width, layout.height);
-      const { pitch, cell, labelH } = layout;
-      const redondo = cell >= 7;
-      // Rótulos
-      ctx.textBaseline = 'middle';
-      for (const b of layout.blocks) {
-        const z = zonas[b.idx];
-        ctx.globalAlpha = zonaDestaque != null && z.zona !== zonaDestaque ? 0.35 : 1;
-        ctx.font = '600 11px "JetBrains Mono", ui-monospace, monospace';
-        ctx.fillStyle = paleta.label;
-        ctx.textAlign = 'left';
-        ctx.fillText(`Zona ${z.zona}`, b.x, b.y + labelH / 2 - 1);
-        if (b.w >= 104) {
-          let tot = 0;
-          for (let i = 0; i < z.estado.length; i++) if (z.estado.charCodeAt(i) !== 48) tot++;
-          ctx.font = '400 10.5px "JetBrains Mono", ui-monospace, monospace';
-          ctx.fillStyle = paleta.labelSub;
-          ctx.textAlign = 'right';
-          ctx.fillText(`${fmtInt(tot)}/${fmtInt(z.secoes.length)}`, b.x + b.cols * pitch - (pitch - cell), b.y + labelH / 2 - 1);
-        }
-      }
-      ctx.globalAlpha = 1;
-      // Células em lote por cor
-      const porCor = new Map<string, number[]>();
-      for (const b of layout.blocks) {
-        const z = zonas[b.idx];
-        const esmaecer = zonaDestaque != null && z.zona !== zonaDestaque;
-        for (let i = 0; i < b.n; i++) {
-          const ch = z.estado[i] ?? '0';
-          const chave = esmaecer ? `~${ch}` : ch;
-          let arr = porCor.get(chave);
-          if (!arr) porCor.set(chave, (arr = []));
-          const gidx = (b.idx << 16) | i;
-          if (pular && pular.has(gidx)) {
-            // Seção que vai "acender": entra como pendente na base.
-            let pend = porCor.get(esmaecer ? '~0' : '0');
-            if (!pend) porCor.set(esmaecer ? '~0' : '0', (pend = []));
-            pend.push(b.x + (i % b.cols) * pitch, b.y + labelH + Math.floor(i / b.cols) * pitch);
-            continue;
-          }
-          arr.push(b.x + (i % b.cols) * pitch, b.y + labelH + Math.floor(i / b.cols) * pitch);
-        }
-      }
-      for (const [chave, pts] of porCor) {
-        const esm = chave.startsWith('~');
-        const ch = esm ? chave.slice(1) : chave;
-        ctx.globalAlpha = esm ? 0.3 : 1;
-        ctx.fillStyle = paleta.p[ch] ?? paleta.p['0'];
-        ctx.beginPath();
-        for (let k = 0; k < pts.length; k += 2) {
-          if (redondo && ctx.roundRect) ctx.roundRect(pts[k], pts[k + 1], cell, cell, Math.min(2.5, cell / 4));
-          else ctx.rect(pts[k], pts[k + 1], cell, cell);
-        }
-        ctx.fill();
-        if (ch === 'x' && !esm) {
-          // Empate: metade de cada cor (diagonal).
-          ctx.fillStyle = paleta.p.a;
-          ctx.beginPath();
-          for (let k = 0; k < pts.length; k += 2) {
-            ctx.moveTo(pts[k], pts[k + 1]);
-            ctx.lineTo(pts[k] + cell, pts[k + 1]);
-            ctx.lineTo(pts[k], pts[k + 1] + cell);
-            ctx.closePath();
-          }
-          ctx.fill();
-          ctx.fillStyle = paleta.p.e;
-          ctx.beginPath();
-          for (let k = 0; k < pts.length; k += 2) {
-            ctx.moveTo(pts[k] + cell, pts[k + 1]);
-            ctx.lineTo(pts[k] + cell, pts[k + 1] + cell);
-            ctx.lineTo(pts[k], pts[k + 1] + cell);
-            ctx.closePath();
-          }
-          ctx.fill();
-        }
-      }
-      ctx.globalAlpha = 1;
-      return base;
-    },
-    [layout, paleta, dpr, zonas, zonaDestaque],
-  );
-
   // Fontes carregadas depois do primeiro desenho → redesenha os rótulos.
   const [fontesV, setFontes] = useState(0);
   useEffect(() => {
@@ -251,8 +176,19 @@ export function SecaoMosaic({
     };
   }, []);
 
-  // Animação: seções que mudaram de estado desde o último desenho.
-  const anterior = useRef<{ layout: MosaicLayout | null; estados: string[] }>({ layout: null, estados: [] });
+  /**
+   * Camada-base (canvas fora da tela) com o estado final de todas as seções. Entre atualizações só as
+   * células que mudaram são repintadas (e os rótulos das zonas afetadas); o redesenho completo acontece
+   * apenas quando muda o layout, o tema, o DPR, a zona em destaque ou as fontes.
+   */
+  const baseInfo = useRef<{
+    layout: MosaicLayout;
+    paleta: NonNullable<typeof paleta>;
+    dpr: number;
+    zonaDestaque: number | null | undefined;
+    fontesV: number;
+    estados: string[];
+  } | null>(null);
   const raf = useRef(0);
 
   useLayoutEffect(() => {
@@ -265,84 +201,186 @@ export function SecaoMosaic({
       cv.width = W;
       cv.height = H;
     }
-    const ant = anterior.current;
-    const mesmoLayout = ant.layout !== null && ant.layout.width === layout.width && ant.estados.length === zonas.length;
-    const anims: { gidx: number; x: number; y: number; ch: string; start: number }[] = [];
-    if (animar && mesmoLayout && !prefersReducedMotion()) {
+    let base = baseRef.current;
+    if (!base) base = baseRef.current = document.createElement('canvas');
+    const bctx = base.getContext('2d')!;
+    const { pitch, cell, labelH } = layout;
+    const redondo = cell >= 7;
+    const raio = Math.min(2.5, cell / 4);
+    const esmaecida = (zona: number) => zonaDestaque != null && zona !== zonaDestaque;
+
+    const pintar = (ctx: CanvasRenderingContext2D, ch: string, x: number, y: number) => {
+      if (ch === 'x') {
+        ctx.fillStyle = paleta.p.a;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + cell, y);
+        ctx.lineTo(x, y + cell);
+        ctx.fill();
+        ctx.fillStyle = paleta.p.e;
+        ctx.beginPath();
+        ctx.moveTo(x + cell, y);
+        ctx.lineTo(x + cell, y + cell);
+        ctx.lineTo(x, y + cell);
+        ctx.fill();
+        return;
+      }
+      ctx.fillStyle = paleta.p[ch] ?? paleta.p['0'];
+      if (redondo && ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(x, y, cell, cell, raio);
+        ctx.fill();
+      } else ctx.fillRect(x, y, cell, cell);
+    };
+
+    const rotulo = (b: MosaicBlock) => {
+      const z = zonas[b.idx];
+      bctx.clearRect(b.x - 1, b.y, b.w + 2, labelH);
+      bctx.globalAlpha = esmaecida(z.zona) ? 0.35 : 1;
+      bctx.textBaseline = 'middle';
+      bctx.font = '600 11px "JetBrains Mono", ui-monospace, monospace';
+      bctx.fillStyle = paleta.label;
+      bctx.textAlign = 'left';
+      bctx.fillText(`Zona ${z.zona}`, b.x, b.y + labelH / 2 - 1);
+      if (b.w >= 104) {
+        let tot = 0;
+        for (let i = 0; i < z.estado.length; i++) if (z.estado.charCodeAt(i) !== 48) tot++;
+        bctx.font = '400 10.5px "JetBrains Mono", ui-monospace, monospace';
+        bctx.fillStyle = paleta.labelSub;
+        bctx.textAlign = 'right';
+        bctx.fillText(
+          `${fmtInt(tot)}/${fmtInt(z.secoes.length)}`,
+          b.x + b.cols * pitch - (pitch - cell),
+          b.y + labelH / 2 - 1,
+        );
+      }
+      bctx.globalAlpha = 1;
+    };
+
+    const ant = baseInfo.current;
+    const completo =
+      !ant ||
+      ant.layout !== layout ||
+      ant.paleta !== paleta ||
+      ant.dpr !== dpr ||
+      ant.zonaDestaque !== zonaDestaque ||
+      ant.fontesV !== fontesV ||
+      ant.estados.length !== zonas.length;
+    const anims: { x: number; y: number; ch: string; start: number }[] = [];
+
+    if (completo) {
+      if (base.width !== W || base.height !== H) {
+        base.width = W;
+        base.height = H;
+      }
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      bctx.clearRect(0, 0, layout.width, layout.height);
+      for (const b of layout.blocks) rotulo(b);
+      // Células em lote por cor (um path por cor).
+      const porCor = new Map<string, number[]>();
+      for (const b of layout.blocks) {
+        const z = zonas[b.idx];
+        const esm = esmaecida(z.zona);
+        for (let i = 0; i < b.n; i++) {
+          const ch = z.estado[i] ?? '0';
+          const chave = esm ? `~${ch}` : ch;
+          let arr = porCor.get(chave);
+          if (!arr) porCor.set(chave, (arr = []));
+          arr.push(b.x + (i % b.cols) * pitch, b.y + labelH + Math.floor(i / b.cols) * pitch);
+        }
+      }
+      for (const [chave, pts] of porCor) {
+        const esm = chave.charCodeAt(0) === 126; // '~'
+        const ch = esm ? chave.slice(1) : chave;
+        bctx.globalAlpha = esm ? 0.3 : 1;
+        if (ch === 'x') {
+          for (let k = 0; k < pts.length; k += 2) pintar(bctx, ch, pts[k], pts[k + 1]);
+          continue;
+        }
+        bctx.fillStyle = paleta.p[ch] ?? paleta.p['0'];
+        bctx.beginPath();
+        for (let k = 0; k < pts.length; k += 2) {
+          if (redondo && bctx.roundRect) bctx.roundRect(pts[k], pts[k + 1], cell, cell, raio);
+          else bctx.rect(pts[k], pts[k + 1], cell, cell);
+        }
+        bctx.fill();
+      }
+      bctx.globalAlpha = 1;
+    } else {
+      // Incremental: só as seções que mudaram.
+      const anima = animar && !prefersReducedMotion();
+      bctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       for (const b of layout.blocks) {
         const novo = zonas[b.idx].estado;
-        const velho = ant.estados[b.idx] ?? '';
+        const velho = ant!.estados[b.idx] ?? '';
         if (novo === velho) continue;
+        const esm = esmaecida(zonas[b.idx].zona);
+        bctx.globalAlpha = esm ? 0.3 : 1;
         for (let i = 0; i < b.n; i++) {
           const a = velho.charCodeAt(i);
           const n = novo.charCodeAt(i);
-          if (a === n || n === 48 /* '0' */) continue;
-          const p = cellPos(layout, b, i);
-          anims.push({ gidx: (b.idx << 16) | i, x: p.x, y: p.y, ch: novo[i], start: 0 });
+          if (a === n) continue;
+          const x = b.x + (i % b.cols) * pitch;
+          const y = b.y + labelH + Math.floor(i / b.cols) * pitch;
+          bctx.clearRect(x, y, cell, cell);
+          const ch = novo[i] ?? '0';
+          pintar(bctx, ch, x, y);
+          if (anima && n !== 48 && !esm) anims.push({ x, y, ch, start: 0 });
         }
+        bctx.globalAlpha = 1;
+        rotulo(b);
       }
     }
-    anterior.current = { layout, estados: zonas.map((z) => z.estado) };
+    baseInfo.current = { layout, paleta, dpr, zonaDestaque, fontesV, estados: zonas.map((z) => z.estado) };
     cancelAnimationFrame(raf.current);
 
     const ctx = cv.getContext('2d')!;
-    if (!anims.length || anims.length > 60000) {
-      const base = desenharBase();
+    const copiarBase = () => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, cv.width, cv.height);
-      if (base) ctx.drawImage(base, 0, 0);
+      ctx.drawImage(base!, 0, 0);
+    };
+    copiarBase();
+    if (!anims.length || anims.length > 60000) {
       registrar(t0);
       return;
     }
 
-    // Base com as seções "novas" ainda pendentes; elas acendem por cima, com atraso aleatório.
-    const pular = new Set(anims.map((a) => a.gidx));
-    const base = desenharBase(pular)!;
+    // "Acendimento": as seções novas começam pendentes e acendem com um clarão, em ordem aleatória.
     const agora = performance.now();
     for (const a of anims) a.start = agora + Math.random() * ATRASO_MAX;
-    const { cell } = layout;
     const flash = paleta.flash;
+    const pend = paleta.p['0'];
     const passo = () => {
       const now = performance.now();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, cv.width, cv.height);
-      ctx.drawImage(base, 0, 0);
+      copiarBase();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       let vivos = 0;
       for (const a of anims) {
         const t = (now - a.start) / DUR_ANIM;
+        if (t >= 1) continue;
+        vivos++;
         if (t < 0) {
-          vivos++;
+          ctx.fillStyle = pend;
+          ctx.fillRect(a.x, a.y, cell, cell);
           continue;
         }
-        const tt = Math.min(1, t);
-        if (tt < 1) vivos++;
-        // Cor final + clarão que encolhe e some.
-        const pop = 1 + 0.9 * Math.pow(1 - tt, 3);
-        const s = cell * pop;
-        const off = (s - cell) / 2;
+        const pop = 1 + 0.9 * Math.pow(1 - t, 3);
+        const sz = cell * pop;
+        const off = (sz - cell) / 2;
+        ctx.fillStyle = paleta.p[a.ch] ?? pend;
+        ctx.fillRect(a.x - off, a.y - off, sz, sz);
+        ctx.globalAlpha = 0.85 * Math.pow(1 - t, 2.2);
+        ctx.fillStyle = flash;
+        ctx.fillRect(a.x - off, a.y - off, sz, sz);
         ctx.globalAlpha = 1;
-        ctx.fillStyle = paleta.p[a.ch] ?? paleta.p['0'];
-        ctx.fillRect(a.x - off, a.y - off, s, s);
-        if (tt < 1) {
-          ctx.globalAlpha = 0.85 * Math.pow(1 - tt, 2.2);
-          ctx.fillStyle = flash;
-          ctx.fillRect(a.x - off, a.y - off, s, s);
-        }
       }
-      ctx.globalAlpha = 1;
       if (vivos > 0) raf.current = requestAnimationFrame(passo);
-      else {
-        // Fim: base definitiva.
-        const final = desenharBase()!;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, cv.width, cv.height);
-        ctx.drawImage(final, 0, 0);
-      }
+      else copiarBase();
     };
     passo();
     registrar(t0);
-  }, [layout, paleta, zonas, dpr, desenharBase, animar, fontesV]);
+  }, [layout, paleta, zonas, dpr, animar, fontesV, zonaDestaque]);
 
   useEffect(() => () => cancelAnimationFrame(raf.current), []);
 
@@ -451,8 +489,8 @@ export function SecaoMosaic({
       {resumo ? (
         <p className="num mb-3 text-[12.5px] text-fg-muted">
           <span className="font-semibold text-fg">{fmtInt(totais.secoes)}</span> seções ·{' '}
-          <span className="font-semibold text-fg">{fmtInt(zonas.length)}</span> {zonas.length === 1 ? 'zona' : 'zonas'} ·{' '}
-          <span className="font-semibold text-fg">{fmtInt(totais.tot)}</span> totalizadas (
+          <span className="font-semibold text-fg">{fmtInt(zonas.length)}</span> {zonas.length === 1 ? 'zona' : 'zonas'}{' '}
+          · <span className="font-semibold text-fg">{fmtInt(totais.tot)}</span> totalizadas (
           {fmtPct(pctTotalizadas({ secoes: totais.secoes, secoesTotalizadas: totais.tot }))})
         </p>
       ) : null}
@@ -520,7 +558,9 @@ export function SecaoMosaic({
             <p className="font-mono text-[12px] font-semibold text-fg">
               Zona {ativoZona.zona} · Seção {ativoZona.secoes[ativo.i]}
             </p>
-            <p className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">{descreverEstado(ativoZona.estado[ativo.i], race)}</p>
+            <p className="mt-0.5 text-[11.5px] leading-snug text-fg-muted">
+              {descreverEstado(ativoZona.estado[ativo.i], race)}
+            </p>
             {ativo.fixo && onSelect ? (
               <button
                 type="button"
@@ -569,7 +609,8 @@ export function MosaicLegend({ race, presentes, className }: MosaicLegendProps) 
     fills: [0, 1, 2, 3].map((b) => fillMargem(cores[ci] ?? (ci === 0 ? 'a' : 'b'), b as 0 | 1 | 2 | 3)),
   }));
   const extras: { label: string; fill: string; split?: boolean }[] = [{ label: 'Não totalizada', fill: FILL_PENDENTE }];
-  if (presentes?.has('t')) extras.push({ label: 'Totalizada (sem resultado por seção)', fill: fillMosaico('t', cores) });
+  if (presentes?.has('t'))
+    extras.push({ label: 'Totalizada (sem resultado por seção)', fill: fillMosaico('t', cores) });
   if (presentes?.has('x')) extras.push({ label: 'Empate', fill: FILL_EMPATE, split: true });
   if (presentes?.has('z')) extras.push({ label: 'Sem votos válidos', fill: FILL_NEUTRO });
   return (

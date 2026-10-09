@@ -24,7 +24,7 @@ import type {
   ZonaSnapshot,
 } from '../shared/types';
 import type { ResultadoPrimeiroTurno } from '../shared/dataset';
-import { F, acumula, somaMunicipios, type Agg } from './aggregate';
+import { F, acumula, camposPar, somaMunicipios, type Agg } from './aggregate';
 import { pctPar } from './events';
 import type { Model } from './model';
 import { triple32 } from './rng';
@@ -338,7 +338,7 @@ export function municipio2t(ctx: Ctx, r: RaceInfo, m: number): MunicipioSnapshot
     const s1 = st.pairSecEnd[p];
     zonas.push({
       zona: st.pairZona[p],
-      ...summaryCampos(agg.pair, p * F.STRIDE, s1 - s0, model.pairEleitorado[p], gov),
+      ...summaryCampos(camposPar(model, p, k), 0, s1 - s0, model.pairEleitorado[p], gov),
     });
     const codes = new Uint8Array(s1 - s0);
     for (let i = s0; i < s1; i++) codes[i - s0] = rank[i] < k ? estadoMosaico(a0[i], a1[i]) : C0;
@@ -391,7 +391,7 @@ export function zona2t(ctx: Ctx, r: RaceInfo, p: number): ZonaSnapshot {
     zona: st.pairZona[p],
     geradoEm: ctx.geradoEm,
     simNow: ctx.simNow,
-    resumo: summaryCampos(agg.pair, p * F.STRIDE, s1 - s0, model.pairEleitorado[p], gov),
+    resumo: summaryCampos(camposPar(model, p, agg.k), 0, s1 - s0, model.pairEleitorado[p], gov),
     secoes,
   };
 }

@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useLayoutEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
@@ -11,8 +11,14 @@ export interface Crumb {
 
 /** Trilha de navegação (Brasil › São Paulo › Campinas). Rola na horizontal se não couber. */
 export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: string }) {
+  const ref = useRef<HTMLElement>(null);
+  // No celular, mantém o item atual (o último) visível.
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [items]);
   return (
-    <nav aria-label="Você está em" className={cn('-mx-1 overflow-x-auto scrollbar-none', className)}>
+    <nav ref={ref} aria-label="Você está em" className={cn('-mx-1 overflow-x-auto scrollbar-none', className)}>
       <ol className="flex w-max items-center gap-0.5 px-1 text-[13px]">
         {items.map((c, i) => {
           const ultimo = i === items.length - 1;

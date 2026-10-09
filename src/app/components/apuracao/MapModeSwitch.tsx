@@ -21,7 +21,10 @@ export function MapModeSwitch({ value, onChange, modos, size = 'sm', className }
     <div
       className={cn('-mx-1 max-w-full overflow-x-auto px-1 pb-0.5 scrollbar-none', className)}
       // Esmaece a borda direita quando há rolagem (dica de que há mais modos).
-      style={{ maskImage: 'linear-gradient(90deg, black calc(100% - 20px), transparent)', WebkitMaskImage: 'linear-gradient(90deg, black calc(100% - 20px), transparent)' }}
+      style={{
+        maskImage: 'linear-gradient(90deg, black calc(100% - 20px), transparent)',
+        WebkitMaskImage: 'linear-gradient(90deg, black calc(100% - 20px), transparent)',
+      }}
     >
       <Segmented<MapMode>
         ariaLabel="Colorir o mapa por"

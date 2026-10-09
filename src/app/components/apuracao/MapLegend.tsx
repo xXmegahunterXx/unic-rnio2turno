@@ -26,7 +26,10 @@ function Swatch({ item, className }: { item: LegendItem; className?: string }) {
   return (
     <span
       aria-hidden
-      className={cn('inline-block h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-line', className)}
+      className={cn(
+        'inline-block h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-[color:rgb(var(--line)/var(--line-alpha))]',
+        className,
+      )}
       style={item.hachura ? hachuraStyle() : { background: item.fill }}
     />
   );
@@ -51,7 +54,9 @@ export function MapLegend({ modo = 'vencedor', race, spec, semTitulo, compacta, 
 
   return (
     <div className={cn('text-fg-muted', className)} role="group" aria-label={`Legenda: ${s.titulo}`}>
-      {!semTitulo ? <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{s.titulo}</p> : null}
+      {!semTitulo ? (
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{s.titulo}</p>
+      ) : null}
       <div className={cn('flex gap-x-6 gap-y-3', compacta ? 'flex-wrap items-end' : 'flex-col')}>
         {s.tipo === 'buckets' ? (
           <div className="inline-grid grid-cols-[auto_repeat(4,minmax(34px,46px))] items-center gap-x-1 gap-y-1">
@@ -83,18 +88,24 @@ export function MapLegend({ modo = 'vencedor', race, spec, semTitulo, compacta, 
             {s.polos ? (
               <div className="mb-1 flex items-center justify-between gap-3 text-[12px] text-fg">
                 <span className="flex min-w-0 items-center gap-1.5">
-                  <span aria-hidden className={cn('h-[3px] w-2.5 shrink-0 rounded-full', corSlot(s.polos.esquerda.cor).bg)} />
+                  <span
+                    aria-hidden
+                    className={cn('h-[3px] w-2.5 shrink-0 rounded-full', corSlot(s.polos.esquerda.cor).bg)}
+                  />
                   <span className="truncate">{s.polos.esquerda.nome}</span>
                 </span>
                 <span className="flex min-w-0 items-center gap-1.5">
                   <span className="truncate">{s.polos.direita.nome}</span>
-                  <span aria-hidden className={cn('h-[3px] w-2.5 shrink-0 rounded-full', corSlot(s.polos.direita.cor).bg)} />
+                  <span
+                    aria-hidden
+                    className={cn('h-[3px] w-2.5 shrink-0 rounded-full', corSlot(s.polos.direita.cor).bg)}
+                  />
                 </span>
               </div>
             ) : null}
             <div
               aria-hidden
-              className="h-2.5 rounded-full ring-1 ring-inset ring-line"
+              className="h-2.5 rounded-full ring-1 ring-inset ring-[color:rgb(var(--line)/var(--line-alpha))]"
               style={{ background: `linear-gradient(90deg, ${s.stops.join(', ')})` }}
             />
             <div className="relative mt-1 h-4">

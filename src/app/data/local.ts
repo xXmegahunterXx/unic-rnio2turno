@@ -14,6 +14,8 @@
  *    descartado: quem abre o demo depois vê a simulação desde o começo.
  *  - Admin: login local com a senha 'sintonia' (sessionStorage). Sem login, os métodos do admin lançam um
  *    erro com `status = 401`.
+ *  - Falha ao carregar o dataset (ou o Worker cair): as chamadas pendentes são rejeitadas com mensagem clara
+ *    e a próxima chamada (≥ 3 s depois — o React Query refaz sozinho) reinicia o motor.
  */
 import type { AdminCommand, AdminSnapshot, ApuracaoClient, PublicMeta } from '@/shared/api';
 import type {
@@ -30,6 +32,7 @@ import type {
 } from '@/shared/types';
 import { CommandError, NotFoundError } from '@/engine/api';
 import type { HostError, HostIn, HostMethod, HostOut } from '@/engine/host';
+import { estadoMaisNovo } from '@/engine/sync';
 import { assetBase } from '@/app/lib/assets';
 
 export const STORAGE_KEY = 'sintonia:admin-state';
@@ -102,12 +105,8 @@ function pareceEstado(v: unknown): v is AdminState {
   );
 }
 
-/** a é mais novo que b? (ordem total: versao → ancoraWall → JSON) */
-function maisNovo(a: AdminState, b: AdminState): boolean {
-  if (a.versao !== b.versao) return a.versao > b.versao;
-  if (a.relogio.ancoraWall !== b.relogio.ancoraWall) return a.relogio.ancoraWall > b.relogio.ancoraWall;
-  return JSON.stringify(a) > JSON.stringify(b);
-}
+/** a é mais novo que b? (ordem total compartilhada com o motor: versao → ancoraWall → JSON) */
+const maisNovo = estadoMaisNovo;
 
 /**
  * Estado inicial a partir do localStorage. Retorna o estado salvo, um estado parcial (só `versao`, para
@@ -143,7 +142,11 @@ class Ponte {
   private seq = 0;
   private pronto = false;
   private fatal: Error | null = null;
+  private fatalEm = 0;
   private emFallback = false;
+  private worker: Worker | null = null;
+  /** geração do motor: respostas de um motor descartado são ignoradas */
+  private geracao = 0;
   /** último estado conhecido (local ou remoto) — base da deduplicação */
   private ultimo: AdminState | null;
   /** estado a mandar no init (pode ser parcial: só versao) */
@@ -163,6 +166,7 @@ class Ponte {
   }
 
   private iniciaWorker(): void {
+    const ger = ++this.geracao;
     let w: Worker;
     try {
       w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module', name: 'sintonia-motor' });
@@ -171,13 +175,23 @@ class Ponte {
       void this.fallback();
       return;
     }
+    this.worker = w;
     const falhou = (motivo: string) => {
-      if (this.pronto || this.emFallback) return;
+      if (ger !== this.geracao) return;
+      if (this.pronto) {
+        // o Worker caiu depois de pronto (ex.: falta de memória): falha as chamadas; a próxima reinicia
+        this.falhaGeral(new Error(`o motor parou (${motivo})`));
+        return;
+      }
+      if (this.emFallback) return;
       console.warn(`[sintonia] Falha no Web Worker (${motivo}); o motor vai rodar na thread principal.`);
       w.terminate();
+      this.worker = null;
       void this.fallback();
     };
-    w.onmessage = (e: MessageEvent<HostOut>) => this.recebe(e.data);
+    w.onmessage = (e: MessageEvent<HostOut>) => {
+      if (ger === this.geracao) this.recebe(e.data);
+    };
     w.onerror = (e: ErrorEvent) => {
       e.preventDefault();
       falhou(e.message || 'erro');
@@ -191,9 +205,12 @@ class Ponte {
     if (this.emFallback) return;
     this.emFallback = true;
     this.enviar = null;
+    const ger = ++this.geracao;
     try {
       const { createEngineHost, fetchJsonLoader } = await import('@/engine/host');
-      const handle = createEngineHost((m) => this.recebe(m), fetchJsonLoader);
+      const handle = createEngineHost((m) => {
+        if (ger === this.geracao) this.recebe(m);
+      }, fetchJsonLoader);
       // assíncrono, como num Worker (não reentra no chamador)
       this.enviar = (m) => {
         setTimeout(() => void handle(m), 0);
@@ -205,10 +222,23 @@ class Ponte {
     }
   }
 
+  /** Falha o motor atual: rejeita as chamadas pendentes; a próxima chamada (após 3 s) tenta reiniciar. */
   private falhaGeral(err: Error): void {
-    this.fatal = new Error(`Não foi possível iniciar a simulação: ${err.message}`);
+    this.fatal = new Error(`Não foi possível carregar a simulação: ${err.message}`);
+    this.fatalEm = Date.now();
+    this.geracao++;
+    this.worker?.terminate();
+    this.worker = null;
+    this.enviar = null;
     for (const p of this.pendentes.values()) p.reject(this.fatal);
     this.pendentes.clear();
+  }
+
+  private reinicia(): void {
+    this.fatal = null;
+    this.pronto = false;
+    this.emFallback = false;
+    this.iniciaWorker();
   }
 
   private recebe(m: HostOut): void {
@@ -235,12 +265,27 @@ class Ponte {
     }
   }
 
-  /** Estado produzido pelo motor DESTA aba: persiste e propaga (se mudou). */
+  /**
+   * Estado produzido pelo motor DESTA aba (pronto ou comando). Se já conhecemos um estado mais novo (de outra
+   * aba), o motor é que está atrasado: reenviamos o mais novo. Senão, persiste e propaga.
+   */
   private adotaLocal(s: AdminState): void {
+    if (this.ultimo && maisNovo(this.ultimo, s)) {
+      this.enviar?.({ type: 'setState', state: this.ultimo });
+      return;
+    }
     this.ultimo = s;
     const json = JSON.stringify(s);
-    if (lsGet(STORAGE_KEY) === json) return;
-    lsSet(STORAGE_KEY, json);
+    const salvo = lsGet(STORAGE_KEY);
+    if (salvo === json) return;
+    let salvoMaisNovo = false;
+    try {
+      const o = salvo ? (JSON.parse(salvo) as unknown) : null;
+      salvoMaisNovo = pareceEstado(o) && maisNovo(o, s);
+    } catch {
+      /* conteúdo inválido: sobrescreve */
+    }
+    if (!salvoMaisNovo) lsSet(STORAGE_KEY, json);
     try {
       this.canal?.postMessage({ type: 'state', state: s });
     } catch {
@@ -256,6 +301,14 @@ class Ponte {
     } else if (this.estadoInit && s.versao < this.estadoInit.versao) return; // reinício em curso
     this.ultimo = s;
     this.enviar?.({ type: 'setState', state: s });
+    // garante que o localStorage guarde o mais novo (comandos simultâneos em duas abas); sem retransmitir
+    try {
+      const salvo = lsGet(STORAGE_KEY);
+      const o = salvo ? (JSON.parse(salvo) as unknown) : null;
+      if (!pareceEstado(o) || maisNovo(s, o)) lsSet(STORAGE_KEY, JSON.stringify(s));
+    } catch {
+      lsSet(STORAGE_KEY, JSON.stringify(s));
+    }
   }
 
   private iniciaSync(): void {
@@ -283,7 +336,10 @@ class Ponte {
   }
 
   call<T>(method: HostMethod, args: unknown[] = []): Promise<T> {
-    if (this.fatal) return Promise.reject(this.fatal);
+    if (this.fatal) {
+      if (Date.now() - this.fatalEm < 3000) return Promise.reject(this.fatal);
+      this.reinicia(); // falha transitória (rede, Worker caiu): tenta de novo
+    }
     return new Promise<T>((resolve, reject) => {
       const id = ++this.seq;
       const msg: Extract<HostIn, { type: 'call' }> = { type: 'call', id, method, args };

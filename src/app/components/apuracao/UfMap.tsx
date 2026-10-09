@@ -10,7 +10,18 @@
  * - Desempenho (MG = 853 paths): os paths são memoizados e só o `fill` muda entre atualizações;
  *   hover/seleção ficam numa camada separada; o gesto de zoom não re-renderiza nada.
  */
-import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
+import {
+  memo,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import type { MunicipioResumo, Race, Tally, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { STROKE_DIVISA } from '@/app/lib/raceUi';
@@ -70,7 +81,9 @@ export function UfMap({
   const vb = useMemo(() => parseViewBox(geo?.viewBox ?? '0 0 1000 1000'), [geo]);
   const ar = vb.h / vb.w;
   const W = size.w;
-  const hMax = alturaMax ?? (typeof window !== 'undefined' ? Math.min(680, Math.max(320, window.innerHeight * 0.7)) : 600);
+  // Altura da janela lida uma vez: no celular ela muda quando a barra de endereço some/aparece.
+  const [hJanela] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 900));
+  const hMax = alturaMax ?? Math.min(680, Math.max(320, hJanela * 0.7));
   const H = W > 0 ? Math.min(W * ar, hMax) : 0;
   const s0 = W > 0 ? Math.min(W / vb.w, H / vb.h) : 1;
   const ox = (W - vb.w * s0) / 2;
@@ -179,12 +192,17 @@ export function UfMap({
   const tipMun = tip ? porIbge.get(tip.ibge) : undefined;
   const gTransform = `translate(${(view.x + (view.k - 1) * ox) / s0} ${(view.y + (view.k - 1) * oy) / s0}) scale(${view.k})`;
   const fs = (px: number) => px * upx;
-  const selIbge = selecionado ? ibgeDoCod.get(selecionado) ?? null : null;
+  const selIbge = selecionado ? (ibgeDoCod.get(selecionado) ?? null) : null;
   const hoverIbge = tip?.ibge ?? null;
 
   if (error && !geo) {
     return (
-      <div className={cn('flex h-64 items-center justify-center rounded-2xl bg-surface-2 text-sm text-fg-muted', className)}>
+      <div
+        className={cn(
+          'flex h-64 items-center justify-center rounded-2xl bg-surface-2 text-sm text-fg-muted',
+          className,
+        )}
+      >
         Não foi possível carregar o mapa de {UF_NOMES[uf]}.
       </div>
     );
@@ -192,193 +210,204 @@ export function UfMap({
 
   return (
     <div className={cn('relative w-full', className)}>
-      <div
-        ref={(el) => {
-          sizeRef(el);
-          zoom.containerRef.current = el;
-        }}
-        className="relative w-full select-none overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand [-webkit-tap-highlight-color:transparent]"
-        style={{ height: H || Math.min(hMax, 360), touchAction: view.k > 1.001 ? 'none' : 'pan-y' }}
-        tabIndex={0}
-        role="group"
-        aria-label={ariaLabel ?? `Mapa dos municípios de ${UF_NOMES[uf]} — ${modoInfo?.label ?? modo}. Use + e − para ampliar.`}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={zoom.handlers.onPointerUp}
-        onPointerCancel={zoom.handlers.onPointerCancel}
-        onPointerLeave={() => tip && !tip.fixo && setTip(null)}
-        onDoubleClick={zoom.handlers.onDoubleClick}
-        onClick={onClick}
-        onKeyDown={onKeyDown}
-      >
-        {!geo || W <= 0 ? (
-          <div className="absolute inset-0 animate-pulse rounded-xl bg-surface-2" aria-busy="true" />
-        ) : (
-          <div ref={zoom.stageRef} className="absolute inset-0 origin-top-left">
-            <svg width={W} height={H} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} className="block overflow-visible">
-              <defs>
-                <MapHatchPattern id={hatchId} escala={upx} />
-              </defs>
-              <g transform={gTransform}>
-                <MunPaths geo={geo} fills={fills} realce={destaqueIbge} />
+      <div className="relative">
+        <div
+          ref={(el) => {
+            sizeRef(el);
+            zoom.containerRef.current = el;
+          }}
+          className="relative w-full select-none overflow-hidden rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand [-webkit-tap-highlight-color:transparent]"
+          style={{ height: H || Math.min(hMax, 360), touchAction: view.k > 1.001 ? 'none' : 'pan-y' }}
+          tabIndex={0}
+          role="group"
+          aria-label={
+            ariaLabel ?? `Mapa dos municípios de ${UF_NOMES[uf]} — ${modoInfo?.label ?? modo}. Use + e − para ampliar.`
+          }
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={zoom.handlers.onPointerUp}
+          onPointerCancel={zoom.handlers.onPointerCancel}
+          onPointerLeave={() => tip && !tip.fixo && setTip(null)}
+          onDoubleClick={zoom.handlers.onDoubleClick}
+          onClick={onClick}
+          onKeyDown={onKeyDown}
+        >
+          {!geo || W <= 0 ? (
+            <div className="absolute inset-0 animate-pulse rounded-xl bg-surface-2" aria-busy="true" />
+          ) : (
+            <div ref={zoom.stageRef} className="absolute inset-0 origin-top-left">
+              <svg width={W} height={H} viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} className="block overflow-visible">
+                <defs>
+                  <MapHatchPattern id={hatchId} escala={upx} />
+                </defs>
+                <g transform={gTransform}>
+                  <MunPaths geo={geo} fills={fills} realce={destaqueIbge} />
 
-                <path
-                  d={geo.contorno}
-                  fill="none"
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinejoin="round"
-                  pointerEvents="none"
-                  style={{ stroke: 'rgb(var(--fg) / 0.35)', strokeWidth: 1 }}
-                />
+                  <path
+                    d={geo.contorno}
+                    fill="none"
+                    vectorEffect="non-scaling-stroke"
+                    strokeLinejoin="round"
+                    pointerEvents="none"
+                    style={{ stroke: 'rgb(var(--fg) / 0.35)', strokeWidth: 1 }}
+                  />
 
-                {/* Encartes (ilhas fora de escala) */}
-                {geo.encartes?.map((enc) => (
-                  <g key={enc.cod} pointerEvents="none">
-                    <rect
-                      x={enc.x}
-                      y={enc.y}
-                      width={enc.w}
-                      height={enc.h}
-                      rx={6 * upx}
-                      fill="none"
-                      vectorEffect="non-scaling-stroke"
-                      style={{ stroke: 'rgb(var(--fg-subtle) / 0.8)', strokeWidth: 1, strokeDasharray: '4 3' }}
-                    />
-                    <text
-                      x={enc.x + enc.w / 2}
-                      y={enc.y - 6 * upx}
-                      textAnchor="middle"
-                      className="font-sans"
-                      style={{
-                        fontSize: fs(10.5),
-                        fill: 'rgb(var(--fg-muted))',
-                        paintOrder: 'stroke',
-                        stroke: 'rgb(var(--surface) / 0.9)',
-                        strokeWidth: 3 * upx,
-                        strokeLinejoin: 'round',
-                      }}
-                    >
-                      {enc.nome} (fora de escala)
-                    </text>
+                  {/* Encartes (ilhas fora de escala) */}
+                  {geo.encartes?.map((enc) => (
+                    <g key={enc.cod} pointerEvents="none">
+                      <rect
+                        x={enc.x}
+                        y={enc.y}
+                        width={enc.w}
+                        height={enc.h}
+                        rx={6 * upx}
+                        fill="none"
+                        vectorEffect="non-scaling-stroke"
+                        style={{ stroke: 'rgb(var(--fg-subtle) / 0.8)', strokeWidth: 1, strokeDasharray: '4 3' }}
+                      />
+                      <text
+                        x={enc.x + enc.w / 2}
+                        y={enc.y - 6 * upx}
+                        textAnchor="middle"
+                        className="font-sans"
+                        style={{
+                          fontSize: fs(10.5),
+                          fill: 'rgb(var(--fg-muted))',
+                          paintOrder: 'stroke',
+                          stroke: 'rgb(var(--surface) / 0.9)',
+                          strokeWidth: 3 * upx,
+                          strokeLinejoin: 'round',
+                        }}
+                      >
+                        {enc.nome} (fora de escala)
+                      </text>
+                    </g>
+                  ))}
+
+                  {/* Realces: busca, capital, hover, seleção */}
+                  <g pointerEvents="none">
+                    {destaqueIbge
+                      ? [...destaqueIbge].map((i) =>
+                          geo.municipios[i] ? (
+                            <path
+                              key={i}
+                              d={geo.municipios[i].d}
+                              fill="none"
+                              vectorEffect="non-scaling-stroke"
+                              strokeLinejoin="round"
+                              style={{ stroke: 'rgb(var(--brand))', strokeWidth: 2 }}
+                            />
+                          ) : null,
+                        )
+                      : null}
+                    {capital && geo.municipios[capital.ibge] ? (
+                      <path
+                        d={geo.municipios[capital.ibge].d}
+                        fill="none"
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinejoin="round"
+                        style={{ stroke: 'rgb(var(--fg) / 0.9)', strokeWidth: 1.5 }}
+                      />
+                    ) : null}
+                    {hoverIbge && hoverIbge !== selIbge && geo.municipios[hoverIbge] ? (
+                      <path
+                        d={geo.municipios[hoverIbge].d}
+                        fill="none"
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinejoin="round"
+                        style={{ stroke: 'rgb(var(--fg))', strokeWidth: 1.75 }}
+                      />
+                    ) : null}
+                    {selIbge && geo.municipios[selIbge] ? (
+                      <>
+                        <path
+                          d={geo.municipios[selIbge].d}
+                          fill="none"
+                          vectorEffect="non-scaling-stroke"
+                          strokeLinejoin="round"
+                          style={{ stroke: 'rgb(var(--bg))', strokeWidth: 4.5 }}
+                        />
+                        <path
+                          d={geo.municipios[selIbge].d}
+                          fill="none"
+                          vectorEffect="non-scaling-stroke"
+                          strokeLinejoin="round"
+                          style={{ stroke: 'rgb(var(--fg))', strokeWidth: 2.25 }}
+                        />
+                      </>
+                    ) : null}
                   </g>
-                ))}
 
-                {/* Realces: busca, capital, hover, seleção */}
-                <g pointerEvents="none">
-                  {destaqueIbge
-                    ? [...destaqueIbge].map((i) =>
-                        geo.municipios[i] ? (
-                          <path
-                            key={i}
-                            d={geo.municipios[i].d}
-                            fill="none"
-                            vectorEffect="non-scaling-stroke"
-                            strokeLinejoin="round"
-                            style={{ stroke: 'rgb(var(--brand))', strokeWidth: 2 }}
+                  {/* Rótulos: capital e selecionado */}
+                  <g pointerEvents="none" className="font-sans">
+                    {[capital, selIbge && selIbge !== capital?.ibge ? porIbge.get(selIbge) : undefined].map((m) => {
+                      if (!m) return null;
+                      const f = geo.municipios[m.ibge];
+                      if (!f) return null;
+                      return (
+                        <g key={m.ibge}>
+                          <circle
+                            cx={f.cx}
+                            cy={f.cy}
+                            r={3 * upx}
+                            style={{ fill: 'rgb(var(--fg))', stroke: 'rgb(var(--bg))', strokeWidth: 1.5 * upx }}
                           />
-                        ) : null,
-                      )
-                    : null}
-                  {capital && geo.municipios[capital.ibge] ? (
-                    <path
-                      d={geo.municipios[capital.ibge].d}
-                      fill="none"
-                      vectorEffect="non-scaling-stroke"
-                      strokeLinejoin="round"
-                      style={{ stroke: 'rgb(var(--fg) / 0.9)', strokeWidth: 1.5 }}
-                    />
-                  ) : null}
-                  {hoverIbge && hoverIbge !== selIbge && geo.municipios[hoverIbge] ? (
-                    <path
-                      d={geo.municipios[hoverIbge].d}
-                      fill="none"
-                      vectorEffect="non-scaling-stroke"
-                      strokeLinejoin="round"
-                      style={{ stroke: 'rgb(var(--fg))', strokeWidth: 1.75 }}
-                    />
-                  ) : null}
-                  {selIbge && geo.municipios[selIbge] ? (
-                    <>
-                      <path
-                        d={geo.municipios[selIbge].d}
-                        fill="none"
-                        vectorEffect="non-scaling-stroke"
-                        strokeLinejoin="round"
-                        style={{ stroke: 'rgb(var(--bg))', strokeWidth: 4.5 }}
-                      />
-                      <path
-                        d={geo.municipios[selIbge].d}
-                        fill="none"
-                        vectorEffect="non-scaling-stroke"
-                        strokeLinejoin="round"
-                        style={{ stroke: 'rgb(var(--fg))', strokeWidth: 2.25 }}
-                      />
-                    </>
-                  ) : null}
+                          <text
+                            x={f.cx}
+                            y={f.cy - 7 * upx}
+                            textAnchor="middle"
+                            style={{
+                              fontSize: fs(11.5),
+                              fontWeight: 600,
+                              fill: 'rgb(var(--fg))',
+                              paintOrder: 'stroke',
+                              stroke: 'rgb(var(--bg) / 0.85)',
+                              strokeWidth: 3.5 * upx,
+                              strokeLinejoin: 'round',
+                            }}
+                          >
+                            {m.nome}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </g>
                 </g>
+              </svg>
+            </div>
+          )}
 
-                {/* Rótulos: capital e selecionado */}
-                <g pointerEvents="none" className="font-sans">
-                  {[capital, selIbge && selIbge !== capital?.ibge ? porIbge.get(selIbge) : undefined].map((m) => {
-                    if (!m) return null;
-                    const f = geo.municipios[m.ibge];
-                    if (!f) return null;
-                    return (
-                      <g key={m.ibge}>
-                        <circle cx={f.cx} cy={f.cy} r={3 * upx} style={{ fill: 'rgb(var(--fg))', stroke: 'rgb(var(--bg))', strokeWidth: 1.5 * upx }} />
-                        <text
-                          x={f.cx}
-                          y={f.cy - 7 * upx}
-                          textAnchor="middle"
-                          style={{
-                            fontSize: fs(11.5),
-                            fontWeight: 600,
-                            fill: 'rgb(var(--fg))',
-                            paintOrder: 'stroke',
-                            stroke: 'rgb(var(--bg) / 0.85)',
-                            strokeWidth: 3.5 * upx,
-                            strokeLinejoin: 'round',
-                          }}
-                        >
-                          {m.nome}
-                        </text>
-                      </g>
-                    );
-                  })}
-                </g>
-              </g>
-            </svg>
-          </div>
-        )}
+          {zoom.dica ? (
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-bg/40 transition-opacity">
+              <span className="glass rounded-full border border-line px-3 py-1.5 text-[12.5px] text-fg">
+                {zoom.dica}
+              </span>
+            </div>
+          ) : null}
+        </div>
 
-        {zoom.dica ? (
-          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-bg/40 transition-opacity">
-            <span className="glass rounded-full border border-line px-3 py-1.5 text-[12.5px] text-fg">{zoom.dica}</span>
+        {/* Controles de zoom */}
+        {geo && W > 0 ? (
+          <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1.5">
+            <ZoomBtn label="Ampliar" onClick={() => zoom.zoomPor(1.8)} disabled={view.k >= 13.9}>
+              <path d="M12 6v12M6 12h12" />
+            </ZoomBtn>
+            <ZoomBtn label="Reduzir" onClick={() => zoom.zoomPor(1 / 1.8)} disabled={view.k <= 1.001}>
+              <path d="M6 12h12" />
+            </ZoomBtn>
+            {view.k > 1.001 ? (
+              <button
+                type="button"
+                aria-label="Ver o estado inteiro"
+                onClick={zoom.resetar}
+                className="glass flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3"
+              >
+                <Icon name="reset" size={17} />
+              </button>
+            ) : null}
           </div>
         ) : null}
       </div>
-
-      {/* Controles de zoom */}
-      {geo && W > 0 ? (
-        <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1.5">
-          <ZoomBtn label="Ampliar" onClick={() => zoom.zoomPor(1.8)} disabled={view.k >= 13.9}>
-            <path d="M12 6v12M6 12h12" />
-          </ZoomBtn>
-          <ZoomBtn label="Reduzir" onClick={() => zoom.zoomPor(1 / 1.8)} disabled={view.k <= 1.001}>
-            <path d="M6 12h12" />
-          </ZoomBtn>
-          {view.k > 1.001 ? (
-            <button
-              type="button"
-              aria-label="Ver o estado inteiro"
-              onClick={zoom.resetar}
-              className="glass flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3"
-            >
-              <Icon name="reset" size={17} />
-            </button>
-          ) : null}
-        </div>
-      ) : null}
 
       {tip && geo ? (
         <MapTooltip
@@ -390,6 +419,8 @@ export function UfMap({
           y={tip.y}
           limites={{ w: W, h: H }}
           fixo={tip.fixo}
+          encaixado={tip.fixo && W < 520}
+          onFechar={() => setTip(null)}
           acao={
             onSelect && tipMun
               ? { label: rotuloAcao?.(tipMun) ?? `Ver ${tipMun.nome}`, onClick: () => onSelect(tipMun.cod, tipMun) }
@@ -399,7 +430,9 @@ export function UfMap({
             tipMun && (modo === 'variacao' || modo === 'comparecimento')
               ? (() => {
                   const v = valorModo(modo, tipMun, { race, primeiroTurno: primeiroTurno?.[tipMun.ibge] });
-                  return v.rotulo ? `${modo === 'variacao' ? `Variação de ${race.candidatos[0]?.nomeUrna} vs 1º turno` : 'Comparecimento'}: ${v.rotulo}` : undefined;
+                  return v.rotulo
+                    ? `${modo === 'variacao' ? `Variação de ${race.candidatos[0]?.nomeUrna} vs 1º turno` : 'Comparecimento'}: ${v.rotulo}`
+                    : undefined;
                 })()
               : undefined
           }
@@ -409,7 +442,17 @@ export function UfMap({
   );
 }
 
-function ZoomBtn({ label, onClick, disabled, children }: { label: string; onClick: () => void; disabled?: boolean; children: ReactNode }) {
+function ZoomBtn({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -418,7 +461,16 @@ function ZoomBtn({ label, onClick, disabled, children }: { label: string; onClic
       disabled={disabled}
       className="glass flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3 disabled:opacity-40"
     >
-      <svg viewBox="0 0 24 24" width={18} height={18} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden>
+      <svg
+        viewBox="0 0 24 24"
+        width={18}
+        height={18}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={2}
+        strokeLinecap="round"
+        aria-hidden
+      >
         {children}
       </svg>
     </button>
@@ -441,7 +493,14 @@ const MunPaths = memo(function MunPaths({
   return (
     <g>
       {entradas.map(([ibge, f]) => (
-        <MunPath key={ibge} ibge={ibge} d={f.d} fill={fills[ibge]} dim={!!realce && !realce.has(ibge)} transicao={transicao} />
+        <MunPath
+          key={ibge}
+          ibge={ibge}
+          d={f.d}
+          fill={fills[ibge]}
+          dim={!!realce && !realce.has(ibge)}
+          transicao={transicao}
+        />
       ))}
     </g>
   );

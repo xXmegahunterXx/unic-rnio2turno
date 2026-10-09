@@ -7,7 +7,7 @@
  *  - 'vencedor'       cor do líder, intensidade pela margem em 4 buckets (calc.bucketMargem)
  *  - 'margem'         escala divergente contínua A ↔ B (diferença em p.p., satura em ±40)
  *  - 'apurado'        % de seções totalizadas, sequencial na cor da marca
- *  - 'comparecimento' % de comparecimento nas seções totalizadas, sequencial (60% → 90%)
+ *  - 'comparecimento' % de comparecimento nas seções totalizadas, sequencial (68% → 88%)
  *  - 'variacao'       variação do % do candidato 0 vs 1º turno (divergente, satura em ±10 p.p.).
  *                     Base do 1º turno: participação do candidato 0 entre os dois finalistas,
  *                     v0 / (v0 + v1) — comparável com o % de válidos do 2º turno.
@@ -41,17 +41,37 @@ export interface MapModeInfo {
 }
 
 export const MAP_MODES: readonly MapModeInfo[] = [
-  { id: 'vencedor', label: 'Vencedor', curto: 'Vencedor', descricao: 'Cor de quem está à frente; quanto mais forte, maior a vantagem.' },
-  { id: 'margem', label: 'Margem', curto: 'Margem', descricao: 'Diferença entre os dois candidatos, em escala contínua.' },
+  {
+    id: 'vencedor',
+    label: 'Vencedor',
+    curto: 'Vencedor',
+    descricao: 'Cor de quem está à frente; quanto mais forte, maior a vantagem.',
+  },
+  {
+    id: 'margem',
+    label: 'Margem',
+    curto: 'Margem',
+    descricao: 'Diferença entre os dois candidatos, em escala contínua.',
+  },
   { id: 'apurado', label: '% apurado', curto: 'Apurado', descricao: 'Percentual de seções já totalizadas.' },
-  { id: 'comparecimento', label: 'Comparecimento', curto: 'Compar.', descricao: 'Eleitores que votaram, nas seções já totalizadas.' },
-  { id: 'variacao', label: 'Variação vs 1º turno', curto: '1º turno', descricao: 'Quanto o primeiro candidato ganhou ou perdeu em relação ao 1º turno (entre os dois finalistas).' },
+  {
+    id: 'comparecimento',
+    label: 'Comparecimento',
+    curto: 'Compar.',
+    descricao: 'Eleitores que votaram, nas seções já totalizadas.',
+  },
+  {
+    id: 'variacao',
+    label: 'Variação vs 1º turno',
+    curto: '1º turno',
+    descricao: 'Quanto o primeiro candidato ganhou ou perdeu em relação ao 1º turno (entre os dois finalistas).',
+  },
 ];
 
 /** Saturação das escalas contínuas. */
 export const MARGEM_MAX_PP = 40;
 export const VARIACAO_MAX_PP = 10;
-export const COMPARECIMENTO_DOMINIO: readonly [number, number] = [60, 90];
+export const COMPARECIMENTO_DOMINIO: readonly [number, number] = [68, 88];
 
 export interface ModeCtx {
   race: Pick<Race, 'candidatos'>;
@@ -96,7 +116,12 @@ export function valorModo(modo: MapMode, t: T | undefined | null, ctx: ModeCtx):
     case 'comparecimento': {
       const p = pctComparecimento(t);
       const [lo, hi] = COMPARECIMENTO_DOMINIO;
-      return { fill: tokenCss('brand', alphaEscala((p - lo) / (hi - lo))), pendente: false, rotulo: fmtPct(p, 1), valor: p };
+      return {
+        fill: tokenCss('brand', alphaEscala((p - lo) / (hi - lo))),
+        pendente: false,
+        rotulo: fmtPct(p, 1),
+        valor: p,
+      };
     }
     case 'margem': {
       const m = margem(t);
@@ -115,7 +140,12 @@ export function valorModo(modo: MapMode, t: T | undefined | null, ctx: ModeCtx):
       if (base === null || t.votos.length < 2 || t.votos[0] + t.votos[1] <= 0) return PEND;
       const v = pctValidos(t, 0) - base;
       const cor = slotDe(ctx.race, v >= 0 ? 0 : 1);
-      return { fill: rgbSlot(cor, alphaEscala(Math.abs(v) / VARIACAO_MAX_PP)), pendente: false, rotulo: fmtPP(v), valor: v };
+      return {
+        fill: rgbSlot(cor, alphaEscala(Math.abs(v) / VARIACAO_MAX_PP)),
+        pendente: false,
+        rotulo: fmtPP(v),
+        valor: v,
+      };
     }
     case 'vencedor':
     default: {
@@ -263,4 +293,16 @@ export function legendaModo(modo: MapMode, race: Pick<Race, 'candidatos'>): Lege
         extras: [{ label: 'Empate', fill: FILL_EMPATE }, PENDENTE_ITEM],
       };
   }
+}
+
+/**
+ * Índice IBGE → votos, para o `primeiroTurno` do UfMap a partir de `useUf('pres-t1', uf).municipios`
+ * (ou de qualquer lista de MunicipioResumo).
+ */
+export function votosPorIbge(
+  lista: readonly { ibge: string; votos: number[] }[],
+): Record<string, Pick<Tally, 'votos'>> {
+  const out: Record<string, Pick<Tally, 'votos'>> = {};
+  for (const m of lista) if (m.ibge) out[m.ibge] = { votos: m.votos };
+  return out;
 }

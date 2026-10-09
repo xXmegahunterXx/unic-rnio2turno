@@ -121,9 +121,9 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
                 <div className="num mt-2 text-[26px] text-fg-muted">
                   {c.partido} · {c.numero}
                 </div>
-                <div className={cn('num mt-8 font-display text-[150px] font-semibold leading-[0.9] tracking-[-0.05em]', tem ? s.text : 'text-fg-subtle')}>
+                <div className={cn('num mt-8 font-display text-[138px] font-semibold leading-[0.9] tracking-[-0.05em]', tem ? s.textDisplay : 'text-fg-subtle')}>
                   {fmtPct(pctValidos(resumo, i)).replace('%', '')}
-                  <span className="ml-1 text-[64px] tracking-normal">%</span>
+                  <span className="ml-1 text-[58px] tracking-normal">%</span>
                 </div>
                 <div className="num mt-4 text-[28px] text-fg-muted">
                   <span className="font-semibold text-fg">{fmtInt(resumo.votos[i] ?? 0)}</span> votos
@@ -201,7 +201,7 @@ function LinhaStory({ race, resumo, i }: { race: Race; resumo: Summary; i: numbe
         </div>
       </div>
       <div className="mt-6 flex items-end justify-between gap-6">
-        <div className={cn('num font-display text-[190px] font-semibold leading-[0.85] tracking-[-0.055em]', tem ? s.text : 'text-fg-subtle')}>
+        <div className={cn('num font-display text-[190px] font-semibold leading-[0.85] tracking-[-0.055em]', tem ? s.textDisplay : 'text-fg-subtle')}>
           {fmtPct(pctValidos(resumo, i)).replace('%', '')}
           <span className="ml-1 text-[80px] tracking-normal">%</span>
         </div>

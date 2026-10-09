@@ -20,8 +20,10 @@ export interface SlotUi {
   bgSoft: string;
   /** Fundo bem sutil (linhas de tabela, áreas grandes). */
   bgFaint: string;
-  /** Texto na cor do slot com contraste AA nos dois temas (escurece no tema claro). */
+  /** Texto na cor do slot com contraste AA (≥ 4,5:1) nos dois temas — escurece no tema claro. */
   text: string;
+  /** Texto grande (≥ 24 px, números do placar): mais vivo, contraste ≥ 3:1 no tema claro. */
+  textDisplay: string;
   /** Texto sobre `bg` (tinta). */
   ink: string;
   /** Preenchimento SVG. */
@@ -45,7 +47,8 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     bg: 'bg-cand-a',
     bgSoft: 'bg-cand-a/15',
     bgFaint: 'bg-cand-a/[0.07]',
-    text: 'text-[color:color-mix(in_srgb,rgb(var(--cand-a))_62%,rgb(var(--fg)))] dark:text-cand-a',
+    text: 'text-[color:color-mix(in_srgb,rgb(var(--cand-a))_70%,rgb(var(--fg)))] dark:text-cand-a',
+    textDisplay: 'text-[color:color-mix(in_srgb,rgb(var(--cand-a))_86%,rgb(var(--fg)))] dark:text-cand-a',
     ink: 'text-cand-a-ink',
     fill: 'fill-cand-a',
     stroke: 'stroke-cand-a',
@@ -59,7 +62,8 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     bg: 'bg-cand-b',
     bgSoft: 'bg-cand-b/15',
     bgFaint: 'bg-cand-b/[0.07]',
-    text: 'text-[color:color-mix(in_srgb,rgb(var(--cand-b))_62%,rgb(var(--fg)))] dark:text-cand-b',
+    text: 'text-[color:color-mix(in_srgb,rgb(var(--cand-b))_70%,rgb(var(--fg)))] dark:text-cand-b',
+    textDisplay: 'text-[color:color-mix(in_srgb,rgb(var(--cand-b))_86%,rgb(var(--fg)))] dark:text-cand-b',
     ink: 'text-cand-b-ink',
     fill: 'fill-cand-b',
     stroke: 'stroke-cand-b',
@@ -74,6 +78,7 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     bgSoft: 'bg-cand-outros/15',
     bgFaint: 'bg-cand-outros/[0.07]',
     text: 'text-fg-muted',
+    textDisplay: 'text-fg-muted',
     ink: 'text-bg',
     fill: 'fill-cand-outros',
     stroke: 'stroke-cand-outros',

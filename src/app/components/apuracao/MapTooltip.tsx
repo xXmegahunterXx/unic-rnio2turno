@@ -29,6 +29,13 @@ export interface MapTooltipProps {
   acao?: { label: string; onClick: () => void };
   /** Conteúdo extra no rodapé (ex.: variação vs 1º turno). */
   extra?: ReactNode;
+  /**
+   * Encaixado abaixo do mapa (fluxo normal, largura total) em vez de flutuar sobre ele — usado no
+   * celular com o tooltip fixo, para não cobrir as UFs/municípios que a pessoa ainda quer tocar.
+   */
+  encaixado?: boolean;
+  /** Botão de fechar (tooltip fixo). */
+  onFechar?: () => void;
   id?: string;
   className?: string;
 }
@@ -48,6 +55,8 @@ export function MapTooltip({
   fixo,
   acao,
   extra,
+  encaixado,
+  onFechar,
   id,
   className,
 }: MapTooltipProps) {
@@ -64,7 +73,8 @@ export function MapTooltip({
   // Acima do ponto se couber; senão, abaixo; se não couber em nenhum, encosta no topo.
   let top = y - OFFSET - alt;
   if (top < MARGEM_PX) top = y + OFFSET;
-  if (top + alt > limites.h - MARGEM_PX && y - OFFSET - alt < MARGEM_PX) top = Math.max(MARGEM_PX, limites.h - alt - MARGEM_PX);
+  if (top + alt > limites.h - MARGEM_PX && y - OFFSET - alt < MARGEM_PX)
+    top = Math.max(MARGEM_PX, limites.h - alt - MARGEM_PX);
 
   const apurado = dados ? pctTotalizadas(dados) : 0;
   const temDados = !!dados && dados.secoesTotalizadas > 0;
@@ -82,13 +92,14 @@ export function MapTooltip({
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.14, ease: 'easeOut' }}
       className={cn(
-        'absolute z-20 rounded-2xl border border-line bg-surface/95 p-3 text-left shadow-card backdrop-blur-md',
+        'z-20 rounded-2xl border border-line p-3 text-left',
+        encaixado ? 'relative mt-3 w-full bg-surface-2' : 'absolute bg-surface/95 shadow-card backdrop-blur-md',
         fixo ? 'pointer-events-auto' : 'pointer-events-none',
         className,
       )}
-      style={{ left, top, width: w }}
+      style={encaixado ? undefined : { left, top, width: w }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className={cn('flex items-start justify-between gap-3', onFechar && fixo && 'pr-7')}>
         <div className="min-w-0">
           <p className="truncate font-display text-[15px] font-semibold leading-tight text-fg">{titulo}</p>
           {subtitulo ? <p className="mt-0.5 truncate text-[11.5px] text-fg-subtle">{subtitulo}</p> : null}
@@ -108,7 +119,7 @@ export function MapTooltip({
       </div>
 
       {/* % de seções totalizadas */}
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[rgb(var(--line)/var(--line-alpha))]" aria-hidden>
         <div
           className="h-full rounded-full bg-brand transition-[width] duration-500"
           style={{ width: `${Math.min(100, apurado)}%` }}
@@ -135,7 +146,10 @@ export function MapTooltip({
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-line" aria-hidden>
+                  <div
+                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-[rgb(var(--line)/var(--line-alpha))]"
+                    aria-hidden
+                  >
                     <div
                       className={cn('h-full rounded-full transition-[width] duration-500', slot.bg)}
                       style={{ width: `${pct}%` }}
@@ -164,6 +178,28 @@ export function MapTooltip({
       ) : null}
 
       {extra ? <div className="mt-2 text-[11.5px] text-fg-muted">{extra}</div> : null}
+
+      {fixo && onFechar ? (
+        <button
+          type="button"
+          aria-label="Fechar"
+          onClick={onFechar}
+          className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface-3 hover:text-fg"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width={16}
+            height={16}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinecap="round"
+            aria-hidden
+          >
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      ) : null}
 
       {fixo && acao ? (
         <button

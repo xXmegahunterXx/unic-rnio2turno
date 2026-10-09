@@ -53,13 +53,6 @@ describe('matemática determinística', () => {
 
   it('hashes são estáveis (mudar isto muda TODOS os números da simulação)', () => {
     expect(triple32(0)).toBe(0);
-    expect(triple32(1)).toBe(0xb2a3ed5e >>> 0 === triple32(1) ? triple32(1) : -1);
-    expect([triple32(1), triple32(2026), hashStr('uf:SP'), seedKey(20261025)]).toEqual([
-      triple32(1),
-      triple32(2026),
-      hashStr('uf:SP'),
-      seedKey(20261025),
-    ]);
     // valores de referência fixos
     expect(triple32(123456789)).toBe(REF.t);
     expect(hashStr('mun:SP:71072')).toBe(REF.h);
@@ -78,4 +71,4 @@ describe('matemática determinística', () => {
   });
 });
 
-const REF = { t: 0, h: 0, s: 0 };
+const REF = { t: 162129505, h: 521816766, s: 3478817873 };

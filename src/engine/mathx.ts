@@ -23,9 +23,9 @@ const POW2 = (() => {
   return t;
 })();
 
-/** Coeficientes 1/n! (n = 2..11) para exp(r), |r| ≤ ln2/2 (erro relativo de truncamento < 7e-15). */
+/** Coeficientes 1/n! (n = 2..12) para exp(r), |r| ≤ ln2/2 (erro de truncamento < 2e-16). */
 const E2 = 1 / 2, E3 = 1 / 6, E4 = 1 / 24, E5 = 1 / 120, E6 = 1 / 720, E7 = 1 / 5040, E8 = 1 / 40320;
-const E9 = 1 / 362880, E10 = 1 / 3628800, E11 = 1 / 39916800;
+const E9 = 1 / 362880, E10 = 1 / 3628800, E11 = 1 / 39916800, E12 = 1 / 479001600;
 
 /** exp(x) determinístico. */
 export function dexp(x: number): number {
@@ -34,7 +34,8 @@ export function dexp(x: number): number {
   if (x < -745.1332191019411) return 0;
   const k = Math.round(x * INV_LN2);
   const r = x - k * LN2_HI - k * LN2_LO;
-  let p = E10 + r * E11;
+  let p = E11 + r * E12;
+  p = E10 + r * p;
   p = E9 + r * p;
   p = E8 + r * p;
   p = E7 + r * p;

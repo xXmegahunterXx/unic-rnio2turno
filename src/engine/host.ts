@@ -5,7 +5,8 @@
  * Protocolo:
  *   → { type: 'init', base, modo?, state? }      carrega o dataset (fetch relativo a `base`) e cria o controller
  *   → { type: 'call', id, method, args }        chamadas (aguardam o init)
- *   → { type: 'setState', state }               estado vindo de outra aba (não gera 'state' de volta)
+ *   → { type: 'setState', state }               estado vindo de outra aba: aplicado só se for MAIS NOVO que o
+ *                                               atual (estadoMaisNovo); nunca gera 'state' de volta
  *   ← { type: 'ready', state, ms }
  *   ← { type: 'reply', id, ok, result | error }
  *   ← { type: 'state', state }                  mudança feita por comando nesta aba (persistir/propagar)
@@ -14,6 +15,7 @@
 import type { AdminState } from '../shared/types';
 import type { Controller, JsonLoader } from './api';
 import { createController, loadDataset } from './controller';
+import { estadoMaisNovo } from './sync';
 
 export type HostMethod =
   | 'status'
@@ -117,7 +119,7 @@ export function createEngineHost(
           initialState: msg.state ?? undefined,
           onStateChange: (s) => post({ type: 'state', state: s }),
         });
-        if (pendente) c.setState(pendente);
+        if (pendente && estadoMaisNovo(pendente, c.state())) c.setState(pendente);
         pendente = null;
         ctrl = c;
         post({ type: 'ready', state: c.state(), ms: Math.round(perf() - t0) });
@@ -127,8 +129,10 @@ export function createEngineHost(
       return;
     }
     if (msg.type === 'setState') {
-      if (ctrl) ctrl.setState(msg.state);
-      else pendente = msg.state;
+      // mensagens podem chegar enfileiradas depois de um estado mais novo (ex.: durante a construção)
+      if (ctrl) {
+        if (estadoMaisNovo(msg.state, ctrl.state())) ctrl.setState(msg.state);
+      } else if (!pendente || estadoMaisNovo(msg.state, pendente)) pendente = msg.state;
       return;
     }
     if (msg.type === 'call') {

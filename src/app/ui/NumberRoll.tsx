@@ -5,7 +5,7 @@
  * - Leitores de tela recebem o texto formatado inteiro (as colunas são aria-hidden).
  * - Use sempre um formatador de `src/shared/format.ts` (fmtPct, fmtInt…).
  */
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { cn } from '@/app/lib/cn';
 import { fmtInt } from '@/shared/format';
 
@@ -61,15 +61,11 @@ export function NumberRoll({
 }: NumberRollProps) {
   const texto = format(Number.isFinite(value) ? value : 0);
   const chars = texto.split('');
-  // Só anima depois da primeira pintura (evita rolar no carregamento inicial).
+  // Só anima depois da primeira pintura (não rola no carregamento inicial). Seguro no StrictMode.
   const [animar, setAnimar] = useState(false);
-  const primeiro = useRef(true);
   useEffect(() => {
-    if (primeiro.current) {
-      primeiro.current = false;
-      const id = requestAnimationFrame(() => setAnimar(true));
-      return () => cancelAnimationFrame(id);
-    }
+    const id = requestAnimationFrame(() => setAnimar(true));
+    return () => cancelAnimationFrame(id);
   }, []);
 
   return (
@@ -77,7 +73,8 @@ export function NumberRoll({
       <span className="sr-only">{ariaLabel ?? texto}</span>
       <span
         aria-hidden
-        className="inline-flex items-baseline"
+        // A máscara recorta tudo fora da caixa: folga lateral para glifos que avançam além dela (tracking negativo).
+        className="-mx-[0.08em] inline-flex items-baseline px-[0.08em]"
         style={{
           maskImage: 'linear-gradient(to bottom, transparent 0, black 9%, black 91%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, black 9%, black 91%, transparent 100%)',

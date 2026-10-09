@@ -10,7 +10,7 @@ import { corSlot, slotDe } from '@/app/lib/raceUi';
 import { DataTable, type Column } from '@/app/ui/DataTable';
 import { Segmented } from '@/app/ui/Segmented';
 import { SearchBox } from '@/app/ui/SearchBox';
-import { ApuradoCell, CandHeader, MargemCell, PctCell, margemAssinada } from './cells';
+import { ApuradoCell, CandHeader, MargemCell, PctCell, W, margemAssinada } from './cells';
 import { CandidateAvatar } from './CandidateAvatar';
 
 export interface ZonaTableProps {
@@ -44,7 +44,7 @@ export function ZonaTable({ race, zonas, onSelect, selected, className }: ZonaTa
       header: 'Seções',
       align: 'right',
       hideBelow: 'md',
-      width: 'w-[1%]',
+      width: 'w-[6rem]',
       sortValue: (z) => z.secoes,
       cell: (z) => (
         <span className="whitespace-nowrap text-fg-muted">
@@ -52,10 +52,10 @@ export function ZonaTable({ race, zonas, onSelect, selected, className }: ZonaTa
         </span>
       ),
     },
-    { key: 'apurado', header: 'Apurado', align: 'right', hideBelow: 'sm', width: 'w-[1%]', sortValue: (z) => pctTotalizadas(z), cell: (z) => <ApuradoCell t={z} /> },
-    { key: 'a', header: <CandHeader c={ca} />, headerLabel: ca.nomeUrna, align: 'right', width: 'w-[1%]', sortValue: (z) => pctValidos(z, 0), cell: (z) => <PctCell t={z} i={0} race={race} /> },
-    { key: 'b', header: <CandHeader c={cb} />, headerLabel: cb.nomeUrna, align: 'right', width: 'w-[1%]', sortValue: (z) => pctValidos(z, 1), cell: (z) => <PctCell t={z} i={1} race={race} /> },
-    { key: 'margem', header: 'Margem', align: 'right', width: 'w-[1%]', sortValue: margemAssinada, cell: (z) => <MargemCell t={z} race={race} /> },
+    { key: 'apurado', header: 'Apurado', align: 'right', hideBelow: 'sm', width: W.apurado, sortValue: (z) => pctTotalizadas(z), cell: (z) => <ApuradoCell t={z} /> },
+    { key: 'a', header: <CandHeader c={ca} />, headerLabel: ca.nomeUrna, align: 'right', width: W.pct, sortValue: (z) => pctValidos(z, 0), cell: (z) => <PctCell t={z} i={0} race={race} /> },
+    { key: 'b', header: <CandHeader c={cb} />, headerLabel: cb.nomeUrna, align: 'right', width: W.pct, sortValue: (z) => pctValidos(z, 1), cell: (z) => <PctCell t={z} i={1} race={race} /> },
+    { key: 'margem', header: 'Margem', align: 'right', width: W.margem, sortValue: margemAssinada, cell: (z) => <MargemCell t={z} race={race} /> },
   ];
   return (
     <DataTable
@@ -106,6 +106,7 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
       header: 'Seção',
       sortValue: (s) => s.secao,
       firstDir: 'asc',
+      width: 'w-[4.25rem]',
       cell: (s) => <span className="inline-flex items-center font-mono text-[13px] font-semibold">{String(s.secao).padStart(4, '0')}</span>,
     },
     {
@@ -128,13 +129,13 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
           </span>
         ),
     },
-    { key: 'aptos', header: 'Aptos', align: 'right', hideBelow: 'sm', width: 'w-[1%]', sortValue: (s) => s.aptos, cell: (s) => fmtInt(s.aptos) },
+    { key: 'aptos', header: 'Aptos', align: 'right', hideBelow: 'sm', width: 'w-[4.5rem]', sortValue: (s) => s.aptos, cell: (s) => fmtInt(s.aptos) },
     {
       key: 'comp',
       header: 'Votaram',
       align: 'right',
       hideBelow: 'md',
-      width: 'w-[1%]',
+      width: 'w-[5.75rem]',
       sortValue: (s) => s.comparecimento,
       cell: (s) => (s.totalizada ? fmtInt(s.comparecimento) : <span className="text-fg-subtle">—</span>),
     },
@@ -143,7 +144,7 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
       header: <CandHeader c={ca} />,
       headerLabel: ca.nomeUrna,
       align: 'right',
-      width: 'w-[1%]',
+      width: 'w-[3.75rem]',
       sortValue: (s) => s.votos[0] ?? 0,
       cell: (s) => (s.totalizada ? <VotosCell s={s} i={0} race={race} /> : <span className="text-fg-subtle">—</span>),
     },
@@ -152,16 +153,17 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
       header: <CandHeader c={cb} />,
       headerLabel: cb.nomeUrna,
       align: 'right',
-      width: 'w-[1%]',
+      width: 'w-[3.75rem]',
       sortValue: (s) => s.votos[1] ?? 0,
       cell: (s) => (s.totalizada ? <VotosCell s={s} i={1} race={race} /> : <span className="text-fg-subtle">—</span>),
     },
     {
       key: 'venc',
-      header: 'Vencedor',
+      header: 'Venc.',
+      headerLabel: 'Vencedor',
       align: 'center',
       hideBelow: 'sm',
-      width: 'w-[1%]',
+      width: 'w-[4.25rem]',
       sortValue: (s) => (s.totalizada ? margemAssinada(s) : -999),
       cell: (s) => {
         const m = margem(s);

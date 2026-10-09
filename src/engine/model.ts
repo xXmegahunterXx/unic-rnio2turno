@@ -8,8 +8,9 @@
  *
  * Calibragem: a preferência por município vem do 1º turno (finalistas + transferência dos "outros"), a
  * geografia é aplicada em logit e um deslocamento δ (Newton com salvaguarda de bisseção) é calculado sobre
- * as PRÓPRIAS seções (já com o ruído por seção e os válidos sorteados), de modo que o resultado final
- * bate com o alvo (erro típico < 0,01 p.p.; só o ruído binomial e os arredondamentos sobram).
+ * as PRÓPRIAS seções (já com o ruído por seção e os válidos sorteados). O ruído binomial agregado é então
+ * devolvido ao valor esperado (±1 voto em seções espalhadas), de modo que, sem `ufVies`, o total da corrida
+ * bate com o alvo com erro < 1 voto.
  */
 import type { ScenarioConfig } from '../shared/types';
 import { clamp, dexp, logit, radixArgsort, sigmoid } from './mathx';

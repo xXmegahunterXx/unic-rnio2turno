@@ -37,7 +37,9 @@ declare global {
   }
 }
 
-const UF_OPCOES = [...UFS].sort((a, b) => UF_NOMES[a].localeCompare(UF_NOMES[b], 'pt-BR')).map((u) => ({ value: u, label: `${UF_NOMES[u]} (${u})` }));
+const UF_OPCOES = [...UFS]
+  .sort((a, b) => UF_NOMES[a].localeCompare(UF_NOMES[b], 'pt-BR'))
+  .map((u) => ({ value: u, label: `${UF_NOMES[u]} (${u})` }));
 const ZONAS_PEQUENAS = [{ z: 31, s: '1-23,25-31' }];
 
 export default function KitVizPage() {
@@ -54,13 +56,27 @@ export default function KitVizPage() {
     const u = params.get('uf')?.toUpperCase() as UFBr | undefined;
     return u && (UFS as readonly string[]).includes(u) ? u : 'MG';
   });
-  const [eixo, setEixo] = useState<'secoes' | 'horario'>(() => (params.get('eixo') === 'horario' ? 'horario' : 'secoes'));
+  const [eixo, setEixo] = useState<'secoes' | 'horario'>(() =>
+    params.get('eixo') === 'horario' ? 'horario' : 'secoes',
+  );
   const [busca, setBusca] = useState('');
   const [munSel, setMunSel] = useState<string | null>(null);
   const [secSel, setSecSel] = useState<{ zona: number; secao: number } | null>(null);
   const [fonteTse, setFonteTse] = useState(false);
   const [base, setBase] = useState<{ uf: UFBr; lista: MunBase[] } | null>(null);
   const [perf, setPerf] = useState<Record<string, PerfRegistro>>({});
+  // Isolamento para medir desempenho: ?so=ufmap | mosaico | brasil | serie
+  const so = params.get('so');
+  const mostrar = (k: string) => !so || so === k;
+  // Gancho de QA: os testes de desempenho mudam o % sem passar pelo controle deslizante.
+  useEffect(() => {
+    const w = window as unknown as { __vizSetPct?: (v: number) => void; __vizSetUf?: (u: UFBr) => void };
+    w.__vizSetPct = (v: number) => {
+      setTocando(false);
+      setPct(v);
+    };
+    w.__vizSetUf = (u: UFBr) => setUf(u);
+  }, []);
 
   // Reprodução: 0 → 100% em ~24 s.
   useEffect(() => {
@@ -97,7 +113,10 @@ export default function KitVizPage() {
     () => (base && base.uf === uf ? fixtureMunicipios(uf, base.lista, nac.fracoes[uf], nac.simNow) : []),
     [base, uf, nac],
   );
-  const t1Mun = useMemo(() => (base && base.uf === uf ? primeiroTurnoMunicipios(uf, base.lista) : undefined), [base, uf]);
+  const t1Mun = useMemo(
+    () => (base && base.uf === uf ? primeiroTurnoMunicipios(uf, base.lista) : undefined),
+    [base, uf],
+  );
   const destaque = useMemo(() => {
     const q = normalize(busca);
     if (q.length < 2) return null;
@@ -105,9 +124,13 @@ export default function KitVizPage() {
   }, [busca, municipios]);
 
   const fracSp = nac.fracoes.SP;
-  const mosaico = useMemo(() => mosaicoGrande(Math.min(1, fracSp * 1.05), fonteTse), [fracSp, fonteTse]);
+  const mosaico = useMemo(
+    () => (!so || so === 'mosaico' ? mosaicoGrande(Math.min(1, fracSp * 1.05), fonteTse) : []),
+    [fracSp, fonteTse, so],
+  );
   const mosaicoPequeno = useMemo(
-    () => mosaicoFixture(ZONAS_PEQUENAS, Math.min(1, nac.fracoes.PI * 1.1), { seed: 'pequeno', lean: 58, tse: fonteTse }),
+    () =>
+      mosaicoFixture(ZONAS_PEQUENAS, Math.min(1, nac.fracoes.PI * 1.1), { seed: 'pequeno', lean: 58, tse: fonteTse }),
     [nac.fracoes.PI, fonteTse],
   );
 
@@ -115,7 +138,13 @@ export default function KitVizPage() {
   const onRender: ProfilerOnRenderCallback = useCallback((id, fase, actual, _base, _start, commitTime) => {
     requestAnimationFrame(() =>
       setTimeout(() => {
-        const reg: PerfRegistro = { id, fase, render: actual, ate_pintar: performance.now() - commitTime, t: Date.now() };
+        const reg: PerfRegistro = {
+          id,
+          fase,
+          render: actual,
+          ate_pintar: performance.now() - commitTime,
+          t: Date.now(),
+        };
         (window.__vizPerf ??= []).push(reg);
         if (window.__vizPerf.length > 400) window.__vizPerf.splice(0, 200);
         ultimoPerf.current[id] = reg;
@@ -139,24 +168,22 @@ export default function KitVizPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1240px] px-4 pb-24 pt-6 sm:px-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <Badge tone="alert" caps size="xs">
-              Simulação · dados fictícios
-            </Badge>
-            <Badge tone="neutral" size="xs">
-              /kit/viz
-            </Badge>
-          </div>
-          <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[34px]">
-            Visualizações da apuração
-          </h1>
-          <p className="mt-1 max-w-[60ch] text-[14px] text-fg-muted">
-            Mapas, cartograma, corrida da apuração e mosaico de seções com geometrias reais do IBGE e números inventados.
-          </p>
+      <header className="mb-5">
+        <div className="mb-2 flex items-center gap-2">
+          <Badge tone="alert" caps size="xs">
+            Simulação · dados fictícios
+          </Badge>
+          <Badge tone="neutral" size="xs">
+            /kit/viz
+          </Badge>
+          <ThemeToggle size="sm" className="ml-auto" />
         </div>
-        <ThemeToggle />
+        <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[34px]">
+          Visualizações da apuração
+        </h1>
+        <p className="mt-1 max-w-[60ch] text-[14px] text-fg-muted">
+          Mapas, cartograma, corrida da apuração e mosaico de seções com geometrias reais do IBGE e números inventados.
+        </p>
       </header>
 
       {/* Controles */}
@@ -188,8 +215,9 @@ export default function KitVizPage() {
             />
           </div>
           <p className="num text-[12.5px] text-fg-muted">
-            <span className="font-semibold text-fg">{fmtPct(pctTotalizadas(r), 1)}</span> apurado · {fmtHora(nac.simNow)} ·{' '}
-            {FIX_RACE.candidatos[0].nomeUrna} <span className="font-semibold text-fg">{fmtPct(pv0)}</span>
+            <span className="font-semibold text-fg">{fmtPct(pctTotalizadas(r), 1)}</span> apurado ·{' '}
+            {fmtHora(nac.simNow)} · {FIX_RACE.candidatos[0].nomeUrna}{' '}
+            <span className="font-semibold text-fg">{fmtPct(pv0)}</span>
           </p>
         </div>
         <div className="mt-3">
@@ -198,106 +226,125 @@ export default function KitVizPage() {
       </div>
 
       {/* Brasil */}
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="lg:col-span-7" padding="md">
-          <CardHeader title="Brasil por estado" subtitle="BrazilMap · clique numa UF (toque duas vezes no celular)" />
-          <BrazilMap
-            ufs={nac.ufs}
-            race={FIX_RACE}
-            modo={modo}
-            selecionada={ufSel}
-            onSelect={(u) => {
-              setUfSel(u);
-              setUf(u);
-            }}
-            primeiroTurno={nac.primeiroTurno}
-          />
-          <MapLegend modo={modo} race={FIX_RACE} compacta className="mt-4" />
-        </Card>
-        <Card className="lg:col-span-5" padding="md">
-          <CardHeader title="Cartograma" subtitle="TileMap · todas as UFs com o mesmo peso visual" />
-          <TileMap
-            ufs={nac.ufs}
-            race={FIX_RACE}
-            modo={modo}
-            selecionada={ufSel}
-            onSelect={(u) => {
-              setUfSel(u);
-              if (u !== 'ZZ') setUf(u);
-            }}
-            primeiroTurno={nac.primeiroTurno}
-          />
-        </Card>
-      </div>
+      {mostrar('brasil') ? (
+        <div className="grid gap-4 lg:grid-cols-12">
+          <Card className="lg:col-span-7" padding="md">
+            <CardHeader title="Brasil por estado" subtitle="BrazilMap · clique numa UF (toque duas vezes no celular)" />
+            <BrazilMap
+              ufs={nac.ufs}
+              race={FIX_RACE}
+              modo={modo}
+              selecionada={ufSel}
+              onSelect={(u) => {
+                setUfSel(u);
+                setUf(u);
+              }}
+              primeiroTurno={nac.primeiroTurno}
+            />
+            <MapLegend modo={modo} race={FIX_RACE} compacta className="mt-4" />
+          </Card>
+          <Card className="lg:col-span-5" padding="md">
+            <CardHeader title="Cartograma" subtitle="TileMap · todas as UFs com o mesmo peso visual" />
+            <TileMap
+              ufs={nac.ufs}
+              race={FIX_RACE}
+              modo={modo}
+              selecionada={ufSel}
+              onSelect={(u) => {
+                setUfSel(u);
+                if (u !== 'ZZ') setUf(u);
+              }}
+              primeiroTurno={nac.primeiroTurno}
+            />
+          </Card>
+        </div>
+      ) : null}
 
       {/* Série */}
-      <Card className="mt-4" padding="md">
-        <CardHeader
-          title="A corrida da apuração"
-          subtitle="TimelineChart · arraste sobre o gráfico"
-          actions={
-            <Segmented
-              size="sm"
-              ariaLabel="Eixo horizontal"
-              value={eixo}
-              onChange={setEixo}
-              options={[
-                { value: 'secoes', label: '% seções' },
-                { value: 'horario', label: 'Horário' },
-              ]}
-            />
-          }
-        />
-        <TimelineChart serie={nac.serie} race={FIX_RACE} eixoX={eixo} />
-      </Card>
+      {mostrar('serie') ? (
+        <Card className="mt-4" padding="md">
+          <CardHeader
+            title="A corrida da apuração"
+            subtitle="TimelineChart · arraste sobre o gráfico"
+            actions={
+              <Segmented
+                size="sm"
+                ariaLabel="Eixo horizontal"
+                value={eixo}
+                onChange={setEixo}
+                options={[
+                  { value: 'secoes', label: '% seções' },
+                  { value: 'horario', label: 'Horário' },
+                ]}
+              />
+            }
+          />
+          <TimelineChart serie={nac.serie} race={FIX_RACE} eixoX={eixo} />
+        </Card>
+      ) : null}
 
       {/* UF */}
-      <Card className="mt-4" padding="md">
-        <CardHeader
-          title={`Municípios · ${UF_NOMES[uf]}`}
-          subtitle={`UfMap · ${fmtInt(municipios.length)} municípios${munNome ? ` · selecionado: ${munNome}` : ''}`}
-        />
-        <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
-          <Select
-            aria-label="Estado"
-            size="sm"
-            value={uf}
-            onChange={(e) => {
-              setUf(e.target.value as UFBr);
-              setMunSel(null);
-              setBusca('');
-            }}
-            options={UF_OPCOES}
+      {mostrar('ufmap') ? (
+        <Card className="mt-4" padding="md">
+          <CardHeader
+            title={`Municípios · ${UF_NOMES[uf]}`}
+            subtitle={`UfMap · ${fmtInt(municipios.length)} municípios${munNome ? ` · selecionado: ${munNome}` : ''}`}
           />
-          <SearchBox size="sm" value={busca} onChange={setBusca} placeholder="Buscar município" ariaLabel="Buscar município no mapa" />
-        </div>
-        <Profiler id="UfMap" onRender={onRender}>
-          <UfMap
-            key={uf}
-            uf={uf}
-            municipios={municipios}
-            race={FIX_RACE}
-            modo={modo}
-            selecionado={munSel}
-            onSelect={(cod) => setMunSel(cod)}
-            destaque={destaque}
-            primeiroTurno={t1Mun}
-          />
-        </Profiler>
-        <MapLegend modo={modo} race={FIX_RACE} compacta className="mt-4" />
-      </Card>
+          <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,240px)_minmax(0,1fr)]">
+            <Select
+              aria-label="Estado"
+              size="sm"
+              value={uf}
+              onChange={(e) => {
+                setUf(e.target.value as UFBr);
+                setMunSel(null);
+                setBusca('');
+              }}
+              options={UF_OPCOES}
+            />
+            <SearchBox
+              size="sm"
+              value={busca}
+              onChange={setBusca}
+              placeholder="Buscar município"
+              ariaLabel="Buscar município no mapa"
+            />
+          </div>
+          <Profiler id="UfMap" onRender={onRender}>
+            <UfMap
+              key={uf}
+              uf={uf}
+              municipios={municipios}
+              race={FIX_RACE}
+              modo={modo}
+              selecionado={munSel}
+              onSelect={(cod) => setMunSel(cod)}
+              destaque={destaque}
+              primeiroTurno={t1Mun}
+            />
+          </Profiler>
+          <MapLegend modo={modo} race={FIX_RACE} compacta className="mt-4" />
+        </Card>
+      ) : null}
 
       {/* Mosaico */}
-      <Card className="mt-4" padding="md">
-        <CardHeader
-          title="Seções · capital fictícia (57 zonas)"
-          subtitle={`SecaoMosaic · ${secSel ? `selecionada: zona ${secSel.zona}, seção ${secSel.secao}` : 'passe o mouse ou toque numa seção'}`}
-          actions={<Toggle size="sm" checked={fonteTse} onChange={setFonteTse} label="Fonte TSE" />}
-        />
-        <Profiler id="SecaoMosaic" onRender={onRender}>
-          <SecaoMosaic mosaico={mosaico} race={FIX_RACE} selecionada={secSel} onSelect={(zona, secao) => setSecSel({ zona, secao })} />
-        </Profiler>
-      </Card>
+      {mostrar('mosaico') ? (
+        <Card className="mt-4" padding="md">
+          <CardHeader
+            title="Seções · capital fictícia (57 zonas)"
+            subtitle={`SecaoMosaic · ${secSel ? `selecionada: zona ${secSel.zona}, seção ${secSel.secao}` : 'passe o mouse ou toque numa seção'}`}
+            actions={<Toggle size="sm" checked={fonteTse} onChange={setFonteTse} label="Fonte TSE" />}
+          />
+          <Profiler id="SecaoMosaic" onRender={onRender}>
+            <SecaoMosaic
+              mosaico={mosaico}
+              race={FIX_RACE}
+              selecionada={secSel}
+              onSelect={(zona, secao) => setSecSel({ zona, secao })}
+            />
+          </Profiler>
+        </Card>
+      ) : null}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-12">
         <Card className="lg:col-span-5" padding="md">
@@ -305,13 +352,18 @@ export default function KitVizPage() {
           <SecaoMosaic mosaico={mosaicoPequeno} race={FIX_RACE} legenda={false} />
         </Card>
         <Card className="lg:col-span-7" padding="md">
-          <CardHeader title="Desempenho" subtitle="Último render (React Profiler) e desenho do mosaico (canvas)" />
+          <CardHeader
+            title="Desempenho"
+            subtitle="Último render (React Profiler, só no modo de desenvolvimento) e desenho do mosaico (canvas)"
+          />
           <dl className="num grid grid-cols-2 gap-x-6 gap-y-2 text-[13px] sm:grid-cols-3" data-testid="perf">
             {(['UfMap', 'SecaoMosaic'] as const).map((id) => (
               <div key={id} className="contents">
                 <dt className="text-fg-muted">{id}</dt>
                 <dd className="text-fg">
-                  {perf[id] ? `${perf[id].render.toFixed(1)} ms render · ${perf[id].ate_pintar.toFixed(1)} ms até pintar` : '—'}
+                  {perf[id]
+                    ? `${perf[id].render.toFixed(1)} ms render · ${perf[id].ate_pintar.toFixed(1)} ms até pintar`
+                    : '—'}
                 </dd>
                 <dd className="hidden text-fg-subtle sm:block">{perf[id]?.fase ?? ''}</dd>
               </div>

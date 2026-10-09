@@ -9,7 +9,15 @@
  * Coordenadas: `view = { k, x, y }` em px de tela — um ponto p do conteúdo (px com k = 1) aparece em
  * `x + k·p`. Para o SVG: `translate(x/s0, y/s0) scale(k)` em unidades do viewBox (s0 = px por unidade).
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent as RMouseEvent, type PointerEvent as RPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type MouseEvent as RMouseEvent,
+  type PointerEvent as RPointerEvent,
+} from 'react';
 
 export interface View {
   k: number;
@@ -34,7 +42,9 @@ export function useMapZoom({ maxK = 12, w, h }: MapZoomOptions) {
   const stage = useRef<HTMLDivElement | null>(null);
   const container = useRef<HTMLDivElement | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const gesto = useRef<{ start: View; p0: { x: number; y: number }; d0: number; m0: { x: number; y: number } } | null>(null);
+  const gesto = useRef<{ start: View; p0: { x: number; y: number }; d0: number; m0: { x: number; y: number } } | null>(
+    null,
+  );
   const moveu = useRef(false);
   const wheelTimer = useRef<number | undefined>(undefined);
   const animTimer = useRef<number | undefined>(undefined);
@@ -80,12 +90,15 @@ export function useMapZoom({ maxK = 12, w, h }: MapZoomOptions) {
     el.style.willChange = '';
   }, [view]);
 
-  // Contêiner mudou de tamanho → volta ao enquadramento inicial.
+  // Largura do contêiner mudou (rotação, redimensionamento) → volta ao enquadramento inicial.
+  const wAnt = useRef(w);
   useEffect(() => {
+    if (Math.abs(wAnt.current - w) < 1) return;
+    wAnt.current = w;
     committed.current = IDENT;
     live.current = IDENT;
     setView(IDENT);
-  }, [w, h]);
+  }, [w]);
 
   const animarPara = useCallback(
     (alvo: View) => {
@@ -141,22 +154,19 @@ export function useMapZoom({ maxK = 12, w, h }: MapZoomOptions) {
     return { x: e.clientX - r.left, y: e.clientY - r.top };
   };
 
-  const onPointerDown = useCallback(
-    (e: RPointerEvent) => {
-      if (e.pointerType === 'mouse' && e.button !== 0) return;
-      pointers.current.set(e.pointerId, rel(e));
-      moveu.current = false;
-      const n = pointers.current.size;
-      const zoomado = live.current.k > 1.001;
-      if (n === 2 || (n === 1 && (zoomado || e.pointerType === 'mouse'))) {
-        const pts = [...pointers.current.values()];
-        const m0 = n === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[0];
-        const d0 = n === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
-        gesto.current = { start: { ...live.current }, p0: pts[0], d0, m0 };
-      }
-    },
-    [],
-  );
+  const onPointerDown = useCallback((e: RPointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pointers.current.set(e.pointerId, rel(e));
+    moveu.current = false;
+    const n = pointers.current.size;
+    const zoomado = live.current.k > 1.001;
+    if (n === 2 || (n === 1 && (zoomado || e.pointerType === 'mouse'))) {
+      const pts = [...pointers.current.values()];
+      const m0 = n === 2 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[0];
+      const d0 = n === 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+      gesto.current = { start: { ...live.current }, p0: pts[0], d0, m0 };
+    }
+  }, []);
 
   const capturar = (e: RPointerEvent) => {
     // Captura só quando o gesto começa de fato (assim um clique simples continua indo para o path).

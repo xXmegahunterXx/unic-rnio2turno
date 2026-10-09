@@ -13,16 +13,7 @@
  *
  * Os candidatos são fictícios ("Alfa" e "Beta") — nunca use estes dados fora de páginas de desenvolvimento.
  */
-import type {
-  MunicipioResumo,
-  Race,
-  SeriePoint,
-  Summary,
-  Tally,
-  UF,
-  UFBr,
-  ZonaMosaico,
-} from '@/shared/types';
+import type { MunicipioResumo, Race, SeriePoint, Summary, Tally, UF, UFBr, ZonaMosaico } from '@/shared/types';
 import { UFS } from '@/shared/types';
 import type { GeoUf, UfDataset } from '@/shared/dataset';
 import { INICIO_APURACAO, UF_REGIAO } from '@/shared/constants';
@@ -52,7 +43,10 @@ export const FIX_RACE_T1: Race = {
   ...FIX_RACE,
   id: 'pres-t1',
   turno: 1,
-  candidatos: [...FIX_RACE.candidatos, { numero: 0, nomeUrna: 'Outros', nome: 'Demais candidatos', partido: '', cor: 'outros', agregado: true }],
+  candidatos: [
+    ...FIX_RACE.candidatos,
+    { numero: 0, nomeUrna: 'Outros', nome: 'Demais candidatos', partido: '', cor: 'outros', agregado: true },
+  ],
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -93,12 +87,34 @@ const clamp = (n: number, a: number, b: number) => (n < a ? a : n > b ? b : n);
 
 /** Eleitorado e seções reais (1º turno 2026, public/data/meta.json). */
 const UF_BASE: Record<UF, [number, number]> = {
-  AC: [613742, 2270], AL: [2442126, 7101], AM: [2798611, 8157], AP: [576988, 1914], BA: [11312752, 35476],
-  CE: [6996545, 23765], DF: [2258320, 6969], ES: [2991650, 9844], GO: [5080590, 15686], MA: [5183115, 18093],
-  MG: [16372372, 52062], MS: [2024430, 7106], MT: [2637801, 8287], PA: [6262397, 20827], PB: [3248531, 10712],
-  PE: [7223450, 21418], PI: [2704758, 10225], PR: [8613657, 27142], RJ: [12857648, 37675], RN: [2659825, 8115],
-  RO: [1265893, 4698], RR: [401521, 1519], RS: [8522545, 27547], SC: [5734651, 17326], SE: [1740135, 5923],
-  SP: [34122892, 103656], TO: [1182023, 4384], ZZ: [916534, 1351],
+  AC: [613742, 2270],
+  AL: [2442126, 7101],
+  AM: [2798611, 8157],
+  AP: [576988, 1914],
+  BA: [11312752, 35476],
+  CE: [6996545, 23765],
+  DF: [2258320, 6969],
+  ES: [2991650, 9844],
+  GO: [5080590, 15686],
+  MA: [5183115, 18093],
+  MG: [16372372, 52062],
+  MS: [2024430, 7106],
+  MT: [2637801, 8287],
+  PA: [6262397, 20827],
+  PB: [3248531, 10712],
+  PE: [7223450, 21418],
+  PI: [2704758, 10225],
+  PR: [8613657, 27142],
+  RJ: [12857648, 37675],
+  RN: [2659825, 8115],
+  RO: [1265893, 4698],
+  RR: [401521, 1519],
+  RS: [8522545, 27547],
+  SC: [5734651, 17326],
+  SE: [1740135, 5923],
+  SP: [34122892, 103656],
+  TO: [1182023, 4384],
+  ZZ: [916534, 1351],
 };
 
 /** Mediana de chegada por região (fração da noite) e tendência fictícia de cada região. */
@@ -193,8 +209,15 @@ export function resumir(t: Tally, simNow: number | null): Summary {
 /** Soma contagens (UF/Brasil a partir das partes). */
 export function somar(partes: Tally[]): Tally {
   const out: Tally = {
-    secoes: 0, secoesTotalizadas: 0, eleitorado: 0, eleitoradoTotalizado: 0, comparecimento: 0, abstencao: 0,
-    votos: [0, 0], brancos: 0, nulos: 0,
+    secoes: 0,
+    secoesTotalizadas: 0,
+    eleitorado: 0,
+    eleitoradoTotalizado: 0,
+    comparecimento: 0,
+    abstencao: 0,
+    votos: [0, 0],
+    brancos: 0,
+    nulos: 0,
   };
   for (const p of partes) {
     out.secoes += p.secoes;
@@ -337,7 +360,17 @@ export function municipiosBase(geo: GeoUf, ds?: UfDataset | null): MunBase[] {
     const m = porIbge.get(ibge);
     if (m) {
       const secoes = m.zonas.reduce((s, z) => s + decodeFaixas(z.s).length, 0);
-      return { cod: m.cod, ibge, nome: m.nome, capital: m.capital, eleitorado: m.eleitorado, secoes, zonas: m.zonas, cx: f.cx, cy: f.cy };
+      return {
+        cod: m.cod,
+        ibge,
+        nome: m.nome,
+        capital: m.capital,
+        eleitorado: m.eleitorado,
+        secoes,
+        zonas: m.zonas,
+        cx: f.cx,
+        cy: f.cy,
+      };
     }
     const r = hash01(ibge);
     const eleitorado = Math.round(3000 + Math.pow(r, 6) * 400000);
@@ -360,7 +393,12 @@ export function municipiosBase(geo: GeoUf, ds?: UfDataset | null): MunBase[] {
  * Resultados fictícios por município quando a UF tem `frac` (0–1) das seções totalizadas.
  * Campo espacialmente coerente (ondas suaves pela geometria) para o mapa parecer real.
  */
-export function fixtureMunicipios(uf: UF, base: MunBase[], frac: number, simNow: number | null = null): MunicipioResumo[] {
+export function fixtureMunicipios(
+  uf: UF,
+  base: MunBase[],
+  frac: number,
+  simNow: number | null = null,
+): MunicipioResumo[] {
   const p = PARAMS[uf];
   const fase1 = hash01(uf + ':f1') * 6.28;
   const fase2 = hash01(uf + ':f2') * 6.28;

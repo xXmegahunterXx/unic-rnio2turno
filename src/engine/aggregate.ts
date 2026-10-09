@@ -1,6 +1,7 @@
 /**
  * Agregação por instante: as seções totalizadas são o prefixo `ordem[0..k)`. Uma passada O(k) preenche
- * arrays por município e por par município×zona (UF, região e Brasil são somas dos municípios).
+ * arrays por município (UF, região e Brasil são somas dos municípios). Zonas (par município×zona) são
+ * somadas sob demanda a partir das seções do próprio município (`camposPar`), só nas telas de município/zona.
  *
  * Cache: LRU pequeno por k (o controller quantiza simNow em buckets de 1 s e converte em k). Um k novo é
  * calculado de forma INCREMENTAL a partir do maior k em cache que seja ≤ k (o relógio quase sempre anda
@@ -28,7 +29,6 @@ export const F = {
 export interface Agg {
   k: number;
   mun: Float64Array;
-  pair: Float64Array;
   /** ms gastos para produzir este agregado */
   ms: number;
 }
@@ -55,67 +55,62 @@ export class Aggregator {
     let base: Agg | null = null;
     for (const a of this.cache.values()) if (a.k <= k && (!base || a.k > base.k)) base = a;
     let mun: Float64Array;
-    let pair: Float64Array;
     let from: number;
     if (base) {
       mun = base.mun.slice();
-      pair = base.pair.slice();
       from = base.k;
     } else {
       mun = new Float64Array(st.nMun * S);
-      pair = new Float64Array(st.nPair * S);
       for (let m = 0; m < st.nMun; m++) mun[m * S + F.LAST] = -1;
-      for (let p = 0; p < st.nPair; p++) pair[p * S + F.LAST] = -1;
       from = 0;
     }
     const { ordem, aptos, comp, pv0, pv1, pb, pn, gv0, gv1, gb, gn, chegada } = this.model;
     const secMun = st.secMun;
-    const secPair = st.secPair;
     for (let j = from; j < k; j++) {
       const i = ordem[j];
-      const a = aptos[i];
-      const c = comp[i];
-      const x0 = pv0[i];
-      const x1 = pv1[i];
-      const xb = pb[i];
-      const xn = pn[i];
-      const y0 = gv0[i];
-      const y1 = gv1[i];
-      const yb = gb[i];
-      const yn = gn[i];
-      const ch = chegada[i];
-      let o = secMun[i] * S;
+      const o = secMun[i] * S;
       mun[o] += 1;
-      mun[o + 1] += a;
-      mun[o + 2] += c;
-      mun[o + 3] += x0;
-      mun[o + 4] += x1;
-      mun[o + 5] += xb;
-      mun[o + 6] += xn;
-      mun[o + 7] += y0;
-      mun[o + 8] += y1;
-      mun[o + 9] += yb;
-      mun[o + 10] += yn;
-      mun[o + 11] = ch;
-      o = secPair[i] * S;
-      pair[o] += 1;
-      pair[o + 1] += a;
-      pair[o + 2] += c;
-      pair[o + 3] += x0;
-      pair[o + 4] += x1;
-      pair[o + 5] += xb;
-      pair[o + 6] += xn;
-      pair[o + 7] += y0;
-      pair[o + 8] += y1;
-      pair[o + 9] += yb;
-      pair[o + 10] += yn;
-      pair[o + 11] = ch;
+      mun[o + 1] += aptos[i];
+      mun[o + 2] += comp[i];
+      mun[o + 3] += pv0[i];
+      mun[o + 4] += pv1[i];
+      mun[o + 5] += pb[i];
+      mun[o + 6] += pn[i];
+      mun[o + 7] += gv0[i];
+      mun[o + 8] += gv1[i];
+      mun[o + 9] += gb[i];
+      mun[o + 10] += gn[i];
+      mun[o + 11] = chegada[i];
     }
-    const agg: Agg = { k, mun, pair, ms: now() - t0 };
+    const agg: Agg = { k, mun, ms: now() - t0 };
     this.cache.set(k, agg);
     while (this.cache.size > this.max) this.cache.delete(this.cache.keys().next().value as number);
     return agg;
   }
+}
+
+/** Campos (12) de um par município×zona no instante k, a partir das suas seções (O(seções do par)). */
+export function camposPar(model: Model, p: number, k: number, out = new Float64Array(F.STRIDE)): Float64Array {
+  const st = model.st;
+  const { rank, aptos, comp, pv0, pv1, pb, pn, gv0, gv1, gb, gn, chegada } = model;
+  out.fill(0);
+  out[F.LAST] = -1;
+  for (let i = st.pairSecStart[p]; i < st.pairSecEnd[p]; i++) {
+    if (rank[i] >= k) continue;
+    out[0] += 1;
+    out[1] += aptos[i];
+    out[2] += comp[i];
+    out[3] += pv0[i];
+    out[4] += pv1[i];
+    out[5] += pb[i];
+    out[6] += pn[i];
+    out[7] += gv0[i];
+    out[8] += gv1[i];
+    out[9] += gb[i];
+    out[10] += gn[i];
+    if (chegada[i] > out[11]) out[11] = chegada[i];
+  }
+  return out;
 }
 
 /** Soma os municípios [m0, m1) num vetor de 12 campos (LAST = máximo). */

@@ -31,8 +31,9 @@ export interface Column<R> {
   /** Esconde a coluna abaixo deste breakpoint. */
   hideBelow?: 'sm' | 'md' | 'lg';
   /**
-   * Coluna elástica: ocupa a sobra e trunca o conteúdo (td com `width:100%; max-width:0`).
-   * Use na coluna de nome para a tabela nunca estourar a largura no celular.
+   * Coluna elástica: ocupa a largura que sobra e trunca o conteúdo. Quando alguma coluna tem `grow`,
+   * a tabela usa `table-layout: fixed` (nunca estoura a largura no celular) e as demais colunas
+   * precisam de `width` (padrão `w-20`).
    */
   grow?: boolean;
 }
@@ -139,13 +140,15 @@ export function DataTable<R>({
   }
 
   const rolagemInterna = maxHeight !== undefined;
+  const fixo = columns.some((c) => c.grow);
+  const largura = (c: Column<R>) => (c.grow ? undefined : (c.width ?? (fixo ? 'w-20' : undefined)));
   return (
     <div className={cn('w-full', className)}>
       <div
         className={cn('w-full overflow-x-clip', rolagemInterna && 'overflow-y-auto overscroll-contain')}
         style={rolagemInterna ? { maxHeight } : undefined}
       >
-        <table className={cn('w-full border-separate border-spacing-0', txt)}>
+        <table className={cn('w-full border-separate border-spacing-0', fixo && 'table-fixed', txt)}>
           {caption ? <caption className="sr-only">{caption}</caption> : null}
           <thead>
             <tr>
@@ -161,11 +164,10 @@ export function DataTable<R>({
                       'z-10 border-b border-line bg-surface font-medium text-fg-muted',
                       stickyHeader && 'sticky',
                       pad,
-                      'py-2 text-[11px] uppercase tracking-[0.08em] sm:py-2.5',
+                      'py-2 text-[11px] uppercase tracking-[0.06em] sm:py-2.5 sm:tracking-[0.08em]',
                       alinhar[c.align ?? 'left'],
-                      c.width,
-                      c.grow && 'w-full max-w-0',
-                      !c.grow && 'whitespace-nowrap',
+                      largura(c),
+                      c.grow ? 'overflow-hidden' : 'whitespace-nowrap',
                       c.hideBelow && esconder[c.hideBelow],
                       c.headerClassName,
                     )}
@@ -177,7 +179,7 @@ export function DataTable<R>({
                         onClick={() => clicarCabecalho(c)}
                         aria-label={c.headerLabel ? `Ordenar por ${c.headerLabel}` : undefined}
                         className={cn(
-                          'group inline-flex items-center gap-1 rounded-md uppercase tracking-[0.08em] transition-colors hover:text-fg',
+                          'group inline-flex max-w-full items-center gap-1 rounded-md uppercase tracking-[inherit] transition-colors hover:text-fg',
                           c.align === 'right' && 'flex-row-reverse',
                           ativo && 'text-fg',
                         )}
@@ -187,7 +189,7 @@ export function DataTable<R>({
                           name={ativo ? (sort!.dir === 'asc' ? 'chevron-cima' : 'chevron') : 'ordenar'}
                           size={ativo ? 14 : 12}
                           strokeWidth={ativo ? 2.25 : 1.75}
-                          className={cn(!ativo && 'opacity-0 transition-opacity group-hover:opacity-70 group-focus-visible:opacity-70')}
+                          className={cn(!ativo && 'hidden opacity-0 transition-opacity group-hover:opacity-70 group-focus-visible:opacity-70 sm:block')}
                         />
                       </button>
                     ) : (
@@ -227,7 +229,7 @@ export function DataTable<R>({
                         pad,
                         alinhar[c.align ?? 'left'],
                         c.align === 'right' && 'num',
-                        c.grow ? 'w-full max-w-0' : 'whitespace-nowrap',
+                        c.grow ? 'overflow-hidden' : 'whitespace-nowrap',
                         c.hideBelow && esconder[c.hideBelow],
                         c.className,
                       )}

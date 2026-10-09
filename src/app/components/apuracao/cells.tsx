@@ -39,11 +39,11 @@ export function MargemCell({ t, race }: { t: Pick<Tally, 'votos'>; race: Race })
 export const margemAssinada = (t: Pick<Tally, 'votos'>) => (validos(t) > 0 ? pctValidos(t, 0) - pctValidos(t, 1) : -999);
 
 /** % apurado com mini-barra. */
-export function ApuradoCell({ t, compact }: { t: Pick<Tally, 'secoes' | 'secoesTotalizadas'>; compact?: boolean }) {
+export function ApuradoCell({ t, compact, bar = true }: { t: Pick<Tally, 'secoes' | 'secoesTotalizadas'>; compact?: boolean; bar?: boolean }) {
   const p = pctTotalizadas(t);
   return (
     <span className={cn('inline-flex items-center gap-2', compact ? 'w-full' : 'justify-end')}>
-      <span className={cn('h-1 overflow-hidden rounded-full bg-surface-3', compact ? 'w-10' : 'hidden w-12 lg:block')} aria-hidden>
+      <span className={cn('h-1 shrink-0 overflow-hidden rounded-full bg-surface-3', compact ? 'w-10' : bar ? 'hidden w-12 xl:block' : 'hidden')} aria-hidden>
         <span className={cn('block h-full rounded-full', p >= 100 ? 'bg-ok' : 'bg-brand')} style={{ width: `${p}%` }} />
       </span>
       <span className={cn('num whitespace-nowrap', compact ? 'text-[11.5px] text-fg-muted' : 'text-fg')}>{fmtPct(p, p >= 99.95 || p === 0 ? 0 : 1)}</span>
@@ -51,12 +51,22 @@ export function ApuradoCell({ t, compact }: { t: Pick<Tally, 'secoes' | 'secoesT
   );
 }
 
-/** Cabeçalho de coluna de candidato: monograma + nome (nome some no celular). */
+/** Cabeçalho de coluna de candidato: monograma na cor do slot (nome completo no title e para leitores de tela). */
 export function CandHeader({ c }: { c: Candidate }) {
   return (
-    <span className="inline-flex items-center gap-1.5 normal-case tracking-normal">
-      <CandidateAvatar candidato={c} size="xs" className="!h-5 !w-5 !text-[9px]" />
-      <span className="hidden max-w-[9rem] truncate text-[12px] font-semibold text-fg-muted lg:inline">{c.nomeUrna}</span>
+    <span className="inline-flex items-center normal-case tracking-normal" title={c.nomeUrna}>
+      <CandidateAvatar candidato={c} size="xs" className="!h-[22px] !w-[22px] !text-[9.5px]" />
+      <span className="sr-only">{c.nomeUrna}</span>
     </span>
   );
 }
+
+/** Larguras padrão das colunas numéricas (tabelas com layout fixo). */
+export const W = {
+  pct: 'w-16 sm:w-[4.75rem]',
+  margem: 'w-[4.5rem] sm:w-[5.5rem]',
+  apurado: 'w-[4.5rem] xl:w-[7.75rem]',
+  apuradoSemBarra: 'w-[4.5rem]',
+  eleitores: 'w-[5.25rem]',
+  num: 'w-[4.25rem]',
+} as const;

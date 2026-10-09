@@ -127,11 +127,19 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
           <dd className="mt-2">
             {it.pct !== null ? (
               <NumberRoll value={it.pct} format={(n) => fmtPct(n)} smallChars="%" className="font-display text-[24px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[26px]" />
-            ) : (
+            ) : it.key === 'eleitorado' ? (
               <NumberRoll value={it.valor} format={fmtCompactSeguro} className="font-display text-[24px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[26px]" />
+            ) : (
+              <span className="font-display text-[24px] font-semibold leading-none text-fg-subtle sm:text-[26px]">—</span>
             )}
-            <div className="num mt-1.5 text-[13px] font-medium leading-tight text-fg">{fmtInt(it.valor)}</div>
-            <div className="mt-0.5 text-[12px] leading-snug text-fg-muted">{it.sub}</div>
+            {it.pct !== null || it.key === 'eleitorado' ? (
+              <>
+                <div className="num mt-1.5 text-[13px] font-medium leading-tight text-fg">{fmtInt(it.valor)}</div>
+                <div className="mt-0.5 text-[12px] leading-snug text-fg-muted">{it.sub}</div>
+              </>
+            ) : (
+              <div className="mt-1.5 text-[12px] leading-snug text-fg-muted">Aguardando seções totalizadas</div>
+            )}
             <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
               <div
                 className={cn('h-full rounded-full transition-[width] duration-700 ease-out', it.barra)}

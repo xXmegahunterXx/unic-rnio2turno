@@ -69,7 +69,7 @@ const INI = INICIO_APURACAO;
 export const ENCERRAMENTO_MS = 5 * 60_000;
 export const MARCOS_PCT = [1, 10, 25, 50, 75, 90, 99, 100];
 const MAX_MODELOS = 2;
-const MAX_SNAPSHOTS = 160;
+const MAX_SNAPSHOTS = 96;
 const MAX_LOG = 100;
 
 const perf = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
@@ -259,9 +259,12 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     const t = perf();
     const agg = atual.agg.get(inst.k);
     if (perf() - t > 0.05) ultimoCalculoMs = Math.round((perf() - t) * 100) / 100;
+    // O conteúdo de um snapshot depende só de k (série e eventos têm o instante de chegada de alguma seção)
+    // e de já ter passado das 17h (evento "início"): chave por (modelo, k, início) — no fim da noite, todas
+    // as requisições caem na mesma entrada.
     return {
       c: { model: atual.model, agg, tq: inst.tDados, simNow: inst.simNow, geradoEm: wall },
-      key: `${atual.model.id}|${inst.tDados}`,
+      key: `${atual.model.id}|${inst.k}|${inst.tDados >= INI ? 1 : 0}`,
     };
   };
   const fresco = <T extends { geradoEm: number; simNow: number }>(v: T, wall: number, simNow: number): T =>

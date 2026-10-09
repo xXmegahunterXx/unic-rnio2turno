@@ -3,9 +3,10 @@
  * Usa fixtures falsas (src/app/fixtures/core.ts) em 4 instantes: aguardando, 35%, 70% e 100% (eleito).
  * Parâmetros de URL: ?t=0|35|70|100 (instante) — útil para screenshots automatizados.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
-import type { RaceId, UF } from '@/shared/types';
+import type { LiveStatus, RaceId, UF } from '@/shared/types';
 import { INICIO_APURACAO, UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt, fmtPct } from '@/shared/format';
 import { coreFixtures, INSTANTES, INSTANTE_ROTULO, RACES, type Instante } from '@/app/fixtures/core';
@@ -63,6 +64,8 @@ import { StatsGrid } from '@/app/components/apuracao/StatsGrid';
 import { UfTable } from '@/app/components/apuracao/UfTable';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 
+type ShellModo = 'api' | 'sim' | 'vivo' | 'aviso';
+
 const SECOES = [
   ['fundamentos', 'Fundamentos'],
   ['controles', 'Controles'],
@@ -84,6 +87,26 @@ export default function KitPage() {
   const tParam = Number(params.get('t'));
   const instante: Instante = (INSTANTES as number[]).includes(tParam) ? (tParam as Instante) : 70;
   const fx = useMemo(() => coreFixtures(instante), [instante]);
+  // Injeta um LiveStatus falso no cache do React Query para revisar o AppShell (pílula, faixa, aviso).
+  const qc = useQueryClient();
+  const [shell, setShell] = useState<ShellModo>('api');
+  useEffect(() => {
+    if (shell === 'api') {
+      qc.removeQueries({ queryKey: ['status'] });
+      return;
+    }
+    const st: LiveStatus = {
+      ...fx.status,
+      wallNow: Date.now(),
+      fonte: shell === 'vivo' ? 'tse' : 'simulacao',
+      simulacao: shell !== 'vivo',
+      aviso:
+        shell === 'aviso'
+          ? { nivel: 'alerta', texto: 'O TSE informa instabilidade momentânea na divulgação. Os números podem demorar alguns minutos para atualizar.' }
+          : null,
+    };
+    qc.setQueryData(['status'], st);
+  }, [shell, fx, qc]);
   const setInstante = (v: Instante) =>
     setParams(
       (p) => {
@@ -112,7 +135,7 @@ export default function KitPage() {
       />
 
       {/* barra de controle do kit */}
-      <div className="sticky z-30 -mx-4 mb-2 border-b border-line bg-bg/85 px-4 py-2.5 backdrop-blur-md sm:mx-0 sm:rounded-2xl sm:border sm:px-3" style={{ top: 'var(--app-header-h, 64px)' }}>
+      <div className="sticky z-30 mb-2 rounded-2xl border border-line bg-surface/90 px-3 py-2.5 shadow-card backdrop-blur-md" style={{ top: 'calc(var(--app-header-h, 64px) + 8px)' }}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-[12px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Instante</span>
           <Segmented<`${Instante}`>
@@ -121,6 +144,19 @@ export default function KitPage() {
             value={String(instante) as `${Instante}`}
             onChange={(v) => setInstante(Number(v) as Instante)}
             options={INSTANTES.map((i) => ({ value: String(i) as `${Instante}`, label: INSTANTE_ROTULO[i] }))}
+          />
+          <span className="text-[12px] font-semibold uppercase tracking-[0.1em] text-fg-muted sm:ml-2">Shell</span>
+          <Segmented<ShellModo>
+            ariaLabel="Status simulado do AppShell"
+            size="sm"
+            value={shell}
+            onChange={setShell}
+            options={[
+              { value: 'api', label: 'Sem API' },
+              { value: 'sim', label: 'Simulação' },
+              { value: 'vivo', label: 'Ao vivo' },
+              { value: 'aviso', label: 'Aviso' },
+            ]}
           />
         </div>
         <nav aria-label="Seções do kit" className="-mx-1 mt-2 flex gap-1 overflow-x-auto px-1 scrollbar-none">

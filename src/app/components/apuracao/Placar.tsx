@@ -11,15 +11,15 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Candidate, Race, Summary } from '@/shared/types';
-import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
-import { fmtInt, fmtPct } from '@/shared/format';
+import { margem, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
+import { fmtInt, fmtPct, fmtPP } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Badge, toneFromCor } from '@/app/ui/Badge';
 import { Icon } from '@/app/ui/Icon';
 import { NumberRoll } from '@/app/ui/NumberRoll';
 import { ApuracaoProgress } from './ApuracaoProgress';
-import { CandidateAvatar, CandidateName } from './CandidateAvatar';
+import { CandidateAvatar } from './CandidateAvatar';
 import { SimulationRibbon } from './SimulationRibbon';
 import { VoteSplitBar } from './VoteSplitBar';
 
@@ -146,14 +146,10 @@ function PlacarDuelo({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-x-3 sm:gap-x-8">
-          {[a, b].map((l, k) =>
-            l ? (
-              <LadoDuelo key={l.i} l={l} lado={k === 0 ? 'esq' : 'dir'} hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} />
-            ) : (
-              <div key={k} />
-            ),
-          )}
+        <div className={cn('grid grid-cols-2 gap-x-3 sm:gap-x-8', hero && 'lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]')}>
+          {a ? <LadoDuelo l={a} lado="esq" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} /> : <div />}
+          {hero ? <Diferenca resumo={resumo} /> : null}
+          {b ? <LadoDuelo l={b} lado="dir" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} /> : <div />}
         </div>
 
         <div className={cn(hero ? 'mt-5 sm:mt-7' : 'mt-4 sm:mt-5')}>
@@ -165,10 +161,7 @@ function PlacarDuelo({
           />
           <div className="mt-2 flex items-center justify-between text-[11.5px] text-fg-muted">
             <span className="num">{a ? fmtPct(a.pct, 1) : ''}</span>
-            <span className="inline-flex items-center gap-1">
-              <span aria-hidden className="h-2.5 w-[2px] rounded-full bg-fg/70" />
-              50% dos válidos
-            </span>
+            <span>50% dos válidos</span>
             <span className="num">{b ? fmtPct(b.pct, 1) : ''}</span>
           </div>
           {outros ? (
@@ -186,6 +179,26 @@ function PlacarDuelo({
         ) : null}
       </div>
     </section>
+  );
+}
+
+/** Coluna central do hero (desktop): diferença em votos e em pontos percentuais. */
+function Diferenca({ resumo }: { resumo: Summary }) {
+  const m = margem(resumo);
+  return (
+    <div className="hidden min-w-[150px] flex-col items-center justify-center self-center px-2 pt-10 text-center lg:flex">
+      <span aria-hidden className="mb-3 h-8 w-px bg-gradient-to-b from-transparent to-[rgb(var(--line)/0.2)]" />
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Diferença</span>
+      {m.lider !== null ? (
+        <>
+          <span className="num mt-1.5 font-display text-[26px] font-semibold leading-none tracking-[-0.02em] text-fg">{fmtInt(m.votos)}</span>
+          <span className="num mt-1 text-[12.5px] text-fg-muted">votos · {fmtPP(m.pp).replace('+', '')}</span>
+        </>
+      ) : (
+        <span className="mt-1.5 text-[13px] text-fg-muted">—</span>
+      )}
+      <span aria-hidden className="mt-3 h-8 w-px bg-gradient-to-t from-transparent to-[rgb(var(--line)/0.2)]" />
+    </div>
   );
 }
 
@@ -246,7 +259,7 @@ function LadoDuelo({
         className={cn(
           'font-display font-semibold leading-none tracking-[-0.045em]',
           pctCls,
-          semVotos ? 'text-fg-subtle' : s.text,
+          semVotos ? 'text-fg-subtle' : s.textDisplay,
           !semVotos && !l.lider && resumo.lider !== null && 'opacity-[0.88]',
         )}
       />
@@ -307,7 +320,7 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
                 value={l.pct}
                 format={(n) => fmtPct(n)}
                 smallChars="%"
-                className={cn('font-display text-[22px] font-semibold leading-none tracking-[-0.03em]', semVotos ? 'text-fg-subtle' : s.text)}
+                className={cn('font-display text-[22px] font-semibold leading-none tracking-[-0.03em]', semVotos ? 'text-fg-subtle' : s.textDisplay)}
               />
             </li>
           );

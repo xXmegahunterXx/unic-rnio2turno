@@ -5,7 +5,7 @@ import { UF_NOMES } from '@/shared/constants';
 import { pctTotalizadas, pctValidos } from '@/shared/calc';
 import { cn } from '@/app/lib/cn';
 import { DataTable, type Column, type SortState } from '@/app/ui/DataTable';
-import { ApuradoCell, CandHeader, MargemCell, PctCell, margemAssinada } from './cells';
+import { ApuradoCell, CandHeader, MargemCell, PctCell, W, margemAssinada } from './cells';
 
 export interface UfTableProps {
   race: Race;
@@ -40,9 +40,13 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
       sortValue: (r) => UF_NOMES[r.uf],
       cell: (r) => (
         <span className="flex min-w-0 items-center gap-2.5">
-          <span className="inline-flex h-6 w-8 shrink-0 items-center justify-center rounded-md bg-surface-3 font-mono text-[11px] font-semibold text-fg">{r.uf}</span>
+          <span className="hidden h-6 w-8 shrink-0 items-center justify-center rounded-md bg-surface-3 font-mono text-[11px] font-semibold text-fg sm:inline-flex">
+            {r.uf}
+          </span>
           <span className="min-w-0">
-            <span className="block truncate font-medium">{UF_NOMES[r.uf]}</span>
+            <span className="block truncate font-medium" title={UF_NOMES[r.uf]}>
+              {UF_NOMES[r.uf]}
+            </span>
             <span className="block sm:hidden">
               <ApuradoCell t={r} compact />
             </span>
@@ -55,7 +59,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
       header: 'Apurado',
       align: 'right',
       hideBelow: 'sm',
-      width: 'w-[1%]',
+      width: W.apurado,
       sortValue: (r) => pctTotalizadas(r),
       cell: (r) => <ApuradoCell t={r} />,
     },
@@ -64,7 +68,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
       header: <CandHeader c={ca} />,
       headerLabel: ca.nomeUrna,
       align: 'right',
-      width: 'w-[1%]',
+      width: W.pct,
       sortValue: (r) => pctValidos(r, 0),
       cell: (r) => <PctCell t={r} i={0} race={race} />,
     },
@@ -73,7 +77,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
       header: <CandHeader c={cb} />,
       headerLabel: cb.nomeUrna,
       align: 'right',
-      width: 'w-[1%]',
+      width: W.pct,
       sortValue: (r) => pctValidos(r, 1),
       cell: (r) => <PctCell t={r} i={1} race={race} />,
     },
@@ -81,7 +85,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
       key: 'margem',
       header: 'Margem',
       align: 'right',
-      width: 'w-[1%]',
+      width: W.margem,
       sortValue: margemAssinada,
       cell: (r) => <MargemCell t={r} race={race} />,
     },

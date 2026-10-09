@@ -42,7 +42,13 @@ export function cellDoPitch(p: number): number {
   return p >= 9 ? p - 2 : p - 1;
 }
 
-function tentar(zonas: { zona: number; n: number }[], width: number, p: number, c: number, o: Required<MosaicLayoutOpts>) {
+function tentar(
+  zonas: { zona: number; n: number }[],
+  width: number,
+  p: number,
+  c: number,
+  o: Required<MosaicLayoutOpts>,
+) {
   const blockW = Math.floor((width - (c - 1) * o.gapX) / c);
   const cols = Math.max(1, Math.floor((blockW + (p - cellDoPitch(p))) / p));
   const blocks: MosaicBlock[] = [];
@@ -61,7 +67,11 @@ function tentar(zonas: { zona: number; n: number }[], width: number, p: number, 
   return { blocks, height: Math.max(0, Math.max(...alturas) - o.gapY) };
 }
 
-export function layoutMosaico(zonas: { zona: number; n: number }[], width: number, opts: MosaicLayoutOpts = {}): MosaicLayout {
+export function layoutMosaico(
+  zonas: { zona: number; n: number }[],
+  width: number,
+  opts: MosaicLayoutOpts = {},
+): MosaicLayout {
   const o: Required<MosaicLayoutOpts> = {
     alturaAlvo: 720,
     minPitch: 3,
@@ -78,7 +88,10 @@ export function layoutMosaico(zonas: { zona: number; n: number }[], width: numbe
   const cMax = Math.max(1, Math.min(zonas.length, Math.floor((w + o.gapX) / (o.minBlockW + o.gapX))));
   let melhor: { blocks: MosaicBlock[]; height: number; p: number } | null = null;
   // Nenhum passo acima deste cabe na altura-alvo (só a área das células já estoura).
-  const pInicio = Math.max(o.minPitch, Math.min(o.maxPitch, Math.floor(Math.sqrt((w * o.alturaAlvo) / Math.max(1, total))) + 1));
+  const pInicio = Math.max(
+    o.minPitch,
+    Math.min(o.maxPitch, Math.floor(Math.sqrt((w * o.alturaAlvo) / Math.max(1, total))) + 1),
+  );
   for (let p = pInicio; p >= o.minPitch; p--) {
     // Para cada passo, o nº de colunas de blocos que minimiza a altura.
     let best: { blocks: MosaicBlock[]; height: number } | null = null;

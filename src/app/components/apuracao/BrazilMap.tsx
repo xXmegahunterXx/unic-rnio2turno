@@ -11,7 +11,17 @@
  *   são alvos de toque; o DF tem um callout (alvo ≥ 36 px).
  * - Tabela equivalente para leitores de tela.
  */
-import { memo, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from 'react';
+import {
+  memo,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type PointerEvent,
+} from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { Race, Summary, Tally, UF, UFBr } from '@/shared/types';
 import { UFS } from '@/shared/types';
@@ -199,7 +209,8 @@ export function BrazilMap({
     for (const uf of UFS) {
       const a = ant[uf];
       const b = lideres[uf];
-      if (a !== null && a !== undefined && b !== null && b !== undefined && a !== b) novos.push({ uf, lider: b, key: performance.now() + Math.random() });
+      if (a !== null && a !== undefined && b !== null && b !== undefined && a !== b)
+        novos.push({ uf, lider: b, key: performance.now() + Math.random() });
     }
     if (!novos.length) return;
     setPulsos((p) => [...p.filter((x) => !novos.some((n) => n.uf === x.uf)), ...novos]);
@@ -303,7 +314,12 @@ export function BrazilMap({
 
   if (error && !geo) {
     return (
-      <div className={cn('flex aspect-square items-center justify-center rounded-2xl bg-surface-2 text-sm text-fg-muted', className)}>
+      <div
+        className={cn(
+          'flex aspect-square items-center justify-center rounded-2xl bg-surface-2 text-sm text-fg-muted',
+          className,
+        )}
+      >
         Não foi possível carregar o mapa.
       </div>
     );
@@ -312,7 +328,11 @@ export function BrazilMap({
   return (
     <div ref={boxRef} className={cn('relative w-full select-none', className)}>
       {!geo ? (
-        <div className="w-full animate-pulse rounded-2xl bg-surface-2" style={{ aspectRatio: `${vbW} / ${vbH}` }} aria-busy="true" />
+        <div
+          className="w-full animate-pulse rounded-2xl bg-surface-2"
+          style={{ aspectRatio: `${vbW} / ${vbH}` }}
+          aria-busy="true"
+        />
       ) : (
         <svg
           viewBox={`${vb.x} ${vb.y} ${vbW} ${vbH}`}
@@ -418,7 +438,12 @@ export function BrazilMap({
                         <tspan x={f.cx} dy={-fs * 0.55}>
                           {uf}
                         </tspan>
-                        <tspan x={f.cx} dy={fs * 1.15} className="num" style={{ fontWeight: 500, fontSize: fs * 0.88, opacity: 0.85 }}>
+                        <tspan
+                          x={f.cx}
+                          dy={fs * 1.15}
+                          className="num"
+                          style={{ fontWeight: 500, fontSize: fs * 0.88, opacity: 0.85 }}
+                        >
                           {vals[uf].rotulo}
                         </tspan>
                       </>
@@ -448,7 +473,13 @@ export function BrazilMap({
                   />
                   <circle cx={c.ax} cy={c.ay} r={1.6 * kq} style={{ fill: 'rgb(var(--fg-subtle))' }} />
                   {/* alvo de toque maior que a caixa */}
-                  <rect x={c.x - 8 * kq} y={c.y - 2.5 * kq} width={c.w + 14 * kq} height={c.h + 5 * kq} fill="transparent" />
+                  <rect
+                    x={c.x - 8 * kq}
+                    y={c.y - 2.5 * kq}
+                    width={c.w + 14 * kq}
+                    height={c.h + 5 * kq}
+                    fill="transparent"
+                  />
                   <rect x={c.x} y={c.y} width={c.w} height={c.h} rx={4 * kq} style={{ fill: 'rgb(var(--surface))' }} />
                   <rect
                     x={c.x}
@@ -471,7 +502,12 @@ export function BrazilMap({
                       textAnchor="middle"
                       dominantBaseline="central"
                       className="font-sans"
-                      style={{ fontSize: fontPx * 0.95 * kq, fontWeight: 650, fill: `rgb(var(--${ink}))`, letterSpacing: '0.02em' }}
+                      style={{
+                        fontSize: fontPx * 0.95 * kq,
+                        fontWeight: 650,
+                        fill: `rgb(var(--${ink}))`,
+                        letterSpacing: '0.02em',
+                      }}
                     >
                       {c.uf}
                     </text>
@@ -539,7 +575,13 @@ export function BrazilMap({
           y={tip.y}
           limites={size}
           fixo={tip.fixo}
-          acao={onSelect ? { label: rotuloAcao?.(tip.uf) ?? `Ver ${UF_NOMES[tip.uf]}`, onClick: () => onSelect(tip.uf) } : undefined}
+          encaixado={tip.fixo && size.w < 520}
+          onFechar={() => setTip(null)}
+          acao={
+            onSelect
+              ? { label: rotuloAcao?.(tip.uf) ?? `Ver ${UF_NOMES[tip.uf]}`, onClick: () => onSelect(tip.uf) }
+              : undefined
+          }
           extra={
             modo === 'variacao' && vals[tip.uf].rotulo
               ? `Variação de ${race.candidatos[0]?.nomeUrna} vs 1º turno: ${vals[tip.uf].rotulo}`

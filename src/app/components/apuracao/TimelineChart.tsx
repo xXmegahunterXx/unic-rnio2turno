@@ -85,7 +85,9 @@ export function TimelineChart({
       for (const p of base) d = Math.max(d, Math.abs(p.pv[0] - 50));
       const passo = d < 2.5 ? 1 : d < 5 ? 2 : d < 16 ? 5 : 10;
       const lim = Math.min(50, Math.max(passo * 2, Math.ceil((d + passo * 0.35) / passo) * passo));
-      y = scaleLinear().domain([50 - lim, 50 + lim]).range([ph, 0]);
+      y = scaleLinear()
+        .domain([50 - lim, 50 + lim])
+        .range([ph, 0]);
       yTicks = [];
       const stepT = ph < 160 && lim / passo > 2 ? passo * 2 : passo;
       for (let v = 50 - lim; v <= 50 + lim + 1e-9; v += stepT) yTicks.push(Math.round(v * 100) / 100);
@@ -93,7 +95,9 @@ export function TimelineChart({
     } else {
       let mx = 0;
       for (const p of base) for (const v of p.pv) mx = Math.max(mx, v);
-      y = scaleLinear().domain([0, Math.min(100, Math.ceil((mx + 4) / 10) * 10)]).range([ph, 0]);
+      y = scaleLinear()
+        .domain([0, Math.min(100, Math.ceil((mx + 4) / 10) * 10)])
+        .range([ph, 0]);
       yTicks = y.ticks(4);
     }
     if (eixoX === 'horario') {
@@ -101,7 +105,14 @@ export function TimelineChart({
       const t1 = Math.max(serie[serie.length - 1]?.t ?? t0, t0 + 60 * 60 * 1000);
       const x = scaleUtc().domain([t0, t1]).range([0, pw]);
       const xTicks = x.ticks(pw < 300 ? 3 : 6).map((d) => +d);
-      return { x: (v: number) => x(v), y, yTicks, xTicks, fmtX: (v: number) => fmtHora(v), inv: (px: number) => +x.invert(px) };
+      return {
+        x: (v: number) => x(v),
+        y,
+        yTicks,
+        xTicks,
+        fmtX: (v: number) => fmtHora(v),
+        inv: (px: number) => +x.invert(px),
+      };
     }
     const x = scaleLinear().domain([0, 100]).range([0, pw]);
     const xTicks = pw < 320 ? [0, 50, 100] : [0, 25, 50, 75, 100];
@@ -111,11 +122,12 @@ export function TimelineChart({
   // Pontos com cruzamentos inseridos (para a faixa entre as linhas fechar exatamente na virada).
   const { linhas, faixas, cruz } = useMemo(() => {
     const pts = serie.map((p) => ({ x: x(xVal(p)), pv: p.pv, pst: p.pst, t: p.t }));
-    const linhas = race.candidatos.map((_, ci) =>
-      d3line<(typeof pts)[number]>()
-        .x((p) => p.x)
-        .y((p) => y(p.pv[ci] ?? 0))
-        .curve(curveMonotoneX)(pts) ?? '',
+    const linhas = race.candidatos.map(
+      (_, ci) =>
+        d3line<(typeof pts)[number]>()
+          .x((p) => p.x)
+          .y((p) => y(p.pv[ci] ?? 0))
+          .curve(curveMonotoneX)(pts) ?? '',
     );
     const cruz: Virada[] = [];
     let faixas: string[] = [];
@@ -132,7 +144,8 @@ export function TimelineChart({
             const xc = q.x + (p.x - q.x) * f;
             aug.push({ x: xc, a: 50, b: 50 });
             const pst = q.pst + (p.pst - q.pst) * f;
-            if (pst >= minPstVirada) cruz.push({ x: xc, pst, t: q.t + (p.t - q.t) * f, lider: d1 > 0 ? 0 : 1, rotulo: true });
+            if (pst >= minPstVirada)
+              cruz.push({ x: xc, pst, t: q.t + (p.t - q.t) * f, lider: d1 > 0 ? 0 : 1, rotulo: true });
           }
         }
         aug.push({ x: p.x, a: p.pv[0], b: p.pv[1] });
@@ -144,7 +157,8 @@ export function TimelineChart({
           .y1((p) => y(Math.max(p.a, p.b)))(aug) ?? '';
       faixas = [mk(0), mk(1)];
       // Rótulo só na última virada de cada grupo próximo (evita amontoar no começo).
-      for (let i = 0; i < cruz.length - 1; i++) if (cruz[i + 1].x - cruz[i].x < Math.max(48, pw * 0.12)) cruz[i].rotulo = false;
+      for (let i = 0; i < cruz.length - 1; i++)
+        if (cruz[i + 1].x - cruz[i].x < Math.max(48, pw * 0.12)) cruz[i].rotulo = false;
     }
     return { linhas, faixas, cruz };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,7 +288,10 @@ export function TimelineChart({
                     dy="0.32em"
                     textAnchor="end"
                     className="num font-sans"
-                    style={{ fontSize: 10.5, fill: v === 50 && dois ? 'rgb(var(--fg-muted))' : 'rgb(var(--fg-subtle))' }}
+                    style={{
+                      fontSize: 10.5,
+                      fill: v === 50 && dois ? 'rgb(var(--fg-muted))' : 'rgb(var(--fg-subtle))',
+                    }}
                   >
                     {v}%
                   </text>
@@ -325,32 +342,55 @@ export function TimelineChart({
                   ))}
               </g>
 
-              {/* viradas */}
+              {/* viradas: marcador no cruzamento + anotação no rodapé do gráfico (longe das linhas) */}
               {viradas
-                ? cruz.map((v, k) => (
-                    <g key={k} transform={`translate(${v.x},${y(50)})`} pointerEvents="none">
-                      <circle r={4.5} style={{ fill: rgbSlot(race.candidatos[v.lider].cor), stroke: 'rgb(var(--surface))', strokeWidth: 2 }} />
-                      {v.rotulo ? (
-                        <g transform={`translate(0,${y(50) > ph * 0.5 ? -16 : 22})`}>
-                          <text
-                            textAnchor={v.x > pw - 40 ? 'end' : v.x < 40 ? 'start' : 'middle'}
-                            className="num font-sans"
-                            style={{
-                              fontSize: 10.5,
-                              fontWeight: 600,
-                              fill: 'rgb(var(--fg-muted))',
-                              paintOrder: 'stroke',
-                              stroke: 'rgb(var(--surface))',
-                              strokeWidth: 3,
-                              strokeLinejoin: 'round',
-                            }}
-                          >
-                            {eixoX === 'horario' ? `Virada às ${fmtHora(v.t)}` : `Virada · ${fmtPct(v.pst, 1)}`}
-                          </text>
-                        </g>
-                      ) : null}
-                    </g>
-                  ))
+                ? cruz.map((v, k) => {
+                    const yc = y(50);
+                    const yRot = ph - 8;
+                    const ancora = v.x > pw - 50 ? 'end' : v.x < 50 ? 'start' : 'middle';
+                    return (
+                      <g key={k} pointerEvents="none">
+                        {v.rotulo ? (
+                          <>
+                            <line
+                              x1={v.x}
+                              x2={v.x}
+                              y1={yc + 7}
+                              y2={yRot - 13}
+                              style={{ stroke: 'rgb(var(--fg-subtle) / 0.55)', strokeWidth: 1 }}
+                            />
+                            <text
+                              x={v.x}
+                              y={yRot}
+                              textAnchor={ancora}
+                              className="num font-sans"
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: 600,
+                                fill: 'rgb(var(--fg-muted))',
+                                paintOrder: 'stroke',
+                                stroke: 'rgb(var(--surface))',
+                                strokeWidth: 3,
+                                strokeLinejoin: 'round',
+                              }}
+                            >
+                              {eixoX === 'horario' ? `Virada às ${fmtHora(v.t)}` : `Virada · ${fmtPct(v.pst, 1)}`}
+                            </text>
+                          </>
+                        ) : null}
+                        <circle
+                          cx={v.x}
+                          cy={yc}
+                          r={4.5}
+                          style={{
+                            fill: rgbSlot(race.candidatos[v.lider].cor),
+                            stroke: 'rgb(var(--surface))',
+                            strokeWidth: 2,
+                          }}
+                        />
+                      </g>
+                    );
+                  })
                 : null}
 
               {/* pontas */}
@@ -452,31 +492,31 @@ export function TimelineChart({
       </div>
 
       <div className="sr-only">
-      <table>
-        <caption>Evolução da apuração</caption>
-        <thead>
-          <tr>
-            <th scope="col">Seções totalizadas</th>
-            <th scope="col">Horário</th>
-            {race.candidatos.map((c) => (
-              <th key={c.numero} scope="col">
-                {c.nomeUrna}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {checkpoints.map((p) => (
-            <tr key={p.t}>
-              <td>{fmtPct(p.pst)}</td>
-              <td>{fmtHora(p.t)}</td>
-              {race.candidatos.map((c, ci) => (
-                <td key={c.numero}>{fmtPct(p.pv[ci] ?? 0)}</td>
+        <table>
+          <caption>Evolução da apuração</caption>
+          <thead>
+            <tr>
+              <th scope="col">Seções totalizadas</th>
+              <th scope="col">Horário</th>
+              {race.candidatos.map((c) => (
+                <th key={c.numero} scope="col">
+                  {c.nomeUrna}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {checkpoints.map((p) => (
+              <tr key={p.t}>
+                <td>{fmtPct(p.pst)}</td>
+                <td>{fmtHora(p.t)}</td>
+                {race.candidatos.map((c, ci) => (
+                  <td key={c.numero}>{fmtPct(p.pv[ci] ?? 0)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );
