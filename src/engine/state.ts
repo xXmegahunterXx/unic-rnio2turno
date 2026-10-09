@@ -50,6 +50,7 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     congeladoEm: null,
     versao: 1,
     tse: tsePadrao(st),
+    nomesReais: false,
   };
 }
 
@@ -118,5 +119,6 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     congeladoEm: congelado ? finito(v.congeladoEm, simNowDe(relogio, relogio.ancoraWall)) : null,
     versao: Math.max(0, Math.floor(finito(v.versao, fallback.versao))),
     tse,
+    nomesReais: typeof v.nomesReais === 'boolean' ? v.nomesReais : (fallback.nomesReais ?? false),
   };
 }

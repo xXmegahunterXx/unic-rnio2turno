@@ -378,6 +378,12 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         log(c ? 'Dados congelados' : 'Dados descongelados');
         break;
       }
+      case 'nomes-reais': {
+        const ativo = !!cmd.ativo;
+        state = { ...state, nomesReais: ativo };
+        log(ativo ? 'Nomes reais exibidos na simulação' : 'Nomes ocultos na simulação (Candidato A/B)');
+        break;
+      }
       case 'tse': {
         const t = cmd.tse ?? {};
         const next = { ...state.tse };
@@ -448,6 +454,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       races: st.races.map((r) => r.id),
       simulacao: sim,
       congelado: state.congelado,
+      anonimizado: sim && !state.nomesReais,
     };
   };
 

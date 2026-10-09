@@ -106,6 +106,7 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('fonte'), fonte: z.enum(['pre', 'simulacao', 'tse']) }).strict(),
   z.object({ tipo: z.literal('aviso'), aviso: aviso.nullable() }).strict(),
   z.object({ tipo: z.literal('congelar'), congelado: z.boolean() }).strict(),
+  z.object({ tipo: z.literal('nomes-reais'), ativo: z.boolean() }).strict(),
   z.object({ tipo: z.literal('tse'), tse }).strict(),
 ]);
 

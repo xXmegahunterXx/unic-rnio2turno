@@ -60,7 +60,9 @@ export type AdminCommand =
   | { tipo: 'fonte'; fonte: FonteDados }
   | { tipo: 'aviso'; aviso: Aviso | null }
   | { tipo: 'congelar'; congelado: boolean }
-  | { tipo: 'tse'; tse: Partial<TseConfig> };
+  | { tipo: 'tse'; tse: Partial<TseConfig> }
+  /** Mostra (true) ou oculta (false, padrão) os nomes reais dos candidatos na fonte 'simulacao'. */
+  | { tipo: 'nomes-reais'; ativo: boolean };
 
 export interface AdminSnapshot {
   state: AdminState;

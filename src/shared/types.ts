@@ -260,6 +260,11 @@ export interface LiveStatus {
   simulacao: boolean;
   /** Dados congelados (simula instabilidade do TSE: números param de atualizar). */
   congelado: boolean;
+  /**
+   * true quando a simulação está com os nomes dos candidatos ocultos ("Candidato A/B"). Padrão na simulação,
+   * para que prints de números fictícios nunca circulem associados a candidatos reais. Ver `useRace()`.
+   */
+  anonimizado?: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -322,6 +327,8 @@ export interface AdminState {
   congeladoEm: number | null;
   versao: number;
   tse: TseConfig;
+  /** Mostrar os nomes reais dos candidatos durante a SIMULAÇÃO (padrão false = "Candidato A/B"). Uso interno. */
+  nomesReais?: boolean;
 }
 
 export interface PresetInfo {

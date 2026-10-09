@@ -10,9 +10,15 @@ export function pctValidos(t: Pick<Tally, 'votos'>, i: number): number {
   return v > 0 ? (t.votos[i] / v) * 100 : 0;
 }
 
-/** % de seções totalizadas (0–100). */
-export const pctTotalizadas = (t: Pick<Tally, 'secoes' | 'secoesTotalizadas'>) =>
-  t.secoes > 0 ? (t.secoesTotalizadas / t.secoes) * 100 : 0;
+/**
+ * % de seções totalizadas (0–100), TRUNCADO em 2 casas como faz o TSE: só mostra 100,00% quando todas as
+ * seções foram totalizadas (99.995% nunca vira "100,00%" com a apuração ainda aberta).
+ */
+export const pctTotalizadas = (t: Pick<Tally, 'secoes' | 'secoesTotalizadas'>) => {
+  if (t.secoes <= 0) return 0;
+  if (t.secoesTotalizadas >= t.secoes) return 100;
+  return Math.floor((t.secoesTotalizadas / t.secoes) * 10000) / 100;
+};
 
 /** % de comparecimento sobre o eleitorado das seções totalizadas. */
 export const pctComparecimento = (t: Pick<Tally, 'comparecimento' | 'eleitoradoTotalizado'>) =>
