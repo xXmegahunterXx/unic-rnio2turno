@@ -165,6 +165,7 @@ export interface ZonaResumo extends Summary {
  *   'a'..'d' = candidato 0 vence a seção, margem em buckets (<5pp, 5–15, 15–30, ≥30)
  *   'e'..'h' = candidato 1 vence, mesmos buckets
  *   'x' = empate · 'z' = totalizada sem votos válidos
+ *   't' = totalizada, vencedor não informado (fonte TSE ao vivo: só o status da seção é conhecido)
  */
 export interface ZonaMosaico {
   zona: number;
