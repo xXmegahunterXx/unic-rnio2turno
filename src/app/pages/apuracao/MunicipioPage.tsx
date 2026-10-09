@@ -61,7 +61,7 @@ export default function MunicipioPage() {
 
   const nomeUf = uf ? UF_NOMES[uf] : '';
   const snap = q.data && q.data.uf === uf && q.data.cod === cod ? q.data : undefined;
-  const raceShown = snap ? ctx.meta?.races.find((r) => r.id === snap.race) : undefined;
+  const raceShown = snap ? ctx.races?.find((r) => r.id === snap.race) : undefined;
   const atualizando = !!snap && snap.race !== ctx.id;
   const erro = q.error ?? q.failureReason;
 
@@ -155,8 +155,8 @@ export default function MunicipioPage() {
         subtitle={subtitulo}
         actions={<ShareButton race={race} resumo={r} simulado={simulado} local={local} size="sm" />}
       >
-        {ctx.temGov && ctx.meta ? (
-          <RaceSwitcher races={ctx.meta.races} uf={uf} value={ctx.id} onChange={ctx.setRace} incluirPrimeiroTurno={t1} />
+        {ctx.temGov && ctx.races ? (
+          <RaceSwitcher races={ctx.races} uf={uf} value={ctx.id} onChange={ctx.setRace} incluirPrimeiroTurno={t1} />
         ) : null}
       </PageHeader>
 

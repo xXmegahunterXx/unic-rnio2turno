@@ -78,7 +78,7 @@ export default function UfPage() {
 
   // Dados só valem se forem desta UF (o React Query mantém o anterior enquanto carrega).
   const snap = q.data && q.data.uf === uf ? q.data : undefined;
-  const raceShown = snap ? ctx.meta?.races.find((r) => r.id === snap.race) : undefined;
+  const raceShown = snap ? ctx.races?.find((r) => r.id === snap.race) : undefined;
   const atualizando = !!snap && snap.race !== ctx.id;
   const snapT1 = qT1.data && qT1.data.uf === uf && qT1.data.race === ctx.idT1 ? qT1.data : undefined;
 
@@ -210,8 +210,8 @@ export default function UfPage() {
         subtitle={subtitulo}
         actions={<ShareButton race={race} resumo={r} simulado={simulado} local={exterior ? 'Exterior' : nomeUf} size="sm" />}
       >
-        {ctx.temGov && ctx.meta ? (
-          <RaceSwitcher races={ctx.meta.races} uf={uf} value={ctx.id} onChange={ctx.setRace} incluirPrimeiroTurno={t1} />
+        {ctx.temGov && ctx.races ? (
+          <RaceSwitcher races={ctx.races} uf={uf} value={ctx.id} onChange={ctx.setRace} incluirPrimeiroTurno={t1} />
         ) : null}
       </PageHeader>
 

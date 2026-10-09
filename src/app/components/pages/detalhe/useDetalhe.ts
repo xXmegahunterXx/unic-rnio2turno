@@ -14,7 +14,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { Fase, LiveStatus, Race, RaceId, UF } from '@/shared/types';
 import { UFS } from '@/shared/types';
 import type { PublicMeta } from '@/shared/api';
-import { useMeta, useStatus } from '@/app/data/hooks';
+import { useMeta, useRaces, useStatus } from '@/app/data/hooks';
 import { useRaceParam } from '@/app/lib/useRaceParam';
 import { useSimNow } from '@/app/lib/useNow';
 
@@ -55,6 +55,13 @@ export const rotaBrasil = (race: RaceId) => `/apuracao${familia(race) === 'pres'
 
 export interface DetalheRace {
   meta: PublicMeta | undefined;
+  /**
+   * Corridas para EXIBIÇÃO (via `useRaces`): na simulação com nomes ocultos vêm como "Candidato A/B".
+   * Nunca use `meta.races` para mostrar candidatos.
+   */
+  races: Race[] | undefined;
+  /** Simulação com nomes ocultos (mostrar "Nomes ocultos na simulação"). */
+  anonimizado: boolean;
   status: LiveStatus | undefined;
   fase: Fase | undefined;
   /** Relógio da apuração interpolado (para contagens regressivas). */
@@ -84,6 +91,7 @@ export interface DetalheRace {
 export function useDetalheRace(uf: UF | null): DetalheRace {
   const [param, setParam] = useRaceParam();
   const { data: meta } = useMeta();
+  const races = useRaces();
   const statusQ = useStatus();
   const status = statusQ.data;
   const simNow = useSimNow(status, statusQ.dataUpdatedAt);
@@ -103,9 +111,9 @@ export function useDetalheRace(uf: UF | null): DetalheRace {
   const id = autoT1 ? `${pedida}-t1` : pedida;
   const idT2 = familia(id);
   const idT1 = `${idT2}-t1`;
-  const race = meta?.races.find((x) => x.id === id);
-  const raceT1 = meta?.races.find((x) => x.id === idT1);
-  const raceT2 = meta?.races.find((x) => x.id === idT2);
+  const race = races?.find((x) => x.id === id);
+  const raceT1 = races?.find((x) => x.id === idT1);
+  const raceT2 = races?.find((x) => x.id === idT2);
   const temGov = !!uf && !!meta?.races.some((x) => x.cargo === 'Governador' && x.turno === 2 && x.abrangencia === uf);
   const t1 = ehT1(id);
 
@@ -119,6 +127,8 @@ export function useDetalheRace(uf: UF | null): DetalheRace {
 
   return {
     meta,
+    races,
+    anonimizado: !!status?.anonimizado,
     status,
     fase,
     simNow,
