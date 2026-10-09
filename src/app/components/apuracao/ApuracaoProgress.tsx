@@ -37,7 +37,7 @@ export function ApuracaoProgress({ resumo, variant = 'default', className }: Apu
       className={cn('relative w-full overflow-hidden rounded-full bg-surface-3', variant === 'compact' ? 'h-1' : 'h-1.5')}
     >
       <div
-        className={cn('relative h-full rounded-full transition-[width] duration-700 ease-out', encerrada ? 'bg-ok' : 'bg-brand-grad')}
+        className={cn('relative h-full rounded-full transition-[width] duration-700 ease-out', encerrada ? 'bg-brand' : 'bg-brand-grad')}
         style={{ width: `${pct}%` }}
       >
         {!encerrada && !aguardando ? (

@@ -44,7 +44,8 @@ export function ApuradoCell({ t, compact, bar = true }: { t: Pick<Tally, 'secoes
   return (
     <span className={cn('inline-flex items-center gap-2', compact ? 'w-full' : 'justify-end')}>
       <span className={cn('h-1 shrink-0 overflow-hidden rounded-full bg-surface-3', compact ? 'w-10' : bar ? 'hidden w-12 xl:block' : 'hidden')} aria-hidden>
-        <span className={cn('block h-full rounded-full', p >= 100 ? 'bg-ok' : 'bg-brand')} style={{ width: `${p}%` }} />
+        {/* progresso sempre na cor da marca (verde ficaria parecido com o turquesa do candidato A) */}
+        <span className="block h-full rounded-full bg-brand" style={{ width: `${p}%` }} />
       </span>
       <span className={cn('num whitespace-nowrap', compact ? 'text-[11.5px] text-fg-muted' : 'text-fg')}>{fmtPct(p, p >= 99.95 || p === 0 ? 0 : 1)}</span>
     </span>

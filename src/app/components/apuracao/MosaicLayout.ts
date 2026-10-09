@@ -1,7 +1,10 @@
 /**
- * Layout do mosaico de seções (puro, testável): blocos por zona em colunas de mesma largura, em ordem
- * (Zona 1, 2, 3…), cada uma na coluna mais baixa (masonry). O tamanho da célula
- * é o maior que faz o mosaico caber na altura-alvo (com mínimo legível).
+ * Layout do mosaico de seções (puro, testável): blocos por zona em colunas de mesma largura, em
+ * "prateleiras" — cada linha tem até `c` zonas em ordem (Zona 1, 2, 3 | Zona 4, 5, 6…) e a altura da
+ * linha é a do bloco mais alto. A ordem de leitura (esquerda → direita, cima → baixo) é sempre a
+ * ordem das zonas: quem procura "Zona 152" acha sem caçar pelo mosaico (o masonry anterior
+ * embaralhava a leitura). O tamanho da célula é o maior que faz o mosaico caber na altura-alvo
+ * (com mínimo legível).
  */
 
 export interface MosaicBlock {
@@ -52,19 +55,19 @@ function tentar(
   const blockW = Math.floor((width - (c - 1) * o.gapX) / c);
   const cols = Math.max(1, Math.floor((blockW + (p - cellDoPitch(p))) / p));
   const blocks: MosaicBlock[] = [];
-  // "Masonry" em ordem: cada zona vai para a coluna mais baixa (empate → a mais à esquerda).
-  // Mantém a leitura quase em linhas (Zona 1, 2, 3…) sem o vão das prateleiras.
-  const alturas = new Array<number>(c).fill(0);
-  for (let i = 0; i < zonas.length; i++) {
-    let col = 0;
-    for (let j = 1; j < c; j++) if (alturas[j] < alturas[col] - 0.5) col = j;
-    const z = zonas[i];
-    const rows = Math.max(1, Math.ceil(z.n / cols));
-    const h = o.labelH + rows * p;
-    blocks.push({ idx: i, zona: z.zona, n: z.n, x: col * (blockW + o.gapX), y: alturas[col], w: blockW, h, cols });
-    alturas[col] += h + o.gapY;
+  let y = 0;
+  for (let i = 0; i < zonas.length; i += c) {
+    let alturaLinha = 0;
+    for (let col = 0; col < c && i + col < zonas.length; col++) {
+      const z = zonas[i + col];
+      const rows = Math.max(1, Math.ceil(z.n / cols));
+      const h = o.labelH + rows * p;
+      blocks.push({ idx: i + col, zona: z.zona, n: z.n, x: col * (blockW + o.gapX), y, w: blockW, h, cols });
+      if (h > alturaLinha) alturaLinha = h;
+    }
+    y += alturaLinha + o.gapY;
   }
-  return { blocks, height: Math.max(0, Math.max(...alturas) - o.gapY) };
+  return { blocks, height: Math.max(0, y - o.gapY) };
 }
 
 export function layoutMosaico(

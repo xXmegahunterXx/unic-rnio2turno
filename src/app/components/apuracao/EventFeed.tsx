@@ -25,6 +25,8 @@ export interface EventFeedProps {
   className?: string;
 }
 
+const FADE_DIREITA = 'linear-gradient(90deg, black calc(100% - 28px), transparent)';
+
 const ICONE: Record<TipoEvento, IconName> = {
   inicio: 'play',
   marco: 'bandeira',
@@ -62,6 +64,8 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
         <ol
           aria-label="Últimos acontecimentos"
           className={cn('flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 scrollbar-none', bleed ? '-mx-4 scroll-px-4 px-4 sm:mx-0 sm:scroll-px-0 sm:px-0' : '')}
+          // esmaece a borda direita: dica de que a faixa rola (e o cartão seguinte não "corta" seco)
+          style={{ maskImage: FADE_DIREITA, WebkitMaskImage: FADE_DIREITA }}
         >
           <AnimatePresence initial={false}>
             {lista.map((e, i) => (
@@ -97,9 +101,8 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
 
   return (
     <ol aria-label="Acontecimentos da apuração" className={cn('relative', className)}>
-      <span aria-hidden className="absolute bottom-3 left-[15px] top-3 w-px bg-line" />
       <AnimatePresence initial={false}>
-        {lista.map((e) => (
+        {lista.map((e, i) => (
           <motion.li
             key={e.id}
             layout
@@ -109,7 +112,9 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
             transition={{ type: 'spring', stiffness: 360, damping: 36 }}
             className="relative"
           >
-            <div className="flex gap-3 pb-4">
+            {/* conector da linha do tempo: liga este ícone ao próximo (some no último item) */}
+            {i < lista.length - 1 ? <span aria-hidden className="absolute bottom-0 left-[15.5px] top-8 w-px bg-line/[2]" /> : null}
+            <div className={cn('flex gap-3', i < lista.length - 1 && 'pb-4')}>
               <span className={cn('relative z-[1] inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-4 ring-surface', tomEvento(e, race))}>
                 <Icon name={ICONE[e.tipo]} size={15} strokeWidth={2} />
               </span>

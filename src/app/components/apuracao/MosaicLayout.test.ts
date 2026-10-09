@@ -20,6 +20,18 @@ describe('layoutMosaico', () => {
       }
   });
 
+  it('mantém a ordem de leitura das zonas (esquerda → direita, cima → baixo)', () => {
+    for (const largura of [358, 720, 1100]) {
+      const l = layoutMosaico(zonasGrandes, largura, { alturaAlvo: 800 });
+      for (let i = 1; i < l.blocks.length; i++) {
+        const a = l.blocks[i - 1];
+        const b = l.blocks[i];
+        expect(b.zona).toBeGreaterThan(a.zona);
+        expect(b.y > a.y || (b.y === a.y && b.x > a.x)).toBe(true);
+      }
+    }
+  });
+
   it('usa células grandes para municípios pequenos e o mínimo legível para ~26 mil seções', () => {
     const pequeno = layoutMosaico([{ zona: 31, n: 30 }], 358);
     expect(pequeno.pitch).toBeGreaterThanOrEqual(14);

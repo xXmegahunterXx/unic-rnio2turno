@@ -192,7 +192,7 @@ export function createApp(deps: AppDeps) {
     const t0 = perf();
     const path = c.req.path;
     const api = path.startsWith('/api/');
-    if (api) metricas.clientes.registrar(clienteDe(c));
+    if (api) metricas.clientes.registrar(ipDe(c)); // vira 1 bit com sal (ClientesAtivos); o IP não é guardado
     await next();
     // headers direto no objeto (c.header() após o fim recriaria a Response e perderia o envio rápido do node-server)
     const h = c.res.headers;

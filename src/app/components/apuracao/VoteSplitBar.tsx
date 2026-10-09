@@ -82,7 +82,7 @@ export function VoteSplitBar({
       </div>
       {apurado !== undefined ? (
         <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-surface-3" aria-hidden>
-          <div className="h-full rounded-full bg-fg-muted/70 transition-[width] duration-700 ease-out" style={{ width: `${Math.max(0, Math.min(100, apurado))}%` }} />
+          <div className="h-full rounded-full bg-brand/80 transition-[width] duration-700 ease-out" style={{ width: `${Math.max(0, Math.min(100, apurado))}%` }} />
         </div>
       ) : null}
     </div>

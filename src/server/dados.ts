@@ -72,7 +72,9 @@ export class Dados {
     if (s.congelado) return `c${this.controller.state().congeladoEm ?? 0}`;
     if (s.fase === 'pre') return 'zero';
     if (s.fase === 'encerrada') return 'fim';
-    return `s${Math.floor(s.simNow / 1000)}`;
+    // 1 balde por segundo de parede (a 20×, 20 s simulados): os clientes consultam a cada 1,5–8 s, e a origem
+    // não precisa remontar/comprimir a mesma rota 20×/s
+    return `s${Math.floor(s.simNow / (1000 * Math.max(1, s.velocidade)))}`;
   }
 
   async nacional(race: RaceId): Promise<NationalSnapshot> {

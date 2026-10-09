@@ -10,7 +10,10 @@ import { UFS } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtHora, fmtInt, fmtPct, normalize } from '@/shared/format';
 import { pctTotalizadas } from '@/shared/calc';
-import { Badge, Button, Card, CardHeader, SearchBox, Segmented, Select, Slider, ThemeToggle, Toggle } from '@/app/ui';
+import { Button, Card, CardHeader, SearchBox, Segmented, Select, Slider, ThemeToggle, Toggle } from '@/app/ui';
+import { Container } from '@/app/components/layout/Container';
+import { PageHeader } from '@/app/components/layout/PageHeader';
+import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { TileMap } from '@/app/components/apuracao/TileMap';
 import { UfMap } from '@/app/components/apuracao/UfMap';
@@ -167,31 +170,29 @@ export default function KitVizPage() {
   const munNome = municipios.find((m) => m.cod === munSel)?.nome;
 
   return (
-    <div className="mx-auto w-full max-w-[1240px] px-4 pb-24 pt-6 sm:px-6">
-      <header className="mb-5">
-        <div className="mb-2 flex items-center gap-2">
-          <Badge tone="alert" caps size="xs">
-            Simulação · dados fictícios
-          </Badge>
-          <Badge tone="neutral" size="xs">
-            /kit/viz
-          </Badge>
-          <ThemeToggle size="sm" className="ml-auto" />
-        </div>
-        <h1 className="font-display text-[28px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[34px]">
-          Visualizações da apuração
-        </h1>
-        <p className="mt-1 max-w-[60ch] text-[14px] text-fg-muted">
-          Mapas, cartograma, corrida da apuração e mosaico de seções com geometrias reais do IBGE e números inventados.
-        </p>
-      </header>
+    <Container>
+      <PageHeader
+        eyebrow={
+          <span className="inline-flex items-center gap-2">
+            Design system · QA visual <SimulationRibbon variant="badge" />
+          </span>
+        }
+        title="Visualizações da apuração"
+        subtitle="Mapas, cartograma, corrida da apuração e mosaico de seções com geometrias reais do IBGE e números inventados."
+        breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Kit', to: '/kit' }, { label: 'Visualizações' }]}
+        actions={<ThemeToggle />}
+      />
 
       {/* Controles */}
-      <div className="glass sticky top-2 z-30 mb-6 rounded-2xl border border-line p-3 shadow-card sm:p-4">
+      <div
+        className="glass sticky z-30 mb-6 rounded-2xl border border-line p-3 shadow-card sm:p-4"
+        style={{ top: 'calc(var(--app-header-h, 64px) + 8px)' }}
+      >
         <div className="flex flex-wrap items-center gap-3">
           <Button
             size="sm"
             variant={tocando ? 'secondary' : 'primary'}
+            icon={tocando ? 'pause' : 'play'}
             onClick={() => {
               if (!tocando && pct >= 100) setPct(0);
               setTocando((t) => !t);
@@ -227,7 +228,7 @@ export default function KitVizPage() {
 
       {/* Brasil */}
       {mostrar('brasil') ? (
-        <div className="grid gap-4 lg:grid-cols-12">
+        <section id="brasil" className="grid scroll-mt-48 grid-cols-1 gap-4 lg:grid-cols-12">
           <Card className="lg:col-span-7" padding="md">
             <CardHeader title="Brasil por estado" subtitle="BrazilMap · clique numa UF (toque duas vezes no celular)" />
             <BrazilMap
@@ -257,12 +258,13 @@ export default function KitVizPage() {
               primeiroTurno={nac.primeiroTurno}
             />
           </Card>
-        </div>
+        </section>
       ) : null}
 
       {/* Série */}
       {mostrar('serie') ? (
-        <Card className="mt-4" padding="md">
+        <section id="serie" className="mt-4 scroll-mt-48">
+        <Card padding="md">
           <CardHeader
             title="A corrida da apuração"
             subtitle="TimelineChart · arraste sobre o gráfico"
@@ -281,11 +283,13 @@ export default function KitVizPage() {
           />
           <TimelineChart serie={nac.serie} race={FIX_RACE} eixoX={eixo} />
         </Card>
+        </section>
       ) : null}
 
       {/* UF */}
       {mostrar('ufmap') ? (
-        <Card className="mt-4" padding="md">
+        <section id="ufmap" className="mt-4 scroll-mt-48">
+        <Card padding="md">
           <CardHeader
             title={`Municípios · ${UF_NOMES[uf]}`}
             subtitle={`UfMap · ${fmtInt(municipios.length)} municípios${munNome ? ` · selecionado: ${munNome}` : ''}`}
@@ -325,11 +329,13 @@ export default function KitVizPage() {
           </Profiler>
           <MapLegend modo={modo} race={FIX_RACE} compacta className="mt-4" />
         </Card>
+        </section>
       ) : null}
 
       {/* Mosaico */}
       {mostrar('mosaico') ? (
-        <Card className="mt-4" padding="md">
+        <section id="mosaico" className="mt-4 scroll-mt-48">
+        <Card padding="md">
           <CardHeader
             title="Seções · capital fictícia (57 zonas)"
             subtitle={`SecaoMosaic · ${secSel ? `selecionada: zona ${secSel.zona}, seção ${secSel.secao}` : 'passe o mouse ou toque numa seção'}`}
@@ -344,9 +350,10 @@ export default function KitVizPage() {
             />
           </Profiler>
         </Card>
+        </section>
       ) : null}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-12">
+      <section id="extras" className="mt-4 grid scroll-mt-48 grid-cols-1 gap-4 lg:grid-cols-12">
         <Card className="lg:col-span-5" padding="md">
           <CardHeader title="Município pequeno" subtitle="SecaoMosaic · 1 zona, 30 seções" />
           <SecaoMosaic mosaico={mosaicoPequeno} race={FIX_RACE} legenda={false} />
@@ -372,7 +379,7 @@ export default function KitVizPage() {
             <dd className="text-fg">{mosaicoMs !== null ? `${mosaicoMs.toFixed(1)} ms` : '—'}</dd>
           </dl>
         </Card>
-      </div>
-    </div>
+      </section>
+    </Container>
   );
 }

@@ -38,7 +38,8 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
   if (v.tipo === 'indisponivel') return null;
   if (v.tipo === 'pre') {
     return (
-      <span className={cn(base, className)} role="status">
+      // role="timer" (aria-live implícito "off"): o relógio não é anunciado a cada segundo.
+      <span className={cn(base, className)} role="timer" aria-label={`Apuração começa em ${fmtFaltam(v.faltaMs)}`}>
         <Icon name="relogio" size={15} className="text-brand-fg" />
         <span className="text-fg-muted">{compact ? 'Em' : 'Começa em'}</span>
         <span className="num font-semibold">{fmtFaltam(v.faltaMs)}</span>
@@ -47,7 +48,7 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
   }
   if (v.tipo === 'encerrada') {
     return (
-      <span className={cn(base, className)} role="status">
+      <span className={cn(base, className)}>
         <Icon name="check-circulo" size={15} className="text-ok-fg" />
         <span className="font-semibold">{v.simulacao ? 'Simulação encerrada' : 'Encerrada'}</span>
       </span>
@@ -56,7 +57,7 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
   return (
     <span
       className={cn(base, v.simulacao && 'border-brand/35 bg-brand/10', className)}
-      role="status"
+      role="timer"
       aria-label={`${v.simulacao ? 'Simulação' : 'Ao vivo'}, ${fmtHoraSeg(v.simNow)} (horário de Brasília)`}
     >
       <LiveDot tone={v.simulacao ? 'brand' : 'live'} pulse={!v.parado} />

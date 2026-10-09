@@ -42,6 +42,11 @@ export interface PlacarProps {
   simulado?: boolean;
   /** Ações no canto (ex.: ShareButton). */
   actions?: ReactNode;
+  /**
+   * Anuncia mudanças a leitores de tela (`aria-live="polite"`). Padrão: só no 'hero' — o placar
+   * principal da página. Cartões compactos em grade NÃO devem anunciar (vários ao mesmo tempo viram ruído).
+   */
+  live?: boolean;
   className?: string;
 }
 
@@ -96,9 +101,11 @@ function PlacarDuelo({
   showVice,
   simulado,
   actions,
+  live,
   className,
 }: PlacarProps) {
   const hero = variant === 'hero';
+  const anunciar = live ?? hero;
   const { finalistas, outros } = linhas(race, resumo);
   const semVotos = validos(resumo) === 0;
   const vice = showVice ?? hero;
@@ -123,9 +130,13 @@ function PlacarDuelo({
         <div className={cn('absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl', b ? corSlot(b.c.cor).bgSoft : '', 'opacity-60')} />
       </div>
 
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {textoVivo(race, resumo)}
-      </p>
+      {anunciar ? (
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {textoVivo(race, resumo)}
+        </p>
+      ) : (
+        <p className="sr-only">{textoVivo(race, resumo)}</p>
+      )}
 
       <div className="relative">
         <div className="mb-4 flex min-h-[28px] items-center justify-between gap-3 sm:mb-6">
@@ -241,7 +252,7 @@ function LadoDuelo({
 
       <div className={cn('mt-3 flex h-6 items-center sm:mt-4', dir && 'justify-end')}>
         {l.lider && !semVotos && !l.eleito ? (
-          <Badge tone={toneFromCor(l.c.cor)} size="xs" caps icon={dir ? undefined : 'seta-cima'}>
+          <Badge tone={toneFromCor(l.c.cor)} size="xs" caps icon="seta-cima">
             À frente
           </Badge>
         ) : l.eleito ? (
@@ -273,15 +284,17 @@ function LadoDuelo({
   );
 }
 
-function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProgress = true, simulado, actions, className }: PlacarProps) {
+function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProgress = true, simulado, actions, live = false, className }: PlacarProps) {
   const { finalistas, outros } = linhas(race, resumo);
   const semVotos = validos(resumo) === 0;
   const eleito = finalistas.find((l) => l.eleito);
   const corpo = (
     <>
-      <p className="sr-only" aria-live="polite" aria-atomic="true">
-        {textoVivo(race, resumo)}
-      </p>
+      {live ? (
+        <p className="sr-only" aria-live="polite" aria-atomic="true">
+          {textoVivo(race, resumo)}
+        </p>
+      ) : null}
       <div className="mb-3.5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -343,7 +356,7 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
   );
   if (to) {
     return (
-      <Link to={to} className={cls} aria-label={`${typeof titulo === 'string' ? titulo : race.titulo}: ver detalhes`}>
+      <Link to={to} className={cls} aria-label={`${textoVivo(race, resumo)} Ver detalhes de ${typeof titulo === 'string' ? titulo : race.titulo}.`}>
         {corpo}
       </Link>
     );
