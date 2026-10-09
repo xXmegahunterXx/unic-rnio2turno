@@ -33,6 +33,7 @@ const routes: RouteObject[] = [
       { path: '/privacidade', element: page(() => import('./pages/static/PrivacidadePage')) },
       { path: '/sobre', element: page(() => import('./pages/static/SobrePage')) },
       { path: '/kit', element: page(() => import('./pages/dev/KitPage')) },
+      { path: '/kit/viz', element: page(() => import('./pages/dev/KitVizPage')) },
       { path: '*', element: page(() => import('./pages/static/NotFoundPage')) },
     ],
   },
