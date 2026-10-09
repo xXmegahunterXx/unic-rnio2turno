@@ -87,7 +87,7 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
       valor: v,
       pct: t.comparecimento > 0 ? (v / t.comparecimento) * 100 : null,
       sub: 'do comparecimento',
-      barra: 'bg-ok',
+      barra: 'bg-fg-muted',
     });
   }
 
@@ -101,7 +101,13 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
             </span>
             <dt className="min-w-0 flex-1 text-[14px] text-fg-muted">{it.label}</dt>
             <dd className="text-right">
-              <div className="num text-[15px] font-semibold text-fg">{fmtInt(it.valor)}</div>
+              {it.pct !== null || it.key === 'eleitorado' ? (
+                <div className="num text-[15px] font-semibold text-fg">{fmtInt(it.valor)}</div>
+              ) : (
+                <div className="text-[15px] font-semibold text-fg-subtle" title="Aguardando seções totalizadas">
+                  —
+                </div>
+              )}
               {it.pct !== null ? <div className="num text-[12px] text-fg-muted">{fmtPct(it.pct)}</div> : null}
             </dd>
           </div>

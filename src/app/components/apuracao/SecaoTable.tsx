@@ -7,10 +7,10 @@ import { margem, pctTotalizadas, pctValidos } from '@/shared/calc';
 import { fmtHora, fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot, slotDe } from '@/app/lib/raceUi';
-import { DataTable, type Column } from '@/app/ui/DataTable';
+import { DataTable, soAbaixoDe, type Column } from '@/app/ui/DataTable';
 import { Segmented } from '@/app/ui/Segmented';
 import { SearchBox } from '@/app/ui/SearchBox';
-import { ApuradoCell, CandHeader, MargemCell, PctCell, W, margemAssinada } from './cells';
+import { ApuradoCell, CandHeader, LARGURA, MargemCell, PctCell, W, margemAssinada } from './cells';
 import { CandidateAvatar } from './CandidateAvatar';
 
 export interface ZonaTableProps {
@@ -33,7 +33,7 @@ export function ZonaTable({ race, zonas, onSelect, selected, className }: ZonaTa
       cell: (z) => (
         <span className="block">
           <span className="font-mono text-[13px] font-semibold">{String(z.zona).padStart(3, '0')}</span>
-          <span className="mt-0.5 block sm:hidden">
+          <span className={cn('mt-0.5 block', soAbaixoDe[LARGURA.apurado])}>
             <ApuradoCell t={z} compact />
           </span>
         </span>
@@ -43,7 +43,7 @@ export function ZonaTable({ race, zonas, onSelect, selected, className }: ZonaTa
       key: 'secoes',
       header: 'Seções',
       align: 'right',
-      hideBelow: 'md',
+      hideBelowWidth: LARGURA.secundaria,
       width: 'w-[6rem]',
       sortValue: (z) => z.secoes,
       cell: (z) => (
@@ -52,7 +52,7 @@ export function ZonaTable({ race, zonas, onSelect, selected, className }: ZonaTa
         </span>
       ),
     },
-    { key: 'apurado', header: 'Apurado', align: 'right', hideBelow: 'sm', width: W.apurado, sortValue: (z) => pctTotalizadas(z), cell: (z) => <ApuradoCell t={z} /> },
+    { key: 'apurado', header: 'Apurado', align: 'right', hideBelowWidth: LARGURA.apurado, width: W.apurado, sortValue: (z) => pctTotalizadas(z), cell: (z) => <ApuradoCell t={z} /> },
     { key: 'a', header: <CandHeader c={ca} />, headerLabel: ca.nomeUrna, align: 'right', width: W.pct, sortValue: (z) => pctValidos(z, 0), cell: (z) => <PctCell t={z} i={0} race={race} /> },
     { key: 'b', header: <CandHeader c={cb} />, headerLabel: cb.nomeUrna, align: 'right', width: W.pct, sortValue: (z) => pctValidos(z, 1), cell: (z) => <PctCell t={z} i={1} race={race} /> },
     { key: 'margem', header: 'Margem', align: 'right', width: W.margem, sortValue: margemAssinada, cell: (z) => <MargemCell t={z} race={race} /> },
@@ -118,7 +118,7 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
       cell: (s) =>
         s.totalizada ? (
           <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-fg">
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-ok" />
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
             <span className="num">{s.totalizadaEm ? fmtHora(s.totalizadaEm) : 'Totalizada'}</span>
             <span className="sr-only">totalizada</span>
           </span>
@@ -129,12 +129,12 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
           </span>
         ),
     },
-    { key: 'aptos', header: 'Aptos', align: 'right', hideBelow: 'sm', width: 'w-[4.5rem]', sortValue: (s) => s.aptos, cell: (s) => fmtInt(s.aptos) },
+    { key: 'aptos', header: 'Aptos', align: 'right', hideBelowWidth: 520, width: 'w-[4.5rem]', sortValue: (s) => s.aptos, cell: (s) => fmtInt(s.aptos) },
     {
       key: 'comp',
       header: 'Votaram',
       align: 'right',
-      hideBelow: 'md',
+      hideBelowWidth: 640,
       width: 'w-[5.75rem]',
       sortValue: (s) => s.comparecimento,
       cell: (s) => (s.totalizada ? fmtInt(s.comparecimento) : <span className="text-fg-subtle">—</span>),
@@ -162,7 +162,7 @@ export function SecaoTable({ race, secoes, onSelect, selected, pageSize = 30, fi
       header: 'Venc.',
       headerLabel: 'Vencedor',
       align: 'center',
-      hideBelow: 'sm',
+      hideBelowWidth: 420,
       width: 'w-[4.25rem]',
       sortValue: (s) => (s.totalizada ? margemAssinada(s) : -999),
       cell: (s) => {

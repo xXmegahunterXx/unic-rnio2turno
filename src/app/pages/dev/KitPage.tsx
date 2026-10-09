@@ -8,7 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearchParams } from 'react-router-dom';
 import type { LiveStatus, RaceId, UF } from '@/shared/types';
 import { INICIO_APURACAO, UF_NOMES } from '@/shared/constants';
-import { fmtCompact, fmtInt, fmtPct } from '@/shared/format';
+import { fmtCompact, fmtInt, fmtPct, fmtPP } from '@/shared/format';
 import { coreFixtures, INSTANTES, INSTANTE_ROTULO, RACES, type Instante } from '@/app/fixtures/core';
 import { cn } from '@/app/lib/cn';
 import { MARGEM_ROTULOS, fillMargem, FILL_PENDENTE } from '@/app/lib/raceUi';
@@ -135,7 +135,7 @@ export default function KitPage() {
       />
 
       {/* barra de controle do kit */}
-      <div className="sticky z-30 mb-2 rounded-2xl border border-line bg-surface/90 px-3 py-2.5 shadow-card backdrop-blur-md" style={{ top: 'calc(var(--app-header-h, 64px) + 8px)' }}>
+      <div className="sticky z-30 mb-2 rounded-2xl border border-line bg-surface/95 px-3 py-2.5 shadow-card backdrop-blur-md" style={{ top: 'calc(var(--app-header-h, 64px) + 8px)' }}>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <span className="text-[12px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Instante</span>
           <Segmented<`${Instante}`>
@@ -364,6 +364,21 @@ function Fundamentos() {
             <Swatch cls="bg-cand-a-soft" nome="cand-a-soft" />
             <Swatch cls="bg-cand-b-soft" nome="cand-b-soft" />
             <Swatch cls="bg-fg-subtle" nome="fg-subtle" />
+            <Swatch cls="bg-brand-deep" nome="brand-deep" />
+            <Swatch cls="bg-brand-cta" nome="brand-cta" />
+          </div>
+          <div className="mt-5">
+            <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-fg-muted">
+              Texto colorido (AA ≥ 4,5:1) · tokens <span className="font-mono normal-case tracking-normal">*-fg</span>
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[14px] font-semibold">
+              <span className="text-brand-fg">brand-fg</span>
+              <span className="text-cand-a-fg">cand-a-fg</span>
+              <span className="text-cand-b-fg">cand-b-fg</span>
+              <span className="text-ok-fg">ok-fg</span>
+              <span className="text-alert-fg">alert-fg</span>
+              <span className="text-fg-subtle">fg-subtle</span>
+            </div>
           </div>
           <div className="mt-5">
             <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Margem (mapas) · raceUi.fillMargem</div>
@@ -554,7 +569,7 @@ function Controles() {
               max={5}
               step={0.5}
               origin={0}
-              format={(v) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1).replace('.', ',')} p.p.`}
+              format={(v) => fmtPP(v)}
               marks={[{ value: -5, label: '−5' }, { value: 0, label: '0' }, { value: 5, label: '+5' }]}
             />
             <div className="grid grid-cols-2 gap-3">

@@ -13,6 +13,7 @@
 import type { DatasetMeta, UfDataset } from '../shared/dataset';
 import type { AdminCommand, AdminSnapshot, PublicMeta } from '../shared/api';
 import { INICIO_APURACAO } from '../shared/constants';
+import { fmtDataHora, fmtHoraSeg } from '../shared/format';
 import type {
   AdminMetrics,
   AdminState,
@@ -73,6 +74,8 @@ const MAX_SNAPSHOTS = 96;
 const MAX_LOG = 100;
 
 const perf = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+/** "18:30:00 de 25/10" (horário de Brasília) para o log do monitor do admin. */
+const quando = (ms: number) => `${fmtHoraSeg(ms)} de ${fmtDataHora(ms).slice(0, 5)}`;
 
 /** Carrega meta + as 28 UFs (paralelo). Caminhos relativos: 'data/meta.json', 'data/uf/sp.json'. */
 export async function loadDataset(load: JsonLoader): Promise<LoadedDataset> {
@@ -331,7 +334,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         if (!Number.isFinite(s)) throw new CommandError('saltar-tempo: simNow inválido.');
         const alvo = Math.min(INI + 36 * 3600_000, Math.max(INI - 7 * 86400_000, s));
         state = { ...state, relogio: { ...state.relogio, ancoraWall: wall, ancoraSim: alvo } };
-        log(`Relógio saltou para ${new Date(alvo).toISOString()}`);
+        log(`Relógio saltou para ${quando(alvo)}`);
         break;
       }
       case 'saltar-pct': {
@@ -339,7 +342,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw new CommandError('saltar-pct: pct deve estar entre 0 e 100.');
         const alvo = Math.ceil(tempoParaPct(pct) / 1000) * 1000;
         state = { ...state, relogio: { ...state.relogio, ancoraWall: wall, ancoraSim: alvo } };
-        log(`Relógio saltou para ${pct}% das seções (${new Date(alvo).toISOString()})`);
+        log(`Relógio saltou para ${pct}% das seções (${quando(alvo)})`);
         break;
       }
       case 'cenario': {

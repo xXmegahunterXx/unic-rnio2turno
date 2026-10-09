@@ -82,9 +82,11 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
   }
   if (!isObj(v)) return fallback;
   const r = isObj(v.relogio) ? v.relogio : {};
+  // mesma faixa que o comando `velocidade` aceita (0 < v ≤ 10000): ida e volta sem alterar o relógio
+  const vel = finito(r.velocidade, fallback.relogio.velocidade);
   const relogio: ClockState = {
     rodando: typeof r.rodando === 'boolean' ? r.rodando : fallback.relogio.rodando,
-    velocidade: Math.min(10000, Math.max(0.01, finito(r.velocidade, fallback.relogio.velocidade))),
+    velocidade: vel > 0 ? Math.min(10000, vel) : fallback.relogio.velocidade,
     ancoraWall: finito(r.ancoraWall, fallback.relogio.ancoraWall),
     ancoraSim: finito(r.ancoraSim, fallback.relogio.ancoraSim),
   };

@@ -14,8 +14,18 @@ Regras que os componentes já cumprem — e que as páginas devem manter:
 - **Números**: classe `.num` + formatadores de `src/shared/format.ts`; percentuais de `src/shared/calc.ts`.
 - **Simulação sinalizada**: o AppShell já mostra a faixa quando `status.simulacao`; passe `simulado` para
   `Placar`, `ShareCard`/`ShareButton` (e o BU usa `secao.simulado`).
-- Evite `divide-line` e `bg-line` puros (o utilitário gerado pelo Tailwind sai com alfa 1, branco/preto chapado).
-  Use `border-b border-line` em cada item, ou `bg-[rgb(var(--line)/var(--line-alpha))]`.
+- **Linhas**: `border-line`, `bg-line`, `divide-line`, `ring-line`, `decoration-line` saem sempre sutis (o alfa vem
+  do tema, `--line-alpha`). O modificador multiplica esse alfa: `border-line/[2]` = 2× mais visível (hover).
+- **Texto colorido** usa os tokens `*-fg` (AA ≥ 4,5:1 nos dois temas, inclusive sobre o fundo suave `bg-x/15`):
+  `text-brand-fg`, `text-cand-a-fg`, `text-cand-b-fg`, `text-ok-fg`, `text-alert-fg`. As cores puras
+  (`text-cand-a`, `text-brand-2`…) só em números grandes (≥ 24 px, 3:1) e ícones. `corSlot(cor).text` já devolve o `*-fg`.
+- **Botões com texto branco** sobre a marca: `bg-brand-cta` (violeta → púrpura, ≥ 4,5:1). `bg-brand-grad`
+  (violeta → lilás) é decorativo (barras, realces) — nunca sob texto.
+- **Progresso = marca** (`bg-brand`/`bg-brand-grad`), inclusive em 100%. Não use `ok` (verde) perto de dados de
+  candidato: fica parecido com o turquesa do slot A.
+- **Tabelas respondem à largura delas mesmas** (container query da `DataTable`): use `hideBelowWidth` nas colunas
+  secundárias e `soAbaixoDe[...]` para o conteúdo que as substitui (ex.: % apurado sob o nome). Assim a mesma tabela
+  fica certa no celular e num cartão de meia largura no desktop. `LARGURA` e `W` (em `cells.tsx`) trazem os padrões.
 - Grids com conteúdo largo: use `grid-cols-1 lg:grid-cols-2` (não só `lg:grid-cols-2`), senão a trilha
   implícita `auto` estoura a largura no celular.
 
@@ -43,7 +53,8 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 | `estimarSimNow(status, recebidoEm, agora)` / `useSimNow(status, recebidoEm)` | interpola o relógio da apuração entre polls (`recebidoEm` = `query.dataUpdatedAt`). |
 | `useRaceParam(padrao = 'pres')` | `[race, setRace(id, { replace? })]` em `?race=` (omitido quando `'pres'`; preserva os outros params). |
 | `share.ts` | `compartilhar({ titulo?, texto, url? })` (Web Share → WhatsApp), `whatsappUrl(texto, url?)`, `abrirWhatsapp`, `copiarTexto`, `copiarLink(url?)`, `urlAbsoluta(caminho)` (funciona no HashRouter do demo), `hostExibicao()`, `nodeToPngBlob(node, opts)`, `downloadNodeAsPng(node, nome, opts)`, `compartilharNodeComoImagem(node, nome, input)` (html-to-image carregado sob demanda). |
-| `raceUi.ts` (**contrato com mapas**) | `corSlot(cor)` → `{ bg, bgSoft, bgFaint, text, textDisplay, ink, fill, stroke, border, ring, glow, css, cssVar }`; `slotDe(race, i)`; `rgbSlot(cor, α)`; `fillMargem(cor, bucket 0–3)` → `rgb(var(--cand-a) / α)`; `MARGEM_ALPHA`, `MARGEM_ROTULOS`; `fillTally(race, tally)`; `fillApurado(pct)` / `fillApuradoTally(t)`; `fillMosaico(ch, cores?)`; `FILL_PENDENTE`, `FILL_EMPATE`, `FILL_NEUTRO`, `STROKE_DIVISA`. `text` tem contraste AA (≥ 4,5:1) nos dois temas; `textDisplay` é para números ≥ 24 px. |
+| `tokens.ts` | Cores em tempo de execução (fonte única): `tokenCss(token, α)` (único construtor de `rgb(var(--x) / α)`), `useTokenColors()`/`getTokens()` (RGB do tema atual, re-renderiza na troca), `resolveFill(css, tokens)`, `inkToken(fill, tokens)`, `contraste(a, b)`, `rgbCss`. Usado pelo canvas do mosaico e pelos rótulos dos mapas. |
+| `raceUi.ts` (**contrato com mapas**) | `corSlot(cor)` → `{ bg, bgSoft, bgFaint, text, textDisplay, ink, fill, stroke, border, ring, glow, css, cssVar, token }` (`text` = AA, `textDisplay` = cor pura para números grandes); `slotDe(race, i)`; `rgbSlot(cor, α)`; `fillMargem(cor, bucket 0–3)` → `rgb(var(--cand-a) / α)`; `MARGEM_ALPHA`, `MARGEM_ROTULOS`; `fillTally(race, tally)`; `fillApurado(pct)` / `fillApuradoTally(t)`; `fillMosaico(ch, cores?)`; `FILL_PENDENTE`, `FILL_EMPATE`, `FILL_NEUTRO`, `STROKE_DIVISA`. `text` tem contraste AA (≥ 4,5:1) nos dois temas; `textDisplay` é para números ≥ 24 px. |
 
 ### `src/app/ui/` (primitivos — `import { … } from '@/app/ui'`)
 
@@ -54,7 +65,7 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 | `IconButton` | `icon`, `label` (obrigatório, vira aria-label/title), `variant='ghost'`, `size`. |
 | `Card` / `CardHeader` | `Card`: `padding: 'none'\|'sm'\|'md'\|'lg'`, `highlight?`, `interactive?`, `as?`. `CardHeader`: `title`, `subtitle?`, `actions?`, `icon?`. |
 | `Badge` / `Pill` | `Badge`: `tone: 'neutral'\|'brand'\|'ok'\|'alert'\|'pending'\|'cand-a'\|'cand-b'\|'outros'\|'solid'`, `size: 'xs'\|'sm'\|'md'`, `icon?`, `dot?`, `caps?`. `toneFromCor(cor)`. `Pill`: `active?`. |
-| `Segmented<V>` | `options: { value, label, icon?, ariaLabel?, disabled? }[]`, `value`, `onChange`, `ariaLabel`, `size: 'sm'\|'md'`, `block?`, `role: 'radiogroup'\|'tablist'`. Indicador animado, setas do teclado. |
+| `Segmented<V>` | `options: { value, label, icon?, ariaLabel?, disabled? }[]`, `value`, `onChange`, `ariaLabel`, `size: 'sm'\|'md'`, `block?`, `role: 'radiogroup'\|'tablist'`. Indicador deslizante em CSS (mede só quando a seleção/tamanho muda; memoizado), setas do teclado. |
 | `Tooltip` | `content`, `children` (1 elemento focável), `side: 'top'\|'bottom'`, `delay=120`. Hover, foco e toque; portal. |
 | `Sheet` | `open`, `onClose`, `title`, `description?`, `footer?`, `side: 'right'\|'left'`, `width: 'sm'\|'md'\|'lg'`. Celular: painel inferior com arrastar p/ fechar; desktop: gaveta. Foco preso, Esc, rolagem travada. |
 | `Dialog` | `open`, `onClose`, `title`, `description?`, `footer?`, `size: 'sm'\|'md'\|'lg'`. |
@@ -64,7 +75,7 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 | `Countdown` | `target` (epoch ms), `now?` (relógio simulado), `size: 'sm'\|'md'\|'lg'`, `hideZeroDays=true`, `doneLabel`. Utilitários `partesTempo(ms)`, `fmtFaltam(ms)` ("2d 4h"). |
 | `SearchBox` | `value`, `onChange(v)`, `size: 'sm'\|'md'\|'lg'`, `placeholder`, `trailing?` + props de `<input>`. |
 | `Combobox` | `options: { value, label, hint?, keywords? }[]`, `onSelect(opt)`, `value?`, `label?`, `placeholder`, `maxResults=60`, `emptyText`, `size: 'md'\|'lg'`, `openOnFocus=true`. Busca sem acento/caixa, ↑/↓/Enter/Esc, realce do trecho. Helpers `casa`, `pontuar`, `realcar`. |
-| `DataTable<R>` | `rows`, `columns: Column<R>[]`, `rowKey`, `onRowClick?`, `rowLabel?`, `rowClassName?`, `initialSort?` ou `sort`+`onSortChange`, `stickyHeader=true`, `stickyOffset` (padrão `var(--app-header-h)`), `maxHeight?` (rolagem interna), `pageSize?` + `itemLabel` ("Ver mais"), `density: 'auto'\|'compact'\|'comfortable'`, `caption`, `empty`. `Column`: `key`, `header`, `headerLabel?`, `cell(row)`, `sortValue?`, `firstDir?`, `align?`, `width?`, `hideBelow?: 'sm'\|'md'\|'lg'`, `grow?` (coluna elástica que trunca → tabela com layout fixo; dê `width` às demais). |
+| `DataTable<R>` | `rows`, `columns: Column<R>[]`, `rowKey`, `onRowClick?`, `rowLabel?`, `rowClassName?`, `initialSort?` ou `sort`+`onSortChange`, `stickyHeader=true`, `stickyOffset` (padrão `var(--app-header-h)`), `maxHeight?` (rolagem interna), `pageSize?` + `itemLabel` ("Ver mais"), `density: 'auto'\|'compact'\|'comfortable'`, `caption`, `empty`. `Column`: `key`, `header`, `headerLabel?`, `cell(row)`, `sortValue?`, `firstDir?`, `align?`, `width?`, `hideBelow?: 'sm'\|'md'\|'lg'`, `grow?` (coluna elástica que trunca → tabela com layout fixo; dê `width` às demais). | **Colunas**: `hideBelowWidth?: 420 \| 520 \| 640 \| 760` (largura da tabela) — prefira a `hideBelow` (janela); `soAbaixoDe[w]` para conteúdo substituto. Ícone de ordenação fica no respiro da célula (não trunca o rótulo).
 | `Toggle` | `checked`, `onChange`, `label?`, `description?`, `ariaLabel?`, `size`. `role="switch"`. |
 | `Slider` | `value`, `onChange`, `min`, `max`, `step`, `label?`, `format?`, `marks?: { value, label? }[]`, `origin?` (preenche a partir dele), `disabled?`. |
 | `Select` | `options: { value, label, disabled? }[]`, `label?`, `size` + props de `<select>` (nativo). |
@@ -91,7 +102,7 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 |---|---|
 | `CandidateAvatar` | `candidato?` (ou `nome` + `cor`), `size: 'xs'\|'sm'\|'md'\|'lg'\|'xl'`, `eleito?`, `dim?`. Monograma (`iniciais()` ignora títulos como “Professora”). |
 | `CandidateName` | `candidato`, `showPartido=true`, `showNumero=true`, `showVice?`, `size: 'sm'\|'md'\|'lg'\|'xl'`, `align`, `colored?`. |
-| `Placar` | `race`, `resumo: Summary`, `variant: 'hero'\|'default'\|'compact'`, `titulo?`, `subtitulo?` (compact), `to?`/`onClick?` (compact clicável), `showProgress=true`, `showVice?`, `simulado?`, `actions?` (ex.: `<ShareButton iconOnly/>`). `aria-live` com resumo em 1 casa decimal. Selo “À frente” / “Eleito” / “Matematicamente eleito”; 1º turno mostra “Demais candidatos”. |
+| `Placar` | `race`, `resumo: Summary`, `variant: 'hero'\|'default'\|'compact'`, `titulo?`, `subtitulo?` (compact), `to?`/`onClick?` (compact clicável), `showProgress=true`, `showVice?`, `simulado?`, `actions?` (ex.: `<ShareButton iconOnly/>`). `aria-live` com resumo em 1 casa decimal. Selo “À frente” / “Eleito” / “Matematicamente eleito”; 1º turno mostra “Demais candidatos”. | `live?` (padrão: só no `hero`) liga o `aria-live`; cartões compactos em grade não anunciam.
 | `VoteSplitBar` | `votos`, `cores?`, `apurado?` (trilho), `size: 'xs'\|'sm'\|'md'\|'lg'`, `showMarker=true` (50%), `showLabels?`, `nomes?`, `ariaLabel?`. |
 | `ApuracaoProgress` | `resumo` (`secoes`, `secoesTotalizadas`, `ultimaAtualizacao`, `status`), `variant: 'default'\|'compact'\|'inline'`. |
 | `StatsGrid` | `t: Tally`, `showValidos?`, `variant: 'cards'\|'list'`. |
@@ -144,12 +155,13 @@ Regras que estes componentes já cumprem:
 
 - **Cores só por token**: os preenchimentos são strings `rgb(var(--cand-a) / α)` de `src/app/lib/raceUi.ts`
   (`fillMargem`, `fillApurado`, `fillMosaico`…). No canvas (mosaico) os tokens são lidos do CSS em tempo de execução
-  (`mapColors.ts`) e o desenho refaz sozinho quando o tema muda. Nunca hex.
+  (`src/app/lib/tokens.ts`) e o desenho refaz sozinho quando o tema muda. Nunca hex.
 - **Identidade nunca só pela cor**: toda legenda e tooltip traz o nome do candidato; rótulos sobre o mapa escolhem a
   tinta (`fg` ou `bg`) pelo contraste com o preenchimento.
 - **Pendente** (nenhuma seção totalizada) = `pending` com hachura sutil, em todos os modos.
-- **Acessibilidade**: BrazilMap tem foco por Tab em cada UF (Enter seleciona, Esc fecha) + tabela equivalente
-  (`sr-only`); TileMap usa `<button>`; TimelineChart tem setas/Home/End e tabela de checkpoints; SecaoMosaic tem setas,
+- **Acessibilidade**: BrazilMap e TileMap são **uma** parada de Tab (roving tabindex): as setas andam para a UF
+  vizinha naquela direção (`vizinhoNaDirecao` em `MapHooks.ts`), Enter seleciona, Esc fecha; há tabela equivalente
+  (`sr-only`) e dica de teclado via `aria-describedby`; TimelineChart tem setas/Home/End e tabela de checkpoints; SecaoMosaic tem setas,
   PageUp/PageDown (zonas), Enter e anúncio `aria-live`.
 - **Toque**: no celular o 1º toque mostra o placar (encaixado abaixo do mapa quando ele tem < 520 px, para não cobrir as
   UFs) e o 2º toque — ou o botão "Ver …" — seleciona.
@@ -176,10 +188,10 @@ Regras que estes componentes já cumprem:
 |---|---|
 | `geo.ts` | `useGeo()` → Brasil, `useGeo(uf)` → municípios: `{ data, error, loading }` (cache em memória, `assetUrl`); `loadGeoBrasil()`, `loadGeoUf(uf)`, `prefetchGeo(uf?)`; `GeoUfExt` (= `GeoUf` + `encartes?`), `pathBBox`, `bboxes`, `parseViewBox`. |
 | `mapModes.ts` | `MapMode`, `MAP_MODES` (rótulos), `valorModo(modo, tally, { race, primeiroTurno? })` → `{ fill, pendente, rotulo, valor }`, `legendaModo(modo, race)` → `LegendSpec`, `rotuloApurado(pct)` (nunca mostra 100% antes do fim), `baseFinalistas`, `votosPorIbge`, constantes `MARGEM_MAX_PP` (40), `VARIACAO_MAX_PP` (10), `COMPARECIMENTO_DOMINIO` (68–88%). Variação = % válidos do candidato 0 agora − participação dele entre os dois finalistas no 1º turno. |
-| `mapColors.ts` | `useTokenColors()` (tokens RGB do tema atual), `resolveFill(css, tokens)`, `inkToken(fill, tokens)`, `contraste`, `tokenCss(token, α)`. |
+| `src/app/lib/tokens.ts` | (antigo `mapColors.ts`, unificado com `raceUi`) `useTokenColors()`, `resolveFill(css, tokens)`, `inkToken(fill, tokens)`, `contraste`, `tokenCss(token, α)`. |
 | `MapZoom.ts` | `useMapZoom({ w, h, maxK })`: gesto só em `transform` CSS (GPU), consolidado no `<g transform>` ao soltar. |
-| `MosaicLayout.ts` | `layoutMosaico(zonas, largura, opts)` (puro, testado), `hitMosaico`, `cellPos`. |
-| `MapHatch.tsx`, `MapHooks.ts` | hachura (`<pattern>`/CSS) e hooks (`useElementSize`, `useClickOutside`). |
+| `MosaicLayout.ts` | `layoutMosaico(zonas, largura, opts)` (puro, testado): zonas em "prateleiras" na ordem de leitura (Zona 1, 2, 3 \| 4, 5, 6…); `hitMosaico`, `cellPos`. |
+| `MapHatch.tsx`, `MapHooks.ts` | hachura (`<pattern>`/CSS) e hooks (`useElementSize`, `useClickOutside`, `vizinhoNaDirecao`/`ehSeta` para navegação por setas). |
 
 ### Exemplo
 

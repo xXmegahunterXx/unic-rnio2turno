@@ -10,6 +10,10 @@
  *  - série (t e pst não decrescentes, pst = 100 só com 100%, termina em 100) e feed (só cresce; evento
  *    "eleito" ⇔ Summary.eleito).
  * Os erros são acumulados (sem `expect` no laço quente) e comparados com [] ao fim de cada bloco.
+ * Repete a varredura (sem o detalhe de zonas/seções) em presets com virada, definição tardia e fim após a
+ * meia-noite. Também: comandos do admin em sequência (estado/versão/fase/relógio coerentes, inválidos sem
+ * efeito), ida e volta toJSON → parseAdminState → initialState/setState, agregador com acesso aleatório,
+ * neutralidade (textos e presets espelhados) e desempate neutro com alvo 50,00%.
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { AdminCommand } from '../shared/api';
@@ -19,15 +23,20 @@ import type {
   FeedEvent,
   NationalSnapshot,
   Regiao,
+  ScenarioConfig,
   SeriePoint,
   Summary,
   UF,
   ZonaMosaico,
 } from '../shared/types';
+import { Aggregator } from './aggregate';
 import { CommandError, type Controller } from './api';
 import { createController, ENCERRAMENTO_MS } from './controller';
+import { textos as textosEventos } from './events';
+import { buildModel } from './model';
+import { PRESET_IDS, presetList } from './presets';
 import { triple32 } from './rng';
-import { cenarioPadrao } from './scenario';
+import { cenarioPadrao, mesclaCenario } from './scenario';
 import { estadoMosaico } from './snapshots';
 import { estadoPadrao, parseAdminState } from './state';
 import { buildStructure } from './structure';
@@ -669,10 +678,185 @@ describe('comandos combinados', () => {
       );
     }
     expect(onStateChange).not.toHaveBeenCalled();
+    // regressão: toda velocidade aceita pelo comando (0 < v ≤ 10000) sobrevive à ida e volta (antes, < 0,01
+    // virava 0,01 na restauração e o relógio saltava)
+    for (const v of [0.005, 0.01, 10000]) {
+      const d = createController(ds, { modo: 'demo', now: r.now });
+      d.command({ tipo: 'velocidade', velocidade: v });
+      expect(parseAdminState(d.toJSON(), fb, stDs).relogio.velocidade, String(v)).toBe(v);
+    }
     // descongelado depois da restauração: os dois andam juntos
     a.command({ tipo: 'congelar', congelado: false });
     b.command({ tipo: 'congelar', congelado: false });
     r.add(5000);
     expect(semGeradoEm(b.nacional('pres'))).toEqual(semGeradoEm(a.nacional('pres')));
+  });
+});
+
+describe('agregador incremental', () => {
+  it('acesso aleatório (para frente, para trás, repetido) = cálculo do zero', () => {
+    const model = buildModel(stDs, cenarioPadrao(stDs));
+    const agg = new Aggregator(model, 4);
+    const N = stDs.nSec;
+    const ks = [0, N, 1, N - 1, 250_000, 250_001, 249_999, 10, 400_000, 399_000, 401_000, 5, N, 0, 123_456];
+    for (let i = 0; i < 25; i++) ks.push(triple32(i + 31) % (N + 1));
+    for (const k of ks) {
+      const a = agg.get(k);
+      const ref = new Aggregator(model, 1).get(k); // sem cache: do zero
+      expect(a.k).toBe(k);
+      expect(Buffer.from(a.mun.buffer).equals(Buffer.from(ref.mun.buffer)), `k=${k}`).toBe(true);
+    }
+    // o agregado em cache não é alterado por cálculos incrementais posteriores
+    const k0 = agg.get(1000);
+    const copia = k0.mun.slice();
+    agg.get(300_000);
+    expect(Buffer.from(agg.get(1000).mun.buffer).equals(Buffer.from(copia.buffer))).toBe(true);
+  });
+});
+
+describe('neutralidade dos textos e dos presets', () => {
+  it(
+    'todo evento de todos os presets segue um modelo neutro, igual para os dois candidatos',
+    { timeout: 300_000 },
+    () => {
+      const r = relogio(Date.UTC(2026, 9, 25, 12, 0));
+      const c = createController(ds, { modo: 'demo', now: r.now });
+      c.command({ tipo: 'relogio', acao: 'pausar' });
+      const P = '\\d{1,3}(,\\d{1,2})?%';
+      const LOC = '(N[oa]s? .+|Em .+|No exterior)';
+      const modelos = [
+        /^Começa a divulgação dos resultados$/,
+        new RegExp(`^\\d{1,3}% das seções totalizadas$`),
+        /^Apuração concluída: 100% das seções totalizadas$/,
+        new RegExp(`^Com ${P} das seções totalizadas, \\{C\\} (sai na frente|passa à frente)$`),
+        new RegExp(`^${LOC}, \\{C\\} (sai na frente|passa à frente)$`),
+        /^Metade das seções totalizadas (n[oa] .+|em .+|no exterior)$/,
+        /^(.+ conclui a apuração|Votos do exterior: apuração concluída)$/,
+        /^\{C\} está matematicamente eleito$/,
+        /^A vitória de \{C\} está matematicamente definida$/,
+        /^Com 100% das seções totalizadas, \{C\} vence a eleição$/,
+      ];
+      const proibido =
+        /[!?]|esmag|derrot|humilh|surpreend|arras|lavada|folga|dispar|despenc|histór|incr[ií]vel|favorit|sonho|virou o jogo/i;
+      const vistos = new Map<string, Set<number>>(); // modelo → candidatos que já apareceram nele
+      const erros: string[] = [];
+      const races = new Map(ds.meta.races.map((x) => [x.id, x]));
+      for (const p of PRESET_IDS) {
+        c.command({ tipo: 'preset', preset: p });
+        c.command({ tipo: 'saltar-tempo', simNow: c.fimPrevisto()! + ENCERRAMENTO_MS });
+        const feeds: FeedEvent[][] = [c.nacional('pres').eventos];
+        for (const u of ds.meta.ufs) feeds.push(c.uf('pres', u.uf).eventos);
+        for (const g of GOVS) feeds.push(c.nacional(g).eventos);
+        for (const ev of feeds.flat()) {
+          const race = races.get(ev.race)!;
+          const nomes = race.candidatos.map((x) => x.nomeUrna);
+          let t = ev.titulo;
+          // nome mais longo primeiro ("Cadu de Lula" antes de "Lula")
+          for (const n of [...nomes].sort((a, b) => b.length - a.length)) t = t.split(n).join('{C}');
+          const m = modelos.findIndex((re) => re.test(t));
+          if (m < 0) erros.push(`${p}: título fora dos modelos: "${ev.titulo}"`);
+          if (proibido.test(ev.titulo + ' ' + (ev.detalhe ?? '')))
+            erros.push(`${p}: termo não neutro: "${ev.titulo}" / "${ev.detalhe}"`);
+          if (t.includes('{C}') && ev.candidato === undefined)
+            erros.push(`${p}: evento com candidato sem índice: ${ev.titulo}`);
+          if (ev.candidato !== undefined && ev.tipo !== 'uf-encerrada' && !ev.titulo.includes(nomes[ev.candidato]))
+            erros.push(`${p}: candidato ${ev.candidato} ausente do título "${ev.titulo}"`);
+          // placar sempre na ordem da urna, com os dois nomes
+          if (ev.detalhe && /%/.test(ev.detalhe) && ev.detalhe.includes(' · ')) {
+            const i0 = ev.detalhe.indexOf(nomes[0] + ' ');
+            const i1 = ev.detalhe.indexOf(' · ' + nomes[1] + ' ');
+            if (i0 < 0 || i1 < 0 || i0 > i1) erros.push(`${p}: placar fora da ordem da urna: "${ev.detalhe}"`);
+          }
+          if (m >= 0 && ev.candidato !== undefined) {
+            const k = `${race.cargo}:${m}`;
+            if (!vistos.has(k)) vistos.set(k, new Set());
+            vistos.get(k)!.add(ev.candidato);
+          }
+        }
+      }
+      expect(erros.slice(0, 30)).toEqual([]);
+      // os mesmos modelos de frase (liderança, virada, eleito) aparecem para A e para B ao longo dos presets
+      for (const k of ['Presidente:3', 'Presidente:7']) expect([...(vistos.get(k) ?? [])].sort(), k).toEqual([0, 1]);
+    },
+  );
+
+  it('presets espelhados: alvos somam 100 e a mesma configuração fora o alvo', () => {
+    const ps = presetList(stDs);
+    const by = new Map(ps.map((p) => [p.id, p.cenario]));
+    for (const [a, b] of [
+      ['equilibrio-a', 'equilibrio-b'],
+      ['folgada-a', 'folgada-b'],
+      ['empate-a', 'empate-b'],
+      ['virada-a', 'virada-b'],
+    ]) {
+      const A = by.get(a)!;
+      const B = by.get(b)!;
+      expect(A.alvoPres! + B.alvoPres!, `${a}/${b}`).toBeCloseTo(100, 9);
+      for (const g of GOVS)
+        if (A.alvoGov![g] !== B.alvoGov![g])
+          expect(A.alvoGov![g] + B.alvoGov![g], `${a}/${b} ${g}`).toBeCloseTo(100, 9);
+      const semAlvo = (x: Partial<ScenarioConfig>) => ({
+        ...x,
+        preset: '',
+        alvoPres: 0,
+        alvoGov: {},
+        ordemRegional: '',
+      });
+      expect(semAlvo(A), `${a}/${b}`).toEqual(semAlvo(B));
+    }
+    // a virada usa ordens regionais opostas (sul-primeiro × norte-primeiro)
+    expect([by.get('virada-a')!.ordemRegional, by.get('virada-b')!.ordemRegional]).toEqual([
+      'sul-primeiro',
+      'norte-primeiro',
+    ]);
+    // padrão neutro: regra simétrica (cada finalista herda metade dos "outros"), sem viés por UF
+    const p = by.get('padrao')!;
+    expect(p.transferenciaOutros).toBe(0.5);
+    expect(p.ufVies).toEqual({});
+    expect(p.ufAtraso).toEqual({});
+  });
+});
+
+describe('desempate neutro (alvo 50,00%)', () => {
+  it(
+    'nunca empate exato e nenhum lado preferido entre sementes (Presidente e governadores)',
+    { timeout: 120_000 },
+    () => {
+      const soma = (a: Int32Array, i0: number, i1: number) => {
+        let s = 0;
+        for (let i = i0; i < i1; i++) s += a[i];
+        return s;
+      };
+      const alvoGov = Object.fromEntries(stDs.govRaces.map((g) => [g.id, 50]));
+      const margens: Record<string, number[]> = {};
+      for (let seed = 1; seed <= 12; seed++) {
+        const m = buildModel(stDs, mesclaCenario(cenarioPadrao(stDs), { seed, alvoPres: 50, alvoGov }, stDs));
+        (margens.pres ??= []).push(soma(m.pv0, 0, stDs.nSec) - soma(m.pv1, 0, stDs.nSec));
+        for (const g of stDs.govRaces) {
+          const [i0, i1] = [stDs.ufSecStart[g.ufIdx], stDs.ufSecEnd[g.ufIdx]];
+          (margens[g.id] ??= []).push(soma(m.gv0, i0, i1) - soma(m.gv1, i0, i1));
+        }
+      }
+      const todas = Object.values(margens).flat();
+      // antes da correção: Presidente com 50,00% → candidato 0 vencia por 1 voto em 11 de 16 sementes, empate no resto
+      expect(
+        todas.filter((d) => d === 0),
+        JSON.stringify(margens),
+      ).toEqual([]);
+      for (const d of todas) expect(Math.abs(d)).toBeLessThanOrEqual(2);
+      const aFavorDe0 = todas.filter((d) => d > 0).length;
+      expect(aFavorDe0).toBeGreaterThan(todas.length * 0.3);
+      expect(aFavorDe0).toBeLessThan(todas.length * 0.7);
+      expect(new Set(margens.pres.map(Math.sign))).toEqual(new Set([1, -1]));
+    },
+  );
+});
+
+describe('textos', () => {
+  it('concordância: "1 voto" no singular (vitória por 1 voto acontece com alvo 50,00%)', () => {
+    const race = ds.meta.races.find((x) => x.id === 'pres')!;
+    expect(textosEventos.vence(race, 0, 1001, 1000).detalhe).toMatch(/diferença de 1 voto\.$/);
+    expect(textosEventos.vence(race, 1, 1000, 1002).detalhe).toMatch(/diferença de 2 votos\.$/);
+    expect(textosEventos.eleito(race, 1, 99.99, 1234, 1000).detalhe).toContain('diferença de 1.234 votos supera');
   });
 });

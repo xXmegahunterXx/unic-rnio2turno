@@ -150,7 +150,7 @@
   }
   /* `border-line`, `bg-line`, `divide-line`, `ring-line` vêm do tailwind.config (alfa = --line-alpha × modificador). */
   .glass {
-    background: rgb(var(--surface) / 0.72);
+    background: rgb(var(--surface) / 0.82);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
   }

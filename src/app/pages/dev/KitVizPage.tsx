@@ -44,6 +44,9 @@ const UF_OPCOES = [...UFS]
   .sort((a, b) => UF_NOMES[a].localeCompare(UF_NOMES[b], 'pt-BR'))
   .map((u) => ({ value: u, label: `${UF_NOMES[u]} (${u})` }));
 const ZONAS_PEQUENAS = [{ z: 31, s: '1-23,25-31' }];
+/** Milissegundos com 1 casa no padrão pt-BR (painel de desempenho). */
+const nfMs = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtMs = (n: number) => nfMs.format(n);
 
 export default function KitVizPage() {
   // Estado inicial pela URL (QA): /kit/viz?pct=12&modo=margem&uf=SP&eixo=horario
@@ -180,7 +183,7 @@ export default function KitVizPage() {
         title="Visualizações da apuração"
         subtitle="Mapas, cartograma, corrida da apuração e mosaico de seções com geometrias reais do IBGE e números inventados."
         breadcrumbs={[{ label: 'Início', to: '/' }, { label: 'Kit', to: '/kit' }, { label: 'Visualizações' }]}
-        actions={<ThemeToggle />}
+        actions={<ThemeToggle className="hidden sm:inline-flex" />}
       />
 
       {/* Controles */}
@@ -369,14 +372,14 @@ export default function KitVizPage() {
                 <dt className="text-fg-muted">{id}</dt>
                 <dd className="text-fg">
                   {perf[id]
-                    ? `${perf[id].render.toFixed(1)} ms render · ${perf[id].ate_pintar.toFixed(1)} ms até pintar`
+                    ? `${fmtMs(perf[id].render)} ms render · ${fmtMs(perf[id].ate_pintar)} ms até pintar`
                     : '—'}
                 </dd>
                 <dd className="hidden text-fg-subtle sm:block">{perf[id]?.fase ?? ''}</dd>
               </div>
             ))}
             <dt className="text-fg-muted">Canvas do mosaico</dt>
-            <dd className="text-fg">{mosaicoMs !== null ? `${mosaicoMs.toFixed(1)} ms` : '—'}</dd>
+            <dd className="text-fg">{mosaicoMs !== null ? `${fmtMs(mosaicoMs)} ms` : '—'}</dd>
           </dl>
         </Card>
       </section>

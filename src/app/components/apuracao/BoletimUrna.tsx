@@ -13,7 +13,7 @@ import { fmtHoraSeg, fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
-import { SimulationRibbon } from './SimulationRibbon';
+import { CARIMBO_SOBRE_PAPEL, SimulationRibbon } from './SimulationRibbon';
 
 export interface BoletimUrnaProps {
   secao: SecaoDetalhe;
@@ -73,7 +73,7 @@ export function BoletimUrna({ secao, race, className }: BoletimUrnaProps) {
             </div>
             <div className="mt-1 text-[12px] font-semibold uppercase tracking-[0.1em]">{race.cargo}</div>
           </div>
-          {secao.simulado ? <SimulationRibbon variant="stamp" className="mr-0.5 mt-3 shrink-0" /> : null}
+          {secao.simulado ? <SimulationRibbon variant="stamp" className={cn('mr-0.5 mt-3 shrink-0', CARIMBO_SOBRE_PAPEL)} /> : null}
         </header>
 
         <div className={cn('relative my-4 border-t', rule)} />

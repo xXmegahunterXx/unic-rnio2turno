@@ -18,6 +18,8 @@ export function emUf(uf: UF, nome: string): string {
   return `${PREP[uf] ?? 'em'} ${nome}`;
 }
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** "1 voto" · "2 votos" · "1.234 votos" */
+const nVotos = (n: number) => `${fmtInt(n)} ${n === 1 ? 'voto' : 'votos'}`;
 
 /** % de válidos do candidato 0 e 1 (2 casas) — somam 100,00. */
 export function pctPar(v0: number, v1: number): [number, number] {
@@ -108,7 +110,7 @@ export const textos = {
           ? `${nome} está matematicamente eleito`
           : `A vitória de ${nome} está matematicamente definida`,
       detalhe:
-        `Com ${fmtPct(Math.floor(pct * 100) / 100)} das seções totalizadas, a diferença de ${fmtInt(diff)} votos ` +
+        `Com ${fmtPct(Math.floor(pct * 100) / 100)} das seções totalizadas, a diferença de ${nVotos(diff)} ` +
         `supera o eleitorado das seções ainda não totalizadas (${fmtInt(restante)}).`,
     };
   },
@@ -117,7 +119,7 @@ export const textos = {
     const [a, b] = pctPar(v0, v1);
     return {
       titulo: `Com 100% das seções totalizadas, ${race.candidatos[cand].nomeUrna} vence a eleição`,
-      detalhe: `${race.candidatos[cand].nomeUrna} tem ${fmtPct(cand === 0 ? a : b)} dos votos válidos, diferença de ${fmtInt(Math.abs(v0 - v1))} votos.`,
+      detalhe: `${race.candidatos[cand].nomeUrna} tem ${fmtPct(cand === 0 ? a : b)} dos votos válidos, diferença de ${nVotos(Math.abs(v0 - v1))}.`,
     };
   },
 };

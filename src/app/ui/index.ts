@@ -13,7 +13,7 @@ export { LiveDot, type LiveDotTone } from './LiveDot';
 export { Countdown, fmtFaltam, partesTempo, type CountdownProps } from './Countdown';
 export { SearchBox, Combobox, type SearchBoxProps, type ComboboxProps, type ComboOption } from './SearchBox';
 export { casa, pontuar, realcar } from './textMatch';
-export { DataTable, type DataTableProps, type Column, type SortState, type SortDir } from './DataTable';
+export { DataTable, soAbaixoDe, type DataTableProps, type Column, type SortState, type SortDir, type TableWidth } from './DataTable';
 export { Toggle, type ToggleProps } from './Toggle';
 export { Slider, type SliderProps, type SliderMark } from './Slider';
 export { Select, type SelectProps, type SelectOption } from './Select';

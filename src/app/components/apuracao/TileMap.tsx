@@ -3,7 +3,7 @@
  * geografia do Brasil. Todas as UFs têm o mesmo tamanho → ótimo no celular para os estados pequenos.
  * Mesmos modos e props do BrazilMap. Cada bloco é um <button> (teclado e leitor de tela de graça).
  */
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { Race, Summary, Tally, UF } from '@/shared/types';
 import { REGIAO_NOMES, UF_NOMES, UF_REGIAO } from '@/shared/constants';
@@ -15,7 +15,7 @@ import { valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapMod
 import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { hachuraStyle } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
-import { useClickOutside, useElementSize } from './MapHooks';
+import { ehSeta, vizinhoNaDirecao, useClickOutside, useElementSize } from './MapHooks';
 
 /** Posição [coluna, linha] de cada UF na grade 6 × 8. */
 export const TILE_LAYOUT: Record<UF, readonly [number, number]> = {
@@ -86,6 +86,9 @@ export function TileMap({
   const [tip, setTip] = useState<{ uf: UF; x: number; y: number; fixo: boolean } | null>(null);
   const ultimo = useRef({ tipo: 'mouse', t: 0 });
   const comExterior = exterior ?? !!ufs.ZZ;
+  // Roving tabindex: o cartograma é UMA parada de Tab; as setas andam pela grade.
+  const [ativa, setAtiva] = useState<UF | null>(null);
+  const dica = `${useId().replace(/:/g, '')}-dica`;
 
   const lista = useMemo(
     () => (Object.keys(TILE_LAYOUT) as UF[]).filter((uf) => uf !== 'ZZ' || comExterior),
@@ -146,6 +149,24 @@ export function TileMap({
     onSelect?.(uf);
   }
 
+  const tabulavel: UF = ativa && lista.includes(ativa) ? ativa : selecionada && lista.includes(selecionada) ? selecionada : lista[0];
+  const pontosGrade = useMemo(() => {
+    const out: Partial<Record<UF, { x: number; y: number }>> = {};
+    for (const uf of lista) out[uf] = { x: TILE_LAYOUT[uf][0], y: TILE_LAYOUT[uf][1] };
+    return out;
+  }, [lista]);
+  function onKeyDown(e: ReactKeyboardEvent, uf: UF) {
+    if (e.key === 'Escape') setTip(null);
+    else if (ehSeta(e.key)) {
+      e.preventDefault();
+      const prox = vizinhoNaDirecao(pontosGrade, uf, e.key);
+      if (prox) {
+        setAtiva(prox);
+        boxEl?.querySelector<HTMLButtonElement>(`button[data-uf="${prox}"]`)?.focus();
+      }
+    }
+  }
+
   const descr = (uf: UF) => {
     const t = ufs[uf];
     if (!t || t.secoesTotalizadas <= 0) return `${UF_NOMES[uf]}: nenhuma seção totalizada`;
@@ -159,9 +180,14 @@ export function TileMap({
       className={cn('relative w-full select-none', className)}
       onPointerLeave={() => tip && !tip.fixo && setTip(null)}
     >
+      <p id={`${dica}`} className="sr-only">
+        Use as setas para passar de um estado a outro e Enter para abrir.
+      </p>
       <div
         role="group"
         aria-label={ariaLabel ?? 'Cartograma dos estados'}
+        aria-roledescription="cartograma"
+        aria-describedby={dica}
         className="relative"
         style={{ height: altura, aspectRatio: altura ? undefined : `${COLS} / ${ROWS}` }}
       >
@@ -181,13 +207,15 @@ export function TileMap({
                   data-uf={uf}
                   aria-label={descr(uf)}
                   aria-pressed={sel}
+                  tabIndex={uf === tabulavel ? 0 : -1}
                   onPointerDown={(e) => (ultimo.current = { tipo: e.pointerType, t: performance.now() })}
                   onPointerMove={(e) => onPointerMove(e, uf)}
                   onFocus={() => {
+                    setAtiva(uf);
                     if (performance.now() - ultimo.current.t > 400) setTip({ uf, ...centro(uf), fixo: false });
                   }}
                   onBlur={() => setTip((t) => (t && t.uf === uf && !t.fixo ? null : t))}
-                  onKeyDown={(e) => e.key === 'Escape' && setTip(null)}
+                  onKeyDown={(e) => onKeyDown(e, uf)}
                   onClick={() => onClick(uf)}
                   className={cn(
                     'group absolute flex flex-col items-center justify-center overflow-visible rounded-[10px] outline-none [-webkit-tap-highlight-color:transparent]',
@@ -221,7 +249,7 @@ export function TileMap({
                     {ext ? 'Exterior' : uf}
                   </span>
                   {valores && v.rotulo ? (
-                    <span className="num mt-1 leading-none opacity-80" style={{ fontSize: fontValor }}>
+                    <span className="num mt-1 font-medium leading-none" style={{ fontSize: fontValor }}>
                       {v.rotulo}
                     </span>
                   ) : null}

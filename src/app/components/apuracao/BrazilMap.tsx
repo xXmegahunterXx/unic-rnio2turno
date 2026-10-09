@@ -37,7 +37,7 @@ import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { MapHatchPattern } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
 import { MapDataTable } from './MapDataTable';
-import { useClickOutside, useElementSize } from './MapHooks';
+import { ehSeta, vizinhoNaDirecao, useClickOutside, useElementSize } from './MapHooks';
 
 export interface BrazilMapProps {
   /** Resumo por UF (UFs ausentes ou sem seções totalizadas ficam como pendentes). */
@@ -171,6 +171,9 @@ export function BrazilMap({
   const [boxRef, size, boxEl] = useElementSize<HTMLDivElement>();
   const [tip, setTip] = useState<Tip | null>(null);
   const [focada, setFocada] = useState<UFBr | null>(null);
+  // Roving tabindex: o mapa é UMA parada de Tab; as setas passeiam entre as UFs.
+  const [ativa, setAtiva] = useState<UFBr | null>(null);
+  const ufTabulavel: UFBr = ativa ?? (selecionada && selecionada !== 'ZZ' ? selecionada : ORDEM_TAB[0]);
   const ultimoPonteiro = useRef<{ tipo: string; t: number }>({ tipo: 'mouse', t: 0 });
 
   const vb = useMemo(() => parseViewBox(geo?.viewBox ?? '0 0 996 1000'), [geo]);
@@ -264,6 +267,7 @@ export function BrazilMap({
     onSelect?.(uf);
   }
   function onFocus(uf: UFBr) {
+    setAtiva(uf);
     // Foco vindo de clique/toque não mostra anel nem tooltip de teclado.
     if (performance.now() - ultimoPonteiro.current.t < 400) return;
     setFocada(uf);
@@ -273,11 +277,25 @@ export function BrazilMap({
     setFocada((f) => (f === uf ? null : f));
     setTip((t) => (t && t.uf === uf && !t.fixo ? null : t));
   }
+  function focarUf(uf: UFBr) {
+    setAtiva(uf);
+    boxEl?.querySelector<SVGPathElement>(`path[data-uf="${uf}"]`)?.focus();
+  }
   function onKeyDown(e: KeyboardEvent, uf: UFBr) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSelect?.(uf);
     } else if (e.key === 'Escape') setTip(null);
+    else if (ehSeta(e.key) && geo) {
+      e.preventDefault();
+      const pts: Partial<Record<UFBr, { x: number; y: number }>> = {};
+      for (const u of ORDEM_TAB) if (geo.ufs[u]) pts[u] = { x: geo.ufs[u].cx, y: geo.ufs[u].cy };
+      const prox = vizinhoNaDirecao(pts, uf, e.key);
+      if (prox) focarUf(prox);
+    } else if (e.key === 'Home' || e.key === 'End') {
+      e.preventDefault();
+      focarUf(e.key === 'Home' ? ORDEM_TAB[0] : ORDEM_TAB[ORDEM_TAB.length - 1]);
+    }
   }
 
   // Handlers estáveis para não invalidar o memo dos paths.
@@ -327,6 +345,9 @@ export function BrazilMap({
 
   return (
     <div ref={boxRef} className={cn('relative w-full select-none', className)}>
+      <p id={`${uid}-dica`} className="sr-only">
+        Use as setas para passar de um estado a outro e Enter para abrir.
+      </p>
       {!geo ? (
         <div
           className="w-full animate-pulse rounded-2xl bg-surface-2"
@@ -340,6 +361,8 @@ export function BrazilMap({
           style={{ aspectRatio: `${vbW} / ${vbH}` }}
           role="group"
           aria-label={ariaLabel ?? `Mapa do Brasil por estado — ${modoInfo?.label ?? modo}`}
+          aria-roledescription="mapa"
+          aria-describedby={`${uid}-dica`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerLeave={onPointerLeave}
@@ -363,6 +386,7 @@ export function BrazilMap({
                   fill={fillDe(uf)}
                   esmaecida={!!esmaecida}
                   label={descr(uf)}
+                  tabulavel={uf === ufTabulavel}
                   {...estaveis}
                 />
               );
@@ -607,17 +631,19 @@ interface UfPathProps {
   fill: string;
   esmaecida: boolean;
   label: string;
+  /** Única UF com tabIndex 0 (roving tabindex). */
+  tabulavel: boolean;
   onFocus: (uf: UFBr) => void;
   onBlur: (uf: UFBr) => void;
   onKeyDown: (e: KeyboardEvent, uf: UFBr) => void;
 }
 
-const UfPath = memo(function UfPath({ uf, d, fill, esmaecida, label, onFocus, onBlur, onKeyDown }: UfPathProps) {
+const UfPath = memo(function UfPath({ uf, d, fill, esmaecida, label, tabulavel, onFocus, onBlur, onKeyDown }: UfPathProps) {
   return (
     <path
       d={d}
       data-uf={uf}
-      tabIndex={0}
+      tabIndex={tabulavel ? 0 : -1}
       role="button"
       aria-label={label}
       vectorEffect="non-scaling-stroke"

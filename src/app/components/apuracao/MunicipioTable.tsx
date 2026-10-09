@@ -5,10 +5,10 @@ import { pctTotalizadas, pctValidos } from '@/shared/calc';
 import { fmtCompact, fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Badge } from '@/app/ui/Badge';
-import { DataTable, type Column, type SortState } from '@/app/ui/DataTable';
+import { DataTable, soAbaixoDe, type Column, type SortState } from '@/app/ui/DataTable';
 import { SearchBox } from '@/app/ui/SearchBox';
 import { casa } from '@/app/ui/textMatch';
-import { ApuradoCell, CandHeader, MargemCell, PctCell, W, margemAssinada } from './cells';
+import { ApuradoCell, CandHeader, LARGURA, MargemCell, PctCell, W, margemAssinada } from './cells';
 
 export interface MunicipioTableProps {
   race: Race;
@@ -35,7 +35,8 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
       cell: (m) => (
         <span className="block min-w-0">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span title={m.nome} className={cn('truncate', m.capital ? 'font-semibold' : 'font-medium')}>
+            {/* até 2 linhas no celular: "Campos dos Goytacazes" inteiro vale mais que "Campos dos G…" */}
+            <span title={m.nome} className={cn('line-clamp-2 min-w-0 break-words leading-tight sm:line-clamp-1', m.capital ? 'font-semibold' : 'font-medium')}>
               {m.nome}
             </span>
             {m.capital ? (
@@ -44,7 +45,7 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
               </Badge>
             ) : null}
           </span>
-          <span className="mt-0.5 flex items-center gap-2 sm:hidden">
+          <span className={cn('mt-0.5 flex items-center gap-2', soAbaixoDe[LARGURA.apurado])}>
             <ApuradoCell t={m} compact />
           </span>
         </span>
@@ -54,7 +55,7 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
       key: 'eleitorado',
       header: 'Eleitores',
       align: 'right',
-      hideBelow: 'md',
+      hideBelowWidth: LARGURA.eleitores,
       width: W.eleitores,
       sortValue: (m) => m.eleitorado,
       cell: (m) => <span title={fmtInt(m.eleitorado)}>{fmtCompact(m.eleitorado)}</span>,
@@ -63,7 +64,7 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
       key: 'apurado',
       header: 'Apurado',
       align: 'right',
-      hideBelow: 'sm',
+      hideBelowWidth: LARGURA.apurado,
       width: W.apuradoSemBarra,
       sortValue: (m) => pctTotalizadas(m),
       cell: (m) => <ApuradoCell t={m} bar={false} />,

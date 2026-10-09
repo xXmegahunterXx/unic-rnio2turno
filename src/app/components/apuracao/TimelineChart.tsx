@@ -15,6 +15,7 @@ import { area as d3area, curveMonotoneX, line as d3line } from 'd3-shape';
 import type { Race, SeriePoint } from '@/shared/types';
 import { fmtHora, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { Icon } from '@/app/ui/Icon';
 import { corSlot, rgbSlot } from '@/app/lib/raceUi';
 import { useClickOutside, useElementSize } from './MapHooks';
 
@@ -456,8 +457,15 @@ export function TimelineChart({
         ) : null}
 
         {!serie.length ? (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] text-fg-subtle">
-            Aguardando as primeiras seções totalizadas
+          // Estado vazio: selo centrado na área do gráfico (fundo opaco, não briga com a linha de 50%).
+          <div
+            className="pointer-events-none absolute flex items-center justify-center px-2"
+            style={{ left: M.left, right: M.right, top: M.top, bottom: M.bottom }}
+          >
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-center text-[12.5px] leading-snug text-fg-muted shadow-card">
+              <Icon name="relogio" size={14} className="shrink-0" />
+              Aguardando as primeiras seções
+            </span>
           </div>
         ) : null}
 

@@ -52,3 +52,44 @@ export function useClickOutside(el: HTMLElement | null, ativo: boolean, onFora: 
 export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
+
+export type DirecaoSeta = 'ArrowRight' | 'ArrowLeft' | 'ArrowDown' | 'ArrowUp';
+const VETOR: Record<DirecaoSeta, readonly [number, number]> = {
+  ArrowRight: [1, 0],
+  ArrowLeft: [-1, 0],
+  ArrowDown: [0, 1],
+  ArrowUp: [0, -1],
+};
+export const ehSeta = (k: string): k is DirecaoSeta => k in VETOR;
+
+/**
+ * Navegação espacial por setas (mapas com "roving tabindex": uma parada de Tab no mapa, setas
+ * passeiam pelas áreas). Devolve a chave do ponto mais próximo na direção da seta — a distância fora
+ * do eixo pesa 2× — ou null se não houver nada naquela direção.
+ */
+export function vizinhoNaDirecao<K extends string>(
+  pontos: Partial<Record<K, { x: number; y: number }>>,
+  origem: K,
+  dir: DirecaoSeta,
+): K | null {
+  const p0 = pontos[origem];
+  if (!p0) return null;
+  const [dx, dy] = VETOR[dir];
+  let melhor: K | null = null;
+  let melhorScore = Infinity;
+  for (const k of Object.keys(pontos) as K[]) {
+    if (k === origem) continue;
+    const p = pontos[k]!;
+    const vx = p.x - p0.x;
+    const vy = p.y - p0.y;
+    const ao = vx * dx + vy * dy;
+    if (ao <= 0.5) continue;
+    const perp = Math.abs(vx * dy - vy * dx);
+    const score = ao + 2 * perp;
+    if (score < melhorScore) {
+      melhorScore = score;
+      melhor = k;
+    }
+  }
+  return melhor;
+}

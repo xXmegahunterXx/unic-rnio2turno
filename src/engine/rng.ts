@@ -55,6 +55,8 @@ export const Canal = {
   Zona: 14,
   UfAleatoria: 15,
   Codigo: 16,
+  /** Desempate neutro de corridas com alvo a menos de 1 voto do empate (ex.: 50,00%). */
+  Desempate: 17,
 } as const;
 
 /** Chave de um canal para uma semente. */

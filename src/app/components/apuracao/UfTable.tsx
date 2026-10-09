@@ -4,8 +4,8 @@ import type { Race, Summary, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { pctTotalizadas, pctValidos } from '@/shared/calc';
 import { cn } from '@/app/lib/cn';
-import { DataTable, type Column, type SortState } from '@/app/ui/DataTable';
-import { ApuradoCell, CandHeader, MargemCell, PctCell, W, margemAssinada } from './cells';
+import { DataTable, soAbaixoDe, type Column, type SortState } from '@/app/ui/DataTable';
+import { ApuradoCell, CandHeader, LARGURA, MargemCell, PctCell, W, margemAssinada } from './cells';
 
 export interface UfTableProps {
   race: Race;
@@ -47,7 +47,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
             <span className="block truncate font-medium" title={UF_NOMES[r.uf]}>
               {UF_NOMES[r.uf]}
             </span>
-            <span className="block sm:hidden">
+            <span className={cn('block', soAbaixoDe[LARGURA.apurado])}>
               <ApuradoCell t={r} compact />
             </span>
           </span>
@@ -58,7 +58,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
       key: 'apurado',
       header: 'Apurado',
       align: 'right',
-      hideBelow: 'sm',
+      hideBelowWidth: LARGURA.apurado,
       width: W.apurado,
       sortValue: (r) => pctTotalizadas(r),
       cell: (r) => <ApuradoCell t={r} />,

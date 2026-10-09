@@ -72,7 +72,16 @@ export function CandidateAvatar({ candidato, nome, cor, size = 'md', eleito, dim
     >
       {iniciais(n)}
       {eleito ? (
-        <span className={cn('absolute -bottom-0.5 -right-0.5 inline-flex items-center justify-center rounded-full ring-2 ring-surface', s.bg, s.ink)} style={{ width: t.selo + 4, height: t.selo + 4 }}>
+        <span
+          className={cn(
+            'absolute inline-flex items-center justify-center rounded-full ring-2 ring-surface',
+            // nos tamanhos pequenos o selo sai mais para fora para não cobrir as iniciais
+            size === 'xs' || size === 'sm' ? '-bottom-1 -right-1.5' : '-bottom-0.5 -right-0.5',
+            s.bg,
+            s.ink,
+          )}
+          style={{ width: t.selo + 4, height: t.selo + 4 }}
+        >
           <Icon name="check" size={t.selo} strokeWidth={3} />
         </span>
       ) : null}

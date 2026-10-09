@@ -7,6 +7,9 @@
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 
+/** Cor do carimbo sobre o papel do BU (claro também no tema escuro): marca escurecida, AA nos dois temas. */
+export const CARIMBO_SOBRE_PAPEL = 'dark:text-[color:color-mix(in_srgb,rgb(var(--brand))_70%,rgb(var(--bg)))]';
+
 export interface SimulationRibbonProps {
   variant?: 'bar' | 'badge' | 'stamp';
   /** Texto complementar (bar). */
@@ -35,12 +38,13 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
         aria-label="Simulação: dados fictícios"
         className={cn(
           'pointer-events-none inline-flex -rotate-[8deg] flex-col items-center rounded-md border-2 border-current px-2.5 py-1.5 font-mono',
-          'text-brand-deep opacity-90',
+          // Sobre superfícies do tema (AA). Sobre papel claro no tema escuro (BU), use `CARIMBO_SOBRE_PAPEL`.
+          'text-brand-fg',
           className,
         )}
       >
         <span className="text-[13px] font-semibold uppercase leading-none tracking-[0.16em]">Simulação</span>
-        <span className="mt-1 text-[8.5px] uppercase leading-none tracking-[0.14em]">dados fictícios</span>
+        <span className="mt-1 text-[9px] font-medium uppercase leading-none tracking-[0.14em]">dados fictícios</span>
       </span>
     );
   }
@@ -49,12 +53,14 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
       role="note"
       aria-label="Simulação: dados fictícios"
       className={cn(
-        'relative isolate flex h-7 items-center justify-center gap-2 overflow-hidden border-b border-brand/25 px-4',
-        'bg-brand/[0.12] text-[11px] font-semibold uppercase tracking-[0.14em]',
+        // Fundo OPACO (surface + tinta violeta): a faixa fica presa sob o header e o conteúdo rola por baixo.
+        'relative isolate flex h-7 items-center justify-center gap-2 overflow-hidden border-b border-brand/25 bg-surface px-4',
+        'text-[11px] font-semibold uppercase tracking-[0.14em]',
         'text-brand-fg',
         className,
       )}
     >
+      <span aria-hidden className="absolute inset-0 -z-10 bg-brand/[0.12]" />
       <span
         aria-hidden
         className="absolute inset-0 -z-10 opacity-60 [background-image:repeating-linear-gradient(-45deg,rgb(var(--brand)/0.10)_0_8px,transparent_8px_16px)]"

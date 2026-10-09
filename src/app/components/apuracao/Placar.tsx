@@ -8,7 +8,7 @@
  *  - 'default' → mesma estrutura, escala menor (UF, município).
  *  - 'compact' → cartões de UF/governador (linhas por candidato).
  */
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Candidate, Race, Summary } from '@/shared/types';
 import { margem, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
@@ -71,6 +71,40 @@ function linhas(race: Race, resumo: Summary): { finalistas: Linha[]; outros: Lin
   return { finalistas: todas.filter((l) => !l.c.agregado), outros: todas.find((l) => l.c.agregado) ?? null };
 }
 
+/**
+ * Espaça os anúncios do `aria-live`: o placar muda a cada poucos segundos e um leitor de tela não pode
+ * ficar falando sem parar. Anuncia na hora quando muda quem lidera, o eleito ou o status; fora isso,
+ * no máximo a cada `intervalo` ms (com o texto mais recente).
+ */
+function useAnuncioEspacado(texto: string, chaveImediata: string, intervalo = 30_000): string {
+  const [anunciado, setAnunciado] = useState(texto);
+  const ultimo = useRef({ t: 0, chave: chaveImediata });
+  useEffect(() => {
+    const agora = Date.now();
+    const publicar = () => {
+      ultimo.current = { t: Date.now(), chave: chaveImediata };
+      setAnunciado(texto);
+    };
+    if (chaveImediata !== ultimo.current.chave || agora - ultimo.current.t >= intervalo) {
+      publicar();
+      return;
+    }
+    const id = window.setTimeout(publicar, intervalo - (agora - ultimo.current.t));
+    return () => window.clearTimeout(id);
+  }, [texto, chaveImediata, intervalo]);
+  return anunciado;
+}
+
+/** Região viva (sr-only) do placar. */
+function AnuncioPlacar({ race, resumo }: { race: Race; resumo: Summary }) {
+  const texto = useAnuncioEspacado(textoVivo(race, resumo), `${resumo.lider}|${resumo.eleito}|${resumo.status}`);
+  return (
+    <p className="sr-only" aria-live="polite" aria-atomic="true">
+      {texto}
+    </p>
+  );
+}
+
 /** Texto curto para aria-live (1 casa decimal, para não "falar" a cada atualização mínima). */
 function textoVivo(race: Race, resumo: Summary): string {
   if (validos(resumo) === 0) return `${race.titulo}: aguardando votos.`;
@@ -130,13 +164,7 @@ function PlacarDuelo({
         <div className={cn('absolute -right-24 -top-24 h-64 w-64 rounded-full blur-3xl', b ? corSlot(b.c.cor).bgSoft : '', 'opacity-60')} />
       </div>
 
-      {anunciar ? (
-        <p className="sr-only" aria-live="polite" aria-atomic="true">
-          {textoVivo(race, resumo)}
-        </p>
-      ) : (
-        <p className="sr-only">{textoVivo(race, resumo)}</p>
-      )}
+      {anunciar ? <AnuncioPlacar race={race} resumo={resumo} /> : null}
 
       <div className="relative">
         <div className="mb-4 flex min-h-[28px] items-center justify-between gap-3 sm:mb-6">
@@ -290,11 +318,7 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
   const eleito = finalistas.find((l) => l.eleito);
   const corpo = (
     <>
-      {live ? (
-        <p className="sr-only" aria-live="polite" aria-atomic="true">
-          {textoVivo(race, resumo)}
-        </p>
-      ) : null}
+      {live ? <AnuncioPlacar race={race} resumo={resumo} /> : null}
       <div className="mb-3.5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

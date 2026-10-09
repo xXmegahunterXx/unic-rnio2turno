@@ -53,7 +53,11 @@ export interface Controller {
   adminSnapshot(extra?: Partial<AdminMetrics>): AdminSnapshot;
   presets(): PresetInfo[];
 
-  /** Snapshots no instante atual (relógio do controller). Lançam `NotFoundError` para escopos inexistentes. */
+  /**
+   * Snapshots no instante atual (relógio do controller). Lançam `NotFoundError` para escopos inexistentes.
+   * Os objetos devolvidos vêm do cache interno (compartilhados entre chamadas): trate-os como IMUTÁVEIS —
+   * alterar um campo (ex.: `snap.zonas.length = 0`) corrompe as respostas seguintes do mesmo instante.
+   */
   nacional(race: RaceId): NationalSnapshot;
   uf(race: RaceId, uf: UF): UfSnapshot;
   municipio(race: RaceId, uf: UF, cod: string): MunicipioSnapshot;

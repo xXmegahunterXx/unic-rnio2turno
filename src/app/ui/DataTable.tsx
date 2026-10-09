@@ -28,8 +28,13 @@ export interface Column<R> {
   width?: string;
   className?: string;
   headerClassName?: string;
-  /** Esconde a coluna abaixo deste breakpoint. */
+  /** Esconde a coluna abaixo deste breakpoint DA JANELA. Prefira `hideBelowWidth`. */
   hideBelow?: 'sm' | 'md' | 'lg';
+  /**
+   * Esconde a coluna quando a própria TABELA tem menos que esta largura (container query). Funciona
+   * igual no celular e em cartões lado a lado no desktop — use este em vez de `hideBelow`.
+   */
+  hideBelowWidth?: TableWidth;
   /**
    * Coluna elástica: ocupa a largura que sobra e trunca o conteúdo. Quando alguma coluna tem `grow`,
    * a tabela usa `table-layout: fixed` (nunca estoura a largura no celular) e as demais colunas
@@ -72,6 +77,26 @@ export interface DataTableProps<R> {
 }
 
 const esconder = { sm: 'hidden sm:table-cell', md: 'hidden md:table-cell', lg: 'hidden lg:table-cell' };
+
+/** Larguras de referência da tabela (px) para colunas responsivas ao contêiner. */
+export type TableWidth = 420 | 520 | 640 | 760;
+// Classes por extenso (o Tailwind só gera o que aparece literalmente no código).
+const esconderLargura: Record<TableWidth, string> = {
+  420: 'hidden [@container(min-width:420px)]:table-cell',
+  520: 'hidden [@container(min-width:520px)]:table-cell',
+  640: 'hidden [@container(min-width:640px)]:table-cell',
+  760: 'hidden [@container(min-width:760px)]:table-cell',
+};
+/**
+ * Para conteúdo que substitui uma coluna escondida (ex.: % apurado sob o nome): visível só enquanto
+ * a tabela for mais estreita que a largura dada. Use dentro de uma célula da DataTable.
+ */
+export const soAbaixoDe: Record<TableWidth, string> = {
+  420: '[@container(min-width:420px)]:hidden',
+  520: '[@container(min-width:520px)]:hidden',
+  640: '[@container(min-width:640px)]:hidden',
+  760: '[@container(min-width:760px)]:hidden',
+};
 const alinhar = { left: 'text-left', right: 'text-right', center: 'text-center' };
 
 export function DataTable<R>({
@@ -128,9 +153,17 @@ export function DataTable<R>({
     onSortChange?.(s);
   }
 
-  const pad =
-    density === 'compact' ? 'px-2 py-2' : density === 'comfortable' ? 'px-3 py-3' : 'px-2 py-2.5 sm:px-3 sm:py-3';
-  const txt = density === 'compact' ? 'text-[13px]' : density === 'comfortable' ? 'text-sm' : 'text-[13px] sm:text-sm';
+  // 'auto' responde à largura da TABELA (container query), não da janela.
+  const padX =
+    density === 'compact' ? 'px-2' : density === 'comfortable' ? 'px-3' : 'px-2 [@container(min-width:560px)]:px-3';
+  const padY =
+    density === 'compact' ? 'py-2' : density === 'comfortable' ? 'py-3' : 'py-2.5 [@container(min-width:560px)]:py-3';
+  const txt =
+    density === 'compact'
+      ? 'text-[13px]'
+      : density === 'comfortable'
+        ? 'text-sm'
+        : 'text-[13px] [@container(min-width:560px)]:text-sm';
 
   function onKey(e: KeyboardEvent<HTMLTableRowElement>, r: R) {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -143,7 +176,8 @@ export function DataTable<R>({
   const fixo = columns.some((c) => c.grow);
   const largura = (c: Column<R>) => (c.grow ? undefined : (c.width ?? (fixo ? 'w-20' : undefined)));
   return (
-    <div className={cn('w-full', className)}>
+    // Contêiner de consulta (container queries): colunas e células se adaptam à largura da TABELA.
+    <div className={cn('w-full [container-type:inline-size]', className)}>
       <div
         className={cn('w-full overflow-x-clip', rolagemInterna && 'overflow-y-auto overscroll-contain')}
         style={rolagemInterna ? { maxHeight } : undefined}
@@ -163,12 +197,13 @@ export function DataTable<R>({
                     className={cn(
                       'z-10 border-b border-line bg-surface align-middle font-medium text-fg-muted',
                       stickyHeader && 'sticky',
-                      pad,
-                      'py-2 text-[11px] uppercase tracking-[0.06em] sm:py-2.5 sm:tracking-[0.08em]',
+                      padX,
+                      'py-2 text-[11px] uppercase tracking-[0.06em] [@container(min-width:560px)]:py-2.5',
                       alinhar[c.align ?? 'left'],
                       largura(c),
                       c.grow ? 'overflow-hidden' : 'whitespace-nowrap',
                       c.hideBelow && esconder[c.hideBelow],
+                      c.hideBelowWidth && esconderLargura[c.hideBelowWidth],
                       c.headerClassName,
                     )}
                     style={stickyHeader ? { top: rolagemInterna ? 0 : stickyOffset } : undefined}
@@ -179,17 +214,21 @@ export function DataTable<R>({
                         onClick={() => clicarCabecalho(c)}
                         aria-label={c.headerLabel ? `Ordenar por ${c.headerLabel}` : undefined}
                         className={cn(
-                          'group inline-flex h-[22px] max-w-full items-center gap-1 rounded-md align-middle uppercase leading-none tracking-[inherit] transition-colors hover:text-fg',
-                          c.align === 'right' && 'flex-row-reverse',
+                          'group relative inline-flex h-[22px] max-w-full items-center rounded-md align-middle uppercase leading-none tracking-[inherit] transition-colors hover:text-fg',
                           ativo && 'text-fg',
                         )}
                       >
                         <span className="truncate">{c.header}</span>
+                        {/* O ícone fica no respiro da célula (absoluto): nunca rouba largura do rótulo. */}
                         <Icon
                           name={ativo ? (sort!.dir === 'asc' ? 'chevron-cima' : 'chevron') : 'ordenar'}
-                          size={ativo ? 14 : 12}
+                          size={ativo ? 13 : 12}
                           strokeWidth={ativo ? 2.25 : 1.75}
-                          className={cn(!ativo && 'hidden opacity-0 transition-opacity group-hover:opacity-70 group-focus-visible:opacity-70 sm:block')}
+                          className={cn(
+                            'pointer-events-none absolute top-1/2 -translate-y-1/2',
+                            c.align === 'right' ? 'right-full mr-0.5' : 'left-full ml-0.5',
+                            !ativo && 'opacity-0 transition-opacity group-hover:opacity-70 group-focus-visible:opacity-70',
+                          )}
                         />
                       </button>
                     ) : (
@@ -226,11 +265,13 @@ export function DataTable<R>({
                       key={c.key}
                       className={cn(
                         'border-b border-line align-middle text-fg',
-                        pad,
+                        padX,
+                        padY,
                         alinhar[c.align ?? 'left'],
                         c.align === 'right' && 'num',
                         c.grow ? 'overflow-hidden' : 'whitespace-nowrap',
                         c.hideBelow && esconder[c.hideBelow],
+                        c.hideBelowWidth && esconderLargura[c.hideBelowWidth],
                         c.className,
                       )}
                     >

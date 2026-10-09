@@ -28,7 +28,7 @@ export function MargemCell({ t, race }: { t: Pick<Tally, 'votos'>; race: Race })
       <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', s.bg)} />
       <span className="num font-medium text-fg">
         {fmtPP(m.pp).replace('+', '').replace(' p.p.', '')}
-        <span className="hidden text-fg-muted sm:inline"> p.p.</span>
+        <span className="hidden text-fg-muted [@container(min-width:560px)]:inline"> p.p.</span>
       </span>
       <span className="sr-only">a favor de {race.candidatos[m.lider]?.nomeUrna}</span>
     </span>
@@ -43,7 +43,8 @@ export function ApuradoCell({ t, compact, bar = true }: { t: Pick<Tally, 'secoes
   const p = pctTotalizadas(t);
   return (
     <span className={cn('inline-flex items-center gap-2', compact ? 'w-full' : 'justify-end')}>
-      <span className={cn('h-1 shrink-0 overflow-hidden rounded-full bg-surface-3', compact ? 'w-10' : bar ? 'hidden w-12 xl:block' : 'hidden')} aria-hidden>
+      {/* a mini-barra só aparece quando a TABELA é larga (container query da DataTable) */}
+      <span className={cn('h-1 shrink-0 overflow-hidden rounded-full bg-surface-3', compact ? 'w-10' : bar ? 'hidden w-12 [@container(min-width:760px)]:block' : 'hidden')} aria-hidden>
         {/* progresso sempre na cor da marca (verde ficaria parecido com o turquesa do candidato A) */}
         <span className="block h-full rounded-full bg-brand" style={{ width: `${p}%` }} />
       </span>
@@ -62,12 +63,22 @@ export function CandHeader({ c }: { c: Candidate }) {
   );
 }
 
-/** Larguras padrão das colunas numéricas (tabelas com layout fixo). */
+/**
+ * Larguras padrão das colunas numéricas (tabelas com layout fixo). Respondem à largura da TABELA
+ * (container query da DataTable), não da janela: a mesma tabela fica certa no celular e num cartão
+ * de meia largura no desktop.
+ */
 export const W = {
-  pct: 'w-16 sm:w-[4.75rem]',
-  margem: 'w-[4.5rem] sm:w-[5.5rem]',
-  apurado: 'w-[4.5rem] xl:w-[7.75rem]',
-  apuradoSemBarra: 'w-[4.5rem]',
-  eleitores: 'w-[5.25rem]',
+  pct: 'w-16 [@container(min-width:520px)]:w-[4.75rem]',
+  margem: 'w-[4.5rem] [@container(min-width:520px)]:w-[5.5rem]',
+  apurado: 'w-[5rem] [@container(min-width:760px)]:w-[7.75rem]',
+  apuradoSemBarra: 'w-[5rem]',
+  eleitores: 'w-[5.75rem]',
   num: 'w-[4.25rem]',
 } as const;
+
+/**
+ * Larguras mínimas da tabela para mostrar colunas secundárias (ver `hideBelowWidth`). Abaixo de
+ * `apurado`, o % apurado aparece compacto sob o nome (use `soAbaixoDe[LARGURA.apurado]`).
+ */
+export const LARGURA = { apurado: 520, eleitores: 640, secundaria: 640 } as const;

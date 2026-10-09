@@ -14,7 +14,7 @@
  */
 import type { ScenarioConfig } from '../shared/types';
 import { clamp, dexp, logit, radixArgsort, sigmoid } from './mathx';
-import { Canal, canalKey, nrm, seedKey, triple32 } from './rng';
+import { Canal, canalKey, hashStr, nrm, seedKey, triple32, uni } from './rng';
 import { cenarioKey } from './scenario';
 import type { RaceInfo, Structure } from './structure';
 import { calculaChegadas } from './timing';
@@ -281,7 +281,18 @@ function votosCorrida(
   // O ruído binomial agregado (desvio-padrão ≈ 0,04 p.p. numa UF de 1,6 mi de válidos) é devolvido ao valor
   // esperado: ±1 voto em seções percorridas com passo coprimo (determinístico, efeito local desprezível).
   // Assim o total da corrida bate com o alvo (sem viés) com erro < 1 voto.
-  let D = Math.round(esperado) - s0;
+  let alvoVotos = Math.round(esperado);
+  // Desempate neutro: com o alvo a menos de 1 voto do empate (ex.: alvo 50,00%), quem vence seria decidido
+  // pelo arredondamento (x,5 sempre para cima) e pelo sinal do resíduo da calibragem — medido: com 50,00% para
+  // Presidente, o candidato 0 vencia por 1 voto em 11 de 16 sementes e empatava nas outras 5 (nunca o 1).
+  // Aqui o lado é sorteado pela semente (canal próprio, por corrida): 50/50 entre sementes, determinístico, e
+  // sem empate exato (que deixaria a apuração encerrada sem vencedor): diferença mínima de 1 voto (2 se os
+  // válidos forem pares).
+  if (sv > 0 && Math.abs(2 * esperado - sv) < 2) {
+    const paraO0 = uni(canalKey(seedK, Canal.Desempate), hashStr(r.id)) < 0.5;
+    alvoVotos = paraO0 ? Math.floor(sv / 2) + 1 : Math.ceil(sv / 2) - 1;
+  }
+  let D = alvoVotos - s0;
   const ns = i1 - i0;
   if (D !== 0 && ns > 0) {
     let passo = Math.max(1, Math.floor(ns * 0.6180339887));

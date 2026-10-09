@@ -181,7 +181,7 @@ function TabBar() {
   return (
     <nav
       aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.94] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
     >
       <ul className="mx-auto grid h-[60px] max-w-md grid-cols-4">
         {NAV.map((n) => {
