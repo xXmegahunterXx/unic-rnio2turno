@@ -11,10 +11,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { MunicipioResumo } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt } from '@/shared/format';
-import { useUf } from '@/app/data/hooks';
+import { useMunicipio, useUf } from '@/app/data/hooks';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
-import { Badge, ButtonLink, Combobox, IconButton, Segmented, Sheet, type ComboOption } from '@/app/ui';
+import { Badge, ButtonLink, Combobox, Icon, IconButton, Segmented, Sheet, type ComboOption } from '@/app/ui';
 import { Container } from '@/app/components/layout/Container';
 import { PageHeader } from '@/app/components/layout/PageHeader';
 import { Section } from '@/app/components/layout/Section';
@@ -36,6 +36,7 @@ import {
   parseUf,
   rotaBrasil,
   rotaMun,
+  rotaSecao,
   rotaUf,
   useDetalheRace,
 } from '@/app/components/pages/detalhe/useDetalhe';
@@ -47,6 +48,10 @@ import { Destaques } from '@/app/components/pages/detalhe/Destaques';
 import { MunicipioPainel } from '@/app/components/pages/detalhe/MunicipioPainel';
 import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
 import { ExteriorTabela, usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
+import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
+import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
+import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
+import { emUf } from '@/app/components/pages/detalhe/fmt';
 
 const MODOS_2T: MapMode[] = ['vencedor', 'margem', 'apurado', 'comparecimento', 'variacao'];
 const MODOS_1T: MapMode[] = ['vencedor', 'margem', 'comparecimento'];
@@ -96,6 +101,9 @@ export default function UfPage() {
 
   const ufMeta = ctx.meta?.ufs.find((u) => u.uf === uf);
   const nomeUf = uf ? UF_NOMES[uf] : '';
+  // UF de um município só (DF): no lugar do mapa, as seções do município.
+  const codUnico = ufMeta && ufMeta.uf !== 'ZZ' && ufMeta.municipios === 1 && ufMeta.capitalCod ? ufMeta.capitalCod : undefined;
+  const qUnico = useMunicipio(ctx.id, uf ?? undefined, codUnico);
 
   // ---------------------------------------------------------------- estados de erro/carregamento
   if (!uf) {
@@ -106,8 +114,8 @@ export default function UfPage() {
           titulo="Estado não encontrado"
           descricao={
             <>
-              Não existe a sigla <span className="font-mono font-semibold text-fg">“{ufRaw}”</span>. Escolha um estado abaixo ou
-              volte para o placar nacional.
+              Não existe a sigla <span className="font-mono font-semibold text-fg">“{ufRaw}”</span>. Escolha um estado abaixo ou volte para
+              o placar nacional.
             </>
           }
           acoes={
@@ -164,7 +172,7 @@ export default function UfPage() {
   const r = snap.resumo;
   const t1 = race.turno === 1;
   const raceT1 = ctx.raceT1;
-  const local = exterior ? 'no exterior' : `em ${nomeUf}`;
+  const local = emUf(uf, nomeUf);
   const unidade = exterior ? 'cidades' : 'municípios';
   const simulado = ctx.simulado && !t1;
   const apurando = !t1 && ctx.fase === 'apurando';
@@ -173,7 +181,36 @@ export default function UfPage() {
   const modos = t1 ? MODOS_1T : MODOS_2T.filter((m) => m !== 'variacao' || !!primeiroTurno);
   const modoAtual = modos.includes(modo) ? modo : 'vencedor';
   const paraMun = (m: MunicipioResumo) => rotaMun(uf, m.cod, ctx.pedida);
+  // "Eleito" só faz sentido onde a disputa se decide (governador na própria UF). Presidente num estado:
+  // o selo fica "À frente" (o kit não tem rótulo "venceu aqui" — anotado no relatório).
+  const resumoPlacar = race.abrangencia === uf ? r : { ...r, eleito: null };
+  const temSerie = snap.serie.length > 1;
+  // O feed da UF traz também eventos nacionais (início, "matematicamente eleito"): deixamos claro que são do país.
+  const eventos = snap.eventos.map((e) =>
+    e.abrangencia === 'BR' && e.tipo !== 'inicio' && e.detalhe ? { ...e, detalhe: `Resultado nacional. ${e.detalhe}` } : e,
+  );
+  const unico = codUnico ? snap.municipios.find((m) => m.cod === codUnico) : undefined;
+  const snapUnico = qUnico.data && qUnico.data.cod === codUnico && qUnico.data.race === snap.race ? qUnico.data : undefined;
   const restanteVisivel = !t1 && r.eleito === null && r.status !== 'encerrada';
+
+  // Ao lado do placar (desktop) ou depois do mapa (celular): o que falta, 1º × 2º turno ou a participação no 1º turno.
+  const lateral = restanteVisivel ? (
+    <RestantePanel race={race} resumo={r} restante={snap.restante} className="h-full" />
+  ) : !t1 && raceT1 && snapT1 ? (
+    <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
+      <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
+      <ComparaTurnos race={race} raceT1={raceT1} t2={r} t1={snapT1.resumo} compacto />
+    </section>
+  ) : (
+    <ParticipacaoCartao t={r} titulo="Participação no 1º turno" className="h-full" />
+  );
+  // No celular o mapa vem logo depois do placar; "o que falta" e a participação descem para depois dele.
+  const lateralCelular = !lg ? (
+    <div className={cn('space-y-3 py-5 transition-opacity', atualizando && 'opacity-60')}>
+      {lateral}
+      {!t1 ? <ParticipacaoCartao t={r} titulo="Participação" /> : null}
+    </div>
+  ) : null;
 
   function selecionar(cod: string) {
     setSel(cod);
@@ -188,7 +225,9 @@ export default function UfPage() {
           {paisesQ.data ? <> em {fmtInt(new Set(Object.values(paisesQ.data)).size)} países</> : null}
         </>
       ) : (
-        <>{fmtInt(ufMeta.municipios)} {ufMeta.municipios === 1 ? 'município' : 'municípios'}</>
+        <>
+          {fmtInt(ufMeta.municipios)} {ufMeta.municipios === 1 ? 'município' : 'municípios'}
+        </>
       )}{' '}
       · {fmtCompact(ufMeta.eleitorado)} de eleitores · {fmtInt(ufMeta.secoes)} seções
     </span>
@@ -205,10 +244,15 @@ export default function UfPage() {
     <Container>
       <PageHeader
         breadcrumbs={[{ label: 'Brasil', to: rotaBrasil(ctx.pedida) }, { label: exterior ? 'Exterior' : nomeUf }]}
-        eyebrow={t1 ? '1º turno · 4 de outubro · resultado oficial' : '2º turno · 25 de outubro'}
+        eyebrow={t1 ? 'Resultado oficial · 1º turno' : '2º turno · 25 de outubro'}
         title={exterior ? 'Votos no exterior' : nomeUf}
         subtitle={subtitulo}
-        actions={<ShareButton race={race} resumo={r} simulado={simulado} local={exterior ? 'Exterior' : nomeUf} size="sm" />}
+        actions={
+          <>
+            {ctx.anonimizado ? <NomesOcultos /> : null}
+            <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={exterior ? 'Exterior' : nomeUf} size="sm" />
+          </>
+        }
       >
         {ctx.temGov && ctx.races ? (
           <RaceSwitcher races={ctx.races} uf={uf} value={ctx.id} onChange={ctx.setRace} incluirPrimeiroTurno={t1} />
@@ -224,37 +268,34 @@ export default function UfPage() {
       <div className={cn('transition-opacity', atualizando && 'opacity-60')}>
         <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12">
           <div className="min-w-0 lg:col-span-8">
-            <Placar race={race} resumo={r} variant="default" titulo={tituloPlacar} simulado={simulado} live className="h-full" />
+            <Placar race={race} resumo={resumoPlacar} variant="default" titulo={tituloPlacar} simulado={simulado} live className="h-full" />
           </div>
-          <aside className="min-w-0 lg:col-span-4">
-            {restanteVisivel ? (
-              <RestantePanel race={race} resumo={r} restante={snap.restante} className="h-full" />
-            ) : !t1 && raceT1 && snapT1 ? (
-              <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
-                <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
-                <ComparaTurnos race={race} raceT1={raceT1} t2={r} t1={snapT1.resumo} compacto />
-              </section>
-            ) : (
-              <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
-                <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Participação no 1º turno</h3>
-                <StatsGrid t={r} variant="list" />
-              </section>
-            )}
-          </aside>
+          {lg ? <aside className="min-w-0 lg:col-span-4">{lateral}</aside> : null}
         </div>
-        {!t1 ? <StatsGrid t={r} className="mt-3 sm:mt-4" /> : null}
+        {lg && !t1 ? <StatsGrid t={r} className="mt-4" /> : null}
         {exterior ? <PanoramaMunicipios race={race} municipios={snap.municipios} unidade={unidade} className="mt-3 sm:mt-4" /> : null}
       </div>
 
-      {/* ------------------------------------------------------------ mapa */}
-      {!exterior ? (
+      {/* ------------------------------------------------------------ mapa (ou as seções, no DF) */}
+      {unico ? (
+        <MunicipioUnico
+          race={race}
+          uf={uf}
+          nomeUf={nomeUf}
+          nome={unico.nome}
+          snap={snapUnico}
+          to={paraMun(unico)}
+          onSecao={(z, s) => navigate(rotaSecao(uf, unico.cod, z, s, ctx.idT2))}
+          className="py-5 sm:py-7"
+        />
+      ) : !exterior ? (
         <Section
           id="mapa"
           title="Mapa dos municípios"
           description={lg ? 'Clique num município para ver o placar ao lado.' : 'Toque num município para ver o placar.'}
-          actions={<MapModeSwitch value={modoAtual} onChange={setModo} modos={modos} />}
+          actions={<MapModeSwitch value={modoAtual} onChange={setModo} modos={modos} className="lg:pr-5" />}
         >
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 rounded-2xl border border-line bg-surface p-3 shadow-card sm:p-5">
               <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-center md:gap-6">
                 <div className="flex min-w-0 items-center gap-2">
@@ -271,7 +312,14 @@ export default function UfPage() {
                     className="min-w-0 flex-1"
                   />
                   {busca ? (
-                    <IconButton icon="fechar" label="Limpar busca" size="md" variant="secondary" onClick={() => setBusca(null)} className="shrink-0" />
+                    <IconButton
+                      icon="fechar"
+                      label="Limpar busca"
+                      size="md"
+                      variant="secondary"
+                      onClick={() => setBusca(null)}
+                      className="shrink-0"
+                    />
                   ) : null}
                 </div>
                 <PanoramaMunicipios race={race} municipios={snap.municipios} unidade={unidade} variant="faixa" />
@@ -324,17 +372,27 @@ export default function UfPage() {
         </Section>
       ) : null}
 
+      {lateralCelular}
+
       {/* ------------------------------------------------------------ destaques */}
-      <Section id="destaques" title="Destaques" description={exterior ? 'As cidades que mais chamam atenção nesta disputa.' : 'Os municípios que mais chamam atenção nesta disputa.'}>
-        <Destaques
-          race={race}
-          municipios={snap.municipios}
-          para={paraMun}
-          apurando={apurando}
-          unidade={unidade}
-          rotulo={exterior ? (m) => paisesQ.data?.[m.cod] : undefined}
-        />
-      </Section>
+      {!unico ? (
+        <Section
+          id="destaques"
+          title="Destaques"
+          description={
+            exterior ? 'As cidades que mais chamam atenção nesta disputa.' : 'Os municípios que mais chamam atenção nesta disputa.'
+          }
+        >
+          <Destaques
+            race={race}
+            municipios={snap.municipios}
+            para={paraMun}
+            apurando={apurando}
+            unidade={unidade}
+            rotulo={exterior ? (m) => paisesQ.data?.[m.cod] : undefined}
+          />
+        </Section>
+      ) : null}
 
       {/* ------------------------------------------------------------ série e eventos */}
       {!t1 ? (
@@ -345,50 +403,59 @@ export default function UfPage() {
             description="% dos votos válidos conforme as seções são totalizadas."
             className="min-w-0 lg:col-span-8"
             actions={
-              <Segmented<'secoes' | 'horario'>
-                ariaLabel="Eixo horizontal"
-                size="sm"
-                value={eixo}
-                onChange={setEixo}
-                options={[
-                  { value: 'secoes', label: '% seções' },
-                  { value: 'horario', label: 'Horário' },
-                ]}
-              />
+              temSerie ? (
+                <Segmented<'secoes' | 'horario'>
+                  ariaLabel="Eixo horizontal"
+                  size="sm"
+                  value={eixo}
+                  onChange={setEixo}
+                  options={[
+                    { value: 'secoes', label: '% seções' },
+                    { value: 'horario', label: 'Horário' },
+                  ]}
+                />
+              ) : null
             }
             card
           >
-            {snap.serie.length > 1 ? (
+            {temSerie ? (
               <TimelineChart serie={snap.serie} race={race} eixoX={eixo} />
             ) : (
-              <p className="flex h-[220px] items-center justify-center text-center text-[14px] text-fg-muted">
-                O gráfico começa a ser desenhado com as primeiras seções totalizadas.
-              </p>
+              <div className="flex min-h-[160px] flex-col items-center justify-center gap-2.5 px-4 text-center">
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-surface-2 text-fg-muted">
+                  <Icon name="grafico" size={20} />
+                </span>
+                <p className="max-w-xs text-pretty text-[14px] leading-snug text-fg-muted">
+                  O gráfico começa a ser desenhado com as primeiras seções totalizadas.
+                </p>
+              </div>
             )}
           </Section>
           <Section id="eventos" title="Acontecimentos" className="min-w-0 lg:col-span-4" card>
-            <EventFeed eventos={snap.eventos} race={race} showUf={false} max={8} bleed={false} />
+            <EventFeed eventos={eventos} race={race} showUf={false} max={8} bleed={false} />
           </Section>
         </div>
       ) : null}
 
       {/* ------------------------------------------------------------ tabela completa */}
-      <Section
-        id="municipios"
-        title={exterior ? 'Cidades e países' : 'Todos os municípios'}
-        description={
-          exterior
-            ? 'Toque numa cidade para ver as seções; em “Países”, os totais por país.'
-            : `Os ${fmtInt(snap.municipios.length)} municípios, do maior para o menor eleitorado. Toque para ver zonas e seções.`
-        }
-        card
-      >
-        {exterior ? (
-          <ExteriorTabela race={race} municipios={snap.municipios} paises={paisesQ.data} onSelect={(m) => navigate(paraMun(m))} />
-        ) : (
-          <MunicipioTable race={race} municipios={snap.municipios} onSelect={(m) => navigate(paraMun(m))} />
-        )}
-      </Section>
+      {!unico ? (
+        <Section
+          id="municipios"
+          title={exterior ? 'Cidades e países' : 'Todos os municípios'}
+          description={
+            exterior
+              ? 'Toque numa cidade para ver as seções; em “Países”, os totais por país.'
+              : `Os ${fmtInt(snap.municipios.length)} municípios, do maior para o menor eleitorado. Toque para ver zonas e seções.`
+          }
+          card
+        >
+          {exterior ? (
+            <ExteriorTabela race={race} municipios={snap.municipios} paises={paisesQ.data} onSelect={(m) => navigate(paraMun(m))} />
+          ) : (
+            <MunicipioTable race={race} municipios={snap.municipios} onSelect={(m) => navigate(paraMun(m))} />
+          )}
+        </Section>
+      ) : null}
 
       {/* ------------------------------------------------------------ Sheet (celular/tablet) */}
       {!lg && selM ? (
@@ -398,7 +465,11 @@ export default function UfPage() {
           title={
             <span className="flex items-center gap-2">
               {selM.nome}
-              {selM.capital ? <Badge tone="brand" size="xs">Capital</Badge> : null}
+              {selM.capital ? (
+                <Badge tone="brand" size="xs">
+                  Capital
+                </Badge>
+              ) : null}
             </span>
           }
           description={`${exterior ? 'Exterior' : nomeUf} · ${fmtCompact(selM.eleitorado)} eleitores · ${fmtInt(selM.secoes)} seções`}

@@ -10,6 +10,7 @@ import { useMemo, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { SecaoDetalhe, Tally } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
+import { validos } from '@/shared/calc';
 import { fmtHoraSeg, fmtInt } from '@/shared/format';
 import { useMunicipio, useSecao, useZona } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
@@ -33,10 +34,17 @@ import {
 import { PreApuracaoAviso } from '@/app/components/pages/detalhe/FaseAviso';
 import { NaoEncontrado } from '@/app/components/pages/detalhe/NaoEncontrado';
 import { EsqueletoSecao } from '@/app/components/pages/detalhe/Esqueletos';
-import { ComparaAbrangencias, ParticipacaoComparada, fraseDiferenca, type Abrangencia } from '@/app/components/pages/detalhe/SecaoContexto';
-import { MiniPlacar } from '@/app/components/pages/detalhe/MiniPlacar';
+import {
+  ComparaAbrangencias,
+  DemaisCandidatos,
+  ParticipacaoComparada,
+  fraseDiferenca,
+  tallyPrimeiroTurno,
+  type Abrangencia,
+} from '@/app/components/pages/detalhe/SecaoContexto';
 import { mesmaSecao, useMinhaSecao } from '@/app/components/pages/detalhe/minhaSecao';
-import { fmt4 } from '@/app/components/pages/detalhe/fmt';
+import { emMun, emUf, fmt4 } from '@/app/components/pages/detalhe/fmt';
+import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 
 /** SecaoDetalhe → Tally (para os cálculos de calc.ts). */
 function tallySecao(s: SecaoDetalhe): Tally {
@@ -71,7 +79,10 @@ export default function SecaoPage() {
   const qMun = useMunicipio(raceId, uf ?? undefined, cod || undefined);
   const [minha, setMinha] = useMinhaSecao();
 
-  const sec = qSec.data && qSec.data.uf === uf && qSec.data.cod === cod && qSec.data.zona === zona && qSec.data.secao === secao ? qSec.data : undefined;
+  const sec =
+    qSec.data && qSec.data.uf === uf && qSec.data.cod === cod && qSec.data.zona === zona && qSec.data.secao === secao
+      ? qSec.data
+      : undefined;
   const zSnap = qZona.data && qZona.data.cod === cod && qZona.data.zona === zona && qZona.data.race === raceId ? qZona.data : undefined;
   const mSnap = qMun.data && qMun.data.cod === cod && qMun.data.uf === uf && qMun.data.race === raceId ? qMun.data : undefined;
   const race = ctx.raceT2;
@@ -96,8 +107,11 @@ export default function SecaoPage() {
     (qSec.isSuccess && qSec.data === null) ||
     (ehNaoEncontrado(erroMun) && !mSnap);
 
+  // Seção inexistente, mas o município ainda carregando: espera para dizer o nível certo (município/zona/seção).
+  const aguardandoMun = !!uf && zona !== undefined && secao !== undefined && !mSnap && !erroMun && !qMun.isError;
+
   // ---------------------------------------------------------------- 404
-  if (naoExiste) {
+  if (naoExiste && !aguardandoMun) {
     const munExiste = !!mSnap;
     const consulta = `/apuracao/consulta${uf ? `?uf=${uf.toLowerCase()}${munExiste ? `&mun=${cod}` : ''}${munExiste && zona !== undefined && mSnap?.zonas.some((z) => z.zona === zona) ? `&zona=${zona}` : ''}` : ''}`;
     const zonaExiste = !!mSnap && zona !== undefined && mSnap.zonas.some((z) => z.zona === zona);
@@ -110,16 +124,19 @@ export default function SecaoPage() {
             !uf ? (
               'Este endereço não corresponde a nenhum estado.'
             ) : !munExiste ? (
-              <>Não há município com o código <span className="font-mono font-semibold text-fg">{codRaw}</span> em {nomeUf}.</>
+              <>
+                Não há município com o código <span className="font-mono font-semibold text-fg">{codRaw}</span> {emUf(uf, nomeUf)}.
+              </>
             ) : !zonaExiste ? (
               <>
-                {mSnap!.nome} ({uf}) não tem a zona <span className="font-mono font-semibold text-fg">{zonaRaw}</span>. Confira o número no seu título
-                de eleitor ou no app e-Título.
+                {mSnap!.nome} ({uf}) não tem a zona <span className="font-mono font-semibold text-fg">{zonaRaw}</span>. Confira o número no
+                seu título de eleitor ou no app e-Título.
               </>
             ) : (
               <>
-                A zona {fmt4(zona!)} de {mSnap!.nome} ({uf}) não tem a seção <span className="font-mono font-semibold text-fg">{secaoRaw}</span>. Confira o
-                número no seu título de eleitor ou no app e-Título — seções agregadas a outras não têm boletim próprio.
+                A zona {fmt4(zona!)} de {mSnap!.nome} ({uf}) não tem a seção{' '}
+                <span className="font-mono font-semibold text-fg">{secaoRaw}</span>. Confira o número no seu título de eleitor ou no app
+                e-Título — seções agregadas a outras não têm boletim próprio.
               </>
             )
           }
@@ -144,7 +161,7 @@ export default function SecaoPage() {
     );
   }
 
-  if (qSec.isError && !sec) {
+  if (qSec.isError && !sec && !ehNaoEncontrado(erroSec)) {
     return (
       <Container className="py-8">
         <ErrorState onRetry={() => qSec.refetch()} />
@@ -166,6 +183,15 @@ export default function SecaoPage() {
   const salva = mesmaSecao(minha, { uf: uf!, cod, zona: zona!, secao: secao! });
   const pre = ctx.fase === 'pre';
   const linkRace = pediuT1 ? raceId : ctx.pedida;
+  // O carimbo "SIMULAÇÃO" acompanha a faixa global (status.simulacao): na fase 'pre' de produção o BU vazio não é
+  // simulação. Fora da simulação, um BU ainda não totalizado não tem código de identificação: mascaramos o código
+  // determinístico do motor para não exibir um número que pareça oficial.
+  const simulacao = ctx.status ? ctx.status.simulacao : sec.simulado;
+  const buExibido: SecaoDetalhe = {
+    ...sec,
+    simulado: simulacao,
+    codigoIdentificacao: !simulacao && !sec.totalizada ? '•••• •••• •••• ••••' : sec.codigoIdentificacao,
+  };
   const caminho = rotaSecao(uf!, cod, zona!, secao!, linkRace);
 
   async function compartilharSecao() {
@@ -189,10 +215,19 @@ export default function SecaoPage() {
 
   const linhas: Abrangencia[] = [
     ...(sec.totalizada ? [{ rotulo: `Seção ${fmt4(secao!)}`, sub: 'esta urna', t: tSec, destaque: true }] : []),
-    { rotulo: `Zona ${fmt4(zona!)}`, sub: zSnap ? `${fmtInt(zSnap.resumo.secoesTotalizadas)} de ${fmtInt(zSnap.resumo.secoes)} seções` : undefined, t: zSnap?.resumo ?? null },
-    { rotulo: nomeMun, sub: mSnap ? `${fmtInt(mSnap.resumo.secoesTotalizadas)} de ${fmtInt(mSnap.resumo.secoes)} seções` : undefined, t: mSnap?.resumo ?? null },
+    {
+      rotulo: `Zona ${fmt4(zona!)}`,
+      sub: zSnap ? `${fmtInt(zSnap.resumo.secoesTotalizadas)} de ${fmtInt(zSnap.resumo.secoes)} seções` : undefined,
+      t: zSnap?.resumo ?? null,
+    },
+    {
+      rotulo: nomeMun,
+      sub: mSnap ? `${fmtInt(mSnap.resumo.secoesTotalizadas)} de ${fmtInt(mSnap.resumo.secoes)} seções` : undefined,
+      t: mSnap?.resumo ?? null,
+    },
   ];
-  const frase = mSnap && sec.totalizada ? fraseDiferenca(race, tSec, mSnap.resumo, exterior ? 'conjunto da cidade' : 'conjunto do município') : null;
+  const frase =
+    mSnap && sec.totalizada ? fraseDiferenca(race, tSec, mSnap.resumo, exterior ? 'conjunto da cidade' : 'conjunto do município') : null;
 
   return (
     <Container>
@@ -212,24 +247,26 @@ export default function SecaoPage() {
         }
         subtitle={
           <>
-            Zona <span className="num">{fmt4(zona!)}</span> · {nomeMun} ({exterior ? 'Exterior' : uf}) · <span className="num">{fmtInt(sec.aptos)}</span>{' '}
-            eleitores aptos
+            Zona <span className="num">{fmt4(zona!)}</span> · {nomeMun} ({exterior ? 'Exterior' : uf}) ·{' '}
+            <span className="num">{fmtInt(sec.aptos)}</span> eleitores aptos
           </>
         }
         actions={
           <>
+            {ctx.anonimizado ? <NomesOcultos /> : null}
             <Button variant="secondary" size="sm" icon="compartilhar" onClick={compartilharSecao}>
               Compartilhar
             </Button>
-            <Button variant="ghost" size="sm" icon="link" onClick={copiar}>
-              Copiar link
+            <Button variant="ghost" size="sm" icon="link" onClick={copiar} aria-label="Copiar link" title="Copiar link">
+              {/* No celular só o ícone (o compartilhamento principal fica sob o boletim). */}
+              <span className="hidden sm:inline">Copiar link</span>
             </Button>
           </>
         }
       />
 
       {pre && ctx.status ? (
-        <PreApuracaoAviso inicio={ctx.status.inicioApuracao} agora={ctx.simNow} local={`em ${nomeMun}`} className="mb-6" />
+        <PreApuracaoAviso inicio={ctx.status.inicioApuracao} agora={ctx.simNow} local={emMun(nomeMun)} className="mb-6" />
       ) : pediuT1 ? (
         <div role="note" className="mb-6 flex items-start gap-2 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
           <Icon name="info" size={18} className="mt-px shrink-0 text-fg-muted" />
@@ -243,7 +280,7 @@ export default function SecaoPage() {
           <div className="lg:sticky lg:top-[calc(var(--app-header-h,64px)+20px)]">
             <div className="relative px-1 pb-4 pt-1">
               <div aria-hidden className="pointer-events-none absolute inset-x-6 top-10 h-64 rounded-full bg-brand/10 blur-3xl" />
-              <BoletimUrna secao={sec} race={race} className="relative" />
+              <BoletimUrna secao={buExibido} race={race} className="relative" />
             </div>
             <nav aria-label="Outras seções da zona" className="mx-auto mt-5 grid max-w-[400px] grid-cols-2 gap-2">
               <ButtonLink
@@ -296,34 +333,35 @@ export default function SecaoPage() {
           <StatusSecao sec={sec} pre={pre} />
 
           {pre && mSnap?.primeiroTurno && ctx.raceT1 ? (
-            <Cartao titulo={`Como ${nomeMun} votou no 1º turno`} subtitulo="Resultado oficial do município (4 de outubro). Não há dado por seção do 1º turno.">
-              <MiniPlacar
+            <Cartao
+              titulo={`Como ${nomeMun} votou no 1º turno`}
+              subtitulo="Resultado oficial do município (4 de outubro), em % dos votos válidos. Não há dado por seção do 1º turno."
+            >
+              <ComparaAbrangencias
                 race={ctx.raceT1}
-                t={{
-                  ...mSnap.resumo,
-                  votos: mSnap.primeiroTurno.votos,
-                  brancos: mSnap.primeiroTurno.brancos,
-                  nulos: mSnap.primeiroTurno.nulos,
-                  comparecimento: mSnap.primeiroTurno.comparecimento,
-                  secoesTotalizadas: mSnap.resumo.secoes,
-                }}
-                nome={nomeMun}
-                semApurado
+                linhas={[{ rotulo: nomeMun, sub: 'resultado oficial', t: { ...mSnap.resumo, ...tallyPrimeiroTurno(mSnap.primeiroTurno) } }]}
               />
+              <DemaisCandidatos race={ctx.raceT1} votos={mSnap.primeiroTurno.votos} className="mt-3" />
             </Cartao>
-          ) : (
+          ) : sec.totalizada || (zSnap && validos(zSnap.resumo) > 0) || (mSnap && validos(mSnap.resumo) > 0) ? (
             <Cartao
               titulo="Como esta seção votou"
-              subtitulo={sec.totalizada ? 'Em % dos votos válidos, comparada com a zona e o município.' : 'A seção ainda não foi totalizada; veja como estão a zona e o município.'}
+              subtitulo={
+                sec.totalizada
+                  ? 'Em % dos votos válidos, comparada com a zona e o município.'
+                  : 'A seção ainda não foi totalizada; veja como estão a zona e o município.'
+              }
             >
               <ComparaAbrangencias race={race} linhas={linhas} />
               {frase ? <p className="mt-4 text-pretty text-[14px] leading-relaxed text-fg">{frase}</p> : null}
             </Cartao>
-          )}
+          ) : null}
 
-          <Cartao titulo="Participação" subtitulo={`Nesta seção, comparada com ${nomeMun}.`}>
-            <ParticipacaoComparada secao={sec.totalizada ? tSec : null} base={mSnap?.resumo ?? null} rotuloBase="no município" />
-          </Cartao>
+          {sec.totalizada || (mSnap && mSnap.resumo.comparecimento > 0) ? (
+            <Cartao titulo="Participação" subtitulo={`Nesta seção, comparada com ${nomeMun}.`}>
+              <ParticipacaoComparada secao={sec.totalizada ? tSec : null} base={mSnap?.resumo ?? null} rotuloBase={nomeMun} />
+            </Cartao>
+          ) : null}
 
           {mosaicoZona.length > 0 ? (
             <Cartao
@@ -364,10 +402,17 @@ function StatusSecao({ sec, pre }: { sec: SecaoDetalhe; pre: boolean }) {
         </span>
         <div className="min-w-0">
           <p className="font-medium text-fg">
-            Totalizada{sec.totalizadaEm ? <> às <span className="num">{fmtHoraSeg(sec.totalizadaEm)}</span></> : null}
+            Totalizada
+            {sec.totalizadaEm ? (
+              <>
+                {' '}
+                às <span className="num">{fmtHoraSeg(sec.totalizadaEm)}</span>
+              </>
+            ) : null}
           </p>
           <p className="text-[13px] text-fg-muted">
-            <span className="num">{fmtInt(sec.comparecimento)}</span> de <span className="num">{fmtInt(sec.aptos)}</span> eleitores votaram nesta urna.
+            <span className="num">{fmtInt(sec.comparecimento)}</span> de <span className="num">{fmtInt(sec.aptos)}</span> eleitores votaram
+            nesta urna.
           </p>
         </div>
       </div>

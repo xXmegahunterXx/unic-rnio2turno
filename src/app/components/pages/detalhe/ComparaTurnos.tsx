@@ -72,7 +72,12 @@ export function ComparaTurnos({ race, raceT1, t2, t1, participacao = true, compa
                   </span>
                 ) : null}
               </div>
-              <div className={cn('mt-2 grid grid-cols-[3.25rem_minmax(0,1fr)_3.75rem] items-center gap-x-2.5', compacto ? 'gap-y-1' : 'gap-y-1.5')}>
+              <div
+                className={cn(
+                  'mt-2 grid grid-cols-[3.25rem_minmax(0,1fr)_3.75rem] items-center gap-x-2.5',
+                  compacto ? 'gap-y-1' : 'gap-y-1.5',
+                )}
+              >
                 <Barra rotulo="1º turno" pct={p1} cls={cn(s.bg, 'opacity-40')} />
                 <Barra rotulo="2º turno" pct={p2} cls={s.bg} forte vazio={tem2 ? undefined : 'aguardando'} />
               </div>
@@ -83,8 +88,8 @@ export function ComparaTurnos({ race, raceT1, t2, t1, participacao = true, compa
 
       {pctOutros !== null ? (
         <p className="mt-4 text-[12.5px] leading-snug text-fg-muted">
-          No 1º turno, os demais candidatos somaram <span className="num font-medium text-fg">{fmtPct(pctOutros, 1)}</span> dos
-          válidos — por isso os dois finalistas tendem a crescer no 2º turno.
+          No 1º turno, os demais candidatos somaram <span className="num font-medium text-fg">{fmtPct(pctOutros, 1)}</span> dos válidos —
+          por isso os dois finalistas tendem a crescer no 2º turno.
         </p>
       ) : null}
 
@@ -138,7 +143,9 @@ function Indicador({ rotulo, v1, v2 }: { rotulo: string; v1: number | null; v2: 
       <dt className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">{rotulo}</dt>
       <dd className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[13px]">
         <span className="num text-fg-muted">{v1 !== null ? fmtPct(v1, 1) : '—'}</span>
-        <span aria-hidden className="text-fg-subtle">→</span>
+        <span aria-hidden className="text-fg-subtle">
+          →
+        </span>
         <span className="num font-semibold text-fg">{v2 !== null ? fmtPct(v2, 1) : '—'}</span>
       </dd>
       <span className="sr-only">no 1º turno e no 2º turno, respectivamente</span>

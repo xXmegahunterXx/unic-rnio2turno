@@ -55,8 +55,12 @@ export function PreHero({
         <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(rgb(var(--line)/var(--line-alpha))_1px,transparent_1px),linear-gradient(90deg,rgb(var(--line)/var(--line-alpha))_1px,transparent_1px)] [background-size:32px_32px] [mask-image:radial-gradient(ellipse_at_top_right,black_10%,transparent_65%)]" />
       </div>
 
-      <div className="grid grid-cols-1 items-center gap-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-12">
-        <div className="min-w-0">
+      {/*
+        Celular: título → contagem → texto e ações (a contagem é o assunto principal, sobe para a 1ª dobra).
+        Desktop: texto à esquerda e a contagem à direita, centrada na altura do cartão.
+      */}
+      <div className="grid grid-cols-1 gap-y-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:grid-rows-[auto_auto] lg:gap-x-12 lg:gap-y-0">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-end">
           <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-brand-fg">
             <Icon name="calendario" size={15} />
             2º turno · domingo, 25 de outubro
@@ -64,7 +68,16 @@ export function PreHero({
           <h2 className="mt-2.5 text-balance font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg sm:text-[40px]">
             {titulo}
           </h2>
-          <p className="mt-3 max-w-xl text-pretty text-[15px] leading-relaxed text-fg-muted">{descricao}</p>
+        </div>
+
+        <div className="flex flex-col items-start lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:items-center lg:self-center">
+          <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Faltam</div>
+          <Countdown target={alvo} now={agora} size="lg" hideZeroDays doneLabel="A apuração começou" />
+          <p className="mt-3 text-[12.5px] text-fg-muted">Horário de Brasília</p>
+        </div>
+
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-start">
+          <p className="max-w-xl text-pretty text-[15px] leading-relaxed text-fg-muted lg:mt-3">{descricao}</p>
 
           {finalistas.length === 2 ? (
             <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2" aria-label={`Quem disputa: ${finalistas.map((c) => c.nomeUrna).join(' e ')}`}>
@@ -96,12 +109,6 @@ export function PreHero({
               Faça o Teste Cego
             </ButtonLink>
           </div>
-        </div>
-
-        <div className="flex flex-col items-start lg:items-center">
-          <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Faltam</div>
-          <Countdown target={alvo} now={agora} size="lg" hideZeroDays doneLabel="A apuração começou" />
-          <p className="mt-3 text-[12.5px] text-fg-muted">Horário de Brasília</p>
         </div>
       </div>
     </section>

@@ -10,7 +10,7 @@ import type { LiveStatus, UF } from '@/shared/types';
 import { INICIO_APURACAO, UF_NOMES } from '@/shared/constants';
 import { pctTotalizadas } from '@/shared/calc';
 import { fmtPct, fmtPP } from '@/shared/format';
-import { useMeta, useNacional, useStatus } from '@/app/data/hooks';
+import { useAnonimizado, useMeta, useNacional, useRace, useRaces, useStatus } from '@/app/data/hooks';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
 import { useSimNow } from '@/app/lib/useNow';
 import { compartilhar, urlAbsoluta } from '@/app/lib/share';
@@ -18,11 +18,10 @@ import { Badge } from '@/app/ui/Badge';
 import { Button, IconButton } from '@/app/ui/Button';
 import { Segmented } from '@/app/ui/Segmented';
 import { Container } from '@/app/components/layout/Container';
-import { Placar } from '@/app/components/apuracao/Placar';
 import { ErrorState } from '@/app/components/apuracao/States';
-import { Topo, SeloFase } from '@/app/components/pages/nacional/Topo';
+import { Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
 import { PreHero } from '@/app/components/pages/nacional/PreHero';
-import { GovernadorCard, difFinalistas } from '@/app/components/pages/nacional/GovernadorCard';
+import { GovernadorCard, PresidenteCard, difFinalistas } from '@/app/components/pages/nacional/GovernadorCard';
 import { GovernadorCartaoSk, GovernadoresEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
 import { useGovernadoresUf } from '@/app/components/pages/nacional/useGovernadores';
 import { GOV_RACES, linkUf } from '@/app/components/pages/nacional/fase';
@@ -51,6 +50,10 @@ export default function GovernadoresPage() {
   const pre = status?.fase === 'pre';
   const govs = useGovernadoresUf(pre);
   const presQ = useNacional(pre ? 'pres-t1' : 'pres');
+  // Corridas SEMPRE por useRace/useRaces: na simulação os nomes viram "Candidato A/B".
+  const races = useRaces();
+  const presRace = useRace(pre ? 'pres-t1' : 'pres');
+  const anonimizado = useAnonimizado();
   const [ordem, setOrdemEstado] = useState<Ordem>(ordemInicial);
   const setOrdem = (o: Ordem) => {
     setOrdemEstado(o);
@@ -65,7 +68,7 @@ export default function GovernadoresPage() {
   // 7 itens: ordenar a cada render é trivial (sem memo).
   const itens = (() => {
     const lista = govs.map((g) => {
-      const race = meta?.races.find((r) => r.id === g.id);
+      const race = races?.find((r) => r.id === g.id);
       const snap = g.q.data && g.q.data.race === g.id ? g.q.data : undefined;
       return { ...g, race, snap };
     });
@@ -92,7 +95,7 @@ export default function GovernadoresPage() {
       </Container>
     );
   }
-  if (!meta || (!status && !statusQ.isError)) {
+  if (!meta || !races || (!status && !statusQ.isError)) {
     return (
       <Container wide className="pb-10">
         <GovernadoresEsqueleto />
@@ -100,7 +103,6 @@ export default function GovernadoresPage() {
     );
   }
 
-  const presRace = meta.races.find((r) => r.id === (pre ? 'pres-t1' : 'pres'));
   const presData = presQ.data && presRace && presQ.data.race === presRace.id ? presQ.data : undefined;
   const resumos = itens.filter((x) => x.snap).map((x) => x.snap!.resumo);
   const definidas = pre ? 0 : resumos.filter((r) => r.eleito !== null).length;
@@ -128,7 +130,12 @@ export default function GovernadoresPage() {
         }
         titulo="Governadores"
         contexto={pre ? '1º turno' : '2º turno'}
-        selos={<SeloFase status={status} t1={pre} />}
+        selos={
+          <>
+            <SeloFase status={status} t1={pre} />
+            {anonimizado ? <SeloAnonimo /> : null}
+          </>
+        }
         seletor={
           <Segmented<'pres' | 'gov'>
             ariaLabel="Disputa"
@@ -174,14 +181,20 @@ export default function GovernadoresPage() {
       )}
 
       {!pre ? (
-        <dl className="mb-5 grid grid-cols-3 gap-2 sm:mb-6 sm:gap-3">
-          <Resumo rotulo="Definidas" valor={`${definidas} de 7`} sub={definidas ? 'resultado matemático' : 'nenhuma ainda'} />
+        <dl className="mb-6 grid grid-cols-2 gap-2 sm:mb-7 sm:grid-cols-3 sm:gap-3">
+          <Resumo className="order-1" rotulo="Definidas" valor={`${definidas} de 7`} sub={definidas ? 'resultado matemático' : 'nenhuma ainda'} />
           <Resumo
+            className="order-3 col-span-2 sm:order-2 sm:col-span-1"
             rotulo="Mais apertada"
-            valor={maisApertada ? maisApertada.uf : '—'}
-            sub={maisApertada ? `${fmtPP(difFinalistas(maisApertada.snap!.resumo)!).replace('+', '')} de diferença` : 'aguardando votos'}
+            valor={maisApertada ? UF_NOMES[maisApertada.uf] : '—'}
+            sub={maisApertada ? `${fmtPP(difFinalistas(maisApertada.snap!.resumo)!).replace('+', '')} de diferença entre os dois` : 'aguardando votos'}
           />
-          <Resumo rotulo="Seções" valor={secoes ? fmtPct((totalizadas / secoes) * 100, 1) : '—'} sub="totalizadas nos 7" />
+          <Resumo
+            className="order-2 sm:order-3"
+            rotulo="Seções"
+            valor={secoes ? fmtPct(pctTotalizadas({ secoes, secoesTotalizadas: totalizadas })) : '—'}
+            sub="totalizadas nos 7 estados"
+          />
         </dl>
       ) : null}
 
@@ -218,15 +231,13 @@ export default function GovernadoresPage() {
         ))}
         <motion.li layout={reduzir ? false : 'position'} className="min-w-0">
           {presRace && presData ? (
-            <Placar
-              variant="compact"
+            <PresidenteCard
               race={presRace}
               resumo={presData.resumo}
-              titulo="Presidente"
-              subtitulo={pre ? '1º turno · resultado oficial' : 'Também neste domingo · Brasil'}
+              ufs={presData.ufs}
+              sub={pre ? '1º turno · resultado oficial' : 'Também neste domingo · Brasil'}
               to="/apuracao"
               simulado={!pre && status?.simulacao}
-              className="h-full"
             />
           ) : (
             <GovernadorCartaoSk />
@@ -241,12 +252,12 @@ export default function GovernadoresPage() {
   );
 }
 
-function Resumo({ rotulo, valor, sub }: { rotulo: string; valor: string; sub: string }) {
+function Resumo({ rotulo, valor, sub, className }: { rotulo: string; valor: string; sub: string; className?: string }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface px-3 py-3 shadow-card sm:px-4 sm:py-3.5">
-      <dt className="text-[10.5px] font-semibold uppercase leading-tight tracking-[0.08em] text-fg-muted sm:text-[11.5px] sm:tracking-[0.1em]">{rotulo}</dt>
-      <dd className="num mt-auto pt-1.5 font-display text-[20px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[26px]">{valor}</dd>
-      <dd className="mt-1 text-[11.5px] leading-snug text-fg-muted sm:text-[12.5px]">{sub}</dd>
+    <div className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface px-3.5 py-3 shadow-card sm:px-4 sm:py-3.5', className)}>
+      <dt className="truncate text-[11px] font-semibold uppercase leading-tight tracking-[0.1em] text-fg-muted sm:text-[11.5px]">{rotulo}</dt>
+      <dd className="num mt-auto truncate pt-2 font-display text-[22px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[26px]">{valor}</dd>
+      <dd className="mt-1.5 truncate text-[12px] leading-snug text-fg-muted sm:text-[12.5px]">{sub}</dd>
     </div>
   );
 }

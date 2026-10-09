@@ -10,7 +10,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import type { LiveStatus, NationalSnapshot, Race, RaceId } from '@/shared/types';
 import type { PublicMeta } from '@/shared/api';
 import { INICIO_APURACAO } from '@/shared/constants';
-import { useMeta, useNacional, useStatus } from '@/app/data/hooks';
+import { useAnonimizado, useMeta, useNacional, useRace, useRaces, useStatus } from '@/app/data/hooks';
 import { useRaceParam } from '@/app/lib/useRaceParam';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
 import { useSimNow } from '@/app/lib/useNow';
@@ -24,21 +24,22 @@ import { RaceSwitcher } from '@/app/components/apuracao/RaceSwitcher';
 import { RestantePanel } from '@/app/components/apuracao/RestantePanel';
 import { ShareButton } from '@/app/components/apuracao/ShareCard';
 import { EmptyState, ErrorState } from '@/app/components/apuracao/States';
-import { Topo, SeloFase } from '@/app/components/pages/nacional/Topo';
+import { Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
 import { PreHero } from '@/app/components/pages/nacional/PreHero';
 import { MapaPanel } from '@/app/components/pages/nacional/MapaPanel';
 import { CorridaPanel } from '@/app/components/pages/nacional/CorridaPanel';
 import { FeedPanel } from '@/app/components/pages/nacional/FeedPanel';
 import { ComparacaoT1 } from '@/app/components/pages/nacional/ComparacaoT1';
 import { ExteriorCard } from '@/app/components/pages/nacional/ExteriorCard';
+import { EleitoradoT1 } from '@/app/components/pages/nacional/EleitoradoT1';
 import { EleitoBanner } from '@/app/components/pages/nacional/EleitoBanner';
 import { GovernadoresFaixa } from '@/app/components/pages/nacional/GovernadoresFaixa';
 import { EstadosSecao, LiderancaCard, ParticipacaoSecao, RegioesCard } from '@/app/components/pages/nacional/Blocos';
 import { NacionalEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
 import { ehSimulado, ehT1, raceExibida, semT1, ufDaRace } from '@/app/components/pages/nacional/fase';
 
-/** Coluna lateral do desktop; no celular os filhos entram direto na grade (ordem por `order-*`). */
-const COLUNA = 'contents lg:flex lg:min-w-0 lg:flex-col lg:gap-6';
+/** Coluna do desktop largo (≥ 1360 px); abaixo disso os filhos entram direto na grade (ordem por `order-*`). */
+const COLUNA = 'contents min-[1360px]:flex min-[1360px]:min-w-0 min-[1360px]:flex-col min-[1360px]:gap-6';
 
 export default function NacionalPage() {
   const [raceParam, setRace] = useRaceParam();
@@ -50,6 +51,12 @@ export default function NacionalPage() {
 
   const raceId = raceExibida(raceParam, status);
   const t1 = ehT1(raceId);
+  // Corridas SEMPRE por useRace/useRaces: na simulação os nomes viram "Candidato A/B".
+  const races = useRaces();
+  const race = useRace(raceId);
+  const raceT1 = useRace(`${semT1(raceId)}-t1`);
+  const race2T = useRace(semT1(raceId));
+  const anonimizado = useAnonimizado();
   const q = useNacional(raceId);
   // 1º turno sempre à mão: modo "variação" do mapa, comparação e Sheet da UF (em t1 é a mesma consulta).
   const qT1 = useNacional(`${semT1(raceId)}-t1`);
@@ -67,12 +74,9 @@ export default function NacionalPage() {
   if (ufGov) return <Navigate to={`/apuracao/${ufGov.toLowerCase()}?race=${raceParam}`} replace />;
 
   const meta = metaQ.data;
-  const race = meta?.races.find((r) => r.id === raceId);
-  const raceT1 = meta?.races.find((r) => r.id === `${semT1(raceId)}-t1`);
-  const race2T = meta?.races.find((r) => r.id === semT1(raceId));
   const statusPronto = !!status || statusQ.isError;
 
-  if (meta && !race) return <DisputaInexistente id={raceParam} />;
+  if (races && !race) return <DisputaInexistente id={raceParam} />;
   const naoEncontrado = (q.error as { name?: string; status?: number } | null)?.name === 'NotFoundError' || (q.error as { status?: number } | null)?.status === 404;
   if (naoEncontrado) return <DisputaInexistente id={raceParam} />;
 
@@ -89,7 +93,7 @@ export default function NacionalPage() {
       </Container>
     );
   }
-  if (!meta || !race || !data || !statusPronto) {
+  if (!meta || !races || !race || !data || !statusPronto) {
     return (
       <Container wide className="pb-10">
         <NacionalEsqueleto />
@@ -102,6 +106,7 @@ export default function NacionalPage() {
   const dataT1 = qT1.data && qT1.data.race === `${semT1(raceId)}-t1` ? qT1.data : undefined;
   const resumo = data.resumo;
   const definido = race.turno === 2 && resumo.eleito !== null;
+  const semApuracao = resumo.secoesTotalizadas === 0;
 
   return (
     <Container wide className="pb-6 sm:pb-10">
@@ -113,8 +118,13 @@ export default function NacionalPage() {
         }
         titulo="Presidente"
         contexto={t1 ? '1º turno' : '2º turno'}
-        selos={<SeloFase status={status} resumo={resumo} t1={t1} />}
-        seletor={<RaceSwitcher races={meta.races} value={raceParam} onChange={trocarDisputa} size={desktop ? 'md' : 'sm'} />}
+        selos={
+          <>
+            <SeloFase status={status} resumo={resumo} t1={t1} />
+            {anonimizado ? <SeloAnonimo /> : null}
+          </>
+        }
+        seletor={<RaceSwitcher races={races} value={raceParam} onChange={trocarDisputa} size={desktop ? 'md' : 'sm'} />}
         acoes={<ShareButton race={race} resumo={resumo} simulado={simulado} caminho={t1 && !pre ? '/apuracao?race=pres-t1' : '/apuracao'} iconOnly={!desktop} size={desktop ? 'md' : 'sm'} />}
       />
 
@@ -139,65 +149,71 @@ export default function NacionalPage() {
       ) : null}
 
       {/*
-        Celular: uma coluna na ordem placar → o que falta → mapa → corrida → feed → tabelas (classes order-*).
-        Desktop: grade de 12 colunas; as colunas laterais são flex (no celular viram `contents` e os
-        filhos entram direto na grade, o que permite reordenar sem duplicar componentes).
+        Celular, tablet e notebooks até 1359 px: uma coluna, na ordem das classes order-*
+        (placar → o que falta → mapa → corrida → feed → tabelas). O placar "hero" precisa de ~750 px para
+        os números gigantes não encostarem na diferença, por isso a divisão 7/5 só entra a partir de 1360 px.
+        Desktop largo: grade de 12 colunas; as colunas laterais são flex (abaixo disso viram `contents` e
+        os filhos entram direto na grade, o que permite reordenar sem duplicar componentes).
       */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
-        <div className={cn(COLUNA, 'lg:col-span-7')}>
-          <Placar
-            race={race}
-            resumo={resumo}
-            variant="hero"
-            simulado={simulado}
-            titulo={t1 ? 'Presidente · resultado do 1º turno' : undefined}
-            className={cn('order-1 lg:order-none', t1 && 'lg:flex-1')}
-          />
-          {!t1 ? <CorridaPanel className="order-4 lg:order-none lg:flex-1" serie={data.serie} race={race} /> : null}
+      {t1 ? (
+        <div className="grid grid-cols-1 gap-4 min-[1360px]:grid-cols-12 min-[1360px]:gap-6">
+          <div className={cn(COLUNA, 'min-[1360px]:col-span-7')}>
+            <Placar race={race} resumo={resumo} variant="hero" simulado={simulado} titulo="Presidente · resultado do 1º turno" className="order-1 min-[1360px]:order-none" />
+            <EleitoradoT1 className="order-3 min-[1360px]:order-none min-[1360px]:flex-1" race={race} resumo={resumo} />
+          </div>
+          <div className={cn(COLUNA, 'min-[1360px]:col-span-5')}>
+            <MapaPanel className="order-2 min-[1360px]:order-none min-[1360px]:flex-1" race={race} ufs={data.ufs} raceLink={raceParam} simulado={simulado} anonimizado={anonimizado} />
+            <LiderancaCard className="order-4 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} />
+          </div>
+
+          <ParticipacaoSecao className="order-6 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" t={resumo} t1 />
+          <GovernadoresFaixa className="order-7 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" races={races} t1 linkT1={!pre} />
+
+          <EstadosSecao className="order-8 pt-2 min-[1360px]:order-none min-[1360px]:col-span-8 min-[1360px]:pt-4" race={race} ufs={data.ufs} raceLink={raceParam} />
+          <div className={cn(COLUNA, 'min-[1360px]:col-span-4 min-[1360px]:pt-[5.25rem]')}>
+            <RegioesCard className="order-5 min-[1360px]:order-none" race={race} regioes={data.regioes} />
+            <ExteriorResumo className="order-9 min-[1360px]:order-none" race={race} data={data} meta={meta} raceLink={raceParam} />
+          </div>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 min-[1360px]:grid-cols-12 min-[1360px]:gap-6">
+          <div className={cn(COLUNA, 'min-[1360px]:col-span-7')}>
+            <Placar race={race} resumo={resumo} variant="hero" simulado={simulado} className="order-1 min-[1360px]:order-none" />
+            <CorridaPanel className="order-4 min-[1360px]:order-none min-[1360px]:flex-1" serie={data.serie} race={race} />
+          </div>
+          <div className={cn(COLUNA, 'min-[1360px]:col-span-5')}>
+            <MapaPanel
+              className="order-3 min-[1360px]:order-none min-[1360px]:flex-1"
+              race={race}
+              ufs={data.ufs}
+              primeiroTurno={dataT1?.ufs}
+              raceT1={raceT1}
+              raceLink={raceParam}
+              simulado={simulado}
+              anonimizado={anonimizado}
+            />
+            {definido ? (
+              <EleitoBanner className="order-2 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
+            ) : (
+              <RestantePanel className="order-2 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
+            )}
+          </div>
 
-        <div className={cn(COLUNA, 'lg:col-span-5')}>
-          <MapaPanel
-            className={cn(t1 ? 'order-2' : 'order-3', 'lg:order-none lg:flex-1')}
-            race={race}
-            ufs={data.ufs}
-            primeiroTurno={!t1 ? dataT1?.ufs : undefined}
-            raceT1={raceT1}
-            raceLink={raceParam}
-            simulado={simulado}
-          />
-          {!t1 && definido ? <EleitoBanner className="order-2 lg:order-none" race={race} resumo={resumo} restante={data.restante} /> : null}
-          {!t1 && !definido ? <RestantePanel className="order-2 lg:order-none" race={race} resumo={resumo} restante={data.restante} /> : null}
+          {/* Antes da 1ª seção totalizada as regiões não têm o que mostrar: o feed ocupa a linha inteira. */}
+          <FeedPanel className={cn('order-5 min-[1360px]:order-none', semApuracao ? 'min-[1360px]:col-span-12' : 'min-[1360px]:col-span-5')} eventos={data.eventos} race={race} largo={semApuracao} />
+          {!semApuracao ? <RegioesCard className="order-7 min-[1360px]:order-none min-[1360px]:col-span-7" race={race} regioes={data.regioes} /> : null}
+
+          <ParticipacaoSecao className="order-8 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" t={resumo} />
+          <GovernadoresFaixa className="order-9 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" races={races} t1={false} />
+
+          <EstadosSecao className="order-10 pt-2 min-[1360px]:order-none min-[1360px]:col-span-8 min-[1360px]:pt-4" race={race} ufs={data.ufs} raceLink={raceParam} />
+          <div className={cn(COLUNA, 'min-[1360px]:col-span-4 min-[1360px]:pt-[5.25rem]')}>
+            <ExteriorResumo className="order-11 min-[1360px]:order-none" race={race} data={data} meta={meta} raceLink={raceParam} />
+            <ComparacaoT1 className="order-6 min-[1360px]:order-none" race={race} resumo={resumo} raceT1={raceT1} anonimizado={anonimizado} />
+            <LiderancaCard className="order-12 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} />
+          </div>
         </div>
-
-        {!t1 ? (
-          <>
-            <FeedPanel className="order-5 lg:order-none lg:col-span-5" eventos={data.eventos} race={race} />
-            <RegioesCard className="order-7 lg:order-none lg:col-span-7" race={race} regioes={data.regioes} />
-          </>
-        ) : null}
-
-        <ParticipacaoSecao className={cn(t1 ? 'order-5' : 'order-8', 'pt-2 lg:order-none lg:col-span-12 lg:pt-4')} t={resumo} t1={t1} />
-
-        <GovernadoresFaixa className={cn(t1 ? 'order-6' : 'order-9', 'pt-2 lg:order-none lg:col-span-12 lg:pt-4')} races={meta.races} t1={t1} linkT1={t1 && !pre} />
-
-        <EstadosSecao className={cn(t1 ? 'order-7' : 'order-10', 'pt-2 lg:order-none lg:col-span-8 lg:pt-4')} race={race} ufs={data.ufs} raceLink={raceParam} />
-        <div className={cn(COLUNA, 'lg:col-span-4 lg:pt-[5.25rem]')}>
-          {!t1 ? (
-            <>
-              <ExteriorResumo className="order-11 lg:order-none" race={race} data={data} meta={meta} raceLink={raceParam} />
-              <ComparacaoT1 className="order-6 lg:order-none" race={race} resumo={resumo} raceT1={raceT1} />
-              <LiderancaCard className="order-12 lg:order-none" race={race} ufs={data.ufs} raceLink={raceParam} />
-            </>
-          ) : (
-            <>
-              <LiderancaCard className="order-3 lg:order-none" race={race} ufs={data.ufs} raceLink={raceParam} />
-              <RegioesCard className="order-4 lg:order-none" race={race} regioes={data.regioes} />
-              <ExteriorResumo className="order-8 lg:order-none" race={race} data={data} meta={meta} raceLink={raceParam} />
-            </>
-          )}
-        </div>
-      </div>
+      )}
     </Container>
   );
 }

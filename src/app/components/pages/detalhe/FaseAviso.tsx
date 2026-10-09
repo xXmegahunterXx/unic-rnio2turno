@@ -26,10 +26,7 @@ export function PreApuracaoAviso({
   return (
     <section
       aria-label="A apuração do 2º turno ainda não começou"
-      className={cn(
-        'relative overflow-hidden rounded-2xl border border-brand/30 bg-surface p-4 shadow-card sm:p-5',
-        className,
-      )}
+      className={cn('relative overflow-hidden rounded-2xl border border-brand/30 bg-surface p-4 shadow-card sm:p-5', className)}
     >
       <div aria-hidden className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-brand/20 blur-3xl" />
       <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

@@ -1,6 +1,9 @@
 /**
  * Comparação com o 1º turno: % dos válidos de cada finalista no 1º turno (Candidate.primeiroTurno) e
  * agora, com a variação em pontos percentuais. Neutro: setas e textos sem cor de "ganho/perda".
+ *
+ * Com a simulação anonimizada ("Candidato A/B") o bloco não mostra os números do 1º turno: eles são
+ * oficiais e públicos, e bastariam para identificar quem é A e quem é B ao lado de números fictícios.
  */
 import { memo } from 'react';
 import type { Race, Summary } from '@/shared/types';
@@ -8,6 +11,7 @@ import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtCompact, fmtInt, fmtPct, fmtPP } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
+import { ButtonLink } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 
@@ -16,10 +20,13 @@ export interface ComparacaoT1Props {
   resumo: Summary;
   /** Corrida do 1º turno (para o total dos demais candidatos). */
   raceT1?: Race;
+  /** Simulação com nomes ocultos: esconde os números (reais) do 1º turno. */
+  anonimizado?: boolean;
   className?: string;
 }
 
-export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, className }: ComparacaoT1Props) {
+export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, anonimizado, className }: ComparacaoT1Props) {
+  if (anonimizado) return <ComparacaoOculta className={className} />;
   const tem = validos(resumo) > 0;
   const outros = raceT1?.candidatos.find((c) => c.agregado)?.primeiroTurno;
   const pst = pctTotalizadas(resumo);
@@ -66,7 +73,7 @@ export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, c
                   pct={tem ? agora : null}
                   votos={tem ? resumo.votos[i] : null}
                   barra={s.bg}
-                  sufixo={tem && resumo.status !== 'encerrada' ? `até agora (${fmtPct(pst, 1)} das seções)` : undefined}
+                  sufixo={tem && resumo.status !== 'encerrada' ? `até agora (${fmtPct(pst)} das seções)` : undefined}
                   destaque
                 />
               </div>
@@ -118,5 +125,30 @@ function Linha({
         {sufixo ? ` ${sufixo}` : ''}
       </div>
     </div>
+  );
+}
+
+/** Versão da simulação anonimizada: explica por que a comparação não aparece. */
+function ComparacaoOculta({ className }: { className?: string }) {
+  return (
+    <section aria-labelledby="comparacao-titulo" className={cn('min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
+      <div className="flex items-start gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-fg-muted">
+          <Icon name="olho-fechado" size={18} />
+        </span>
+        <div className="min-w-0">
+          <h2 id="comparacao-titulo" className="font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[19px]">
+            Comparação com o 1º turno
+          </h2>
+          <p className="mt-1 text-pretty text-[13px] leading-relaxed text-fg-muted">
+            Fica oculta na simulação: os números oficiais de 4 de outubro identificariam quem é o Candidato A e quem é o Candidato B ao lado de
+            resultados fictícios.
+          </p>
+        </div>
+      </div>
+      <ButtonLink to="/apuracao?race=pres-t1" variant="outline" size="sm" iconRight="chevron-direita" className="mt-4 w-full">
+        Ver o resultado oficial do 1º turno
+      </ButtonLink>
+    </section>
   );
 }

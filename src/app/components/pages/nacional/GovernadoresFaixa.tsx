@@ -47,7 +47,7 @@ export function GovernadoresFaixa({ races, t1, linkT1, className }: Governadores
         </Link>
       </div>
 
-      <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 scrollbar-none sm:mx-0 sm:grid sm:scroll-px-0 sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-4">
+      <ul className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-2 scrollbar-none sm:mx-0 sm:grid sm:scroll-px-0 sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3 min-[1360px]:grid-cols-4">
         {govs.map((g) => {
           const race = races.find((r) => r.id === g.id);
           const data = g.q.data && g.q.data.race === g.id ? g.q.data : undefined;

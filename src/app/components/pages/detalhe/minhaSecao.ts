@@ -73,5 +73,7 @@ export function useMinhaSecao(): [MinhaSecao | null, (s: Omit<MinhaSecao, 'em'> 
   return [v, set];
 }
 
-export const mesmaSecao = (a: Pick<MinhaSecao, 'uf' | 'cod' | 'zona' | 'secao'> | null, b: Pick<MinhaSecao, 'uf' | 'cod' | 'zona' | 'secao'> | null) =>
-  !!a && !!b && a.uf === b.uf && a.cod === b.cod && a.zona === b.zona && a.secao === b.secao;
+export const mesmaSecao = (
+  a: Pick<MinhaSecao, 'uf' | 'cod' | 'zona' | 'secao'> | null,
+  b: Pick<MinhaSecao, 'uf' | 'cod' | 'zona' | 'secao'> | null,
+) => !!a && !!b && a.uf === b.uf && a.cod === b.cod && a.zona === b.zona && a.secao === b.secao;

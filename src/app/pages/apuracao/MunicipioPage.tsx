@@ -8,6 +8,7 @@
  */
 import { useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import type { RaceId, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtInt } from '@/shared/format';
 import { useMunicipio } from '@/app/data/hooks';
@@ -23,7 +24,8 @@ import { ShareButton } from '@/app/components/apuracao/ShareCard';
 import { SecaoMosaic } from '@/app/components/apuracao/SecaoMosaic';
 import { ErrorState } from '@/app/components/apuracao/States';
 import { Icon } from '@/app/ui/Icon';
-import { fmtEleitores } from '@/app/components/pages/detalhe/fmt';
+import { emMun, emUf, fmt4, fmtEleitores } from '@/app/components/pages/detalhe/fmt';
+import { useMinhaSecao } from '@/app/components/pages/detalhe/minhaSecao';
 import {
   ehNaoEncontrado,
   parseUf,
@@ -39,6 +41,10 @@ import { EsqueletoMunicipio } from '@/app/components/pages/detalhe/Esqueletos';
 import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
 import { ZonasExplorer } from '@/app/components/pages/detalhe/ZonasExplorer';
 import { usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
+import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
+import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
+import { Recolhivel } from '@/app/components/pages/detalhe/Recolhivel';
+import { useMediaQuery } from '@/app/lib/useMediaQuery';
 
 export default function MunicipioPage() {
   const { uf: ufRaw, cod: codRaw = '' } = useParams();
@@ -46,6 +52,7 @@ export default function MunicipioPage() {
   const cod = /^\d+$/.test(codRaw) ? codRaw.padStart(5, '0') : codRaw;
   const ctx = useDetalheRace(uf);
   const navigate = useNavigate();
+  const lg = useMediaQuery('(min-width: 1024px)');
   const [zona, setZona] = useZonaParam();
   const q = useMunicipio(ctx.id, uf ?? undefined, cod || undefined);
   const exterior = uf === 'ZZ';
@@ -74,8 +81,8 @@ export default function MunicipioPage() {
           descricao={
             uf ? (
               <>
-                Não há município com o código <span className="font-mono font-semibold text-fg">{codRaw}</span> em {nomeUf}. Busque pelo
-                nome na página do estado ou consulte a sua seção.
+                Não há município com o código <span className="font-mono font-semibold text-fg">{codRaw}</span> {emUf(uf, nomeUf)}. Busque
+                pelo nome na página do estado ou consulte a sua seção.
               </>
             ) : (
               'Este endereço não corresponde a nenhum estado. Comece pelo placar nacional ou consulte a sua seção.'
@@ -113,6 +120,8 @@ export default function MunicipioPage() {
   // ---------------------------------------------------------------- dados prontos
   const race = raceShown;
   const r = snap.resumo;
+  // Um município não elege presidente nem governador: o selo "Eleito" do placar vira "À frente".
+  const resumoPlacar = { ...r, eleito: null };
   const t1 = race.turno === 1;
   const simulado = ctx.simulado && !t1;
   const pais = exterior ? paisesQ.data?.[snap.cod] : undefined;
@@ -120,6 +129,14 @@ export default function MunicipioPage() {
   const nZonas = snap.mosaico.length;
   const nSecoes = r.secoes;
   const unidade = exterior ? 'cidade' : 'município';
+  const compara =
+    !t1 && ctx.raceT1 && snap.primeiroTurno ? (
+      <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
+        <h3 className="mb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
+        <p className="mb-4 text-[12.5px] text-fg-muted">% dos votos válidos {emMun(snap.nome)}</p>
+        <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto />
+      </section>
+    ) : null;
 
   const subtitulo = (
     <span className="num">
@@ -153,7 +170,12 @@ export default function MunicipioPage() {
         eyebrow={eyebrow}
         title={snap.nome}
         subtitle={subtitulo}
-        actions={<ShareButton race={race} resumo={r} simulado={simulado} local={local} size="sm" />}
+        actions={
+          <>
+            {ctx.anonimizado ? <NomesOcultos /> : null}
+            <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={local} size="sm" />
+          </>
+        }
       >
         {ctx.temGov && ctx.races ? (
           <RaceSwitcher races={ctx.races} uf={uf} value={ctx.id} onChange={ctx.setRace} incluirPrimeiroTurno={t1} />
@@ -161,7 +183,7 @@ export default function MunicipioPage() {
       </PageHeader>
 
       {ctx.fase === 'pre' && ctx.status ? (
-        <PreApuracaoAviso inicio={ctx.status.inicioApuracao} agora={ctx.simNow} local={`em ${snap.nome}`} className="mb-4" />
+        <PreApuracaoAviso inicio={ctx.status.inicioApuracao} agora={ctx.simNow} local={emMun(snap.nome)} className="mb-4" />
       ) : t1 && !ctx.autoT1 ? (
         <PrimeiroTurnoAviso onVoltar={() => ctx.setRace(ctx.idT2)} className="mb-4" />
       ) : null}
@@ -169,24 +191,16 @@ export default function MunicipioPage() {
       <div className={cn('transition-opacity', atualizando && 'opacity-60')}>
         <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-12">
           <div className="min-w-0 lg:col-span-8">
-            <Placar race={race} resumo={r} variant="default" titulo={tituloPlacar} simulado={simulado} live className="h-full" />
+            <Placar race={race} resumo={resumoPlacar} variant="default" titulo={tituloPlacar} simulado={simulado} live className="h-full" />
           </div>
-          <aside className="min-w-0 lg:col-span-4">
-            {!t1 && ctx.raceT1 && snap.primeiroTurno ? (
-              <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
-                <h3 className="mb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
-                <p className="mb-4 text-[12.5px] text-fg-muted">% dos votos válidos em {snap.nome}</p>
-                <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto />
-              </section>
-            ) : (
-              <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
-                <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Participação no 1º turno</h3>
-                <StatsGrid t={r} variant="list" />
-              </section>
-            )}
-          </aside>
+          {/* No celular só a comparação com o 1º turno fica junto do placar; a participação desce para o fim. */}
+          {lg || compara ? (
+            <aside className="min-w-0 lg:col-span-4">
+              {compara ?? <ParticipacaoCartao t={r} titulo="Participação no 1º turno" className="h-full" />}
+            </aside>
+          ) : null}
         </div>
-        {!t1 ? <StatsGrid t={r} className="mt-3 sm:mt-4" /> : null}
+        {lg && !t1 ? <StatsGrid t={r} className="mt-4" /> : null}
       </div>
 
       {/* ------------------------------------------------------------ mosaico */}
@@ -211,14 +225,16 @@ export default function MunicipioPage() {
           <div className="mb-3 flex items-start gap-2.5 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[13.5px] leading-relaxed text-fg-muted">
             <Icon name="info" size={18} className="mt-0.5 shrink-0" />
             <p>
-              O TSE divulga o resultado do 1º turno por município nesta base; não há dado por seção. Por isso, todas as seções aparecem com a
-              cor de quem venceu em {snap.nome}. No 2º turno, cada seção ganha a própria cor assim que for totalizada.
+              O TSE divulga o resultado do 1º turno por município nesta base; não há dado por seção. Por isso, todas as seções aparecem com
+              a cor de quem venceu em {snap.nome}. No 2º turno, cada seção ganha a própria cor assim que for totalizada.
             </p>
           </div>
         ) : null}
         <div className="rounded-2xl border border-line bg-surface p-3 shadow-card sm:p-5">
           {snap.mosaico.length > 0 ? (
-            <SecaoMosaic mosaico={snap.mosaico} race={race} zonaDestaque={t1 ? null : zona} onSelect={irSecao} />
+            <Recolhivel alturaMax={lg ? null : 560} rotulo={`Ver as ${fmtInt(nZonas)} zonas`}>
+              <SecaoMosaic mosaico={snap.mosaico} race={race} zonaDestaque={t1 ? null : zona} onSelect={irSecao} />
+            </Recolhivel>
           ) : (
             <p className="py-10 text-center text-[14px] text-fg-muted">O mosaico de seções não está disponível para esta fonte de dados.</p>
           )}
@@ -245,27 +261,46 @@ export default function MunicipioPage() {
         </Section>
       ) : null}
 
-      <ConsultaCta to={`/apuracao/consulta?uf=${uf.toLowerCase()}&mun=${snap.cod}`} nome={snap.nome} />
+      {!lg ? <ParticipacaoCartao t={r} titulo={t1 ? 'Participação no 1º turno' : 'Participação'} className="mt-5" /> : null}
 
+      <ConsultaCta uf={uf} cod={snap.cod} nome={snap.nome} race={ctx.idT2} />
     </Container>
   );
 }
 
-function ConsultaCta({ to, nome }: { to: string; nome: string }) {
+function ConsultaCta({ uf, cod, nome, race }: { uf: UF; cod: string; nome: string; race: RaceId }) {
+  const [minha] = useMinhaSecao();
+  const aqui = minha && minha.uf === uf && minha.cod === cod ? minha : null;
   return (
     <section className="mt-6 flex flex-col items-start gap-4 rounded-2xl border border-line bg-surface-2 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div className="flex items-start gap-3">
         <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand-fg">
           <Icon name="urna" size={22} />
         </span>
-        <div>
-          <h2 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">Você vota em {nome}?</h2>
-          <p className="mt-0.5 text-[14px] text-fg-muted">Informe a zona e a seção do seu título para abrir o boletim da sua urna.</p>
-        </div>
+        {aqui ? (
+          <div>
+            <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-brand-fg">Minha seção</p>
+            <h2 className="mt-0.5 font-mono text-[17px] font-semibold text-fg">
+              Seção {fmt4(aqui.secao)} · Zona {fmt4(aqui.zona)}
+            </h2>
+            <p className="mt-0.5 text-[14px] text-fg-muted">Guardada neste aparelho. Abra o boletim da sua urna.</p>
+          </div>
+        ) : (
+          <div>
+            <h2 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">Você vota {emMun(nome)}?</h2>
+            <p className="mt-0.5 text-[14px] text-fg-muted">Informe a zona e a seção do seu título para abrir o boletim da sua urna.</p>
+          </div>
+        )}
       </div>
-      <ButtonLink to={to} variant="secondary" icon="busca" className="shrink-0">
-        Consultar minha seção
-      </ButtonLink>
+      {aqui ? (
+        <ButtonLink to={rotaSecao(uf, cod, aqui.zona, aqui.secao, race)} variant="primary" iconRight="seta" className="shrink-0">
+          Ver minha seção
+        </ButtonLink>
+      ) : (
+        <ButtonLink to={`/apuracao/consulta?uf=${uf.toLowerCase()}&mun=${cod}`} variant="secondary" icon="busca" className="shrink-0">
+          Consultar minha seção
+        </ButtonLink>
+      )}
     </section>
   );
 }

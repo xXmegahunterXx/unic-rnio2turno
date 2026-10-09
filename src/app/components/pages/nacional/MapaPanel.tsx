@@ -11,7 +11,7 @@ import { memo, useCallback, useMemo, useRef, useState, type MouseEvent, type Poi
 import { useNavigate } from 'react-router-dom';
 import type { Race, RaceId, Summary, Tally, UF } from '@/shared/types';
 import { REGIAO_NOMES, UF_NOMES, UF_REGIAO } from '@/shared/constants';
-import { pctAbstencao, pctComparecimento, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
+import { margem, pctAbstencao, pctComparecimento, pctValidos, validos } from '@/shared/calc';
 import { fmtInt, fmtPct, fmtPP } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
@@ -56,10 +56,12 @@ export interface MapaPanelProps {
   /** Corrida usada nos links (a que o usuário pediu). */
   raceLink: RaceId;
   simulado?: boolean;
+  /** Simulação com nomes ocultos: o Sheet não mostra os números (reais) do 1º turno. */
+  anonimizado?: boolean;
   className?: string;
 }
 
-export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, raceT1, raceLink, simulado, className }: MapaPanelProps) {
+export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, raceT1, raceLink, simulado, anonimizado, className }: MapaPanelProps) {
   const navigate = useNavigate();
   const t1 = race.turno === 1;
   const modos = t1 ? MODOS_1T : primeiroTurno ? MODOS_2T : MODOS_2T_SEM_T1;
@@ -152,7 +154,8 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
       <div
         className={cn(
           'relative flex flex-1 flex-col justify-center px-3 pb-3 pt-3 sm:px-5',
-          vista === 'cartograma' && 'mx-auto w-full max-w-[460px] pt-4 lg:max-w-[400px]',
+          // Cartograma: blocos de tamanho confortável. Mapa: limitado a 640 px quando o cartão ocupa a largura toda (tablet).
+          vista === 'cartograma' ? 'mx-auto w-full max-w-[460px] pt-4 lg:max-w-[400px]' : 'mx-auto w-full max-w-[680px]',
         )}
         onPointerDownCapture={onPointerDownCapture}
         onClickCapture={onClickCapture}
@@ -164,10 +167,10 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
         )}
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:items-end sm:justify-between sm:px-5">
+      <div className="flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-x-6 sm:px-5">
         <MapLegend modo={modo} race={race} compacta semTitulo={modo === 'vencedor'} />
         {!t1 ? (
-          <p className="num shrink-0 text-[12px] leading-snug text-fg-muted sm:text-right">
+          <p className="num text-[12px] leading-snug text-fg-muted sm:ml-auto sm:text-right">
             <span className="font-semibold text-fg">{resumoMapa.comVotos}</span> de {resumoMapa.total} estados com seções totalizadas
             {resumoMapa.encerradas > 0 ? (
               <>
@@ -187,7 +190,7 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
           onClose={() => setSheet((s) => (s ? { ...s, aberto: false } : s))}
           race={race}
           resumo={ufs[sheet.uf]}
-          t1={primeiroTurno?.[sheet.uf]}
+          t1={anonimizado ? undefined : primeiroTurno?.[sheet.uf]}
           raceT1={raceT1}
           raceLink={raceLink}
           simulado={simulado}
@@ -243,7 +246,7 @@ function UfSheet({
           <Placar variant="compact" race={race} resumo={resumo} titulo={race.cargo === 'Presidente' ? `Presidente · ${race.turno}º turno` : race.titulo} simulado={simulado} />
           {tem ? (
             <dl className="grid grid-cols-3 gap-2">
-              <MiniStat rotulo="Apurado" valor={fmtPct(pctTotalizadas(resumo), 1)} />
+              <MiniStat rotulo="Diferença" valor={margem(resumo).lider === null ? '—' : fmtPP(margem(resumo).pp).replace('+', '')} />
               <MiniStat rotulo="Comparec." valor={fmtPct(pctComparecimento(resumo), 1)} />
               <MiniStat rotulo="Abstenção" valor={fmtPct(pctAbstencao(resumo), 1)} />
             </dl>

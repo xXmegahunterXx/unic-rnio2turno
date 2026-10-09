@@ -51,7 +51,7 @@ export function EleitoBanner({ race, resumo, restante, className }: { race: Race
               </>
             ) : (
               <>
-                Com <span className="num font-semibold text-fg">{fmtPct(pctTotalizadas(resumo), 1)}</span> das seções totalizadas, a diferença de{' '}
+                Com <span className="num font-semibold text-fg">{fmtPct(pctTotalizadas(resumo))}</span> das seções totalizadas, a diferença de{' '}
                 <span className="num font-semibold text-fg">{fmtInt(dif)}</span> votos já supera o eleitorado das seções que faltam (
                 <span className="num">{fmtInt(restante.eleitorado)}</span>).
               </>

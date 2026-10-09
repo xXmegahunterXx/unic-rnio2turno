@@ -28,7 +28,18 @@ export interface MunicipioPainelProps {
   className?: string;
 }
 
-export function MunicipioPainel({ race, raceT1, municipio: m, municipioT1, to, simulado, unidade = 'município', semBotao, tituloPlacar, className }: MunicipioPainelProps) {
+export function MunicipioPainel({
+  race,
+  raceT1,
+  municipio: m,
+  municipioT1,
+  to,
+  simulado,
+  unidade = 'município',
+  semBotao,
+  tituloPlacar,
+  className,
+}: MunicipioPainelProps) {
   const sub = (
     <span className="num">
       {m.capital ? 'Capital · ' : ''}
@@ -37,7 +48,14 @@ export function MunicipioPainel({ race, raceT1, municipio: m, municipioT1, to, s
   );
   return (
     <div className={cn('space-y-3', className)}>
-      <Placar race={race} resumo={m} variant="compact" titulo={tituloPlacar ?? m.nome} subtitulo={tituloPlacar ? undefined : sub} simulado={simulado} />
+      <Placar
+        race={race}
+        resumo={{ ...m, eleito: null }}
+        variant="compact"
+        titulo={tituloPlacar ?? m.nome}
+        subtitulo={tituloPlacar ? undefined : sub}
+        simulado={simulado}
+      />
       {race.turno === 2 && raceT1 && municipioT1 ? (
         <section className="rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
           <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>

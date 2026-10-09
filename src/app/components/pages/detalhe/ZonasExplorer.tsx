@@ -25,6 +25,7 @@ import { ApuracaoProgress } from '@/app/components/apuracao/ApuracaoProgress';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
 import { ehNaoEncontrado } from './useDetalhe';
 import { MiniPlacar } from './MiniPlacar';
+import { emMun } from './fmt';
 
 export interface ZonasExplorerProps {
   race: Race;
@@ -87,9 +88,32 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
       sortValue: (z) => pctTotalizadas(z),
       cell: (z) => <ApuradoCell t={z} bar={false} />,
     },
-    { key: 'a', header: <CandHeader c={ca} />, headerLabel: ca.nomeUrna, align: 'right', width: W.pct, sortValue: (z) => pctValidos(z, 0), cell: (z) => <PctCell t={z} i={0} race={race} /> },
-    { key: 'b', header: <CandHeader c={cb} />, headerLabel: cb.nomeUrna, align: 'right', width: W.pct, sortValue: (z) => pctValidos(z, 1), cell: (z) => <PctCell t={z} i={1} race={race} /> },
-    { key: 'margem', header: 'Margem', align: 'right', width: W.margem, sortValue: margemAssinada, cell: (z) => <MargemCell t={z} race={race} /> },
+    {
+      key: 'a',
+      header: <CandHeader c={ca} />,
+      headerLabel: ca.nomeUrna,
+      align: 'right',
+      width: W.pct,
+      sortValue: (z) => pctValidos(z, 0),
+      cell: (z) => <PctCell t={z} i={0} race={race} />,
+    },
+    {
+      key: 'b',
+      header: <CandHeader c={cb} />,
+      headerLabel: cb.nomeUrna,
+      align: 'right',
+      width: W.pct,
+      sortValue: (z) => pctValidos(z, 1),
+      cell: (z) => <PctCell t={z} i={1} race={race} />,
+    },
+    {
+      key: 'margem',
+      header: 'Margem',
+      align: 'right',
+      width: W.margem,
+      sortValue: margemAssinada,
+      cell: (z) => <MargemCell t={z} race={race} />,
+    },
   ];
 
   return (
@@ -115,7 +139,7 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
           maxHeight={lg ? 'calc(100dvh - var(--app-header-h, 64px) - 120px)' : undefined}
           pageSize={lg ? undefined : 8}
           itemLabel="zonas"
-          caption={`Resultado por zona eleitoral em ${nomeMunicipio}`}
+          caption={`Resultado por zona eleitoral ${emMun(nomeMunicipio)}`}
         />
       </section>
 
@@ -132,7 +156,8 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
 
 function SemZona({ zonas, onZona }: { zonas: ZonaResumo[]; onZona: (z: number) => void }) {
   return (
-    <section className="flex h-full min-h-[260px] flex-col items-center justify-center rounded-2xl border border-dashed border-line px-6 py-10 text-center">
+    // No celular a própria lista de zonas é o seletor (o detalhe aparece logo abaixo ao tocar).
+    <section className="hidden min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-line px-6 py-10 text-center lg:flex">
       <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2 text-fg-muted">
         <Icon name="lista" size={22} />
       </span>
@@ -144,7 +169,10 @@ function SemZona({ zonas, onZona }: { zonas: ZonaResumo[]; onZona: (z: number) =
         aria-label="Zona eleitoral"
         defaultValue=""
         onChange={(e) => e.target.value && onZona(Number(e.target.value))}
-        options={[{ value: '', label: 'Escolher zona…' }, ...zonas.map((z) => ({ value: String(z.zona), label: `Zona ${fmtZona(z.zona)} · ${fmtInt(z.secoes)} seções` }))]}
+        options={[
+          { value: '', label: 'Escolher zona…' },
+          ...zonas.map((z) => ({ value: String(z.zona), label: `Zona ${fmtZona(z.zona)} · ${fmtInt(z.secoes)} seções` })),
+        ]}
         wrapperClassName="mt-5 w-full max-w-[260px]"
       />
     </section>
@@ -208,4 +236,3 @@ function ZonaDetalhe({
     </section>
   );
 }
-

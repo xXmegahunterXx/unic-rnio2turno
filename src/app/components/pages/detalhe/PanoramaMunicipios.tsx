@@ -60,7 +60,11 @@ export function PanoramaMunicipios({ race, municipios, unidade = 'municípios', 
     >
       {seg.map((s) =>
         s.w > 0 ? (
-          <span key={s.k} className={cn('h-full transition-[flex-grow] duration-700', s.cls)} style={{ flexGrow: s.w / total, flexBasis: 0 }} />
+          <span
+            key={s.k}
+            className={cn('h-full transition-[flex-grow] duration-700', s.cls)}
+            style={{ flexGrow: s.w / total, flexBasis: 0 }}
+          />
         ) : null,
       )}
     </div>
@@ -76,7 +80,13 @@ export function PanoramaMunicipios({ race, municipios, unidade = 'municípios', 
               <span key={cand.numero} className={cn('flex min-w-0 items-center gap-2', i === 1 && 'flex-row-reverse text-right')}>
                 <CandidateAvatar candidato={cand} size="xs" />
                 <span className="min-w-0 truncate font-medium text-fg">{cand.nomeUrna}</span>
-                <NumberRoll value={c.n[i]} className={cn('shrink-0 font-display text-[20px] font-semibold leading-none tracking-[-0.02em]', corSlot(cand.cor).textDisplay)} />
+                <NumberRoll
+                  value={c.n[i]}
+                  className={cn(
+                    'shrink-0 font-display text-[20px] font-semibold leading-none tracking-[-0.02em]',
+                    corSlot(cand.cor).textDisplay,
+                  )}
+                />
               </span>
             );
           })}
@@ -92,10 +102,11 @@ export function PanoramaMunicipios({ race, municipios, unidade = 'municípios', 
   }
 
   return (
-    <section aria-label={`${unidade} à frente por candidato`} className={cn('rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
-      <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
-        Onde cada um está à frente
-      </h3>
+    <section
+      aria-label={`${unidade} à frente por candidato`}
+      className={cn('rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}
+    >
+      <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Onde cada um está à frente</h3>
       <div className="mt-3.5 grid grid-cols-2 gap-3">
         {[0, 1].map((i) => {
           const cand = race.candidatos[i];
@@ -111,9 +122,7 @@ export function PanoramaMunicipios({ race, municipios, unidade = 'municípios', 
                 className={cn('mt-2 font-display text-[30px] font-semibold leading-none tracking-[-0.03em]', s.textDisplay)}
               />
               <span className="mt-1 text-[12px] text-fg-muted">{unidade}</span>
-              {c.eleit[i] > 0 ? (
-                <span className="num mt-0.5 text-[11.5px] text-fg-subtle">{fmtCompact(c.eleit[i])} eleitores</span>
-              ) : null}
+              {c.eleit[i] > 0 ? <span className="num mt-0.5 text-[11.5px] text-fg-subtle">{fmtCompact(c.eleit[i])} eleitores</span> : null}
             </div>
           );
         })}

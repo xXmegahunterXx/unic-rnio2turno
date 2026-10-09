@@ -77,10 +77,7 @@ export function MiniPlacar({ race, t, nome, badge, extra, rank, to, semApurado, 
     return (
       <Link
         to={to}
-        className={cn(
-          cls,
-          'transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-        )}
+        className={cn(cls, 'transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand')}
       >
         {corpo}
       </Link>

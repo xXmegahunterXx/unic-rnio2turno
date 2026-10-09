@@ -7,7 +7,7 @@ import type { Race, SeriePoint } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
 import { Segmented } from '@/app/ui/Segmented';
 import { TimelineChart } from '@/app/components/apuracao/TimelineChart';
-import { EmptyState } from '@/app/components/apuracao/States';
+import { Icon } from '@/app/ui/Icon';
 
 export interface CorridaPanelProps {
   serie: SeriePoint[];
@@ -47,13 +47,41 @@ export const CorridaPanel = memo(function CorridaPanel({ serie, race, className 
           <TimelineChart serie={serie} race={race} eixoX={eixo} ariaLabel={`Evolução do placar · ${race.titulo}`} />
         </div>
       ) : (
-        <EmptyState
-          compact
-          icon="grafico"
-          title="O gráfico começa com as primeiras seções"
-          description="A partir das 17h (Brasília), cada ponto mostra o placar acumulado até ali."
-        />
+        <GraficoVazio />
       )}
     </section>
   );
 });
+
+/**
+ * Antes das primeiras seções: a moldura do gráfico (eixos e a linha dos 50%) com a explicação no centro,
+ * para o cartão já ter a forma do que vai aparecer.
+ */
+function GraficoVazio() {
+  const linhas = [60, 55, 50, 45, 40];
+  return (
+    <div className="relative flex min-h-[200px] flex-1 flex-col sm:min-h-[240px]">
+      <div aria-hidden className="relative ml-9 flex-1">
+        {linhas.map((v, k) => (
+          <div key={v} className="absolute inset-x-0" style={{ top: `${(k / (linhas.length - 1)) * 100}%` }}>
+            <div className={cn('border-t', v === 50 ? 'border-dashed border-fg-subtle/60' : 'border-line')} />
+            <span className="num absolute -left-9 -translate-y-1/2 text-[11px] text-fg-subtle">{v}%</span>
+          </div>
+        ))}
+      </div>
+      <div aria-hidden className="num ml-9 mt-2 flex justify-between text-[11px] text-fg-subtle">
+        <span>0%</span>
+        <span>50%</span>
+        <span>100%</span>
+      </div>
+      <div className="absolute inset-0 ml-9 flex items-center justify-center p-3">
+        <div className="max-w-[340px] rounded-2xl border border-line bg-surface/90 px-4 py-3 text-center shadow-card backdrop-blur-sm">
+          <p className="flex items-center justify-center gap-2 text-[14px] font-semibold text-fg">
+            <Icon name="grafico" size={16} className="text-fg-muted" />O gráfico começa com as primeiras seções
+          </p>
+          <p className="mt-1 text-pretty text-[12.5px] leading-snug text-fg-muted">Cada ponto mostra o placar acumulado até ali, a partir das 17h (Brasília).</p>
+        </div>
+      </div>
+    </div>
+  );
+}

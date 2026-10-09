@@ -2,9 +2,9 @@
  * Contexto do Boletim de Urna: como a seção votou em relação à zona e ao município (barras A|B na
  * mesma escala), diferença em p.p. e participação (comparecimento, brancos, nulos) lado a lado.
  */
-import type { Race, Tally } from '@/shared/types';
+import type { PrimeiroTurnoLocal, Race, Tally } from '@/shared/types';
 import { pctBrancos, pctComparecimento, pctNulos, pctValidos, validos } from '@/shared/calc';
-import { fmtPP, fmtPct } from '@/shared/format';
+import { fmtInt, fmtPP, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
@@ -35,16 +35,26 @@ export function ComparaAbrangencias({ race, linhas, className }: { race: Race; l
         {linhas.map((l) => {
           const tem = !!l.t && validos(l.t) > 0;
           return (
-            <li key={l.rotulo} className={cn('rounded-xl px-3 py-2.5', l.destaque ? 'bg-brand/[0.08] ring-1 ring-inset ring-brand/25' : 'bg-surface-2')}>
+            <li
+              key={l.rotulo}
+              className={cn('rounded-xl px-3 py-2.5', l.destaque ? 'bg-brand/[0.08] ring-1 ring-inset ring-brand/25' : 'bg-surface-2')}
+            >
               <div className="mb-2 flex items-baseline justify-between gap-2">
-                <span className={cn('truncate text-[13.5px]', l.destaque ? 'font-semibold text-fg' : 'font-medium text-fg')}>{l.rotulo}</span>
+                <span className={cn('truncate text-[13.5px]', l.destaque ? 'font-semibold text-fg' : 'font-medium text-fg')}>
+                  {l.rotulo}
+                </span>
                 {l.sub ? <span className="num shrink-0 text-[11.5px] text-fg-muted">{l.sub}</span> : null}
               </div>
               <div className="grid grid-cols-[3.4rem_minmax(0,1fr)_3.4rem] items-center gap-2.5">
                 <span className={cn('num text-[13px] font-semibold', tem ? corSlot(a.cor).text : 'text-fg-subtle')}>
                   {tem ? fmtPct(pctValidos(l.t!, 0), 1) : '—'}
                 </span>
-                <VoteSplitBar votos={l.t?.votos ?? [0, 0]} cores={race.candidatos.map((c) => c.cor)} size="sm" nomes={race.candidatos.map((c) => c.nomeUrna)} />
+                <VoteSplitBar
+                  votos={l.t?.votos ?? [0, 0]}
+                  cores={race.candidatos.map((c) => c.cor)}
+                  size="sm"
+                  nomes={race.candidatos.map((c) => c.nomeUrna)}
+                />
                 <span className={cn('num text-right text-[13px] font-semibold', tem ? corSlot(b.cor).text : 'text-fg-subtle')}>
                   {tem ? fmtPct(pctValidos(l.t!, 1), 1) : '—'}
                 </span>
@@ -57,6 +67,32 @@ export function ComparaAbrangencias({ race, linhas, className }: { race: Race; l
   );
 }
 
+/** Campos de contagem do 1º turno (PrimeiroTurnoLocal) sobre um Tally do município. */
+export function tallyPrimeiroTurno(
+  p: PrimeiroTurnoLocal,
+): Pick<Tally, 'votos' | 'brancos' | 'nulos' | 'comparecimento' | 'eleitoradoTotalizado' | 'abstencao'> {
+  return {
+    votos: p.votos,
+    brancos: p.brancos,
+    nulos: p.nulos,
+    comparecimento: p.comparecimento,
+    eleitoradoTotalizado: p.eleitorado,
+    abstencao: Math.max(0, p.eleitorado - p.comparecimento),
+  };
+}
+
+/** "Demais candidatos: 11,3% dos válidos" (1º turno, pseudo-candidato agregado). */
+export function DemaisCandidatos({ race, votos, className }: { race: Race; votos: number[]; className?: string }) {
+  const i = race.candidatos.findIndex((c) => c.agregado);
+  if (i < 0 || validos({ votos }) === 0) return null;
+  return (
+    <p className={cn('text-[12.5px] leading-snug text-fg-muted', className)}>
+      Os demais candidatos do 1º turno somaram <span className="num font-medium text-fg">{fmtPct(pctValidos({ votos }, i), 1)}</span> dos
+      votos válidos (faixa cinza).
+    </p>
+  );
+}
+
 /** "Nesta seção, X teve N p.p. a mais do que no município." (null se não der para comparar). */
 export function fraseDiferenca(race: Race, secao: Tally, base: Tally, onde: string): string | null {
   if (validos(secao) === 0 || validos(base) === 0) return null;
@@ -66,27 +102,86 @@ export function fraseDiferenca(race: Race, secao: Tally, base: Tally, onde: stri
   return `Nesta seção, ${race.candidatos[i].nomeUrna} teve ${fmtPP(Math.abs(d)).replace('+', '')} a mais do que no ${onde}.`;
 }
 
-export function ParticipacaoComparada({ secao, base, rotuloBase, className }: { secao: Tally | null; base: Tally | null; rotuloBase: string; className?: string }) {
-  const itens: { rotulo: string; f: (t: Tally) => number; ok: (t: Tally) => boolean }[] = [
-    { rotulo: 'Comparecimento', f: pctComparecimento, ok: (t) => t.eleitoradoTotalizado > 0 },
-    { rotulo: 'Brancos', f: pctBrancos, ok: (t) => t.comparecimento > 0 },
-    { rotulo: 'Nulos', f: pctNulos, ok: (t) => t.comparecimento > 0 },
+/**
+ * Participação da seção ao lado da base (município): comparecimento, brancos e nulos. Tabela de 3 colunas
+ * (indicador · seção · base), legível do celular ao desktop sem truncar rótulos.
+ */
+export function ParticipacaoComparada({
+  secao,
+  base,
+  rotuloSecao = 'Seção',
+  rotuloBase,
+  className,
+}: {
+  secao: Tally | null;
+  base: Tally | null;
+  rotuloSecao?: string;
+  /** Cabeçalho da coluna de comparação (ex.: "São Paulo"). */
+  rotuloBase: string;
+  className?: string;
+}) {
+  const itens: { rotulo: string; f: (t: Tally) => number; ok: (t: Tally) => boolean; abs: (t: Tally) => string }[] = [
+    {
+      rotulo: 'Comparecimento',
+      f: pctComparecimento,
+      ok: (t) => t.eleitoradoTotalizado > 0,
+      abs: (t) => `${fmtInt(t.comparecimento)} de ${fmtInt(t.eleitoradoTotalizado)} eleitores`,
+    },
+    {
+      rotulo: 'Brancos',
+      f: pctBrancos,
+      ok: (t) => t.comparecimento > 0,
+      abs: (t) => `${fmtInt(t.brancos)} ${t.brancos === 1 ? 'voto' : 'votos'}`,
+    },
+    { rotulo: 'Nulos', f: pctNulos, ok: (t) => t.comparecimento > 0, abs: (t) => `${fmtInt(t.nulos)} ${t.nulos === 1 ? 'voto' : 'votos'}` },
   ];
   return (
-    <dl className={cn('grid grid-cols-3 gap-2', className)}>
-      {itens.map((it) => (
-        <div key={it.rotulo} className="min-w-0 rounded-xl bg-surface-2 px-3 py-2.5">
-          <dt className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">{it.rotulo}</dt>
-          <dd className="mt-1">
-            <span className="num block font-display text-[19px] font-semibold leading-tight text-fg">
-              {secao && it.ok(secao) ? fmtPct(it.f(secao), 1) : '—'}
-            </span>
-            <span className="num block truncate text-[11.5px] text-fg-muted">
-              {base && it.ok(base) ? `${fmtPct(it.f(base), 1)} ${rotuloBase}` : ' '}
-            </span>
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <div className={cn('overflow-hidden rounded-xl border border-line', className)}>
+      <table className="w-full table-fixed border-collapse text-left">
+        <caption className="sr-only">
+          Participação: {rotuloSecao} comparada com {rotuloBase}
+        </caption>
+        <colgroup>
+          <col />
+          <col className="w-[30%] sm:w-[26%]" />
+          <col className="w-[30%] sm:w-[26%]" />
+        </colgroup>
+        <thead className="bg-surface-2">
+          <tr className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
+            <th scope="col" className="px-3 py-2 font-semibold">
+              <span className="sr-only">Indicador</span>
+            </th>
+            <th scope="col" className="px-3 py-2 text-right font-semibold text-fg">
+              {rotuloSecao}
+            </th>
+            <th scope="col" className="truncate px-3 py-2 text-right font-semibold" title={rotuloBase}>
+              {rotuloBase}
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {itens.map((it) => {
+            const temS = !!secao && it.ok(secao);
+            const temB = !!base && it.ok(base);
+            return (
+              <tr key={it.rotulo}>
+                <th scope="row" className="px-3 py-2.5 align-middle font-normal">
+                  <span className="block text-[13.5px] font-medium text-fg">{it.rotulo}</span>
+                  {temS ? <span className="num block truncate text-[11.5px] text-fg-muted">{it.abs(secao!)}</span> : null}
+                </th>
+                <td className="px-3 py-2.5 text-right align-middle">
+                  <span className={cn('num font-display text-[18px] font-semibold leading-none', temS ? 'text-fg' : 'text-fg-subtle')}>
+                    {temS ? fmtPct(it.f(secao!), 1) : '—'}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 text-right align-middle">
+                  <span className="num text-[14px] text-fg-muted">{temB ? fmtPct(it.f(base!), 1) : '—'}</span>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
