@@ -1,0 +1,1179 @@
+{
+ "versao": 1,
+ "geradoEm": "2026-10-09T20:38:16.829Z",
+ "fonte": "TSE — resultados oficiais do 1º turno das Eleições Gerais de 04/10/2026 (pleito 3220): Presidente (eleição 6257) e Governador (eleição 6259) por município; estrutura de zonas e seções do arquivo de urnas (3220); candidatos do 2º turno de 25/10/2026 (eleições 6258 e 6260). URLs: https://resultados.tse.jus.br/oficial/ele2026/6257/config/mun-e006257-cm.json · https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json · https://resultados.tse.jus.br/oficial/ele2026/6257/dados/{uf}/{uf}{mun}-c0001-e006257-u.json · https://resultados.tse.jus.br/oficial/ele2026/6259/dados/{uf}/{uf}{mun}-c0003-e006259-u.json · https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json. Malhas municipais: IBGE (servicodados.ibge.gov.br/api/v3/malhas).",
+ "races": [
+  {
+   "id": "pres",
+   "cargo": "Presidente",
+   "turno": 2,
+   "abrangencia": "BR",
+   "titulo": "Presidente",
+   "candidatos": [
+    {
+     "numero": 13,
+     "nomeUrna": "Lula",
+     "nome": "Luiz Inácio Lula da Silva",
+     "partido": "PT",
+     "coligacao": "Brasil Pronto pra Mais",
+     "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
+     "vice": "Geraldo Alckmin",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 53879538,
+      "pct": 45.16
+     }
+    },
+    {
+     "numero": 22,
+     "nomeUrna": "Flávio Bolsonaro",
+     "nome": "Flávio Nantes Bolsonaro",
+     "partido": "PL",
+     "vice": "Alfredo Gaspar",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 56104503,
+      "pct": 47.03
+     }
+    }
+   ],
+   "ufs": [
+    "AC",
+    "AL",
+    "AM",
+    "AP",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MG",
+    "MS",
+    "MT",
+    "PA",
+    "PB",
+    "PE",
+    "PI",
+    "PR",
+    "RJ",
+    "RN",
+    "RO",
+    "RR",
+    "RS",
+    "SC",
+    "SE",
+    "SP",
+    "TO",
+    "ZZ"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6258",
+    "cargo": "1",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-ac",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "AC",
+   "titulo": "Governador · Acre",
+   "candidatos": [
+    {
+     "numero": 10,
+     "nomeUrna": "Alan Rick",
+     "nome": "Alan Rick Miranda",
+     "partido": "REPUBLICANOS",
+     "coligacao": "Trabalho da Esperança",
+     "composicao": "REPUBLICANOS / NOVO / PSD / AVANTE",
+     "vice": "Ricardo Leite",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 141859,
+      "pct": 32.27
+     }
+    },
+    {
+     "numero": 11,
+     "nomeUrna": "Mailza Assis",
+     "nome": "Mailza Assis Cameli",
+     "partido": "PP",
+     "coligacao": "Avança Acre",
+     "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
+     "vice": "Jessica Sales",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 218760,
+      "pct": 49.76
+     }
+    }
+   ],
+   "ufs": [
+    "AC"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-am",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "AM",
+   "titulo": "Governador · Amazonas",
+   "candidatos": [
+    {
+     "numero": 22,
+     "nomeUrna": "Professora Maria do Carmo",
+     "nome": "Maria do Carmo Seffair Lins de Albuquerque",
+     "partido": "PL",
+     "coligacao": "Mudar é Urgente",
+     "composicao": "PL / NOVO",
+     "vice": "Coronel Anibal",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 507335,
+      "pct": 24.49
+     }
+    },
+    {
+     "numero": 55,
+     "nomeUrna": "Omar Aziz",
+     "nome": "Omar José Abdelaziz",
+     "partido": "PSD",
+     "coligacao": "Força Amazonas",
+     "composicao": "REPUBLICANOS / MDB / PSD / PCdoB / PT / PV",
+     "vice": "Alessandra Campelo",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 841846,
+      "pct": 40.63
+     }
+    }
+   ],
+   "ufs": [
+    "AM"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-df",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "DF",
+   "titulo": "Governador · Distrito Federal",
+   "candidatos": [
+    {
+     "numero": 11,
+     "nomeUrna": "Celina Leão",
+     "nome": "Celina Leão Hizim Ferreira",
+     "partido": "PP",
+     "coligacao": "Propósito e Ação",
+     "composicao": "REPUBLICANOS / MDB / PODE / PL / DC / MOBILIZA / DEMOCRATA / PRD / SOLIDARIEDADE / PP / UNIÃO",
+     "vice": "Gustavo Rocha",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 825530,
+      "pct": 49.93
+     }
+    },
+    {
+     "numero": 13,
+     "nomeUrna": "Leandro Grass",
+     "nome": "Leandro Antônio Grass Peixoto",
+     "partido": "PT",
+     "coligacao": "DF do Povo",
+     "composicao": "PDT / PCdoB / PT / PV / PSOL / REDE",
+     "vice": "Dora Gomes",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 569930,
+      "pct": 34.47
+     }
+    }
+   ],
+   "ufs": [
+    "DF"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-es",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "ES",
+   "titulo": "Governador · Espírito Santo",
+   "candidatos": [
+    {
+     "numero": 10,
+     "nomeUrna": "Lorenzo Pazolini",
+     "nome": "Lorenzo Silva de Pazolini",
+     "partido": "REPUBLICANOS",
+     "coligacao": "Paz pra Viver um Novo Tempo",
+     "composicao": "REPUBLICANOS / PL / DEMOCRATA",
+     "vice": "Eliane Leal",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 1048633,
+      "pct": 49.65
+     }
+    },
+    {
+     "numero": 15,
+     "nomeUrna": "Ricardo Ferraço",
+     "nome": "Ricardo de Rezende Ferraço",
+     "partido": "MDB",
+     "coligacao": "Agora é o Futuro",
+     "composicao": "PODE / MDB / AGIR / PSB / PDT / CIDADANIA / PSDB / PP / UNIÃO",
+     "vice": "Camillo Neves",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 719397,
+      "pct": 34.06
+     }
+    }
+   ],
+   "ufs": [
+    "ES"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-rj",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "RJ",
+   "titulo": "Governador · Rio de Janeiro",
+   "candidatos": [
+    {
+     "numero": 22,
+     "nomeUrna": "Douglas Ruas",
+     "nome": "Douglas Ruas dos Santos",
+     "partido": "PL",
+     "coligacao": "Rio Real",
+     "composicao": "PL / MOBILIZA / AGIR / AVANTE",
+     "vice": "Fernanda Louback",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 4271199,
+      "pct": 49.27
+     }
+    },
+    {
+     "numero": 55,
+     "nomeUrna": "Eduardo Paes",
+     "nome": "Eduardo da Costa Paes",
+     "partido": "PSD",
+     "coligacao": "Juntos para Mudar Coragem para Reconstruir",
+     "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
+     "vice": "Jane Reis",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 3706984,
+      "pct": 42.76
+     }
+    }
+   ],
+   "ufs": [
+    "RJ"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-rn",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "RN",
+   "titulo": "Governador · Rio Grande do Norte",
+   "candidatos": [
+    {
+     "numero": 13,
+     "nomeUrna": "Cadu de Lula",
+     "nome": "Carlos Eduardo Xavier",
+     "partido": "PT",
+     "coligacao": "Time que Cuida",
+     "composicao": "PDT / PSB / PCdoB / PT / PV",
+     "vice": "Larissa",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 718300,
+      "pct": 36.16
+     }
+    },
+    {
+     "numero": 44,
+     "nomeUrna": "Allyson",
+     "nome": "Allyson Leandro Bezerra Silva",
+     "partido": "UNIÃO",
+     "coligacao": "Esperança e Trabalho",
+     "composicao": "REPUBLICANOS / MDB / PSD / AVANTE / PRD / SOLIDARIEDADE / PP / UNIÃO",
+     "vice": "Hermano",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 733809,
+      "pct": 36.94
+     }
+    }
+   ],
+   "ufs": [
+    "RN"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "gov-to",
+   "cargo": "Governador",
+   "turno": 2,
+   "abrangencia": "TO",
+   "titulo": "Governador · Tocantins",
+   "candidatos": [
+    {
+     "numero": 44,
+     "nomeUrna": "Professora Dorinha",
+     "nome": "Maria Auxiliadora Seabra Rezende",
+     "partido": "UNIÃO",
+     "coligacao": "União pelo Tocantins",
+     "composicao": "REPUBLICANOS / PODE / AVANTE / PL / PRD / SOLIDARIEDADE / PP / UNIÃO",
+     "vice": "Atos Gomes",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 386260,
+      "pct": 45.52
+     }
+    },
+    {
+     "numero": 45,
+     "nomeUrna": "Vicentinho Júnior",
+     "nome": "Vicente Alves de Oliveira Júnior",
+     "partido": "PSDB",
+     "coligacao": "Pra Cima Tocantins",
+     "composicao": "MDB / CIDADANIA / PSDB",
+     "vice": "Amélio Cayres",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 372848,
+      "pct": 43.94
+     }
+    }
+   ],
+   "ufs": [
+    "TO"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6260",
+    "cargo": "3",
+    "pleito": "3221"
+   }
+  },
+  {
+   "id": "pres-t1",
+   "cargo": "Presidente",
+   "turno": 1,
+   "abrangencia": "BR",
+   "titulo": "Presidente · 1º turno",
+   "candidatos": [
+    {
+     "numero": 13,
+     "nomeUrna": "Lula",
+     "nome": "Luiz Inácio Lula da Silva",
+     "partido": "PT",
+     "coligacao": "Brasil Pronto pra Mais",
+     "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
+     "vice": "Geraldo Alckmin",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 53879538,
+      "pct": 45.16
+     }
+    },
+    {
+     "numero": 22,
+     "nomeUrna": "Flávio Bolsonaro",
+     "nome": "Flávio Nantes Bolsonaro",
+     "partido": "PL",
+     "vice": "Alfredo Gaspar",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 56104503,
+      "pct": 47.03
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 9316747,
+      "pct": 7.81
+     }
+    }
+   ],
+   "ufs": [
+    "AC",
+    "AL",
+    "AM",
+    "AP",
+    "BA",
+    "CE",
+    "DF",
+    "ES",
+    "GO",
+    "MA",
+    "MG",
+    "MS",
+    "MT",
+    "PA",
+    "PB",
+    "PE",
+    "PI",
+    "PR",
+    "RJ",
+    "RN",
+    "RO",
+    "RR",
+    "RS",
+    "SC",
+    "SE",
+    "SP",
+    "TO",
+    "ZZ"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6257",
+    "cargo": "1",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-ac-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "AC",
+   "titulo": "Governador · Acre · 1º turno",
+   "candidatos": [
+    {
+     "numero": 10,
+     "nomeUrna": "Alan Rick",
+     "nome": "Alan Rick Miranda",
+     "partido": "REPUBLICANOS",
+     "coligacao": "Trabalho da Esperança",
+     "composicao": "REPUBLICANOS / NOVO / PSD / AVANTE",
+     "vice": "Ricardo Leite",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 141859,
+      "pct": 32.27
+     }
+    },
+    {
+     "numero": 11,
+     "nomeUrna": "Mailza Assis",
+     "nome": "Mailza Assis Cameli",
+     "partido": "PP",
+     "coligacao": "Avança Acre",
+     "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
+     "vice": "Jessica Sales",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 218760,
+      "pct": 49.76
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 79028,
+      "pct": 17.98
+     }
+    }
+   ],
+   "ufs": [
+    "AC"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-am-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "AM",
+   "titulo": "Governador · Amazonas · 1º turno",
+   "candidatos": [
+    {
+     "numero": 22,
+     "nomeUrna": "Professora Maria do Carmo",
+     "nome": "Maria do Carmo Seffair Lins de Albuquerque",
+     "partido": "PL",
+     "coligacao": "Mudar é Urgente",
+     "composicao": "PL / NOVO",
+     "vice": "Coronel Anibal",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 507335,
+      "pct": 24.49
+     }
+    },
+    {
+     "numero": 55,
+     "nomeUrna": "Omar Aziz",
+     "nome": "Omar José Abdelaziz",
+     "partido": "PSD",
+     "coligacao": "Força Amazonas",
+     "composicao": "REPUBLICANOS / MDB / PSD / PCdoB / PT / PV",
+     "vice": "Alessandra Campelo",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 841846,
+      "pct": 40.63
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 722804,
+      "pct": 34.88
+     }
+    }
+   ],
+   "ufs": [
+    "AM"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-df-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "DF",
+   "titulo": "Governador · Distrito Federal · 1º turno",
+   "candidatos": [
+    {
+     "numero": 11,
+     "nomeUrna": "Celina Leão",
+     "nome": "Celina Leão Hizim Ferreira",
+     "partido": "PP",
+     "coligacao": "Propósito e Ação",
+     "composicao": "REPUBLICANOS / MDB / PODE / PL / DC / MOBILIZA / DEMOCRATA / PRD / SOLIDARIEDADE / PP / UNIÃO",
+     "vice": "Gustavo Rocha",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 825530,
+      "pct": 49.93
+     }
+    },
+    {
+     "numero": 13,
+     "nomeUrna": "Leandro Grass",
+     "nome": "Leandro Antônio Grass Peixoto",
+     "partido": "PT",
+     "coligacao": "DF do Povo",
+     "composicao": "PDT / PCdoB / PT / PV / PSOL / REDE",
+     "vice": "Dora Gomes",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 569930,
+      "pct": 34.47
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 257777,
+      "pct": 15.59
+     }
+    }
+   ],
+   "ufs": [
+    "DF"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-es-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "ES",
+   "titulo": "Governador · Espírito Santo · 1º turno",
+   "candidatos": [
+    {
+     "numero": 10,
+     "nomeUrna": "Lorenzo Pazolini",
+     "nome": "Lorenzo Silva de Pazolini",
+     "partido": "REPUBLICANOS",
+     "coligacao": "Paz pra Viver um Novo Tempo",
+     "composicao": "REPUBLICANOS / PL / DEMOCRATA",
+     "vice": "Eliane Leal",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 1048633,
+      "pct": 49.65
+     }
+    },
+    {
+     "numero": 15,
+     "nomeUrna": "Ricardo Ferraço",
+     "nome": "Ricardo de Rezende Ferraço",
+     "partido": "MDB",
+     "coligacao": "Agora é o Futuro",
+     "composicao": "PODE / MDB / AGIR / PSB / PDT / CIDADANIA / PSDB / PP / UNIÃO",
+     "vice": "Camillo Neves",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 719397,
+      "pct": 34.06
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 344141,
+      "pct": 16.29
+     }
+    }
+   ],
+   "ufs": [
+    "ES"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-rj-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "RJ",
+   "titulo": "Governador · Rio de Janeiro · 1º turno",
+   "candidatos": [
+    {
+     "numero": 22,
+     "nomeUrna": "Douglas Ruas",
+     "nome": "Douglas Ruas dos Santos",
+     "partido": "PL",
+     "coligacao": "Rio Real",
+     "composicao": "PL / MOBILIZA / AGIR / AVANTE",
+     "vice": "Fernanda Louback",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 4271199,
+      "pct": 49.27
+     }
+    },
+    {
+     "numero": 55,
+     "nomeUrna": "Eduardo Paes",
+     "nome": "Eduardo da Costa Paes",
+     "partido": "PSD",
+     "coligacao": "Juntos para Mudar Coragem para Reconstruir",
+     "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
+     "vice": "Jane Reis",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 3706984,
+      "pct": 42.76
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 690855,
+      "pct": 7.97
+     }
+    }
+   ],
+   "ufs": [
+    "RJ"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-rn-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "RN",
+   "titulo": "Governador · Rio Grande do Norte · 1º turno",
+   "candidatos": [
+    {
+     "numero": 13,
+     "nomeUrna": "Cadu de Lula",
+     "nome": "Carlos Eduardo Xavier",
+     "partido": "PT",
+     "coligacao": "Time que Cuida",
+     "composicao": "PDT / PSB / PCdoB / PT / PV",
+     "vice": "Larissa",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 718300,
+      "pct": 36.16
+     }
+    },
+    {
+     "numero": 44,
+     "nomeUrna": "Allyson",
+     "nome": "Allyson Leandro Bezerra Silva",
+     "partido": "UNIÃO",
+     "coligacao": "Esperança e Trabalho",
+     "composicao": "REPUBLICANOS / MDB / PSD / AVANTE / PRD / SOLIDARIEDADE / PP / UNIÃO",
+     "vice": "Hermano",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 733809,
+      "pct": 36.94
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 534559,
+      "pct": 26.91
+     }
+    }
+   ],
+   "ufs": [
+    "RN"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  },
+  {
+   "id": "gov-to-t1",
+   "cargo": "Governador",
+   "turno": 1,
+   "abrangencia": "TO",
+   "titulo": "Governador · Tocantins · 1º turno",
+   "candidatos": [
+    {
+     "numero": 44,
+     "nomeUrna": "Professora Dorinha",
+     "nome": "Maria Auxiliadora Seabra Rezende",
+     "partido": "UNIÃO",
+     "coligacao": "União pelo Tocantins",
+     "composicao": "REPUBLICANOS / PODE / AVANTE / PL / PRD / SOLIDARIEDADE / PP / UNIÃO",
+     "vice": "Atos Gomes",
+     "cor": "a",
+     "primeiroTurno": {
+      "votos": 386260,
+      "pct": 45.52
+     }
+    },
+    {
+     "numero": 45,
+     "nomeUrna": "Vicentinho Júnior",
+     "nome": "Vicente Alves de Oliveira Júnior",
+     "partido": "PSDB",
+     "coligacao": "Pra Cima Tocantins",
+     "composicao": "MDB / CIDADANIA / PSDB",
+     "vice": "Amélio Cayres",
+     "cor": "b",
+     "primeiroTurno": {
+      "votos": 372848,
+      "pct": 43.94
+     }
+    },
+    {
+     "numero": 0,
+     "nomeUrna": "Outros",
+     "nome": "Demais candidatos do 1º turno",
+     "partido": "",
+     "cor": "outros",
+     "agregado": true,
+     "primeiroTurno": {
+      "votos": 89521,
+      "pct": 10.55
+     }
+    }
+   ],
+   "ufs": [
+    "TO"
+   ],
+   "tse": {
+    "ciclo": "ele2026",
+    "eleicao": "6259",
+    "cargo": "3",
+    "pleito": "3220"
+   }
+  }
+ ],
+ "ufs": [
+  {
+   "uf": "AC",
+   "nome": "Acre",
+   "regiao": "N",
+   "capitalCod": "01392",
+   "eleitorado": 613742,
+   "secoes": 2270,
+   "municipios": 22,
+   "zonas": 9
+  },
+  {
+   "uf": "AL",
+   "nome": "Alagoas",
+   "regiao": "NE",
+   "capitalCod": "27855",
+   "eleitorado": 2442126,
+   "secoes": 7101,
+   "municipios": 102,
+   "zonas": 42
+  },
+  {
+   "uf": "AM",
+   "nome": "Amazonas",
+   "regiao": "N",
+   "capitalCod": "02550",
+   "eleitorado": 2798611,
+   "secoes": 8157,
+   "municipios": 62,
+   "zonas": 60
+  },
+  {
+   "uf": "AP",
+   "nome": "Amapá",
+   "regiao": "N",
+   "capitalCod": "06050",
+   "eleitorado": 576988,
+   "secoes": 1914,
+   "municipios": 16,
+   "zonas": 11
+  },
+  {
+   "uf": "BA",
+   "nome": "Bahia",
+   "regiao": "NE",
+   "capitalCod": "38490",
+   "eleitorado": 11312752,
+   "secoes": 35476,
+   "municipios": 417,
+   "zonas": 199
+  },
+  {
+   "uf": "CE",
+   "nome": "Ceará",
+   "regiao": "NE",
+   "capitalCod": "13897",
+   "eleitorado": 6996545,
+   "secoes": 23765,
+   "municipios": 184,
+   "zonas": 109
+  },
+  {
+   "uf": "DF",
+   "nome": "Distrito Federal",
+   "regiao": "CO",
+   "capitalCod": "97012",
+   "eleitorado": 2258320,
+   "secoes": 6969,
+   "municipios": 1,
+   "zonas": 19
+  },
+  {
+   "uf": "ES",
+   "nome": "Espírito Santo",
+   "regiao": "SE",
+   "capitalCod": "57053",
+   "eleitorado": 2991650,
+   "secoes": 9844,
+   "municipios": 78,
+   "zonas": 50
+  },
+  {
+   "uf": "GO",
+   "nome": "Goiás",
+   "regiao": "CO",
+   "capitalCod": "93734",
+   "eleitorado": 5080590,
+   "secoes": 15686,
+   "municipios": 246,
+   "zonas": 92
+  },
+  {
+   "uf": "MA",
+   "nome": "Maranhão",
+   "regiao": "NE",
+   "capitalCod": "09210",
+   "eleitorado": 5183115,
+   "secoes": 18093,
+   "municipios": 217,
+   "zonas": 105
+  },
+  {
+   "uf": "MG",
+   "nome": "Minas Gerais",
+   "regiao": "SE",
+   "capitalCod": "41238",
+   "eleitorado": 16372372,
+   "secoes": 52062,
+   "municipios": 853,
+   "zonas": 304
+  },
+  {
+   "uf": "MS",
+   "nome": "Mato Grosso do Sul",
+   "regiao": "CO",
+   "capitalCod": "90514",
+   "eleitorado": 2024430,
+   "secoes": 7106,
+   "municipios": 79,
+   "zonas": 49
+  },
+  {
+   "uf": "MT",
+   "nome": "Mato Grosso",
+   "regiao": "CO",
+   "capitalCod": "90670",
+   "eleitorado": 2637801,
+   "secoes": 8287,
+   "municipios": 142,
+   "zonas": 57
+  },
+  {
+   "uf": "PA",
+   "nome": "Pará",
+   "regiao": "N",
+   "capitalCod": "04278",
+   "eleitorado": 6262397,
+   "secoes": 20827,
+   "municipios": 144,
+   "zonas": 101
+  },
+  {
+   "uf": "PB",
+   "nome": "Paraíba",
+   "regiao": "NE",
+   "capitalCod": "20516",
+   "eleitorado": 3248531,
+   "secoes": 10712,
+   "municipios": 223,
+   "zonas": 68
+  },
+  {
+   "uf": "PE",
+   "nome": "Pernambuco",
+   "regiao": "NE",
+   "capitalCod": "25313",
+   "eleitorado": 7223450,
+   "secoes": 21418,
+   "municipios": 185,
+   "zonas": 122
+  },
+  {
+   "uf": "PI",
+   "nome": "Piauí",
+   "regiao": "NE",
+   "capitalCod": "12190",
+   "eleitorado": 2704758,
+   "secoes": 10225,
+   "municipios": 224,
+   "zonas": 74
+  },
+  {
+   "uf": "PR",
+   "nome": "Paraná",
+   "regiao": "S",
+   "capitalCod": "75353",
+   "eleitorado": 8613657,
+   "secoes": 27142,
+   "municipios": 399,
+   "zonas": 186
+  },
+  {
+   "uf": "RJ",
+   "nome": "Rio de Janeiro",
+   "regiao": "SE",
+   "capitalCod": "60011",
+   "eleitorado": 12857648,
+   "secoes": 37675,
+   "municipios": 92,
+   "zonas": 165
+  },
+  {
+   "uf": "RN",
+   "nome": "Rio Grande do Norte",
+   "regiao": "NE",
+   "capitalCod": "17612",
+   "eleitorado": 2659825,
+   "secoes": 8115,
+   "municipios": 167,
+   "zonas": 60
+  },
+  {
+   "uf": "RO",
+   "nome": "Rondônia",
+   "regiao": "N",
+   "capitalCod": "00035",
+   "eleitorado": 1265893,
+   "secoes": 4698,
+   "municipios": 52,
+   "zonas": 29
+  },
+  {
+   "uf": "RR",
+   "nome": "Roraima",
+   "regiao": "N",
+   "capitalCod": "03018",
+   "eleitorado": 401521,
+   "secoes": 1519,
+   "municipios": 15,
+   "zonas": 9
+  },
+  {
+   "uf": "RS",
+   "nome": "Rio Grande do Sul",
+   "regiao": "S",
+   "capitalCod": "88013",
+   "eleitorado": 8522545,
+   "secoes": 27547,
+   "municipios": 497,
+   "zonas": 165
+  },
+  {
+   "uf": "SC",
+   "nome": "Santa Catarina",
+   "regiao": "S",
+   "capitalCod": "81051",
+   "eleitorado": 5734651,
+   "secoes": 17326,
+   "municipios": 295,
+   "zonas": 100
+  },
+  {
+   "uf": "SE",
+   "nome": "Sergipe",
+   "regiao": "NE",
+   "capitalCod": "31054",
+   "eleitorado": 1740135,
+   "secoes": 5923,
+   "municipios": 75,
+   "zonas": 29
+  },
+  {
+   "uf": "SP",
+   "nome": "São Paulo",
+   "regiao": "SE",
+   "capitalCod": "71072",
+   "eleitorado": 34122892,
+   "secoes": 103656,
+   "municipios": 645,
+   "zonas": 393
+  },
+  {
+   "uf": "TO",
+   "nome": "Tocantins",
+   "regiao": "N",
+   "capitalCod": "73440",
+   "eleitorado": 1182023,
+   "secoes": 4384,
+   "municipios": 139,
+   "zonas": 33
+  },
+  {
+   "uf": "ZZ",
+   "nome": "Exterior",
+   "regiao": "EX",
+   "capitalCod": null,
+   "eleitorado": 916534,
+   "secoes": 1351,
+   "municipios": 186,
+   "zonas": 1
+  }
+ ],
+ "totaisPrimeiroTurno": {
+  "secoes": 499248,
+  "eleitorado": 158745502,
+  "comparecimento": 125275835,
+  "brancos": 2300798,
+  "nulos": 3674249,
+  "validos": 119300788
+ }
+}

@@ -1,0 +1,14 @@
+/** Códigos IBGE das UFs (2 dígitos) ↔ siglas. */
+import type { UFBr } from '../../../src/shared/types';
+
+export const IBGE_UF: Record<string, UFBr> = {
+  '11': 'RO', '12': 'AC', '13': 'AM', '14': 'RR', '15': 'PA', '16': 'AP', '17': 'TO',
+  '21': 'MA', '22': 'PI', '23': 'CE', '24': 'RN', '25': 'PB', '26': 'PE', '27': 'AL', '28': 'SE', '29': 'BA',
+  '31': 'MG', '32': 'ES', '33': 'RJ', '35': 'SP',
+  '41': 'PR', '42': 'SC', '43': 'RS',
+  '50': 'MS', '51': 'MT', '52': 'GO', '53': 'DF',
+};
+
+export const UF_IBGE: Record<UFBr, string> = Object.fromEntries(
+  Object.entries(IBGE_UF).map(([cod, uf]) => [uf, cod]),
+) as Record<UFBr, string>;
