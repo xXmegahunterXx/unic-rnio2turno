@@ -1,0 +1,13 @@
+node_modules/
+dist/
+dist-server/
+dist-demo/
+data-raw/
+.server-state/
+*.log
+.DS_Store
+test-results/
+playwright-report/
+preview-out/
+.env
+.env.local

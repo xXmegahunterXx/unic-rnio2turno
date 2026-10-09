@@ -1,0 +1,164 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/bricolage-grotesque';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — "Sintonia".
+ * Paleta neutra de propósito: nenhum lado usa vermelho, verde-amarelo ou azul partidário.
+ * Candidatos recebem slots por ordem do número na urna: A = turquesa, B = âmbar (par seguro para daltonismo).
+ * Valores em "R G B" para uso com rgb(var(--x) / alpha).
+ */
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: 9 9 15;
+  --surface: 17 17 26;
+  --surface-2: 24 24 36;
+  --surface-3: 34 34 50;
+  --fg: 244 244 250;
+  --fg-muted: 168 168 190;
+  --fg-subtle: 112 112 136;
+  --line: 255 255 255;
+  --line-alpha: 0.08;
+  --brand: 124 92 255; /* violeta elétrico */
+  --brand-2: 196 168 255; /* lilás */
+  --brand-ink: 255 255 255;
+  --cand-a: 25 194 176; /* turquesa */
+  --cand-a-soft: 126 232 220;
+  --cand-a-ink: 4 40 36;
+  --cand-b: 245 165 36; /* âmbar */
+  --cand-b-soft: 255 212 138;
+  --cand-b-ink: 48 28 0;
+  --cand-outros: 139 139 163;
+  --ok: 52 211 153;
+  --alert: 251 113 133;
+  --pending: 58 58 80; /* território ainda não apurado */
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: 246 246 251;
+  --surface: 255 255 255;
+  --surface-2: 240 240 247;
+  --surface-3: 228 228 239;
+  --fg: 14 14 26;
+  --fg-muted: 82 82 104;
+  --fg-subtle: 128 128 150;
+  --line: 14 14 26;
+  --line-alpha: 0.1;
+  --brand: 98 64 240;
+  --brand-2: 150 112 255;
+  --brand-ink: 255 255 255;
+  --cand-a: 10 150 136;
+  --cand-a-soft: 160 228 220;
+  --cand-a-ink: 255 255 255;
+  --cand-b: 214 132 8;
+  --cand-b-soft: 255 214 150;
+  --cand-b-ink: 255 255 255;
+  --cand-outros: 120 120 145;
+  --ok: 16 160 110;
+  --alert: 225 60 90;
+  --pending: 214 214 228;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: 246 246 251;
+    --surface: 255 255 255;
+    --surface-2: 240 240 247;
+    --surface-3: 228 228 239;
+    --fg: 14 14 26;
+    --fg-muted: 82 82 104;
+    --fg-subtle: 128 128 150;
+    --line: 14 14 26;
+    --line-alpha: 0.1;
+    --brand: 98 64 240;
+    --brand-2: 150 112 255;
+    --brand-ink: 255 255 255;
+    --cand-a: 10 150 136;
+    --cand-a-soft: 160 228 220;
+    --cand-a-ink: 255 255 255;
+    --cand-b: 214 132 8;
+    --cand-b-soft: 255 214 150;
+    --cand-b-ink: 255 255 255;
+    --cand-outros: 120 120 145;
+    --ok: 16 160 110;
+    --alert: 225 60 90;
+    --pending: 214 214 228;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-bg text-fg font-sans;
+    min-height: 100dvh;
+    font-feature-settings: 'cv11', 'ss01';
+  }
+  ::selection {
+    background: rgb(var(--brand) / 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--brand));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer utilities {
+  /* Números sempre tabulares (não "dançam" ao atualizar). */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum', 'cv11';
+  }
+  .border-line {
+    border-color: rgb(var(--line) / var(--line-alpha));
+  }
+  .divide-line > * + * {
+    border-color: rgb(var(--line) / var(--line-alpha));
+  }
+  .bg-line {
+    background-color: rgb(var(--line) / var(--line-alpha));
+  }
+  .glass {
+    background: rgb(var(--surface) / 0.72);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+  }
+  .text-grad {
+    background-image: linear-gradient(120deg, rgb(var(--fg)) 10%, rgb(var(--brand-2)) 60%, rgb(var(--brand)) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
