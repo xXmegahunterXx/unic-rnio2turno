@@ -6,6 +6,9 @@ import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-quer
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { FeedEvent, LiveStatus, Race, RaceId, UF } from '@/shared/types';
 import type { PublicMeta } from '@/shared/api';
+import { anonimizarRace, anonimizarTexto } from '@/shared/anon';
+
+export { anonimizarRace, anonimizarTexto };
 import { getClient } from './client';
 
 const STATUS_MS = 2000;
@@ -56,41 +59,6 @@ export function useMeta() {
 // por `useRace`/`useRaces` (nunca direto de `useMeta`) e os eventos já chegam com os nomes trocados.
 // O Teste Cego usa propostas reais e NÃO passa por aqui (usa os candidatos reais de `useMeta`).
 // ---------------------------------------------------------------------------------------------
-
-const ROTULO_SLOT = { a: 'A', b: 'B', outros: '' } as const;
-
-/** Versão anônima de uma corrida: "Candidato A/B", sem partido, vice ou número reais. */
-export function anonimizarRace(r: Race): Race {
-  return {
-    ...r,
-    candidatos: r.candidatos.map((c) =>
-      c.agregado
-        ? c
-        : {
-            ...c,
-            nomeUrna: `Candidato ${ROTULO_SLOT[c.cor]}`,
-            nome: `Candidato ${ROTULO_SLOT[c.cor]} (simulação)`,
-            partido: 'Simulação',
-            coligacao: undefined,
-            composicao: undefined,
-            vice: undefined,
-            numero: c.cor === 'a' ? 1 : 2,
-          },
-    ),
-  };
-}
-
-/** Troca nomes reais por "Candidato A/B" num texto (títulos de eventos). Nomes mais longos primeiro. */
-export function anonimizarTexto(texto: string, races: Race[]): string {
-  const pares: [string, string][] = [];
-  for (const r of races)
-    for (const c of r.candidatos)
-      if (!c.agregado && c.nomeUrna) pares.push([c.nomeUrna, `Candidato ${ROTULO_SLOT[c.cor]}`]);
-  pares.sort((x, y) => y[0].length - x[0].length);
-  let out = texto;
-  for (const [real, anon] of pares) out = out.split(real).join(anon);
-  return out;
-}
 
 const anonimizarEventos = (eventos: FeedEvent[], races: Race[]) =>
   eventos.map((e) => ({

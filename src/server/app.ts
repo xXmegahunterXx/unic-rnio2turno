@@ -29,6 +29,7 @@ import { caminhoParaLog, msgErro, type Logger } from './log';
 import { injetarMeta, metaDaRota, type ContextoMeta } from './meta-tags';
 import { Metricas } from './metrics';
 import { layoutPlacar, layoutTeste, renderPng } from './og';
+import { anonimizarRace } from '../shared/anon';
 import { Estaticos, pareceArquivo } from './static';
 import type { TseManager } from './tse';
 import { ErroValidacao, loginSchema, parseAdminCommand, parseCodMunicipio, parseNumero, parseRace, parseUf } from './validation';
@@ -337,9 +338,11 @@ export function createApp(deps: AppDeps) {
       const resumo = snap.resumo;
       const simulacao = dados.status().simulacao && r.turno === 2;
       const fonteTse = dados.fonteDe(r.id) === 'tse';
+      const raceOg = races.get(snap.race) ?? r;
       const png = await renderPng(
         layoutPlacar({
-          race: races.get(snap.race) ?? r,
+          // simulação anônima: nada de nome real em imagem com números fictícios
+          race: dados.status().anonimizado ? anonimizarRace(raceOg) : raceOg,
           uf,
           resumo,
           simulacao,
@@ -484,7 +487,13 @@ export function createApp(deps: AppDeps) {
         if (dados.fonteDe(race) === 'tse') return null;
         const r = dados.race(race);
         const snap = uf ? controller.uf(race, uf) : controller.nacional(race);
-        return { resumo: snap.resumo, simulacao: dados.status().simulacao && r.turno === 2, race: races.get(snap.race) ?? r };
+        const raceMeta = races.get(snap.race) ?? r;
+        const st = dados.status();
+        return {
+          resumo: snap.resumo,
+          simulacao: st.simulacao && r.turno === 2,
+          race: st.anonimizado ? anonimizarRace(raceMeta) : raceMeta,
+        };
       },
     };
 

@@ -71,7 +71,7 @@ export function criarFakeFetch(): FakeFetch {
     const etag = etagDe(corpo);
     const headers = new Headers(init?.headers);
     if (headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { etag } });
-    return new Response(corpo as BodyInit, { status: 200, headers: { 'content-type': tipo, etag, 'last-modified': 'Mon, 05 Oct 2026 15:52:12 GMT' } });
+    return new Response(corpo as ConstructorParameters<typeof Response>[0], { status: 200, headers: { 'content-type': tipo, etag, 'last-modified': 'Mon, 05 Oct 2026 15:52:12 GMT' } });
   }) as FakeFetch;
   f.chamadas = chamadas;
   f.rotas = rotas;
