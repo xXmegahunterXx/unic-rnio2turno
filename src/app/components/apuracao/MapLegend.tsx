@@ -27,7 +27,7 @@ function Swatch({ item, className }: { item: LegendItem; className?: string }) {
     <span
       aria-hidden
       className={cn(
-        'inline-block h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-[color:rgb(var(--line)/var(--line-alpha))]',
+        'inline-block h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-line',
         className,
       )}
       style={item.hachura ? hachuraStyle() : { background: item.fill }}
@@ -105,7 +105,7 @@ export function MapLegend({ modo = 'vencedor', race, spec, semTitulo, compacta, 
             ) : null}
             <div
               aria-hidden
-              className="h-2.5 rounded-full ring-1 ring-inset ring-[color:rgb(var(--line)/var(--line-alpha))]"
+              className="h-2.5 rounded-full ring-1 ring-inset ring-line"
               style={{ background: `linear-gradient(90deg, ${s.stops.join(', ')})` }}
             />
             <div className="relative mt-1 h-4">

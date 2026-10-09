@@ -415,7 +415,11 @@ describe('eventos e "eleito"', () => {
         }
         for (const p of serie) expect(Math.round((p.pv[0] + p.pv[1]) * 100)).toBe(10000);
         const last = serie[serie.length - 1];
-        expect(last.pst).toBeCloseTo((100 * s.resumo.secoesTotalizadas) / s.resumo.secoes, 2);
+        // pst truncado em 2 casas (nunca arredonda para cima; 100 só com todas as seções)
+        const real = (100 * s.resumo.secoesTotalizadas) / s.resumo.secoes;
+        expect(last.pst).toBeLessThanOrEqual(real);
+        expect(real - last.pst).toBeLessThan(0.01);
+        expect(last.pst === 100).toBe(s.resumo.secoesTotalizadas === s.resumo.secoes);
         expect(last.pv[0]).toBeCloseTo(pct0(s.resumo), 2);
         expect(last.t).toBe(s.resumo.ultimaAtualizacao);
       }

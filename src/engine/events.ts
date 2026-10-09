@@ -27,6 +27,16 @@ export function pctPar(v0: number, v1: number): [number, number] {
   return [a, Math.round((100 - a) * 100) / 100];
 }
 
+/**
+ * % de seções totalizadas com 2 casas, TRUNCADO (como o TSE): nunca arredonda para cima, então 100 só aparece
+ * com todas as seções totalizadas (com arredondamento comum, 499.223 de 499.248 seções já dariam "100,00%").
+ */
+export function pctSecoes(k: number, secoes: number): number {
+  if (secoes <= 0) return 0;
+  if (k >= secoes) return 100;
+  return Math.floor((10000 * k) / secoes) / 100;
+}
+
 /** "Lula 50,82% · Flávio Bolsonaro 49,18%" (ordem do número na urna). */
 export function placar(race: Race, v0: number, v1: number): string {
   const [a, b] = pctPar(v0, v1);

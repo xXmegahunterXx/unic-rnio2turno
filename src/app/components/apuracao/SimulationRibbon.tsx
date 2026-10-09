@@ -19,8 +19,8 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
     return (
       <span
         className={cn(
-          'inline-flex h-6 items-center gap-1.5 rounded-lg border border-[color:rgb(var(--brand)/0.4)] bg-brand/15 px-2',
-          'text-[10.5px] font-bold uppercase tracking-[0.14em] text-[color:color-mix(in_srgb,rgb(var(--brand))_70%,rgb(var(--fg)))] dark:text-brand-2',
+          'inline-flex h-6 items-center gap-1.5 rounded-lg border border-brand/40 bg-brand/15 px-2',
+          'text-[10.5px] font-bold uppercase tracking-[0.14em] text-brand-fg',
           className,
         )}
       >
@@ -35,7 +35,7 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
         aria-label="Simulação: dados fictícios"
         className={cn(
           'pointer-events-none inline-flex -rotate-[8deg] flex-col items-center rounded-md border-2 border-current px-2.5 py-1.5 font-mono',
-          'text-[color:color-mix(in_srgb,rgb(var(--brand))_80%,rgb(var(--fg)))] opacity-80 mix-blend-multiply dark:mix-blend-normal',
+          'text-brand-deep opacity-90',
           className,
         )}
       >
@@ -49,9 +49,9 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
       role="note"
       aria-label="Simulação: dados fictícios"
       className={cn(
-        'relative isolate flex h-7 items-center justify-center gap-2 overflow-hidden border-b border-[color:rgb(var(--brand)/0.25)] px-4',
+        'relative isolate flex h-7 items-center justify-center gap-2 overflow-hidden border-b border-brand/25 px-4',
         'bg-brand/[0.12] text-[11px] font-semibold uppercase tracking-[0.14em]',
-        'text-[color:color-mix(in_srgb,rgb(var(--brand))_72%,rgb(var(--fg)))] dark:text-brand-2',
+        'text-brand-fg',
         className,
       )}
     >

@@ -1,5 +1,7 @@
 /**
- * Ponte entre os preenchimentos dos mapas (strings CSS de `src/app/lib/raceUi.ts`, sempre do tipo
+ * Tokens de cor em tempo de execução — fonte ÚNICA para quem precisa da cor "resolvida" (canvas, contraste).
+ *
+ * Ponte entre os preenchimentos CSS (strings de `src/app/lib/raceUi.ts`, sempre do tipo
  * `rgb(var(--token) / α)`) e o que o SVG/canvas precisa em tempo de execução:
  *  - leitura dos tokens do tema atual (getComputedStyle) com atualização na troca de tema;
  *  - resolução de um preenchimento para RGB opaco (composto sobre a superfície do cartão),
@@ -24,10 +26,14 @@ export const TOKENS = [
   'line',
   'brand',
   'brand-2',
+  'brand-deep',
+  'brand-fg',
   'cand-a',
   'cand-a-soft',
+  'cand-a-fg',
   'cand-b',
   'cand-b-soft',
+  'cand-b-fg',
   'cand-outros',
   'pending',
   'ok',
@@ -36,9 +42,9 @@ export const TOKENS = [
 export type ColorToken = (typeof TOKENS)[number];
 export type TokenColors = Record<ColorToken, RGB> & { lineAlpha: number };
 
-/** `rgb(var(--token) / α)` — atalho para preenchimentos que não estão em raceUi. */
+/** `rgb(var(--token))` ou `rgb(var(--token) / α)` (α com 3 casas). Único construtor de cor CSS do app. */
 export function tokenCss(token: ColorToken, alpha = 1): string {
-  return alpha >= 1 ? `rgb(var(--${token}))` : `rgb(var(--${token}) / ${Math.round(alpha * 1000) / 1000})`;
+  return alpha >= 1 ? `rgb(var(--${token}))` : `rgb(var(--${token}) / ${Math.round(Math.max(0, alpha) * 1000) / 1000})`;
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -150,14 +150,14 @@ function AvisoBanner({ aviso }: { aviso: Aviso | null }) {
               className={cn(
                 'flex items-start gap-3 rounded-2xl border px-4 py-3 text-[14px] leading-snug',
                 aviso.nivel === 'alerta'
-                  ? 'border-[color:rgb(var(--alert)/0.35)] bg-alert/10 text-fg'
-                  : 'border-[color:rgb(var(--brand)/0.3)] bg-brand/10 text-fg',
+                  ? 'border-alert/35 bg-alert/10 text-fg'
+                  : 'border-brand/30 bg-brand/10 text-fg',
               )}
             >
               <Icon
                 name={aviso.nivel === 'alerta' ? 'alerta' : 'info'}
                 size={18}
-                className={cn('mt-px', aviso.nivel === 'alerta' ? 'text-alert' : 'text-brand-2')}
+                className={cn('mt-px', aviso.nivel === 'alerta' ? 'text-alert-fg' : 'text-brand-fg')}
               />
               <p className="min-w-0 flex-1 text-pretty">{aviso.texto}</p>
               <button
@@ -204,7 +204,7 @@ function TabBar() {
                     transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                   />
                 ) : null}
-                <Icon name={n.icon} size={22} className={cn(ativo && 'text-brand-2')} />
+                <Icon name={n.icon} size={22} className={cn(ativo && 'text-brand-fg')} />
                 <span>{n.short}</span>
               </Link>
             </li>
@@ -227,7 +227,7 @@ function Footer() {
               propostas.
             </p>
             <p className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-[12.5px] leading-snug text-fg-muted">
-              <Icon name="info" size={16} className="mt-px shrink-0 text-brand-2" />
+              <Icon name="info" size={16} className="mt-px shrink-0 text-brand-fg" />
               <span>
                 Projeto independente e <strong className="font-semibold text-fg">apartidário</strong>: sem vínculo com
                 candidatos, partidos ou campanhas. Não fazemos enquetes. Cores dos candidatos seguem a ordem do número na
@@ -260,7 +260,7 @@ function Footer() {
                   href="https://resultados.tse.jus.br"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-2"
+                  className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg"
                 >
                   TSE · Resultados
                   <Icon name="externo" size={14} className="text-fg-muted" />
@@ -271,7 +271,7 @@ function Footer() {
                   href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-2"
+                  className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg"
                 >
                   IBGE · Malhas territoriais
                   <Icon name="externo" size={14} className="text-fg-muted" />
@@ -296,7 +296,7 @@ function FooterCol({ titulo, links }: { titulo: string; links: { to: string; lab
       <ul className="mt-3 space-y-2.5 text-[14px]">
         {links.map((l) => (
           <li key={l.to}>
-            <Link to={l.to} className="text-fg transition-colors hover:text-brand-2">
+            <Link to={l.to} className="text-fg transition-colors hover:text-brand-fg">
               {l.label}
             </Link>
           </li>

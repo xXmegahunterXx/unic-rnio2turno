@@ -8,12 +8,12 @@ export type BadgeTone = 'neutral' | 'brand' | 'ok' | 'alert' | 'pending' | 'cand
 const tones: Record<BadgeTone, string> = {
   neutral: 'bg-surface-3 text-fg-muted',
   brand:
-    'bg-brand/15 text-[color:color-mix(in_srgb,rgb(var(--brand))_70%,rgb(var(--fg)))] dark:text-brand-2',
-  ok: 'bg-ok/15 text-[color:color-mix(in_srgb,rgb(var(--ok))_60%,rgb(var(--fg)))] dark:text-ok',
-  alert: 'bg-alert/15 text-[color:color-mix(in_srgb,rgb(var(--alert))_70%,rgb(var(--fg)))] dark:text-alert',
+    'bg-brand/15 text-brand-fg',
+  ok: 'bg-ok/15 text-ok-fg',
+  alert: 'bg-alert/15 text-alert-fg',
   pending: 'bg-pending/60 text-fg-muted',
-  'cand-a': 'bg-cand-a/15 text-[color:color-mix(in_srgb,rgb(var(--cand-a))_62%,rgb(var(--fg)))] dark:text-cand-a',
-  'cand-b': 'bg-cand-b/15 text-[color:color-mix(in_srgb,rgb(var(--cand-b))_62%,rgb(var(--fg)))] dark:text-cand-b',
+  'cand-a': 'bg-cand-a/15 text-cand-a-fg',
+  'cand-b': 'bg-cand-b/15 text-cand-b-fg',
   outros: 'bg-cand-outros/15 text-fg-muted',
   solid: 'bg-fg text-bg',
 };

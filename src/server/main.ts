@@ -7,6 +7,7 @@
  * Sobe em ~1 s: lê o dataset do disco, constrói o motor (modelo de ~499 mil seções), restaura o AdminState
  * salvo em STATE_DIR e começa a servir. Variáveis de ambiente: ver src/server/config.ts e README.md.
  */
+import { unwatchFile, watchFile } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { serve } from '@hono/node-server';
@@ -66,6 +67,24 @@ async function main() {
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
 
+  // Várias instâncias com o mesmo STATE_DIR (volume compartilhado, PM2/cluster) convergem para o admin.json
+  // mais recente: quem não escreveu adota o estado (setState não regrava → sem laço). Atraso ≤ ~1 s.
+  watchFile(store.caminho, { interval: 1000, persistent: false }, (cur, prev) => {
+    if (cur.mtimeMs === prev.mtimeMs || cur.mtimeMs === 0) return;
+    const v = store.ler() as AdminState | null;
+    if (!v || typeof v !== 'object' || typeof v.versao !== 'number') return;
+    const atual = controller.state();
+    if (v.versao < atual.versao || JSON.stringify(v) === JSON.stringify(atual)) return;
+    try {
+      controller.setState(v);
+      const s = controller.state();
+      tse.sincronizar(s.fonte, s.tse);
+      log.info(`Estado do admin sincronizado de outra instância (versão ${s.versao}, fonte ${s.fonte})`);
+    } catch (e) {
+      log.erro('Falha ao adotar o estado de outra instância', e);
+    }
+  });
+
   // ---- HTTP ----------------------------------------------------------------------------------------
   const sintonia = createApp({ config, dataset: ds, controller, tse, log });
   const server = serve({ fetch: sintonia.app.fetch, port: config.port, hostname: config.host }, (info) => {
@@ -74,6 +93,10 @@ async function main() {
         `(${config.producao ? 'produção' : 'desenvolvimento'}, fonte ${controller.status().fonte}, ` +
         `${config.serveStatic ? `servindo ${config.distDir}` : 'só API'}; subida em ${Math.round(performance.now() - t0)} ms)`,
     );
+  });
+  server.on('error', (e: NodeJS.ErrnoException) => {
+    log.erro(e.code === 'EADDRINUSE' ? `Porta ${config.port} já está em uso (defina PORT)` : 'Falha no servidor HTTP', e);
+    process.exit(1);
   });
   // keep-alive maior que o do balanceador (evita 502 por conexão reaproveitada fechando)
   (server as unknown as { keepAliveTimeout: number; headersTimeout: number }).keepAliveTimeout = 65_000;
@@ -97,6 +120,7 @@ async function main() {
     }, 10_000);
     forcar.unref();
     clearInterval(resumo);
+    unwatchFile(store.caminho);
     try {
       await new Promise<void>((res) => {
         server.close(() => res());
@@ -107,7 +131,8 @@ async function main() {
     }
     try {
       await tse.encerrar();
-      store.salvar(controller.state());
+      // só grava o que estiver pendente: o estado já é salvo a cada comando, e regravar aqui poderia
+      // sobrescrever um estado mais novo escrito por outra instância no mesmo STATE_DIR
       await store.flush();
     } catch (e) {
       log.erro('Erro ao gravar o estado no encerramento', e);

@@ -92,7 +92,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
         </div>
         {simulado ? (
           <div className="rounded-2xl border-[3px] border-brand bg-brand/10 px-6 py-3 text-center">
-            <div className="text-[30px] font-bold uppercase leading-none tracking-[0.16em] text-[color:color-mix(in_srgb,rgb(var(--brand))_80%,rgb(var(--fg)))] dark:text-brand-2">Simulação</div>
+            <div className="text-[30px] font-bold uppercase leading-none tracking-[0.16em] text-brand-fg">Simulação</div>
             <div className="mt-1.5 text-[17px] font-semibold uppercase tracking-[0.18em] text-fg-muted">dados fictícios</div>
           </div>
         ) : null}

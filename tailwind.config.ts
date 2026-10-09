@@ -12,15 +12,17 @@ export default {
         bg: v('bg'),
         surface: { DEFAULT: v('surface'), 2: v('surface-2'), 3: v('surface-3') },
         fg: { DEFAULT: v('fg'), muted: v('fg-muted'), subtle: v('fg-subtle') },
-        line: v('line'),
-        brand: { DEFAULT: v('brand'), 2: v('brand-2'), ink: v('brand-ink') },
+        // Linhas: o alfa base vem do tema (--line-alpha); `/50` etc. multiplicam esse alfa.
+        // Assim `border-line`, `bg-line`, `divide-line` e `ring-line` saem sempre sutis (nunca branco/preto chapado).
+        line: 'rgb(var(--line) / calc(var(--line-alpha) * <alpha-value>))',
+        brand: { DEFAULT: v('brand'), 2: v('brand-2'), deep: v('brand-deep'), ink: v('brand-ink'), fg: v('brand-fg') },
         cand: {
-          a: v('cand-a'), 'a-soft': v('cand-a-soft'), 'a-ink': v('cand-a-ink'),
-          b: v('cand-b'), 'b-soft': v('cand-b-soft'), 'b-ink': v('cand-b-ink'),
+          a: v('cand-a'), 'a-soft': v('cand-a-soft'), 'a-ink': v('cand-a-ink'), 'a-fg': v('cand-a-fg'),
+          b: v('cand-b'), 'b-soft': v('cand-b-soft'), 'b-ink': v('cand-b-ink'), 'b-fg': v('cand-b-fg'),
           outros: v('cand-outros'),
         },
-        ok: v('ok'),
-        alert: v('alert'),
+        ok: { DEFAULT: v('ok'), fg: v('ok-fg') },
+        alert: { DEFAULT: v('alert'), fg: v('alert-fg') },
         pending: v('pending'),
       },
       fontFamily: {
@@ -34,7 +36,10 @@ export default {
         glow: '0 0 0 1px rgb(var(--brand) / 0.35), 0 10px 40px -10px rgb(var(--brand) / 0.55)',
       },
       backgroundImage: {
+        // Decorativo (barras de progresso, realces): violeta → lilás. NÃO use sob texto.
         'brand-grad': 'linear-gradient(135deg, rgb(var(--brand)) 0%, rgb(var(--brand-2)) 100%)',
+        // Botões/CTAs com texto branco: violeta → púrpura, contraste ≥ 4,5:1 em todo o gradiente.
+        'brand-cta': 'linear-gradient(135deg, rgb(var(--brand)) 0%, rgb(var(--brand-deep)) 100%)',
         noise: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E\")",
       },
       keyframes: {

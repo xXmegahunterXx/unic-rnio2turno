@@ -70,7 +70,7 @@ export function Toaster() {
             <Icon
               name={t.icon ?? icones[t.tone]}
               size={18}
-              className={cn(t.tone === 'ok' && 'text-ok', t.tone === 'alert' && 'text-alert', t.tone === 'neutral' && 'text-brand-2')}
+              className={cn(t.tone === 'ok' && 'text-ok-fg', t.tone === 'alert' && 'text-alert-fg', t.tone === 'neutral' && 'text-brand-fg')}
             />
             <span>{t.texto}</span>
           </motion.div>

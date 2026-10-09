@@ -18,11 +18,11 @@ const base =
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    'bg-brand-grad text-brand-ink shadow-[0_8px_24px_-10px_rgb(var(--brand)/0.7),inset_0_1px_0_0_rgb(var(--brand-ink)/0.22)] ' +
+    'bg-brand-cta text-brand-ink shadow-[0_8px_24px_-10px_rgb(var(--brand)/0.7),inset_0_1px_0_0_rgb(var(--brand-ink)/0.22)] ' +
     'hover:brightness-110 hover:shadow-[0_10px_30px_-10px_rgb(var(--brand)/0.85),inset_0_1px_0_0_rgb(var(--brand-ink)/0.22)]',
   secondary: 'bg-surface-3 text-fg hover:bg-[color:color-mix(in_srgb,rgb(var(--surface-3))_82%,rgb(var(--fg)))]',
   ghost: 'bg-transparent text-fg-muted hover:bg-surface-2 hover:text-fg',
-  outline: 'border border-line bg-transparent text-fg hover:border-[color:rgb(var(--line)/0.2)] hover:bg-surface-2',
+  outline: 'border border-line bg-transparent text-fg hover:border-line/[2.5] hover:bg-surface-2',
 };
 
 const sizes: Record<ButtonSize, string> = {

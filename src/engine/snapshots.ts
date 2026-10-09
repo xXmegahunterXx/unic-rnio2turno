@@ -25,7 +25,7 @@ import type {
 } from '../shared/types';
 import type { ResultadoPrimeiroTurno } from '../shared/dataset';
 import { F, acumula, camposPar, somaMunicipios, type Agg } from './aggregate';
-import { pctPar } from './events';
+import { pctPar, pctSecoes } from './events';
 import type { Model } from './model';
 import { triple32 } from './rng';
 import type { SerieBuf } from './series';
@@ -168,7 +168,7 @@ export function serieAte(buf: SerieBuf, tq: number, atual: Summary): SeriePoint[
     const [a, b] = pctPar(atual.votos[0], atual.votos[1]);
     out.push({
       t: atual.ultimaAtualizacao,
-      pst: Math.round((10000 * atual.secoesTotalizadas) / atual.secoes) / 100,
+      pst: pctSecoes(atual.secoesTotalizadas, atual.secoes),
       pv: [a, b],
     });
   }

@@ -27,7 +27,7 @@ import {
   rgbSlot,
   slotDe,
 } from '@/app/lib/raceUi';
-import { tokenCss } from './mapColors';
+import { tokenCss } from '@/app/lib/tokens';
 
 export type MapMode = 'vencedor' | 'margem' | 'apurado' | 'comparecimento' | 'variacao';
 

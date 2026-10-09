@@ -10,6 +10,7 @@
  */
 import type { CorCandidato, Race, Tally } from '@/shared/types';
 import { bucketMargem, margem, pctTotalizadas } from '@/shared/calc';
+import { tokenCss, type ColorToken } from './tokens';
 
 export type MargemBucket = 0 | 1 | 2 | 3;
 
@@ -20,11 +21,11 @@ export interface SlotUi {
   bgSoft: string;
   /** Fundo bem sutil (linhas de tabela, áreas grandes). */
   bgFaint: string;
-  /** Texto na cor do slot com contraste AA (≥ 4,5:1) nos dois temas — escurece no tema claro. */
+  /** Texto pequeno na cor do slot, AA (≥ 4,5:1) nos dois temas — token `--cand-x-fg`. */
   text: string;
-  /** Texto grande (≥ 24 px, números do placar): mais vivo, contraste ≥ 3:1 no tema claro. */
+  /** Texto grande (≥ 24 px, números do placar): cor pura do slot, ≥ 3:1 nos dois temas. */
   textDisplay: string;
-  /** Texto sobre `bg` (tinta). */
+  /** Tinta sobre `bg` — só para ícones/sinais (≥ 3:1), não para texto. */
   ink: string;
   /** Preenchimento SVG. */
   fill: string;
@@ -40,6 +41,8 @@ export interface SlotUi {
   css: string;
   /** Nome da variável CSS (sem `var()`): '--cand-a'. */
   cssVar: string;
+  /** Token de cor (para `tokenCss`/`resolveFill` de ./tokens). */
+  token: ColorToken;
 }
 
 const SLOTS: Record<CorCandidato, SlotUi> = {
@@ -47,8 +50,8 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     bg: 'bg-cand-a',
     bgSoft: 'bg-cand-a/15',
     bgFaint: 'bg-cand-a/[0.07]',
-    text: 'text-[color:color-mix(in_srgb,rgb(var(--cand-a))_70%,rgb(var(--fg)))] dark:text-cand-a',
-    textDisplay: 'text-[color:color-mix(in_srgb,rgb(var(--cand-a))_86%,rgb(var(--fg)))] dark:text-cand-a',
+    text: 'text-cand-a-fg',
+    textDisplay: 'text-cand-a',
     ink: 'text-cand-a-ink',
     fill: 'fill-cand-a',
     stroke: 'stroke-cand-a',
@@ -57,13 +60,14 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     glow: 'from-cand-a/[0.14] to-transparent',
     css: 'rgb(var(--cand-a))',
     cssVar: '--cand-a',
+    token: 'cand-a',
   },
   b: {
     bg: 'bg-cand-b',
     bgSoft: 'bg-cand-b/15',
     bgFaint: 'bg-cand-b/[0.07]',
-    text: 'text-[color:color-mix(in_srgb,rgb(var(--cand-b))_70%,rgb(var(--fg)))] dark:text-cand-b',
-    textDisplay: 'text-[color:color-mix(in_srgb,rgb(var(--cand-b))_86%,rgb(var(--fg)))] dark:text-cand-b',
+    text: 'text-cand-b-fg',
+    textDisplay: 'text-cand-b',
     ink: 'text-cand-b-ink',
     fill: 'fill-cand-b',
     stroke: 'stroke-cand-b',
@@ -72,6 +76,7 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     glow: 'from-cand-b/[0.14] to-transparent',
     css: 'rgb(var(--cand-b))',
     cssVar: '--cand-b',
+    token: 'cand-b',
   },
   outros: {
     bg: 'bg-cand-outros',
@@ -87,6 +92,7 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     glow: 'from-cand-outros/[0.12] to-transparent',
     css: 'rgb(var(--cand-outros))',
     cssVar: '--cand-outros',
+    token: 'cand-outros',
   },
 };
 
@@ -103,8 +109,7 @@ export function slotDe(race: Pick<Race, 'candidatos'> | undefined, i: number | n
 
 /** `rgb(var(--cand-a) / α)`. */
 export function rgbSlot(cor: CorCandidato, alpha = 1): string {
-  const v = corSlot(cor).cssVar;
-  return alpha >= 1 ? `rgb(var(${v}))` : `rgb(var(${v}) / ${round(alpha)})`;
+  return tokenCss(corSlot(cor).token, alpha);
 }
 
 /**
@@ -119,13 +124,15 @@ export function fillMargem(cor: CorCandidato, bucket: MargemBucket): string {
 }
 
 /** Território/seção ainda sem apuração. */
-export const FILL_PENDENTE = 'rgb(var(--pending))';
+export const FILL_PENDENTE = tokenCss('pending');
 /** Empate exato. */
-export const FILL_EMPATE = 'rgb(var(--cand-outros) / 0.55)';
+export const FILL_EMPATE = tokenCss('cand-outros', 0.55);
 /** Totalizada sem votos válidos / vencedor desconhecido. */
-export const FILL_NEUTRO = 'rgb(var(--fg-subtle) / 0.45)';
+export const FILL_NEUTRO = tokenCss('fg-subtle', 0.45);
+/** Totalizada sem vencedor informado (mosaico na fonte TSE). */
+export const FILL_TOTALIZADA = tokenCss('fg-muted', 0.55);
 /** Contorno entre polígonos (combina com o fundo do cartão). */
-export const STROKE_DIVISA = 'rgb(var(--surface))';
+export const STROKE_DIVISA = tokenCss('surface');
 
 /**
  * Preenchimento de uma área a partir de uma contagem: pendente se nenhuma seção totalizada,
@@ -145,7 +152,7 @@ export function fillTally(
 export function fillApurado(pct: number): string {
   if (pct <= 0) return FILL_PENDENTE;
   const a = 0.18 + 0.82 * Math.min(1, Math.max(0, pct / 100));
-  return `rgb(var(--brand) / ${round(a)})`;
+  return tokenCss('brand', a);
 }
 
 /** Atalho: fill de % apurado para uma contagem. */
@@ -162,7 +169,7 @@ export function fillMosaico(ch: string, cores: readonly CorCandidato[] = ['a', '
   if (code >= 97 && code <= 100) return fillMargem(cores[0] ?? 'a', (code - 97) as MargemBucket);
   if (code >= 101 && code <= 104) return fillMargem(cores[1] ?? 'b', (code - 101) as MargemBucket);
   if (ch === 'x') return FILL_EMPATE;
-  if (ch === 't') return 'rgb(var(--fg-muted) / 0.55)';
+  if (ch === 't') return FILL_TOTALIZADA;
   return FILL_NEUTRO;
 }
 
@@ -173,7 +180,3 @@ export const MARGEM_ROTULOS: readonly [string, string, string, string] = [
   '15 a 30 p.p.',
   '30 p.p. ou mais',
 ];
-
-function round(n: number): string {
-  return String(Math.round(n * 1000) / 1000);
-}

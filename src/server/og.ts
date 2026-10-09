@@ -194,7 +194,10 @@ function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar:
   const r = inp.resumo;
   const temVotos = r.votos.reduce((a, b) => a + b, 0) > 0;
   const pct = temVotos ? pctValidos(r, idx) : null;
-  const eleito = r.eleito === idx;
+  // "eleito" só no 2º turno e na abrangência da própria disputa (no recorte de uma UF, `eleito` do resumo
+  // significa apenas "vencedor ali"; no 1º turno ninguém foi eleito para estes cargos)
+  const escopoDaDisputa = !inp.uf || inp.race.abrangencia === inp.uf;
+  const eleito = r.eleito === idx && inp.race.turno === 2 && escopoDaDisputa;
   const cabecalho = [
     h(
       'div',

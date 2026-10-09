@@ -33,7 +33,7 @@ export function Toggle({ checked, onChange, label, description, ariaLabel, disab
         'relative inline-flex shrink-0 items-center rounded-full p-[2px] transition-colors duration-200',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
         'disabled:cursor-not-allowed disabled:opacity-45',
-        checked ? 'bg-brand' : 'bg-surface-3 ring-1 ring-inset ring-[color:rgb(var(--line)/0.12)]',
+        checked ? 'bg-brand' : 'bg-surface-3 ring-1 ring-inset ring-line/[1.5]',
         w,
       )}
     >

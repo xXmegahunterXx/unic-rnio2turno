@@ -47,7 +47,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div role="alert" className={cn('flex flex-col items-center text-center', compact ? 'px-4 py-8' : 'px-6 py-14', className)}>
-      <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-[color:rgb(var(--alert)/0.3)] bg-alert/10 text-alert">
+      <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-alert/30 bg-alert/10 text-alert-fg">
         <Icon name="alerta" size={26} />
       </span>
       <h3 className="mt-4 font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">{title}</h3>

@@ -161,7 +161,7 @@ export function DataTable<R>({
                     scope="col"
                     aria-sort={ariaSort}
                     className={cn(
-                      'z-10 border-b border-line bg-surface font-medium text-fg-muted',
+                      'z-10 border-b border-line bg-surface align-middle font-medium text-fg-muted',
                       stickyHeader && 'sticky',
                       pad,
                       'py-2 text-[11px] uppercase tracking-[0.06em] sm:py-2.5 sm:tracking-[0.08em]',
@@ -179,12 +179,12 @@ export function DataTable<R>({
                         onClick={() => clicarCabecalho(c)}
                         aria-label={c.headerLabel ? `Ordenar por ${c.headerLabel}` : undefined}
                         className={cn(
-                          'group inline-flex max-w-full items-center gap-1 rounded-md uppercase tracking-[inherit] transition-colors hover:text-fg',
+                          'group inline-flex h-[22px] max-w-full items-center gap-1 rounded-md align-middle uppercase leading-none tracking-[inherit] transition-colors hover:text-fg',
                           c.align === 'right' && 'flex-row-reverse',
                           ativo && 'text-fg',
                         )}
                       >
-                        <span>{c.header}</span>
+                        <span className="truncate">{c.header}</span>
                         <Icon
                           name={ativo ? (sort!.dir === 'asc' ? 'chevron-cima' : 'chevron') : 'ordenar'}
                           size={ativo ? 14 : 12}
@@ -193,7 +193,7 @@ export function DataTable<R>({
                         />
                       </button>
                     ) : (
-                      c.header
+                      <span className="inline-flex h-[22px] max-w-full items-center align-middle leading-none">{c.header}</span>
                     )}
                   </th>
                 );

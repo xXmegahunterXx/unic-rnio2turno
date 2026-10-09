@@ -187,7 +187,7 @@ function Diferenca({ resumo }: { resumo: Summary }) {
   const m = margem(resumo);
   return (
     <div className="hidden min-w-[150px] flex-col items-center justify-center self-center px-2 pt-10 text-center lg:flex">
-      <span aria-hidden className="mb-3 h-8 w-px bg-gradient-to-b from-transparent to-[rgb(var(--line)/0.2)]" />
+      <span aria-hidden className="mb-3 h-8 w-px bg-gradient-to-b from-transparent to-line/[2.5]" />
       <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Diferença</span>
       {m.lider !== null ? (
         <>
@@ -197,7 +197,7 @@ function Diferenca({ resumo }: { resumo: Summary }) {
       ) : (
         <span className="mt-1.5 text-[13px] text-fg-muted">—</span>
       )}
-      <span aria-hidden className="mt-3 h-8 w-px bg-gradient-to-t from-transparent to-[rgb(var(--line)/0.2)]" />
+      <span aria-hidden className="mt-3 h-8 w-px bg-gradient-to-t from-transparent to-line/[2.5]" />
     </div>
   );
 }
@@ -338,7 +338,7 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
   const cls = cn(
     'group relative block rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5',
     (to || onClick) &&
-      'transition-[transform,border-color,background-color] duration-200 hover:-translate-y-px hover:border-[color:rgb(var(--line)/0.16)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+      'transition-[transform,border-color,background-color] duration-200 hover:-translate-y-px hover:border-line/[2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
     className,
   );
   if (to) {

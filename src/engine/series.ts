@@ -14,7 +14,7 @@
  */
 import { INICIO_APURACAO } from '../shared/constants';
 import type { FeedEvent, Race, TipoEvento, UF } from '../shared/types';
-import { pctPar, textos } from './events';
+import { pctPar, pctSecoes, textos } from './events';
 import type { Model } from './model';
 import type { RaceInfo } from './structure';
 
@@ -88,7 +88,7 @@ class Escopo {
     const buf = this.buf;
     buf.t.push(t);
     buf.k.push(k);
-    buf.pst.push(Math.round((10000 * k) / this.secoes) / 100);
+    buf.pst.push(pctSecoes(k, this.secoes));
     buf.pv0.push(a);
     buf.pv1.push(b);
     this.lastK = k;

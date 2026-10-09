@@ -39,7 +39,7 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
   if (v.tipo === 'pre') {
     return (
       <span className={cn(base, className)} role="status">
-        <Icon name="relogio" size={15} className="text-brand-2" />
+        <Icon name="relogio" size={15} className="text-brand-fg" />
         <span className="text-fg-muted">{compact ? 'Em' : 'Começa em'}</span>
         <span className="num font-semibold">{fmtFaltam(v.faltaMs)}</span>
       </span>
@@ -48,19 +48,19 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
   if (v.tipo === 'encerrada') {
     return (
       <span className={cn(base, className)} role="status">
-        <Icon name="check-circulo" size={15} className="text-ok" />
+        <Icon name="check-circulo" size={15} className="text-ok-fg" />
         <span className="font-semibold">{v.simulacao ? 'Simulação encerrada' : 'Encerrada'}</span>
       </span>
     );
   }
   return (
     <span
-      className={cn(base, v.simulacao && 'border-[color:rgb(var(--brand)/0.35)] bg-brand/10', className)}
+      className={cn(base, v.simulacao && 'border-brand/35 bg-brand/10', className)}
       role="status"
       aria-label={`${v.simulacao ? 'Simulação' : 'Ao vivo'}, ${fmtHoraSeg(v.simNow)} (horário de Brasília)`}
     >
       <LiveDot tone={v.simulacao ? 'brand' : 'live'} pulse={!v.parado} />
-      <span className={cn('text-[11px] font-bold uppercase tracking-[0.12em]', v.simulacao ? 'text-[color:color-mix(in_srgb,rgb(var(--brand))_70%,rgb(var(--fg)))] dark:text-brand-2' : 'text-fg')}>
+      <span className={cn('text-[11px] font-bold uppercase tracking-[0.12em]', v.simulacao ? 'text-brand-fg' : 'text-fg')}>
         {v.simulacao ? (compact ? 'Sim.' : 'Simulação') : 'Ao vivo'}
       </span>
       <span className="num text-fg-muted">{compact ? fmtHora(v.simNow) : fmtHoraSeg(v.simNow)}</span>

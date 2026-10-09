@@ -42,11 +42,12 @@ export function Countdown({ target, now, size = 'md', hideZeroDays = true, doneL
   if (restante <= 0) {
     return <span className={cn('font-display font-semibold text-fg', className)}>{doneLabel}</span>;
   }
-  const unidades: [number, string, string][] = [
-    [p.dias, 'dias', 'd'],
-    [p.horas, 'horas', 'h'],
-    [p.min, 'minutos', 'min'],
-    [p.seg, 'segundos', 's'],
+  // [valor, rótulo longo (≥ sm), rótulo médio (celular), rótulo curto (size sm)]
+  const unidades: [number, string, string, string][] = [
+    [p.dias, 'dias', 'dias', 'd'],
+    [p.horas, 'horas', 'horas', 'h'],
+    [p.min, 'minutos', 'min', 'min'],
+    [p.seg, 'segundos', 'seg', 's'],
   ];
   const lista = hideZeroDays && p.dias === 0 ? unidades.slice(1) : unidades;
   const numCls = size === 'lg' ? 'text-[clamp(2.25rem,9vw,3.75rem)]' : size === 'md' ? 'text-[28px]' : 'text-lg';
@@ -60,13 +61,20 @@ export function Countdown({ target, now, size = 'md', hideZeroDays = true, doneL
     <div
       role="timer"
       aria-label={`Faltam ${p.dias} dias, ${p.horas} horas, ${p.min} minutos e ${p.seg} segundos`}
-      className={cn('inline-flex items-stretch gap-1.5 sm:gap-2', className)}
+      className={cn('inline-grid auto-cols-fr grid-flow-col gap-1.5 sm:gap-2', className)}
     >
-      {lista.map(([v, longo, curto]) => (
-        <div key={longo} aria-hidden className={cn('flex flex-col items-center border border-line bg-surface-2', boxCls)}>
+      {lista.map(([v, longo, medio, curto]) => (
+        <div key={longo} aria-hidden className={cn('flex flex-col items-center justify-center border border-line bg-surface-2', boxCls)}>
           <NumberRoll value={v} format={(n) => (curto === 'd' ? String(n) : pad(n))} className={cn('font-display font-semibold leading-none tracking-tight text-fg', numCls)} />
           <span className={cn('mt-1 font-medium uppercase tracking-[0.12em] text-fg-muted', size === 'sm' ? 'text-[9px]' : 'text-[10px]')}>
-            {size === 'sm' ? curto : longo}
+            {size === 'sm' ? (
+              curto
+            ) : (
+              <>
+                <span className="sm:hidden">{medio}</span>
+                <span className="hidden sm:inline">{longo}</span>
+              </>
+            )}
           </span>
         </div>
       ))}

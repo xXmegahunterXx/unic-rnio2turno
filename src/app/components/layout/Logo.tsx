@@ -13,7 +13,7 @@ export function LogoMark({ size = 28, className }: { size?: number; className?: 
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="16" className="fill-fg dark:fill-surface-3" />
-      <rect x=".75" y=".75" width="62.5" height="62.5" rx="15.25" fill="none" className="stroke-transparent dark:stroke-[rgb(var(--line)/0.12)]" strokeWidth="1.5" />
+      <rect x=".75" y=".75" width="62.5" height="62.5" rx="15.25" fill="none" className="stroke-transparent dark:stroke-line/[1.5]" strokeWidth="1.5" />
       <path d="M14 38c6-14 12-14 18 0s12 14 18 0" fill="none" stroke={`url(#g${id})`} strokeWidth="6" strokeLinecap="round" />
       <circle cx="32" cy="22" r="4" className="fill-brand-ink" />
     </svg>

@@ -23,7 +23,7 @@ export { buildStructure, forEachFaixa, type Structure, type RaceInfo } from './s
 export { buildModel, MODELO, viesLogit, type Model, type Calibragem } from './model';
 export { Aggregator, camposPar, F as CAMPOS_AGREGADO, type Agg } from './aggregate';
 export { buildTimeline, MARCOS_BR, MARCOS_GOV, type Timeline, type SerieBuf } from './series';
-export { textos as textosEventos, placar, pctPar, emUf } from './events';
+export { textos as textosEventos, placar, pctPar, pctSecoes, emUf } from './events';
 export {
   montaSummary,
   montaRestante,

@@ -33,7 +33,7 @@ import { cn } from '@/app/lib/cn';
 import { STROKE_DIVISA, rgbSlot, slotDe } from '@/app/lib/raceUi';
 import { bboxes, parseViewBox, pontoMaisLeste, useGeo, type BBox } from './geo';
 import { MAP_MODES, valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapModes';
-import { inkToken, useTokenColors } from './mapColors';
+import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { MapHatchPattern } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
 import { MapDataTable } from './MapDataTable';

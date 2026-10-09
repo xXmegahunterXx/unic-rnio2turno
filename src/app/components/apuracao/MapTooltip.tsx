@@ -110,7 +110,7 @@ export function MapTooltip({
             encerrada
               ? 'bg-fg/10 text-fg'
               : temDados
-                ? 'bg-brand/15 text-[color:color-mix(in_srgb,rgb(var(--brand))_70%,rgb(var(--fg)))] dark:text-brand-2'
+                ? 'bg-brand/15 text-brand-fg'
                 : 'bg-pending/60 text-fg-muted',
           )}
         >
@@ -119,7 +119,7 @@ export function MapTooltip({
       </div>
 
       {/* % de seções totalizadas */}
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[rgb(var(--line)/var(--line-alpha))]" aria-hidden>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-line" aria-hidden>
         <div
           className="h-full rounded-full bg-brand transition-[width] duration-500"
           style={{ width: `${Math.min(100, apurado)}%` }}
@@ -147,7 +147,7 @@ export function MapTooltip({
                 </div>
                 <div className="mt-1 flex items-center gap-2">
                   <div
-                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-[rgb(var(--line)/var(--line-alpha))]"
+                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"
                     aria-hidden
                   >
                     <div

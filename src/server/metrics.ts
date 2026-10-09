@@ -79,6 +79,7 @@ export class Metricas {
   private reqSlots = new Int32Array(60);
   private reqSeg = new Float64Array(60).fill(-1);
   private latencias: number[] = [];
+  private nMinuto = 0;
   private erros5xx = 0;
   private hits = 0;
   private misses = 0;
@@ -101,7 +102,13 @@ export class Metricas {
       this.reqSlots[i] = 0;
     }
     this.reqSlots[i]++;
-    if (this.latencias.length < 200_000) this.latencias.push(ms);
+    this.nMinuto++;
+    // amostragem: guarda até 50 mil latências por minuto (reservatório), conta todas
+    if (this.latencias.length < 50_000) this.latencias.push(ms);
+    else {
+      const j = Math.floor(Math.random() * this.nMinuto);
+      if (j < 50_000) this.latencias[j] = ms;
+    }
     if (status >= 500) this.erros5xx++;
     if (status === 304) this.n304++;
   }
@@ -123,7 +130,7 @@ export class Metricas {
     const l = this.latencias.sort((a, b) => a - b);
     const q = (p: number) => (l.length ? l[Math.min(l.length - 1, Math.floor(p * l.length))] : 0);
     const r: ResumoMinuto = {
-      requisicoes: l.length,
+      requisicoes: this.nMinuto,
       p50: q(0.5),
       p95: q(0.95),
       p99: q(0.99),
@@ -133,6 +140,7 @@ export class Metricas {
       respostas304: this.n304,
     };
     this.latencias = [];
+    this.nMinuto = 0;
     this.erros5xx = 0;
     this.hits = 0;
     this.misses = 0;

@@ -25,9 +25,9 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(function Card(
       className={cn(
         'relative rounded-2xl border border-line bg-surface shadow-card',
         pads[padding],
-        highlight && 'border-[color:rgb(var(--brand)/0.35)] shadow-glow',
+        highlight && 'border-brand/35 shadow-glow',
         interactive &&
-          'transition-[transform,border-color,background-color] duration-200 hover:-translate-y-px hover:border-[color:rgb(var(--line)/0.16)] hover:bg-[color:color-mix(in_srgb,rgb(var(--surface))_92%,rgb(var(--fg)))]',
+          'transition-[transform,border-color,background-color] duration-200 hover:-translate-y-px hover:border-line/[2] hover:bg-[color:color-mix(in_srgb,rgb(var(--surface))_92%,rgb(var(--fg)))]',
         className,
       )}
       {...rest}
@@ -50,8 +50,9 @@ export function CardHeader({
   className?: string;
 }) {
   return (
-    <div className={cn('mb-4 flex items-start justify-between gap-3', className)}>
-      <div className="flex min-w-0 items-start gap-2.5">
+    <div className={cn('mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5', className)}>
+      {/* o título reserva ~13rem: se as ações não cabem ao lado (celular), descem para a linha de baixo */}
+      <div className="flex min-w-0 flex-[1_1_13rem] items-start gap-2.5">
         {icon ? <span className="mt-0.5 text-fg-muted">{icon}</span> : null}
         <div className="min-w-0">
           <h3 className="font-display text-[17px] font-semibold leading-tight tracking-[-0.01em] text-fg">{title}</h3>

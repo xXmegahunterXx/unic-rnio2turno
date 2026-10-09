@@ -1,4 +1,4 @@
-import { Fragment, useLayoutEffect, useRef } from 'react';
+import { Fragment, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
@@ -12,13 +12,24 @@ export interface Crumb {
 /** Trilha de navegação (Brasil › São Paulo › Campinas). Rola na horizontal se não couber. */
 export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: string }) {
   const ref = useRef<HTMLElement>(null);
+  // Esmaece a borda esquerda quando há itens escondidos (dica de que dá para rolar).
+  const [cortado, setCortado] = useState(false);
   // No celular, mantém o item atual (o último) visível.
   useLayoutEffect(() => {
     const el = ref.current;
-    if (el) el.scrollLeft = el.scrollWidth;
+    if (!el) return;
+    el.scrollLeft = el.scrollWidth;
+    setCortado(el.scrollLeft > 1);
   }, [items]);
+  const fade = 'linear-gradient(90deg, transparent, black 28px)';
   return (
-    <nav ref={ref} aria-label="Você está em" className={cn('-mx-1 overflow-x-auto scrollbar-none', className)}>
+    <nav
+      ref={ref}
+      aria-label="Você está em"
+      onScroll={(e) => setCortado(e.currentTarget.scrollLeft > 1)}
+      className={cn('-mx-1 overflow-x-auto scrollbar-none', className)}
+      style={cortado ? { maskImage: fade, WebkitMaskImage: fade } : undefined}
+    >
       <ol className="flex w-max items-center gap-0.5 px-1 text-[13px]">
         {items.map((c, i) => {
           const ultimo = i === items.length - 1;

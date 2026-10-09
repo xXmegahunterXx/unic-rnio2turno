@@ -762,7 +762,7 @@ function LayoutDemo() {
         </Card>
       </div>
       <div className="mt-4 text-[13px] text-fg-muted">
-        Veja também <Link to="/kit/viz" className="font-medium text-fg underline decoration-line underline-offset-4 hover:text-brand-2">/kit/viz</Link> (mapas, gráfico e mosaico).
+        Veja também <Link to="/kit/viz" className="font-medium text-fg underline decoration-line underline-offset-4 hover:text-brand-fg">/kit/viz</Link> (mapas, gráfico e mosaico).
       </div>
     </Section>
   );

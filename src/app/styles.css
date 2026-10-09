@@ -12,6 +12,12 @@
  * Paleta neutra de propósito: nenhum lado usa vermelho, verde-amarelo ou azul partidário.
  * Candidatos recebem slots por ordem do número na urna: A = turquesa, B = âmbar (par seguro para daltonismo).
  * Valores em "R G B" para uso com rgb(var(--x) / alpha).
+ *
+ * Contraste (WCAG 2.1, conferido nos dois temas):
+ *  - `*-fg` (brand-fg, cand-a-fg, cand-b-fg, ok-fg, alert-fg) = cor para TEXTO pequeno: ≥ 4,5:1 sobre
+ *    surface/surface-2 e sobre o próprio fundo suave (`bg-x/15`). Use `text-cand-a-fg`, nunca `text-cand-a`, em texto corrido.
+ *  - `cand-a`/`cand-b` puros: preenchimentos e números grandes (≥ 24 px): ≥ 3:1.
+ *  - `fg-subtle` ≥ 4,5:1 sobre surface e surface-2; `brand`/`brand-deep` aceitam texto branco (≥ 4,5:1).
  */
 :root,
 :root[data-theme='dark'] {
@@ -22,21 +28,27 @@
   --surface-3: 34 34 50;
   --fg: 244 244 250;
   --fg-muted: 168 168 190;
-  --fg-subtle: 112 112 136;
+  --fg-subtle: 130 130 154; /* ≥ 4,5:1 sobre surface e surface-2 */
   --line: 255 255 255;
   --line-alpha: 0.08;
-  --brand: 124 92 255; /* violeta elétrico */
+  --brand: 120 88 255; /* violeta elétrico (texto branco por cima ≥ 4,5:1) */
   --brand-2: 196 168 255; /* lilás */
+  --brand-deep: 150 78 240; /* fim do gradiente dos botões (texto branco ≥ 4,5:1) */
   --brand-ink: 255 255 255;
+  --brand-fg: 196 168 255; /* texto na cor da marca (AA) */
   --cand-a: 25 194 176; /* turquesa */
   --cand-a-soft: 126 232 220;
   --cand-a-ink: 4 40 36;
+  --cand-a-fg: 25 194 176; /* texto na cor do slot (AA) */
   --cand-b: 245 165 36; /* âmbar */
   --cand-b-soft: 255 212 138;
   --cand-b-ink: 48 28 0;
+  --cand-b-fg: 245 165 36;
   --cand-outros: 139 139 163;
   --ok: 52 211 153;
+  --ok-fg: 52 211 153;
   --alert: 251 113 133;
+  --alert-fg: 251 113 133;
   --pending: 58 58 80; /* território ainda não apurado */
 }
 
@@ -48,21 +60,27 @@
   --surface-3: 228 228 239;
   --fg: 14 14 26;
   --fg-muted: 82 82 104;
-  --fg-subtle: 128 128 150;
+  --fg-subtle: 104 104 126;
   --line: 14 14 26;
   --line-alpha: 0.1;
   --brand: 98 64 240;
   --brand-2: 150 112 255;
+  --brand-deep: 124 58 237;
   --brand-ink: 255 255 255;
+  --brand-fg: 88 56 224;
   --cand-a: 10 150 136;
   --cand-a-soft: 160 228 220;
   --cand-a-ink: 255 255 255;
-  --cand-b: 214 132 8;
+  --cand-a-fg: 6 112 103;
+  --cand-b: 200 120 6;
   --cand-b-soft: 255 214 150;
   --cand-b-ink: 255 255 255;
+  --cand-b-fg: 138 84 8;
   --cand-outros: 120 120 145;
   --ok: 16 160 110;
+  --ok-fg: 8 122 84;
   --alert: 225 60 90;
+  --alert-fg: 190 34 66;
   --pending: 214 214 228;
 }
 
@@ -75,21 +93,27 @@
     --surface-3: 228 228 239;
     --fg: 14 14 26;
     --fg-muted: 82 82 104;
-    --fg-subtle: 128 128 150;
+    --fg-subtle: 104 104 126;
     --line: 14 14 26;
     --line-alpha: 0.1;
     --brand: 98 64 240;
     --brand-2: 150 112 255;
+    --brand-deep: 124 58 237;
     --brand-ink: 255 255 255;
+    --brand-fg: 88 56 224;
     --cand-a: 10 150 136;
     --cand-a-soft: 160 228 220;
     --cand-a-ink: 255 255 255;
-    --cand-b: 214 132 8;
+    --cand-a-fg: 6 112 103;
+    --cand-b: 200 120 6;
     --cand-b-soft: 255 214 150;
     --cand-b-ink: 255 255 255;
+    --cand-b-fg: 138 84 8;
     --cand-outros: 120 120 145;
     --ok: 16 160 110;
+    --ok-fg: 8 122 84;
     --alert: 225 60 90;
+    --alert-fg: 190 34 66;
     --pending: 214 214 228;
   }
 }
@@ -121,15 +145,7 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum', 'cv11';
   }
-  .border-line {
-    border-color: rgb(var(--line) / var(--line-alpha));
-  }
-  .divide-line > * + * {
-    border-color: rgb(var(--line) / var(--line-alpha));
-  }
-  .bg-line {
-    background-color: rgb(var(--line) / var(--line-alpha));
-  }
+  /* `border-line`, `bg-line`, `divide-line`, `ring-line` vêm do tailwind.config (alfa = --line-alpha × modificador). */
   .glass {
     background: rgb(var(--surface) / 0.72);
     backdrop-filter: blur(18px) saturate(140%);

@@ -56,6 +56,10 @@ export const CC = {
 } as const;
 
 const OG_TTL_MS = 30_000;
+/** Imagem vencida da mesma fonte ainda serve (enquanto a nova é gerada) por até 5 min. */
+const OG_STALE_MS = 5 * 60_000;
+const OG_CACHE_MAX = 128;
+const OG_FILA_MAX = 16;
 
 type Ctx = Context<{ Bindings: HttpBindings }>;
 
@@ -96,7 +100,9 @@ export function createApp(deps: AppDeps) {
   const nomes = new Map<string, string>();
   for (const [uf, d] of Object.entries(deps.dataset.ufs)) for (const m of d?.municipios ?? []) nomes.set(`${uf}|${m.cod}`, m.nome);
   const nomeMunicipio = (uf: UF, cod: string) => nomes.get(`${uf}|${cod}`);
-  const ogCache = new Map<string, { em: number; chave: string; p: Promise<Buffer> }>();
+  const ogCache = new Map<string, { png: Buffer | null; em: number; sub: string; pendente: Promise<Buffer> | null }>();
+  let ogFila: Promise<unknown> = Promise.resolve();
+  let ogNaFila = 0;
   let ogTeste: Promise<Buffer> | null = null;
 
   // ---- utilidades --------------------------------------------------------------------------------
@@ -283,6 +289,39 @@ export function createApp(deps: AppDeps) {
   });
 
   // ---- OG images ---------------------------------------------------------------------------------
+  /**
+   * Renderização serial (satori ocupa a thread principal ~0,2–0,3 s por imagem): uma por vez, no máximo
+   * OG_FILA_MAX na fila. Imagem vencida (> 30 s) da MESMA fonte é servida na hora enquanto a nova é gerada
+   * em segundo plano; troca de fonte (real ↔ simulação) sempre espera a imagem nova (a marca "SIMULAÇÃO"
+   * nunca pode faltar nem sobrar).
+   */
+  const renderOg = (chave: string, sub: string, montar: () => Promise<Buffer>): Promise<Buffer> => {
+    let e = ogCache.get(chave);
+    if (!e) {
+      e = { png: null, em: 0, sub: '', pendente: null };
+      ogCache.set(chave, e);
+      while (ogCache.size > OG_CACHE_MAX) ogCache.delete(ogCache.keys().next().value as string);
+    }
+    if (e.pendente) return e.pendente;
+    if (ogNaFila >= OG_FILA_MAX) throw new ErroHttp(503, 'Gerando muitas imagens agora; tente de novo em instantes.', { 'retry-after': '10' });
+    const ent = e;
+    ogNaFila++;
+    const p: Promise<Buffer> = ogFila.catch(() => undefined).then(async () => {
+      try {
+        const png = await montar();
+        Object.assign(ent, { png, em: now(), sub });
+        return png;
+      } finally {
+        ogNaFila--;
+        ent.pendente = null;
+      }
+    });
+    ogFila = p;
+    ent.pendente = p;
+    p.catch((err) => log.erro(`Falha ao gerar a imagem OG ${chave}`, err));
+    return p;
+  };
+
   app.get('/api/og/apuracao.png', async (c) => {
     const race = parseRace(c.req.query('race') || 'pres');
     const r = dados.race(race);
@@ -290,36 +329,48 @@ export function createApp(deps: AppDeps) {
     const uf = ufQ ? parseUf(ufQ) : undefined;
     if (uf && !r.ufs.includes(uf)) throw new NotFoundError(`A UF ${uf} não participa da corrida ${r.id}.`);
     const st = dados.status();
-    const agora = now();
     const chave = `${r.id}|${uf ?? 'br'}`;
     const sub = `${st.versao}|${st.fonte}`;
-    let e = ogCache.get(chave);
-    if (!e || e.chave !== sub || agora - e.em >= OG_TTL_MS) {
-      const p = (async () => {
-        const t0 = perf();
-        const snap = uf ? await dados.uf(r.id, uf) : await dados.nacional(r.id);
-        const resumo = snap.resumo;
-        const simulacao = st.simulacao && r.turno === 2;
-        const fonteTse = dados.fonteDe(r.id) === 'tse';
-        const png = await renderPng(
-          layoutPlacar({
-            race: races.get(snap.race) ?? r,
-            uf,
-            resumo,
-            simulacao,
-            horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
-            pre: r.turno === 2 && resumo.secoesTotalizadas === 0,
-          }),
-        );
-        log.info(`OG ${r.id}${uf ? `/${uf}` : ''} renderizada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB)`);
-        return png;
-      })();
-      e = { em: agora, chave: sub, p };
-      ogCache.set(chave, e);
-      p.catch(() => ogCache.delete(chave));
+    const montar = async () => {
+      const t0 = perf();
+      const snap = uf ? await dados.uf(r.id, uf) : await dados.nacional(r.id);
+      const resumo = snap.resumo;
+      const simulacao = dados.status().simulacao && r.turno === 2;
+      const fonteTse = dados.fonteDe(r.id) === 'tse';
+      const png = await renderPng(
+        layoutPlacar({
+          race: races.get(snap.race) ?? r,
+          uf,
+          resumo,
+          simulacao,
+          horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
+          pre: r.turno === 2 && resumo.secoesTotalizadas === 0,
+        }),
+      );
+      log.info(`OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB)`);
+      return png;
+    };
+
+    const e = ogCache.get(chave);
+    const agora = now();
+    const mesmaFonte = !!e?.png && e.sub.split('|')[1] === st.fonte;
+    let png: Buffer;
+    let em: number;
+    let deQual: string;
+    if (e?.png && e.sub === sub && agora - e.em < OG_TTL_MS) {
+      [png, em, deQual] = [e.png, e.em, e.sub]; // fresca
+    } else if (e?.png && mesmaFonte && agora - e.em < OG_STALE_MS) {
+      [png, em, deQual] = [e.png, e.em, e.sub]; // vencida: serve já e renova em segundo plano
+      try {
+        void renderOg(chave, sub, montar).catch(() => undefined);
+      } catch {
+        /* fila cheia: segue com a vencida */
+      }
+    } else {
+      png = await renderOg(chave, sub, montar);
+      [em, deQual] = [ogCache.get(chave)?.em ?? agora, sub];
     }
-    const png = await e.p;
-    const etag = etagFraco('og', hashCurto(chave), st.versao, e.em.toString(36));
+    const etag = etagFraco('og', hashCurto(chave), hashCurto(deQual), em.toString(36));
     const headers = { 'content-type': 'image/png', 'cache-control': CC.og, etag, 'access-control-allow-origin': '*' };
     if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
     return responder(c, png, 200, headers);
@@ -484,7 +535,8 @@ export function createApp(deps: AppDeps) {
     const r = metricas.fecharMinuto();
     if (r.requisicoes === 0) return null;
     return (
-      `Último minuto: ${r.requisicoes} req · p50 ${r.p50.toFixed(1)} ms · p95 ${r.p95.toFixed(1)} ms · p99 ${r.p99.toFixed(1)} ms` +
+      `Último minuto: ${r.requisicoes} req (${Math.round(r.requisicoes / 60)}/s) · processamento p50 ${r.p50.toFixed(2)} ms · ` +
+      `p95 ${r.p95.toFixed(2)} ms · p99 ${r.p99.toFixed(2)} ms · máx ${r.max.toFixed(0)} ms` +
       ` · cache ${(r.cacheHit * 100).toFixed(0)}% · 304: ${r.respostas304} · 5xx: ${r.erros5xx}` +
       ` · clientes ~${metricas.clientes.estimar()}`
     );

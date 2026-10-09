@@ -56,7 +56,7 @@ export function ApuracaoProgress({ resumo, variant = 'default', className }: Apu
           </span>
           {encerrada ? (
             <span className="inline-flex items-center gap-1 font-medium text-fg-muted">
-              <Icon name="check-circulo" size={13} className="text-ok" /> Encerrada
+              <Icon name="check-circulo" size={13} className="text-ok-fg" /> Encerrada
             </span>
           ) : hora ? (
             <span className="num text-fg-muted">{hora}</span>
@@ -82,7 +82,7 @@ export function ApuracaoProgress({ resumo, variant = 'default', className }: Apu
       <div className="mt-2.5 flex items-center gap-1.5 text-[12.5px] text-fg-muted">
         {encerrada ? (
           <>
-            <Icon name="check-circulo" size={14} className="text-ok" />
+            <Icon name="check-circulo" size={14} className="text-ok-fg" />
             <span>
               Totalização concluída{hora ? <> às <span className="num">{hora}</span></> : null}
             </span>

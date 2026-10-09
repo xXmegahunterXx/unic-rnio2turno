@@ -36,12 +36,12 @@ const ICONE: Record<TipoEvento, IconName> = {
 };
 
 function tomEvento(e: FeedEvent, race?: Race) {
-  if (e.tipo === 'aviso') return 'bg-alert/15 text-alert';
+  if (e.tipo === 'aviso') return 'bg-alert/15 text-alert-fg';
   if (e.candidato !== undefined && race?.candidatos[e.candidato]) {
     const s = corSlot(race.candidatos[e.candidato].cor);
     return cn(s.bgSoft, s.text);
   }
-  if (e.tipo === 'uf-encerrada') return 'bg-ok/15 text-ok';
+  if (e.tipo === 'uf-encerrada') return 'bg-ok/15 text-ok-fg';
   return 'bg-surface-3 text-fg-muted';
 }
 
@@ -74,7 +74,7 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
                 transition={{ type: 'spring', stiffness: 380, damping: 34 }}
                 className={cn(
                   'flex w-[78%] max-w-[300px] shrink-0 snap-start items-start gap-2.5 rounded-2xl border border-line bg-surface p-3',
-                  i === 0 && 'border-[color:rgb(var(--brand)/0.35)]',
+                  i === 0 && 'border-brand/35',
                 )}
               >
                 <span className={cn('mt-px inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', tomEvento(e, race))}>
@@ -97,7 +97,7 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
 
   return (
     <ol aria-label="Acontecimentos da apuração" className={cn('relative', className)}>
-      <span aria-hidden className="absolute bottom-3 left-[15px] top-3 w-px bg-[rgb(var(--line)/var(--line-alpha))]" />
+      <span aria-hidden className="absolute bottom-3 left-[15px] top-3 w-px bg-line" />
       <AnimatePresence initial={false}>
         {lista.map((e) => (
           <motion.li

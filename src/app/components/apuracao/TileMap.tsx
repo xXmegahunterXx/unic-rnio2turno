@@ -12,7 +12,7 @@ import { fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { rgbSlot, slotDe } from '@/app/lib/raceUi';
 import { valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapModes';
-import { inkToken, useTokenColors } from './mapColors';
+import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { hachuraStyle } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
 import { useClickOutside, useElementSize } from './MapHooks';

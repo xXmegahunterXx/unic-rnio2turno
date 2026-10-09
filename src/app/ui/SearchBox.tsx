@@ -39,7 +39,7 @@ export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function S
         onChange={(e) => onChange(e.target.value)}
         className={cn(
           'w-full border border-line bg-surface-2 pr-10 text-fg placeholder:text-fg-subtle',
-          'transition-[border-color,background-color,box-shadow] focus:border-[color:rgb(var(--brand)/0.6)] focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand/15',
+          'transition-[border-color,background-color,box-shadow] focus:border-brand/60 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand/15',
           '[&::-webkit-search-cancel-button]:appearance-none',
           alturas[size],
         )}
@@ -208,7 +208,7 @@ export function Combobox({
           onKeyDown={onKeyDown}
           className={cn(
             'w-full border border-line bg-surface-2 pr-10 text-fg placeholder:text-fg-subtle',
-            'transition-[border-color,background-color,box-shadow] focus:border-[color:rgb(var(--brand)/0.6)] focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand/15',
+            'transition-[border-color,background-color,box-shadow] focus:border-brand/60 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand/15',
             'disabled:cursor-not-allowed disabled:opacity-50',
             h,
           )}
@@ -257,7 +257,7 @@ export function Combobox({
                   )}
                 </span>
                 {o.hint ? <span className="num shrink-0 text-xs text-fg-muted">{o.hint}</span> : null}
-                {selecionado?.value === o.value ? <Icon name="check" size={16} className="shrink-0 text-brand-2" /> : null}
+                {selecionado?.value === o.value ? <Icon name="check" size={16} className="shrink-0 text-brand-fg" /> : null}
               </li>
             ))
           )}

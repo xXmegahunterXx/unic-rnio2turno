@@ -25,7 +25,7 @@ import { decodeFaixas, pctTotalizadas } from '@/shared/calc';
 import { fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { FILL_EMPATE, FILL_NEUTRO, FILL_PENDENTE, MARGEM_ROTULOS, fillMosaico, fillMargem } from '@/app/lib/raceUi';
-import { resolveFill, rgbCss, useTokenColors, type TokenColors } from './mapColors';
+import { resolveFill, rgbCss, useTokenColors, type TokenColors } from '@/app/lib/tokens';
 import { cellPos, hitMosaico, layoutMosaico, type MosaicBlock, type MosaicLayout } from './MosaicLayout';
 import { useClickOutside, useElementSize, prefersReducedMotion } from './MapHooks';
 
