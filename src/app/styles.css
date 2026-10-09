@@ -31,6 +31,7 @@
   --fg-subtle: 130 130 154; /* ≥ 4,5:1 sobre surface e surface-2 */
   --line: 255 255 255;
   --line-alpha: 0.08;
+  --shadow-alpha: 0.55;
   --brand: 120 88 255; /* violeta elétrico (texto branco por cima ≥ 4,5:1) */
   --brand-2: 196 168 255; /* lilás */
   --brand-deep: 150 78 240; /* fim do gradiente dos botões (texto branco ≥ 4,5:1) */
@@ -63,6 +64,7 @@
   --fg-subtle: 104 104 126;
   --line: 14 14 26;
   --line-alpha: 0.1;
+  --shadow-alpha: 0.16;
   --brand: 98 64 240;
   --brand-2: 150 112 255;
   --brand-deep: 124 58 237;
@@ -96,6 +98,7 @@
     --fg-subtle: 104 104 126;
     --line: 14 14 26;
     --line-alpha: 0.1;
+    --shadow-alpha: 0.16;
     --brand: 98 64 240;
     --brand-2: 150 112 255;
     --brand-deep: 124 58 237;

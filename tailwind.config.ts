@@ -32,7 +32,8 @@ export default {
       },
       borderRadius: { xl: '14px', '2xl': '20px', '3xl': '28px' },
       boxShadow: {
-        card: '0 1px 0 0 rgb(var(--line) / 0.06) inset, 0 20px 40px -24px rgb(0 0 0 / 0.55)',
+        // Sombra dos cartões: forte no escuro, suave no claro (--shadow-alpha por tema).
+        card: '0 1px 0 0 rgb(var(--line) / 0.06) inset, 0 20px 40px -24px rgb(0 0 0 / var(--shadow-alpha, 0.55)), 0 1px 2px 0 rgb(0 0 0 / calc(var(--shadow-alpha, 0.55) * 0.25))',
         glow: '0 0 0 1px rgb(var(--brand) / 0.35), 0 10px 40px -10px rgb(var(--brand) / 0.55)',
       },
       backgroundImage: {
