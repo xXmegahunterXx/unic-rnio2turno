@@ -7,13 +7,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { getClient } from '@/app/data/client';
+import { useAnonimizado, useRace, useRaces } from '@/app/data/hooks';
 import { LogoMark } from '@/app/components/layout/Logo';
 import { Button, Icon, Spinner, ThemeToggle } from '@/app/ui';
 import {
   AdminProvider,
   CHAVE_SNAPSHOT,
   useExecutor,
-  useMetaAdmin,
   useNacionalAdmin,
   useSnapshotAdmin,
   type AdminCtx,
@@ -81,7 +81,10 @@ function Painel({
   onSair: () => void;
 }) {
   const qc = useQueryClient();
-  const meta = useMetaAdmin();
+  // Corridas SEMPRE via useRaces/useRace: "Candidato A/B" quando a simulação está anonimizada.
+  const races = useRaces();
+  const pres = useRace('pres');
+  const anon = useAnonimizado();
   const nacional = useNacionalAdmin('pres');
   const exec = useExecutor(onSessaoExpirada);
   const { confirmar, elemento: dialogo } = useConfirmacao();
@@ -115,13 +118,13 @@ function Painel({
     onSair();
   }, [qc, onSair]);
 
-  const pres = meta.data?.races.find((r) => r.id === 'pres');
   const ctx: AdminCtx = useMemo(
     () => ({
       dados,
       snap: dados.snap,
-      meta: meta.data,
+      races,
       pres,
+      anon,
       nacional: nacional.data,
       offline,
       run: exec.run,
@@ -133,7 +136,7 @@ function Painel({
       sair: () => void sair(),
       abrirAtalhos: () => setAtalhos(true),
     }),
-    [dados, meta.data, pres, nacional.data, offline, exec, confirmar, secao, irPara, sair],
+    [dados, races, pres, anon, nacional.data, offline, exec, confirmar, secao, irPara, sair],
   );
 
   return (

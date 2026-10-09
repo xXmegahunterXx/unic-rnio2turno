@@ -10,9 +10,9 @@ import { margem, pctTotalizadas } from '@/shared/calc';
 import { fmtPct, fmtPP } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
-import { Badge, Button, Segmented } from '@/app/ui';
+import { Button, Segmented } from '@/app/ui';
 import { useAdmin } from './dados';
-import { CabecalhoSecao, Callout, Cronometro, Painel, Passo, textoVies, ViesSlider } from './kit';
+import { CabecalhoSecao, Callout, Cronometro, NotaNomesOcultos, Painel, Passo, textoVies, ViesSlider } from './kit';
 import { fmtMs } from './rotulos';
 
 const TODAS: UF[] = [...UFS, 'ZZ'];
@@ -20,7 +20,7 @@ const REGIOES: Regiao[] = ['N', 'NE', 'CO', 'SE', 'S', 'EX'];
 type Filtro = 'todas' | 'ajustadas' | Regiao;
 
 export function SecaoEstados() {
-  const { snap, nacional, pres, run, pendente, pendenteDesde, confirmar } = useAdmin();
+  const { snap, nacional, pres, run, pendente, pendenteDesde, confirmar, anon, irPara } = useAdmin();
   const cen = snap.state.cenario;
   const [vies, setVies] = useState<Partial<Record<UF, number>>>({});
   const [atraso, setAtraso] = useState<Partial<Record<UF, number>>>({});
@@ -95,6 +95,7 @@ export function SecaoEstados() {
         titulo="Estados"
         icone="mapa"
         descricao="Situação de cada UF agora (Presidente) e ajustes do cenário por UF. Edite à vontade: nada muda até aplicar."
+        acoes={anon ? <NotaNomesOcultos onClick={() => irPara('fonte')} /> : undefined}
       />
       <Callout tom="info" className="mb-5">
         O <strong className="font-semibold text-fg">viés</strong> desloca a preferência só naquela UF (na corrida para Presidente) e,
@@ -114,7 +115,7 @@ export function SecaoEstados() {
 
         {/* cabeçalho (desktop) */}
         <div
-          className="hidden items-center gap-4 border-b border-line bg-surface-2/50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted lg:grid lg:grid-cols-[minmax(150px,1.25fr)_104px_minmax(150px,1fr)_minmax(220px,1.5fr)_128px]"
+          className="hidden items-center gap-4 border-b border-line bg-surface-2/50 px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted xl:grid xl:grid-cols-[minmax(150px,1.25fr)_96px_minmax(140px,1fr)_minmax(250px,1.6fr)_128px]"
           aria-hidden
         >
           <span>Estado</span>
@@ -144,23 +145,24 @@ export function SecaoEstados() {
           ) : null}
         </ul>
 
-        <div className="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 flex flex-wrap items-center justify-end gap-2 rounded-b-2xl border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:px-5 lg:bottom-0">
-          <span className="mr-auto text-[13px] text-fg-muted">
+        <div className="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 flex items-center justify-end gap-2 rounded-b-2xl border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:px-5 lg:bottom-0">
+          <span className="mr-auto min-w-0 truncate text-[12.5px] text-fg-muted sm:text-[13px]" aria-live="polite">
             {alteradas.length ? (
               <>
-                <span className="num font-semibold text-brand-fg">{alteradas.length}</span>{' '}
-                {alteradas.length === 1 ? 'UF alterada' : 'UFs alteradas'} · não aplicado
+                <span className="num font-semibold text-brand-fg">{alteradas.length}</span> {alteradas.length === 1 ? 'alterada' : 'alteradas'}
+                <span className="hidden sm:inline"> · não aplicado</span>
               </>
             ) : ajustadas.length ? (
               <>
-                <span className="num font-semibold text-fg">{ajustadas.length}</span> {ajustadas.length === 1 ? 'UF com ajuste' : 'UFs com ajuste'} no ar
+                <span className="num font-semibold text-fg">{ajustadas.length}</span> {ajustadas.length === 1 ? 'UF ajustada' : 'UFs ajustadas'}
+                <span className="hidden sm:inline"> no ar</span>
               </>
             ) : (
               'Sem ajustes por UF'
             )}
           </span>
-          {ajustadas.length ? (
-            <Button variant="ghost" icon="reset" onClick={zerar} disabled={ocupado}>
+          {ajustadas.length && !alteradas.length ? (
+            <Button variant="ghost" icon="reset" onClick={zerar} disabled={ocupado} className="shrink-0 px-3 sm:px-4">
               Zerar
             </Button>
           ) : null}
@@ -172,17 +174,28 @@ export function SecaoEstados() {
                 setAtraso({});
               }}
               disabled={ocupado}
+              className="shrink-0 px-3 sm:px-4"
             >
               Descartar
             </Button>
           ) : null}
-          <Button variant="primary" icon="check" onClick={aplicar} disabled={!alteradas.length || ocupado} loading={ocupado}>
+          <Button
+            variant="primary"
+            icon="check"
+            onClick={aplicar}
+            disabled={!alteradas.length || ocupado}
+            loading={ocupado}
+            className="shrink-0 px-3.5 sm:px-4"
+          >
             {ocupado ? (
               <>
-                Reconstruindo… <Cronometro desde={pendenteDesde('estados')} />
+                <span className="hidden sm:inline">Reconstruindo…</span> <Cronometro desde={pendenteDesde('estados')} />
               </>
             ) : (
-              `Aplicar em lote${alteradas.length ? ` (${alteradas.length})` : ''}`
+              <>
+                Aplicar<span className="hidden sm:inline"> em lote</span>
+                {alteradas.length ? <span className="num"> ({alteradas.length})</span> : null}
+              </>
             )}
           </Button>
         </div>
@@ -214,49 +227,63 @@ function LinhaUf({
 }) {
   const pct = resumo ? pctTotalizadas(resumo) : 0;
   const m = resumo ? margem(resumo) : null;
+  // "Candidato A/B" quando anonimizado; com nomes reais, só o primeiro nome (cabe ao lado do controle)
+  const anonimos = nomes.every((n) => /^Candidato [AB]$/.test(n));
+  const curtos = (anonimos ? ['A', 'B'] : nomes.map((n) => n.split(' ')[0])) as [string, string];
   const lider = m && m.lider !== null ? m.lider : null;
   const slot = lider !== null ? corSlot(cores[lider] ?? 'outros') : null;
+  const sublinha = (
+    <>
+      <span className="num">{fmtPct(pct, 1)}</span> apurado
+      {lider !== null && m ? (
+        <>
+          {' · '}
+          <span className={cn('font-medium', slot?.text)}>{nomes[lider]}</span> <span className="num">{fmtPP(m.pp)}</span>
+        </>
+      ) : null}
+    </>
+  );
   return (
     <li
       className={cn(
-        'relative grid grid-cols-1 gap-3 border-b border-line px-4 py-3.5 transition-colors sm:px-5',
-        'lg:grid-cols-[minmax(150px,1.25fr)_104px_minmax(150px,1fr)_minmax(220px,1.5fr)_128px] lg:items-center lg:gap-4 lg:py-2.5',
+        'relative grid grid-cols-1 gap-2.5 border-b border-line px-4 py-3.5 transition-colors sm:px-5',
+        'md:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)_auto] md:items-center md:gap-6',
+        'xl:grid-cols-[minmax(150px,1.25fr)_96px_minmax(140px,1fr)_minmax(250px,1.6fr)_128px] xl:gap-4 xl:py-2.5',
         alterada && 'bg-brand/[0.06]',
       )}
     >
       {alterada ? <span aria-hidden className="absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full bg-brand" /> : null}
-      {/* estado + (celular) apurado/líder */}
-      <div className="flex min-w-0 items-center gap-3">
-        <span className="inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 font-mono text-[12.5px] font-semibold text-fg">
+      {/* estado + (abaixo de xl) apurado/líder; no celular, o atraso fica na mesma linha do nome */}
+      <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 md:flex">
+        <span className="row-span-2 inline-flex h-8 w-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 font-mono text-[12.5px] font-semibold text-fg">
           {uf}
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[14px] font-medium text-fg">{UF_NOMES[uf]}</p>
-          <p className="truncate text-[12px] text-fg-muted lg:hidden">
-            <span className="num">{fmtPct(pct, 1)}</span> apurado
-            {lider !== null && m ? (
-              <>
-                {' · '}
-                <span className={cn('font-medium', slot?.text)}>{nomes[lider]}</span> <span className="num">{fmtPP(m.pp)}</span>
-              </>
-            ) : null}
-          </p>
+        <div className="min-w-0 md:flex-1">
+          <p className="truncate text-[14px] font-medium leading-snug text-fg">{UF_NOMES[uf]}</p>
+          <p className="hidden truncate text-[12px] leading-snug text-fg-muted md:block xl:hidden">{sublinha}</p>
         </div>
-        {alterada ? (
-          <Badge tone="brand" size="xs" className="lg:hidden">
-            editado
-          </Badge>
-        ) : null}
+        <Passo
+          valor={atraso}
+          onChange={onAtraso}
+          min={0}
+          max={600}
+          passo={5}
+          sufixo="min"
+          icone="relogio"
+          rotulo={`Atraso em ${UF_NOMES[uf]} (minutos)`}
+          className="md:hidden"
+        />
+        <p className="col-span-2 col-start-2 truncate text-[12px] leading-snug text-fg-muted md:hidden">{sublinha}</p>
       </div>
       {/* apurado */}
-      <div className="hidden min-w-0 lg:block">
+      <div className="hidden min-w-0 xl:block">
         <span className="num text-[13.5px] font-semibold text-fg">{fmtPct(pct, 1)}</span>
         <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
           <span className="block h-full rounded-full bg-brand-grad transition-[width] duration-700" style={{ width: `${pct}%` }} />
         </span>
       </div>
       {/* líder */}
-      <div className="hidden min-w-0 lg:block">
+      <div className="hidden min-w-0 xl:block">
         {lider !== null && m ? (
           <p className="flex min-w-0 items-baseline gap-2 text-[13.5px]">
             <span className={cn('inline-flex min-w-0 items-center gap-1.5 font-medium', slot?.text)}>
@@ -272,19 +299,18 @@ function LinhaUf({
       {/* viés */}
       <div className="min-w-0">
         <div className="flex items-center gap-3">
-          <span className="w-14 shrink-0 truncate text-right text-[11.5px] font-medium text-cand-a-fg" aria-hidden>
-            {nomes[0].split(' ')[0]}
+          <span className={cn('shrink-0 truncate text-right text-[11.5px] font-semibold text-cand-a-fg', anonimos ? 'w-7' : 'w-[4.75rem]')} aria-hidden>
+            ← {curtos[0]}
           </span>
           <ViesSlider valor={vies} onChange={onVies} nomes={nomes} rotulo={`Viés em ${UF_NOMES[uf]}`} />
-          <span className="w-14 shrink-0 truncate text-[11.5px] font-medium text-cand-b-fg" aria-hidden>
-            {nomes[1].split(' ')[0]}
+          <span className={cn('shrink-0 truncate text-[11.5px] font-semibold text-cand-b-fg', anonimos ? 'w-7' : 'w-[4.75rem]')} aria-hidden>
+            {curtos[1]} →
           </span>
         </div>
         <p className={cn('num mt-0.5 text-center text-[11.5px]', vies ? 'font-semibold text-fg' : 'text-fg-subtle')}>{textoVies(vies, nomes)}</p>
       </div>
       {/* atraso */}
-      <div className="flex items-center justify-between gap-3 lg:justify-end">
-        <span className="text-[12.5px] text-fg-muted lg:hidden">Atraso na totalização</span>
+      <div className="hidden items-center justify-end md:flex">
         <Passo valor={atraso} onChange={onAtraso} min={0} max={600} passo={5} sufixo="min" rotulo={`Atraso em ${UF_NOMES[uf]} (minutos)`} />
       </div>
     </li>

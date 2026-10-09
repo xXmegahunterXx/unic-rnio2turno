@@ -12,7 +12,7 @@ import type { UF } from '@/shared/types';
 import { UFS } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { decodeFaixas, encodeFaixas } from '@/shared/calc';
-import { fmtCompact, fmtInt } from '@/shared/format';
+import { fmtInt } from '@/shared/format';
 import { useMunicipio, useUf, useZona } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { Button, ButtonLink, Combobox, Icon, SearchBox, Skeleton, type ComboOption } from '@/app/ui';
@@ -577,5 +577,3 @@ function Campo({ rotulo, valor, destaque }: { rotulo: string; valor: string; des
     </div>
   );
 }
-
-export { fmtCompact as _fmtCompact };

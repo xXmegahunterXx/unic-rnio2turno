@@ -135,12 +135,15 @@ export function EstadoAoVivo({ compacto, className }: { compacto?: boolean; clas
       {!compacto && sim && st.relogio.rodando && !st.congelado ? (
         <span className="num font-semibold tracking-[0.04em] text-fg-muted">· {fmtVel(st.relogio.velocidade)}</span>
       ) : null}
+      {!compacto && sim && (!st.relogio.rodando || st.congelado) ? (
+        <span className="hidden font-semibold tracking-[0.08em] text-fg-subtle min-[400px]:inline lg:hidden xl:inline">· {FASE_ROTULO[fase]}</span>
+      ) : null}
     </span>
   );
 }
 
-/** % de seções da corrida 'pres' + selo de eleito. */
-export function ProgressoPres({ compacto, className }: { compacto?: boolean; className?: string }) {
+/** % de seções da corrida 'pres' + selo de eleito. `bloco`: largura toda (painel do celular). */
+export function ProgressoPres({ compacto, bloco, className }: { compacto?: boolean; bloco?: boolean; className?: string }) {
   const { nacional, pres, snap } = useAdmin();
   const r = nacional?.resumo;
   const pct = r ? pctTotalizadas(r) : 0;
@@ -148,31 +151,60 @@ export function ProgressoPres({ compacto, className }: { compacto?: boolean; cla
   const preEleicao = snap.state.fonte === 'pre';
   if (compacto) {
     return (
-      <span className={cn('num text-[12px] font-medium text-fg-muted', className)}>
-        {preEleicao ? '1º turno no site' : `${fmtPct(pct, pct > 0 && pct < 100 ? 2 : 0)} das seções`}
+      <span className={cn('num whitespace-nowrap text-[12px] font-medium text-fg-muted', className)}>
+        {preEleicao ? '1º turno no site' : `${fmtPct(pct)} seções`}
       </span>
+    );
+  }
+  const barra = (
+    <span className={cn('relative h-1.5 overflow-hidden rounded-full bg-surface-3', bloco ? 'block w-full' : 'hidden w-28 xl:block 2xl:w-36')} aria-hidden>
+      <span
+        className={cn('absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out', eleito ? corSlot(eleito.cor).bg : 'bg-brand-grad')}
+        style={{ width: `${preEleicao ? 0 : pct}%` }}
+      />
+    </span>
+  );
+  const selo = eleito ? (
+    <Badge size="xs" tone={eleito.cor === 'a' ? 'cand-a' : 'cand-b'} icon="selo" caps className="whitespace-nowrap" title={`${eleito.nomeUrna} eleito`}>
+      {bloco ? (
+        `${eleito.nomeUrna} eleito`
+      ) : (
+        <>
+          <span className="xl:hidden">Eleito</span>
+          <span className="hidden xl:inline">{eleito.nomeUrna} eleito</span>
+        </>
+      )}
+    </Badge>
+  ) : null;
+  if (bloco) {
+    return (
+      <div className={cn('min-w-0', className)}>
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <span className="block text-[11px] font-semibold uppercase leading-tight tracking-[0.1em] text-fg-muted">Seções · Presidente</span>
+            <span className="num mt-1 block font-display text-[22px] font-semibold leading-none tracking-[-0.02em] text-fg">
+              {preEleicao ? '—' : fmtPct(pct)}
+            </span>
+          </div>
+          {selo}
+        </div>
+        <div className="mt-2.5">{barra}</div>
+      </div>
     );
   }
   return (
     <div className={cn('min-w-0', className)}>
       <div className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Seções · Presidente</span>
-        {eleito ? (
-          <Badge size="xs" tone={eleito.cor === 'a' ? 'cand-a' : 'cand-b'} icon="selo" caps>
-            {eleito.nomeUrna} eleito
-          </Badge>
-        ) : null}
+        <span className="whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.1em] text-fg-muted">
+          Seções<span className="hidden xl:inline"> · Presidente</span>
+        </span>
+        {selo}
       </div>
       <div className="mt-1.5 flex items-center gap-2.5">
-        <span className="num w-[68px] font-display text-[20px] font-semibold leading-none tracking-[-0.02em] text-fg">
+        <span className="num min-w-[80px] font-display text-[20px] font-semibold leading-none tracking-[-0.02em] text-fg">
           {preEleicao ? '—' : fmtPct(pct)}
         </span>
-        <span className="relative h-1.5 w-28 overflow-hidden rounded-full bg-surface-3 xl:w-36" aria-hidden>
-          <span
-            className={cn('absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out', eleito ? corSlot(eleito.cor).bg : 'bg-brand-grad')}
-            style={{ width: `${preEleicao ? 0 : pct}%` }}
-          />
-        </span>
+        {barra}
       </div>
     </div>
   );
@@ -187,8 +219,7 @@ export function Transporte({ variante = 'barra', className }: { variante?: 'barr
   const onPrincipal = a.sim ? a.alternar : a.iniciar;
   if (variante === 'mini') {
     return (
-      <div className={cn('flex items-center gap-1', className)}>
-        <IconButton icon="reset" label="Reiniciar (volta a 16:59:30, pausado)" size="md" onClick={a.reiniciar} disabled={ocupado} />
+      <div className={cn('flex items-center', className)}>
         <button
           type="button"
           onClick={onPrincipal}
@@ -207,15 +238,32 @@ export function Transporte({ variante = 'barra', className }: { variante?: 'barr
   }
   if (variante === 'painel') {
     return (
-      <div className={cn('flex flex-wrap items-center gap-2', className)}>
-        <Button variant="outline" icon="play" onClick={a.iniciar} disabled={ocupado}>
+      <div className={cn('grid grid-cols-2 gap-2', className)}>
+        <Button
+          variant="primary"
+          size="lg"
+          icon={a.sim && a.rodando ? 'pause' : 'play'}
+          onClick={onPrincipal}
+          loading={ocupado}
+          className="col-span-2"
+        >
+          {a.sim ? (a.rodando ? 'Pausar relógio' : 'Retomar relógio') : 'Iniciar simulação'}
+        </Button>
+        <Button variant="outline" icon="play" onClick={a.iniciar} disabled={ocupado || !a.sim}>
           Iniciar
         </Button>
-        <Button variant="primary" icon={a.rodando ? 'pause' : 'play'} onClick={onPrincipal} loading={ocupado}>
-          {principal}
-        </Button>
-        <Button variant="ghost" icon="reset" onClick={a.reiniciar} disabled={ocupado}>
+        <Button variant="outline" icon="reset" onClick={a.reiniciar} disabled={ocupado}>
           Reiniciar
+        </Button>
+      </div>
+    );
+  }
+  if (!a.sim) {
+    // Pré-eleição ou TSE: o único comando de relógio que faz sentido é começar a simulação (com confirmação)
+    return (
+      <div className={cn('flex items-center gap-1.5', className)}>
+        <Button variant="primary" icon="play" onClick={a.iniciar} loading={ocupado} title="Troca a fonte para Simulação e começa às 16:59:30">
+          Iniciar simulação
         </Button>
       </div>
     );
@@ -227,15 +275,48 @@ export function Transporte({ variante = 'barra', className }: { variante?: 'barr
       </Button>
       <Button
         variant="primary"
-        icon={a.sim && a.rodando ? 'pause' : 'play'}
+        icon={a.rodando ? 'pause' : 'play'}
         onClick={onPrincipal}
         loading={ocupado}
         className="w-[118px]"
-        title={a.sim ? 'Espaço' : 'Inicia a simulação'}
+        title="Espaço"
       >
         {principal}
       </Button>
       <IconButton icon="reset" label="Reiniciar (volta a 16:59:30, pausado)" variant="ghost" size="md" onClick={a.reiniciar} disabled={ocupado} />
+    </div>
+  );
+}
+
+/** Velocidades em grade 4 × 2 (painel do celular): alvos de toque grandes, sem rolagem horizontal. */
+export function GradeVelocidade({ className }: { className?: string }) {
+  const { snap, pendente } = useAdmin();
+  const a = useAcoesRelogio();
+  const atual = snap.state.relogio.velocidade;
+  const desab = snap.state.fonte !== 'simulacao' || pendente('velocidade');
+  return (
+    <div role="radiogroup" aria-label="Velocidade da simulação" className={cn('grid grid-cols-4 gap-1.5', className)}>
+      {VELOCIDADES.map((v) => {
+        const ativo = v === atual;
+        return (
+          <button
+            key={v}
+            type="button"
+            role="radio"
+            aria-checked={ativo}
+            aria-label={`${v} vezes`}
+            disabled={desab}
+            onClick={() => !ativo && void a.velocidade(v)}
+            className={cn(
+              'num h-10 rounded-xl border text-[14px] font-semibold transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-45',
+              ativo ? 'border-brand/50 bg-brand/15 text-brand-fg' : 'border-line bg-surface-2/60 text-fg-muted hover:text-fg',
+            )}
+          >
+            {fmtVel(v)}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -261,7 +342,7 @@ export function SeletorVelocidade({ variante = 'segmentado', className }: { vari
         disabled={desab}
         onChange={(e) => void a.velocidade(Number(e.target.value))}
         className="num w-[84px]"
-        wrapperClassName={className}
+        wrapperClassName={cn('shrink-0', className)}
       />
     );
   }

@@ -302,31 +302,36 @@ export function LinhaDoTempo({ className, extra }: { className?: string; extra?:
           </svg>
         ) : null}
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2.5">
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ir para % das seções">
-          <span className="mr-1 text-[12px] font-medium text-fg-muted">Ir para</span>
-          {ATALHOS_PCT.map((p) => (
-            <Button
-              key={p}
-              size="sm"
-              variant="outline"
-              disabled={!sim || pendente('saltar')}
-              onClick={() => void run({ tipo: 'saltar-pct', pct: p }, { chave: 'saltar', sucesso: `Relógio no instante de ${p}% das seções` })}
-              className="num"
-            >
-              {p}%
-            </Button>
-          ))}
+      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-5 sm:gap-y-2.5">
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center" role="group" aria-label="Ir para % das seções">
+          <span className="text-[12px] font-medium text-fg-muted sm:mr-1">Ir para</span>
+          <div className="grid grid-cols-5 gap-1.5 sm:flex">
+            {ATALHOS_PCT.map((p) => (
+              <Button
+                key={p}
+                size="sm"
+                variant="outline"
+                disabled={!sim || pendente('saltar')}
+                onClick={() => void run({ tipo: 'saltar-pct', pct: p }, { chave: 'saltar', sucesso: `Relógio no instante de ${p}% das seções` })}
+                className="num px-2 sm:px-3"
+                aria-label={`Ir para ${p}% das seções`}
+              >
+                {p}%
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Ir para horário">
-          <span className="mr-1 text-[12px] font-medium text-fg-muted">Horário</span>
-          {ATALHOS_HORA.map(({ h, t }) => (
-            <Button key={h} size="sm" variant="outline" disabled={!sim || pendente('saltar')} onClick={() => void comitar(t)} className="num">
-              {String(h).padStart(2, '0')}:00
-            </Button>
-          ))}
+        <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center" role="group" aria-label="Ir para horário">
+          <span className="text-[12px] font-medium text-fg-muted sm:mr-1">Horário</span>
+          <div className="grid grid-cols-4 gap-1.5 sm:flex">
+            {ATALHOS_HORA.map(({ h, t }) => (
+              <Button key={h} size="sm" variant="outline" disabled={!sim || pendente('saltar')} onClick={() => void comitar(t)} className="num px-2 sm:px-3">
+                {String(h).padStart(2, '0')}:00
+              </Button>
+            ))}
+          </div>
         </div>
-        {extra ? <div className="ml-auto max-w-full overflow-x-auto scrollbar-none">{extra}</div> : null}
+        {extra ? <div className="max-w-full overflow-x-auto scrollbar-none sm:ml-auto">{extra}</div> : null}
       </div>
     </Painel>
   );

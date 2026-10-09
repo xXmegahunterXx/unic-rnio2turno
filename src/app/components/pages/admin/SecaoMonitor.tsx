@@ -28,12 +28,12 @@ function Metrica({
 }) {
   return (
     <div className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-card">
-      <div className="flex items-center gap-2 text-fg-muted">
-        <Icon name={icone} size={15} />
-        <Rotulo className="truncate">{rotulo}</Rotulo>
+      <div className="flex items-start gap-2 text-fg-muted">
+        <Icon name={icone} size={15} className="shrink-0" />
+        <Rotulo className="min-w-0 text-balance">{rotulo}</Rotulo>
       </div>
       <div className="num mt-3 truncate font-display text-[24px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[26px]">{valor}</div>
-      {sub ? <div className="num mt-1.5 truncate text-[12px] text-fg-muted">{sub}</div> : null}
+      {sub ? <div className="num mt-1.5 text-pretty text-[12px] leading-snug text-fg-muted">{sub}</div> : null}
       {serie ? <MiniSerie valores={serie} tom={tom} className="-mx-1 mt-3" /> : <div className="mt-auto" />}
     </div>
   );

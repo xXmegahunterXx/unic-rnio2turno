@@ -5,9 +5,10 @@
  */
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdminCommand, AdminSnapshot, PublicMeta } from '@/shared/api';
+import type { AdminCommand, AdminSnapshot } from '@/shared/api';
 import type { NationalSnapshot, PresetInfo, Race } from '@/shared/types';
 import { getClient } from '@/app/data/client';
+import { anonimizarTexto, useAnonimizado, useMeta } from '@/app/data/hooks';
 import { toast } from '@/app/ui';
 import { mensagemErro, naoAutorizado, type SecaoId } from './rotulos';
 
@@ -66,23 +67,35 @@ export function useSnapshotAdmin(ativo: boolean) {
 
 export const amostrasMonitor = () => amostras;
 
-/** Snapshot nacional de uma corrida, com poll de 1 s (mesma chave de cache de `useNacional`). */
+/**
+ * Snapshot nacional de uma corrida, com poll de 1 s (mesma chave de cache de `useNacional`).
+ * Como `useNacional`, troca os nomes reais por "Candidato A/B" nos eventos quando a simulação está anonimizada.
+ */
 export function useNacionalAdmin(race: string, ativo = true, intervalo = 1000) {
-  return useQuery<NationalSnapshot>({
+  const anon = useAnonimizado();
+  const { data: meta } = useMeta();
+  const select = useCallback(
+    (d: NationalSnapshot): NationalSnapshot =>
+      anon && meta
+        ? {
+            ...d,
+            eventos: d.eventos.map((e) => ({
+              ...e,
+              titulo: anonimizarTexto(e.titulo, meta.races),
+              detalhe: e.detalhe ? anonimizarTexto(e.detalhe, meta.races) : e.detalhe,
+            })),
+          }
+        : d,
+    [anon, meta],
+  );
+  return useQuery<NationalSnapshot, Error, NationalSnapshot>({
     queryKey: ['nacional', race],
     queryFn: async () => (await getClient()).nacional(race),
     enabled: ativo,
     refetchInterval: intervalo,
     refetchIntervalInBackground: false,
     placeholderData: keepPreviousData,
-  });
-}
-
-export function useMetaAdmin() {
-  return useQuery<PublicMeta>({
-    queryKey: ['meta'],
-    queryFn: async () => (await getClient()).meta(),
-    staleTime: Infinity,
+    select,
   });
 }
 
@@ -117,8 +130,11 @@ export interface RunOpts {
 export interface AdminCtx {
   dados: SnapshotRecebido;
   snap: AdminSnapshot;
-  meta: PublicMeta | undefined;
+  /** Corridas para exibição (useRaces: "Candidato A/B" quando a simulação está anonimizada). */
+  races: Race[] | undefined;
   pres: Race | undefined;
+  /** Nomes ocultos na simulação (LiveStatus.anonimizado). */
+  anon: boolean;
   /** Snapshot nacional de Presidente (2º turno). */
   nacional: NationalSnapshot | undefined;
   /** Último poll falhou (servidor fora do ar): os dados exibidos são os últimos conhecidos. */
@@ -163,7 +179,7 @@ export function useExecutor(onSessaoExpirada: () => void) {
         const ms = performance.now() - t0;
         qc.setQueryData<SnapshotRecebido>(CHAVE_SNAPSHOT, { snap, recebidoEm: Date.now(), latenciaMs: ms });
         // as telas públicas (prévia, placar) refazem as consultas já
-        void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'admin' });
+        void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'admin' && q.queryKey[0] !== 'meta' });
         if (opts.sucesso) {
           toast(typeof opts.sucesso === 'function' ? opts.sucesso(snap, ms) : opts.sucesso, { tone: 'ok' });
         }

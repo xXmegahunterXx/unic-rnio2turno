@@ -36,7 +36,7 @@ export function SalaDeControle({ offline }: { offline: boolean }) {
       <div className="relative min-h-dvh bg-bg">
         <Fundo />
         <Sidebar />
-        <div className="relative lg:pl-[248px]">
+        <div className="relative lg:pl-[72px] xl:pl-[248px]">
           <BarraSuperior />
           <CabecalhoMovel />
           {offline ? <FaixaOffline /> : null}
@@ -111,67 +111,109 @@ function useDicas(): Record<SecaoId, ReactNode> {
           {st.congelado ? 'gelo' : 'no ar'}
         </Badge>
       ) : null,
-    fonte: <span className="text-[11.5px] text-fg-subtle">{FONTE_CURTA[st.fonte]}</span>,
+    fonte:
+      st.fonte === 'simulacao' && st.nomesReais ? (
+        <Badge size="xs" tone="alert" caps>
+          nomes
+        </Badge>
+      ) : (
+        <span className="text-[11.5px] text-fg-subtle">{FONTE_CURTA[st.fonte]}</span>
+      ),
     monitor: <span className="num text-[11px] text-fg-subtle">v{st.versao}</span>,
   };
 }
 
+/** Ponto de atenção da seção no trilho de ícones (sidebar recolhida, 1024–1279 px). */
+function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
+  const { snap } = useAdmin();
+  const st = snap.state;
+  const ajustes = Object.keys(st.cenario.ufVies).length + Object.keys(st.cenario.ufAtraso).length;
+  return {
+    controle: st.congelado ? 'alert' : null,
+    cenario: st.cenario.preset === 'padrao' ? null : 'brand',
+    estados: ajustes ? 'brand' : null,
+    comunicacao: st.congelado || st.aviso?.nivel === 'alerta' ? 'alert' : st.aviso ? 'brand' : null,
+    fonte: st.fonte === 'simulacao' && st.nomesReais ? 'alert' : null,
+    monitor: null,
+  };
+}
+
+/**
+ * Navegação lateral. ≥ 1280 px: completa (marca, rótulos, dicas). 1024–1279 px: trilho de ícones (72 px), para a
+ * barra superior caber inteira. Abaixo de 1024 px some (abas no topo + barra inferior).
+ */
 function Sidebar() {
   const { secao, irPara, sair, abrirAtalhos } = useAdmin();
   const dicas = useDicas();
+  const atencao = useAtencao();
+  const util =
+    'inline-flex h-9 items-center justify-center gap-1.5 rounded-[10px] text-[12.5px] font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-line bg-surface/70 backdrop-blur-xl lg:flex">
-      <div className="flex h-[72px] shrink-0 items-center border-b border-line px-5">
-        <Marca />
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-[72px] flex-col border-r border-line bg-surface/70 backdrop-blur-xl lg:flex xl:w-[248px]">
+      <div className="flex h-[72px] shrink-0 items-center justify-center border-b border-line xl:justify-start xl:px-5">
+        <span className="xl:hidden" title="Sintonia · Sala de controle">
+          <LogoMark size={32} />
+        </span>
+        <span className="hidden xl:inline-flex">
+          <Marca />
+        </span>
       </div>
       <nav aria-label="Seções do painel" className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-0.5">
+        <ul className="space-y-1 xl:space-y-0.5">
           {SECOES.map((s, i) => {
             const ativo = s.id === secao;
+            const at = atencao[s.id];
             return (
               <li key={s.id}>
                 <button
                   type="button"
                   onClick={() => irPara(s.id)}
                   aria-current={ativo ? 'page' : undefined}
+                  aria-label={s.rotulo}
+                  title={`${s.rotulo}: ${s.descricao} (atalho: ${i + 1})`}
                   className={cn(
-                    'group relative flex h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-[14px] font-medium transition-colors',
+                    'group relative flex h-11 w-full items-center justify-center gap-3 rounded-xl text-left text-[14px] font-medium transition-colors xl:justify-start xl:px-3',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                     ativo ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-2 hover:text-fg',
                   )}
                 >
                   {ativo ? <span aria-hidden className="absolute -left-3 top-2.5 h-6 w-[3px] rounded-r-full bg-brand-grad" /> : null}
-                  <Icon name={s.icone} size={18} className={cn(ativo ? 'text-brand-fg' : 'text-fg-subtle group-hover:text-fg-muted')} />
-                  <span className="min-w-0 flex-1 truncate">{s.rotulo}</span>
-                  <span className="flex shrink-0 items-center">{dicas[s.id]}</span>
-                  <Kbd className="hidden h-5 min-w-5 px-1 text-[10.5px] opacity-0 transition-opacity group-hover:opacity-100 xl:inline-flex">{i + 1}</Kbd>
+                  <Icon name={s.icone} size={18} className={cn('shrink-0', ativo ? 'text-brand-fg' : 'text-fg-subtle group-hover:text-fg-muted')} />
+                  <span className="hidden min-w-0 flex-1 truncate xl:block">{s.rotulo}</span>
+                  <span className="hidden shrink-0 items-center xl:flex">{dicas[s.id]}</span>
+                  {at ? (
+                    <span
+                      aria-hidden
+                      className={cn('absolute right-2.5 top-2.5 h-2 w-2 rounded-full ring-2 ring-surface xl:hidden', at === 'alert' ? 'bg-alert' : 'bg-brand-2')}
+                    />
+                  ) : null}
                 </button>
               </li>
             );
           })}
         </ul>
       </nav>
-      <div className="shrink-0 space-y-3 border-t border-line p-4">
-        <a href={urlPublica('/')} target="_blank" rel="noopener" className={buttonClasses({ variant: 'outline', size: 'md', block: true })}>
+      <div className="flex shrink-0 flex-col items-center gap-2 border-t border-line p-3 xl:items-stretch xl:gap-3 xl:p-4">
+        <a
+          href={urlPublica('/')}
+          target="_blank"
+          rel="noopener"
+          aria-label="Ver site (nova aba)"
+          title="Ver site (nova aba)"
+          className={cn(buttonClasses({ variant: 'outline', size: 'md' }), 'w-10 px-0 xl:w-full xl:px-4')}
+        >
           <Icon name="externo" size={17} />
-          Ver site
+          <span className="hidden xl:inline">Ver site</span>
         </a>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-col items-center gap-1 xl:flex-row">
           <ThemeToggle size="sm" />
-          <button
-            type="button"
-            onClick={abrirAtalhos}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[10px] px-2 text-[12.5px] font-medium text-fg-muted hover:bg-surface-2 hover:text-fg"
-          >
+          <button type="button" onClick={abrirAtalhos} className={cn(util, 'w-9 xl:w-auto xl:px-2')} aria-label="Atalhos de teclado" title="Atalhos de teclado (?)">
             <Kbd className="h-5 min-w-5 px-1 text-[10.5px]">?</Kbd>
-            Atalhos
+            <span className="hidden xl:inline">Atalhos</span>
           </button>
-          <button
-            type="button"
-            onClick={sair}
-            className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-[10px] px-2.5 text-[12.5px] font-medium text-fg-muted hover:bg-surface-2 hover:text-fg"
-          >
-            Sair
+          <button type="button" onClick={sair} className={cn(util, 'w-9 xl:ml-auto xl:w-auto xl:px-2.5')} aria-label="Sair" title="Sair">
+            <span className="hidden xl:inline">Sair</span>
             <Icon name="seta" size={14} />
           </button>
         </div>
@@ -183,12 +225,12 @@ function Sidebar() {
 // ---- barra superior (desktop) --------------------------------------------------------------------------
 
 function BarraSuperior() {
-  const { snap, irPara } = useAdmin();
+  const { snap, irPara, anon } = useAdmin();
   const fonte = snap.state.fonte;
   return (
     <header className="glass sticky top-0 z-30 hidden h-[72px] border-b border-line lg:block">
-      <div className="mx-auto flex h-full max-w-[1280px] items-center gap-5 px-8">
-        <div className="flex min-w-[168px] flex-col items-start">
+      <div className="mx-auto flex h-full max-w-[1280px] items-center gap-4 px-8 xl:gap-5">
+        <div className="flex min-w-[164px] flex-col items-start">
           <EstadoAoVivo />
           <RelogioApuracao tamanho="lg" className="mt-1.5" />
         </div>
@@ -203,6 +245,15 @@ function BarraSuperior() {
           <span className={cn('mt-2 flex items-center gap-1.5 text-[14px] font-semibold leading-none', fonte === 'simulacao' ? 'text-brand-fg' : 'text-fg')}>
             <Icon name={FONTE_ICONE[fonte]} size={15} />
             {FONTE_ROTULO[fonte]}
+            {fonte === 'simulacao' ? (
+              anon ? (
+                <Icon name="olho-fechado" size={14} className="ml-0.5 text-fg-subtle" title="Nomes ocultos na simulação (Candidato A/B)" />
+              ) : (
+                <Badge tone="alert" size="xs" caps className="ml-1">
+                  Nomes reais
+                </Badge>
+              )
+            ) : null}
           </span>
         </button>
         <SepV />
@@ -288,12 +339,10 @@ function BarraInferior() {
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/[0.94] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden">
       <div className="mx-auto flex h-[72px] max-w-3xl items-center gap-3 px-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <EstadoAoVivo compacto />
-          </div>
-          <div className="mt-1 flex items-baseline gap-2">
+          <EstadoAoVivo compacto />
+          <div className="mt-1 flex min-w-0 items-baseline gap-2">
             <RelogioApuracao tamanho="md" />
-            <ProgressoPres compacto className="truncate" />
+            <ProgressoPres compacto className="min-w-0 truncate" />
           </div>
         </div>
         <SeletorVelocidade variante="select" />
@@ -307,7 +356,7 @@ function BarraInferior() {
 
 function FaixaOffline() {
   return (
-    <div role="alert" className="sticky top-[72px] z-20 border-b border-alert/30 bg-alert/10 px-4 py-2.5 text-[13px] text-fg backdrop-blur lg:top-[72px]">
+    <div role="alert" className="sticky top-[101px] z-20 border-b border-alert/30 bg-alert/10 px-4 py-2.5 text-[13px] text-fg backdrop-blur lg:top-[72px]">
       <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 sm:px-2 lg:px-4">
         <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-alert" />
         <span className="font-semibold">Sem conexão com o servidor.</span>

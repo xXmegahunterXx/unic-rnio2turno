@@ -10,7 +10,7 @@ import { cn } from '@/app/lib/cn';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { Badge, Button, Icon, Segmented, Select, Skeleton, Slider } from '@/app/ui';
 import { useAdmin, usePresets } from './dados';
-import { CabecalhoSecao, Callout, Campo, Cronometro, DuelSlider, Painel, Rotulo } from './kit';
+import { CabecalhoSecao, Callout, Campo, Cronometro, DuelSlider, NotaNomesOcultos, Painel, Rotulo } from './kit';
 import { fmtDec, fmtMs, ORDEM_ROTULO, RITMO_ROTULO } from './rotulos';
 
 type Editavel = Pick<
@@ -71,22 +71,25 @@ function chipsDoPreset(p: PresetInfo, base: PresetInfo | undefined): string[] {
 }
 
 export function SecaoCenario() {
-  const { snap, pres, run, pendente, pendenteDesde, confirmar, meta } = useAdmin();
+  const { snap, pres, run, pendente, pendenteDesde, confirmar, races, anon, irPara } = useAdmin();
   const cen = snap.state.cenario;
   const presetsQ = usePresets(true, cen.seed);
   const presets = presetsQ.data;
   const padrao = presets?.find((p) => p.id === 'padrao');
   const nomes: [string, string] = [pres?.candidatos[0]?.nomeUrna ?? 'A', pres?.candidatos[1]?.nomeUrna ?? 'B'];
-  const govRaces = useMemo(() => (meta?.races ?? []).filter((r) => r.cargo === 'Governador' && r.turno === 2), [meta]);
+  const govRaces = useMemo(() => (races ?? []).filter((r) => r.cargo === 'Governador' && r.turno === 2), [races]);
   const ocupado = pendente('cenario');
 
   const presetAtual = presets?.find((p) => p.id === cen.preset);
 
+  const [aplicando, setAplicando] = useState<string | null>(null);
   async function aplicarPreset(p: PresetInfo) {
+    setAplicando(p.id);
     await run(
       { tipo: 'preset', preset: p.id },
       { chave: 'cenario', sucesso: (s) => `“${p.nome}” aplicado · modelo em ${fmtMs(s.metrics.modeloMs)}` },
     );
+    setAplicando(null);
   }
 
   // ---- grupos: pares simétricos (…-a / …-b) e avulsos ----
@@ -112,9 +115,12 @@ export function SecaoCenario() {
         icone="ajustes"
         descricao="Escolha um preset ou ajuste o modelo. O motor é determinístico: mesmo cenário e mesma semente geram os mesmos números em qualquer máquina."
         acoes={
-          <Badge tone="brand" size="md" icon="ajustes">
-            {cen.preset === 'personalizado' ? 'Personalizado' : (presetAtual?.nome ?? cen.preset)}
-          </Badge>
+          <div className="flex flex-col items-start gap-1.5 sm:items-end">
+            <Badge tone="brand" size="md" icon="ajustes">
+              {cen.preset === 'personalizado' ? 'Personalizado' : (presetAtual?.nome ?? cen.preset)}
+            </Badge>
+            {anon ? <NotaNomesOcultos onClick={() => irPara('fonte')} /> : null}
+          </div>
         }
       />
       <Callout tom="alerta" titulo="Afeta todos os visitantes em tempo real" className="mb-5">
@@ -144,7 +150,7 @@ export function SecaoCenario() {
           <>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {avulsos.map((p) => (
-                <CartaoPreset key={p.id} p={p} base={padrao} ativo={cen.preset === p.id} nomes={nomes} ocupado={ocupado} onAplicar={aplicarPreset} />
+                <CartaoPreset key={p.id} p={p} base={padrao} ativo={cen.preset === p.id} nomes={nomes} ocupado={ocupado} carregando={aplicando === p.id} onAplicar={aplicarPreset} />
               ))}
             </div>
             <div className="mt-5 flex items-center gap-3">
@@ -154,8 +160,8 @@ export function SecaoCenario() {
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {pares.map(([a, b]) => (
                 <div key={a.id} className="relative grid grid-cols-1 gap-2 rounded-[22px] border border-dashed border-line p-2 sm:grid-cols-2">
-                  <CartaoPreset p={a} base={padrao} ativo={cen.preset === a.id} nomes={nomes} ocupado={ocupado} onAplicar={aplicarPreset} compacto />
-                  <CartaoPreset p={b} base={padrao} ativo={cen.preset === b.id} nomes={nomes} ocupado={ocupado} onAplicar={aplicarPreset} compacto />
+                  <CartaoPreset p={a} base={padrao} ativo={cen.preset === a.id} nomes={nomes} ocupado={ocupado} carregando={aplicando === a.id} onAplicar={aplicarPreset} compacto />
+                  <CartaoPreset p={b} base={padrao} ativo={cen.preset === b.id} nomes={nomes} ocupado={ocupado} carregando={aplicando === b.id} onAplicar={aplicarPreset} compacto />
                   <span
                     aria-hidden
                     title="Espelho"
@@ -203,6 +209,7 @@ function CartaoPreset({
   ativo,
   nomes,
   ocupado,
+  carregando,
   compacto,
   onAplicar,
 }: {
@@ -211,6 +218,7 @@ function CartaoPreset({
   ativo: boolean;
   nomes: [string, string];
   ocupado: boolean;
+  carregando?: boolean;
   compacto?: boolean;
   onAplicar: (p: PresetInfo) => void;
 }) {
@@ -231,18 +239,20 @@ function CartaoPreset({
           </Badge>
         ) : null}
       </div>
-      <div className="mt-3">
-        <div className="mb-1.5 flex items-baseline justify-between gap-2 text-[12px]">
-          <span className="min-w-0 truncate text-fg-muted">
-            {nomes[0]} <span className="num font-semibold text-cand-a-fg">{fmtPct(alvo)}</span>
+      <div className="mt-3" title={`${nomes[0]} ${fmtPct(alvo)} × ${nomes[1]} ${fmtPct(100 - alvo)} (Presidente, % dos válidos)`}>
+        <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px]">
+          <span className="inline-flex items-center gap-1.5">
+            <ChipSlot cor="a" />
+            <span className="num font-semibold text-cand-a-fg">{fmtPct(alvo)}</span>
           </span>
-          <span className="min-w-0 truncate text-right text-fg-muted">
-            <span className="num font-semibold text-cand-b-fg">{fmtPct(100 - alvo)}</span> {nomes[1]}
+          <span className="inline-flex items-center gap-1.5">
+            <span className="num font-semibold text-cand-b-fg">{fmtPct(100 - alvo)}</span>
+            <ChipSlot cor="b" />
           </span>
         </div>
         <VoteSplitBar votos={[alvo, 100 - alvo]} size="xs" nomes={nomes} />
       </div>
-      <p className={cn('mt-3 text-pretty text-[12.5px] leading-relaxed text-fg-muted', compacto ? 'line-clamp-4' : 'line-clamp-5')}>{p.descricao}</p>
+      <p className={cn('mt-3 text-pretty text-[12.5px] leading-relaxed text-fg-muted', compacto ? 'line-clamp-5' : 'line-clamp-6')}>{p.descricao}</p>
       {chips.length ? (
         <div className="mt-2.5 flex flex-wrap gap-1">
           {chips.map((c) => (
@@ -257,15 +267,31 @@ function CartaoPreset({
           size="sm"
           variant={ativo ? 'ghost' : 'outline'}
           block
-          disabled={ocupado}
+          disabled={ocupado && !carregando}
+          loading={carregando}
           icon={ativo ? 'reset' : 'play'}
           onClick={() => onAplicar(p)}
           aria-label={`${ativo ? 'Reaplicar' : 'Aplicar'} preset ${p.nome}`}
         >
-          {ativo ? 'Reaplicar' : 'Aplicar'}
+          {carregando ? 'Aplicando…' : ativo ? 'Reaplicar' : 'Aplicar'}
         </Button>
       </div>
     </article>
+  );
+}
+
+/** Letra do slot (A = menor número na urna, turquesa; B = âmbar), como nos monogramas. */
+function ChipSlot({ cor }: { cor: 'a' | 'b' }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        'inline-flex h-[18px] w-[18px] items-center justify-center rounded-md text-[10.5px] font-bold',
+        cor === 'a' ? 'bg-cand-a/15 text-cand-a-fg' : 'bg-cand-b/15 text-cand-b-fg',
+      )}
+    >
+      {cor === 'a' ? 'A' : 'B'}
+    </span>
   );
 }
 
@@ -325,6 +351,8 @@ function EditorAvancado({
     if (await onAplicar(parcial)) setEd({});
   }
 
+  // valor do slider ao lado do rótulo: curto para não quebrar a linha no celular
+  const curto0 = /^Candidato [AB]$/.test(nomes[0]) ? 'A' : nomes[0].split(' ')[0];
   const nomeGov = (r: Race): [string, string] => [r.candidatos[0]?.nomeUrna ?? 'A', r.candidatos[1]?.nomeUrna ?? 'B'];
   const fx = (x: number) => `×${fmtDec(x)}`;
 
@@ -391,7 +419,7 @@ function EditorAvancado({
                 min={0}
                 max={100}
                 step={1}
-                format={(x) => `${fmtPct(x, 0)} → ${nomes[0]}`}
+                format={(x) => `${fmtPct(x, 0)} → ${curto0}`}
                 marks={[{ value: 0 }, { value: 50 }, { value: 100 }]}
               />
             </Ajuste>
@@ -486,22 +514,25 @@ function EditorAvancado({
         </Grupo>
       </div>
 
-      <div className="sticky bottom-[calc(76px+env(safe-area-inset-bottom))] z-10 -mx-4 mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5 lg:bottom-0 lg:rounded-b-2xl">
-        <Button variant="ghost" icon="reset" onClick={onPadrao} disabled={ocupado} className="mr-auto">
-          Restaurar padrão
+      <div className="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] z-10 -mx-4 mt-6 flex items-center justify-end gap-2 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5 lg:bottom-0 lg:rounded-b-2xl">
+        <Button variant="ghost" icon="reset" onClick={onPadrao} disabled={ocupado} className="mr-auto shrink-0 px-3 sm:px-4" aria-label="Restaurar padrão">
+          <span className="sm:hidden">Padrão</span>
+          <span className="hidden sm:inline">Restaurar padrão</span>
         </Button>
         {n > 0 ? (
-          <Button variant="outline" onClick={() => setEd({})} disabled={ocupado}>
+          <Button variant="outline" onClick={() => setEd({})} disabled={ocupado} className="shrink-0 px-3 sm:px-4">
             Descartar
           </Button>
         ) : null}
-        <Button variant="primary" icon="check" onClick={aplicar} disabled={n === 0 || ocupado} loading={ocupado}>
+        <Button variant="primary" icon="check" onClick={aplicar} disabled={n === 0 || ocupado} loading={ocupado} className="shrink-0 px-3.5 sm:px-4">
           {ocupado ? (
             <>
-              Reconstruindo… <Cronometro desde={desde} />
+              <span className="hidden sm:inline">Reconstruindo…</span> <Cronometro desde={desde} />
             </>
           ) : (
-            'Aplicar cenário'
+            <>
+              Aplicar<span className="hidden sm:inline"> cenário</span>
+            </>
           )}
         </Button>
       </div>

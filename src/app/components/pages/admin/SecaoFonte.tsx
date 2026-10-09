@@ -7,8 +7,10 @@ import type { FonteDados, TseConfig } from '@/shared/types';
 import { INICIO_APURACAO } from '@/shared/constants';
 import { fmtDataHora } from '@/shared/format';
 import { getClient } from '@/app/data/client';
+import { anonimizarRace } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
-import { Badge, Button, Countdown, Icon } from '@/app/ui';
+import { Badge, Button, Countdown, Icon, Toggle } from '@/app/ui';
+import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { useAdmin } from './dados';
 import { CabecalhoSecao, Callout, Campo, Painel, Rotulo } from './kit';
 import { FONTE_ICONE, FONTE_ROTULO, fmtMs, mensagemErro } from './rotulos';
@@ -156,6 +158,8 @@ export function SecaoFonte() {
         })}
       </div>
 
+      <NomesNaSimulacao />
+
       <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <Painel titulo="Feed do TSE" icone="configuracoes" subtitulo="Códigos do 2º turno de 2026 no feed oficial (resultados.tse.jus.br/oficial).">
           <div className="space-y-4">
@@ -246,5 +250,111 @@ export function SecaoFonte() {
         </Painel>
       </div>
     </div>
+  );
+}
+
+/**
+ * Interruptor "Mostrar nomes reais na simulação" (comando `nomes-reais`). Desligado por padrão: na fonte Simulação
+ * os candidatos aparecem como "Candidato A/B" para que prints com números fictícios nunca circulem associados a
+ * candidatos reais. Ligar pede confirmação.
+ */
+function NomesNaSimulacao() {
+  const { snap, pres, run, pendente, confirmar } = useAdmin();
+  const reais = !!snap.state.nomesReais;
+  const sim = snap.state.fonte === 'simulacao';
+  const ocupado = pendente('nomes-reais');
+
+  async function alternar(ativo: boolean) {
+    if (ativo) {
+      const ok = await confirmar({
+        titulo: 'Mostrar os nomes reais na simulação?',
+        descricao: 'Uso interno: demonstrações para a equipe ou para parceiros, em ambiente controlado.',
+        corpo: (
+          <>
+            Os números da simulação são <strong className="font-semibold text-fg">fictícios</strong>. Com os nomes reais, qualquer
+            print ou imagem compartilhada pode circular como se fosse um resultado verdadeiro de candidatos reais. A faixa
+            “SIMULAÇÃO” continua em todas as páginas, mas não impede recortes. Desligue assim que terminar.
+          </>
+        ),
+        confirmar: 'Mostrar nomes reais',
+        perigo: true,
+      });
+      if (!ok) return;
+    }
+    await run(
+      { tipo: 'nomes-reais', ativo },
+      { chave: 'nomes-reais', sucesso: ativo ? 'Nomes reais visíveis na simulação' : 'Nomes ocultos: o site volta a mostrar Candidato A e B' },
+    );
+  }
+
+  // fora da simulação, `pres` vem com os nomes reais (dados verdadeiros): mostra como a simulação apareceria
+  const exibida = pres && !sim && !reais ? anonimizarRace(pres) : pres;
+  const candidatos = exibida?.candidatos.filter((c) => !c.agregado).slice(0, 2) ?? [];
+
+  return (
+    <Painel
+      className="mt-4 lg:mt-5"
+      titulo="Nomes na simulação"
+      icone="olho-fechado"
+      subtitulo="Por padrão, a simulação mostra “Candidato A” e “Candidato B” no lugar dos nomes reais."
+      acoes={
+        reais ? (
+          <Badge tone="alert" size="sm" dot caps>
+            Nomes reais
+          </Badge>
+        ) : (
+          <Badge tone="neutral" size="sm" icon="olho-fechado">
+            Nomes ocultos
+          </Badge>
+        )
+      }
+    >
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <div className={cn('rounded-2xl border p-4', reais ? 'border-alert/40 bg-alert/[0.06]' : 'border-line bg-surface-2/60')}>
+            <Toggle
+              checked={reais}
+              onChange={(v) => void alternar(v)}
+              disabled={ocupado}
+              label="Mostrar nomes reais na simulação (uso interno)"
+              description={
+                reais
+                  ? 'Ligado: o site mostra os nomes reais junto dos números fictícios.'
+                  : 'Desligado (recomendado): o site mostra Candidato A e Candidato B.'
+              }
+            />
+          </div>
+          <Callout tom={reais ? 'alerta' : 'neutro'} titulo="Por que ficam ocultos">
+            Números fictícios ao lado de nomes reais viram desinformação num print. Com os nomes ocultos, as imagens de
+            compartilhamento e as capturas de tela da simulação nunca associam um resultado inventado a um candidato real.
+          </Callout>
+          {!sim ? (
+            <p className="flex items-start gap-2 text-[12.5px] leading-snug text-fg-muted">
+              <Icon name="info" size={14} className="mt-0.5 shrink-0 text-brand-fg" />
+              Vale só na fonte Simulação. Pré-eleição e TSE ao vivo mostram dados verdadeiros, sempre com os nomes reais.
+            </p>
+          ) : null}
+        </div>
+        <div className="rounded-2xl border border-line bg-bg/60 p-4">
+          <Rotulo>{sim ? 'No site agora' : 'Na simulação'}</Rotulo>
+          <ul className="mt-3 space-y-3">
+            {candidatos.map((c) => (
+              <li key={c.cor} className="flex items-center gap-3">
+                <CandidateAvatar candidato={c} size="md" />
+                <div className="min-w-0">
+                  <p className="truncate text-[14.5px] font-semibold text-fg">{c.nomeUrna}</p>
+                  <p className="truncate text-[12px] text-fg-muted">
+                    {c.partido} · <span className="num">{c.numero}</span>
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 border-t border-line pt-3 text-[12px] leading-snug text-fg-subtle">
+            A ordem e as cores seguem o número na urna: A (turquesa) é o menor número; B (âmbar), o maior.
+          </p>
+        </div>
+      </div>
+    </Painel>
   );
 }

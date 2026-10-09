@@ -15,7 +15,7 @@ import { fmtMs } from './rotulos';
 /** Rótulo em caixa alta (cabeçalhos de métricas, grupos). */
 export function Rotulo({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <span className={cn('block text-[11px] font-semibold uppercase leading-none tracking-[0.1em] text-fg-muted', className)}>
+    <span className={cn('block text-[11px] font-semibold uppercase leading-[1.25] tracking-[0.1em] text-fg-muted', className)}>
       {children}
     </span>
   );
@@ -132,6 +132,31 @@ export function Callout({
   );
 }
 
+/**
+ * Nota discreta "Nomes ocultos na simulação" (LiveStatus.anonimizado): os candidatos aparecem como "Candidato A/B"
+ * para que prints com números fictícios nunca circulem associados a candidatos reais. `onClick` leva ao controle.
+ */
+export function NotaNomesOcultos({ onClick, className }: { onClick?: () => void; className?: string }) {
+  const conteudo = (
+    <>
+      <Icon name="olho-fechado" size={14} className="shrink-0" />
+      <span>Nomes ocultos na simulação</span>
+    </>
+  );
+  const cls = cn('inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-fg-muted', className);
+  if (!onClick) return <span className={cls}>{conteudo}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Configurar em Fonte › Nomes na simulação"
+      className={cn(cls, '-mx-1.5 rounded-lg px-1.5 py-0.5 transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand')}
+    >
+      {conteudo}
+    </button>
+  );
+}
+
 /** Tecla de atalho. */
 export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
@@ -231,6 +256,7 @@ export function Passo({
   passo = 5,
   sufixo,
   rotulo,
+  icone,
   className,
 }: {
   valor: number;
@@ -240,6 +266,8 @@ export function Passo({
   passo?: number;
   sufixo?: string;
   rotulo: string;
+  /** Ícone à esquerda (quando não há rótulo visível por perto). */
+  icone?: IconName;
   className?: string;
 }) {
   const [texto, setTexto] = useState<string | null>(null);
@@ -251,8 +279,10 @@ export function Passo({
     <div
       role="group"
       aria-label={rotulo}
+      title={icone ? rotulo : undefined}
       className={cn('inline-flex h-9 items-center rounded-xl border border-line bg-surface-2 p-0.5', className)}
     >
+      {icone ? <Icon name={icone} size={14} className="ml-1.5 mr-0.5 shrink-0 text-fg-subtle" /> : null}
       <button type="button" className={btn} aria-label={`Diminuir ${rotulo}`} disabled={valor <= min} onClick={() => onChange(lim(valor - passo))}>
         <Icon name="menos" size={15} />
       </button>
@@ -501,7 +531,7 @@ export function DialogoConfirmacao({
       onClose={() => onResposta(false)}
       title={titulo}
       description={descricao}
-      size="sm"
+      size="md"
       footer={
         <>
           <Button variant="ghost" onClick={() => onResposta(false)}>

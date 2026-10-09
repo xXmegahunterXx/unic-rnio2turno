@@ -88,8 +88,8 @@ export function ComparaTurnos({ race, raceT1, t2, t1, participacao = true, compa
 
       {pctOutros !== null ? (
         <p className="mt-4 text-[12.5px] leading-snug text-fg-muted">
-          No 1º turno, os demais candidatos somaram <span className="num font-medium text-fg">{fmtPct(pctOutros, 1)}</span> dos válidos —
-          por isso os dois finalistas tendem a crescer no 2º turno.
+          No 1º turno, os demais candidatos somaram <span className="num font-medium text-fg">{fmtPct(pctOutros, 1)}</span> dos válidos; no
+          2º turno, os votos válidos se dividem só entre os dois finalistas.
         </p>
       ) : null}
 

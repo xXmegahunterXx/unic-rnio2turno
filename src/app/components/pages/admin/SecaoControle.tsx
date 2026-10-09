@@ -5,26 +5,28 @@
 import { useState } from 'react';
 import type { UF } from '@/shared/types';
 import { fmtHoraSeg } from '@/shared/format';
+import { useRace } from '@/app/data/hooks';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { EventFeed } from '@/app/components/apuracao/EventFeed';
 import { Placar } from '@/app/components/apuracao/Placar';
 import { Skeleton } from '@/app/ui';
 import { useAdmin, useNacionalAdmin } from './dados';
-import { CabecalhoSecao, Callout, Painel, Rotulo } from './kit';
+import { CabecalhoSecao, Callout, NotaNomesOcultos, Painel, Rotulo } from './kit';
 import { LinhaDoTempo } from './LinhaDoTempo';
 import { PreviaCelular, rotuloPagina } from './Previa';
-import { EstadoAoVivo, RelogioApuracao, SeletorVelocidade, Transporte } from './relogio';
+import { EstadoAoVivo, GradeVelocidade, ProgressoPres, RelogioApuracao, SeletorVelocidade, Transporte } from './relogio';
 import { FONTE_ROTULO } from './rotulos';
 
 export function SecaoControle() {
-  const { snap, nacional, pres, meta } = useAdmin();
+  const { snap, nacional, pres, anon, irPara } = useAdmin();
   const [pagina, setPagina] = useState('/apuracao');
   const preEleicao = snap.state.fonte === 'pre';
   const t1 = useNacionalAdmin('pres-t1', preEleicao, 60_000);
-  const raceT1 = meta?.races.find((r) => r.id === 'pres-t1');
+  const raceT1 = useRace('pres-t1');
   const placarRace = preEleicao ? raceT1 : pres;
   const placarDados = preEleicao ? t1.data : nacional;
   const simulado = snap.status.simulacao;
+  const ufPrevia = pagina.startsWith('/apuracao/') ? (pagina.slice(10).toUpperCase() as UF) : null;
 
   return (
     <div>
@@ -36,27 +38,38 @@ export function SecaoControle() {
 
       {/* Transporte completo no celular/tablet (a barra inferior fica compacta) */}
       <Painel className="mb-4 lg:hidden" pt="pt-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <EstadoAoVivo />
-            <RelogioApuracao tamanho="xl" className="mt-2" />
-            <p className="mt-1.5 text-[12.5px] text-fg-muted">Horário de Brasília · fonte: {FONTE_ROTULO[snap.state.fonte]}</p>
-          </div>
+        <EstadoAoVivo />
+        <div className="mt-2 flex items-end justify-between gap-3">
+          <RelogioApuracao tamanho="xl" />
         </div>
+        <p className="mt-2 text-[12.5px] text-fg-muted">
+          Horário de Brasília · fonte: <span className="font-medium text-fg">{FONTE_ROTULO[snap.state.fonte]}</span>
+        </p>
+        <ProgressoPres bloco className="mt-4 border-t border-line pt-4" />
         <Transporte variante="painel" className="mt-4" />
-        <div className="-mx-4 mt-4 overflow-x-auto px-4 pb-1 scrollbar-none sm:-mx-5 sm:px-5">
-          <SeletorVelocidade />
-        </div>
+        <Rotulo className="mb-2 mt-5">Velocidade</Rotulo>
+        <GradeVelocidade />
       </Painel>
 
       {snap.state.congelado ? (
         <Callout tom="alerta" titulo="Dados congelados" className="mb-4">
           Os números públicos estão parados em <span className="num font-semibold text-fg">{fmtHoraSeg(snap.state.congeladoEm ?? 0)}</span>{' '}
-          (simulação de instabilidade do TSE). O relógio continua. Descongele em Comunicação.
+          (simulação de instabilidade do TSE). O relógio continua. Descongele em{' '}
+          <button type="button" onClick={() => irPara('comunicacao')} className="font-semibold text-fg underline decoration-line underline-offset-2 hover:decoration-fg">
+            Comunicação
+          </button>
+          .
         </Callout>
       ) : null}
 
-      <LinhaDoTempo />
+      <LinhaDoTempo
+        extra={
+          <div className="hidden items-center gap-2 lg:flex">
+            <span className="text-[12px] font-medium text-fg-muted">Velocidade</span>
+            <SeletorVelocidade />
+          </div>
+        }
+      />
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4 lg:space-y-5">
@@ -65,7 +78,19 @@ export function SecaoControle() {
               race={placarRace}
               resumo={placarDados.resumo}
               variant="compact"
-              titulo={preEleicao ? `${placarRace.titulo} · exibido no site` : `${placarRace.titulo} · agora no site`}
+              subtitulo={
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{preEleicao ? 'Resultado do 1º turno exibido no site' : 'Exibido agora no site'}</span>
+                  {anon ? (
+                    <>
+                      <span aria-hidden className="hidden text-fg-subtle sm:inline">
+                        ·
+                      </span>
+                      <NotaNomesOcultos onClick={() => irPara('fonte')} />
+                    </>
+                  ) : null}
+                </span>
+              }
               simulado={simulado}
               live={false}
             />
@@ -80,7 +105,7 @@ export function SecaoControle() {
                   race={placarRace}
                   rotulos
                   valores={false}
-                  selecionada={pagina.startsWith('/apuracao/') ? (pagina.slice(10).toUpperCase() as UF) : null}
+                  selecionada={ufPrevia}
                   onSelect={(uf) => setPagina(`/apuracao/${uf.toLowerCase()}`)}
                   rotuloAcao={(uf) => `Pré-visualizar ${uf}`}
                   ariaLabel="Mapa do Brasil: líder por UF"
@@ -89,7 +114,7 @@ export function SecaoControle() {
                 <Skeleton className="aspect-square w-full" rounded="lg" />
               )}
             </Painel>
-            <Painel titulo="Últimos eventos" icone="lista" pt="pt-3">
+            <Painel titulo="Últimos eventos" icone="lista" subtitulo="O que o feed público está mostrando." pt="pt-3">
               <EventFeed
                 eventos={placarDados?.eventos ?? []}
                 race={placarRace}
@@ -108,9 +133,7 @@ export function SecaoControle() {
           pt="pt-3"
         >
           <PreviaCelular caminho={pagina} onCaminho={setPagina} alturaMax={660} />
-          <Rotulo className="mt-3 text-center normal-case tracking-normal">
-            <span className="font-medium text-fg-subtle">Mesma origem, dados em tempo real</span>
-          </Rotulo>
+          <p className="mt-3 text-center text-[12px] text-fg-subtle">Mesma origem, dados em tempo real</p>
         </Painel>
       </div>
     </div>
