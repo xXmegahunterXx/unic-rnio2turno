@@ -315,6 +315,7 @@ function CabecalhoMovel() {
               type="button"
               role="tab"
               aria-selected={ativo}
+              aria-controls="conteudo"
               onClick={() => irPara(s.id)}
               className={cn(
                 'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-colors',

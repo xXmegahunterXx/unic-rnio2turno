@@ -72,7 +72,7 @@ export default function MetodologiaPage() {
           colunas={['Fonte', 'O que usamos', 'Atualização']}
           linhas={[
             [
-              <LinkExterno key="tse" href="https://resultados.tse.jus.br">
+              <LinkExterno key="tse" href="https://resultados.tse.jus.br" className="whitespace-nowrap">
                 TSE · Resultados
               </LinkExterno>,
               '2º turno (25/10) para Presidente e para Governador em 7 estados: totais do país, dos estados, dos municípios e das seções',
@@ -92,7 +92,7 @@ export default function MetodologiaPage() {
               'Fixo (oficial)',
             ],
             [
-              <LinkExterno key="ibge" href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html">
+              <LinkExterno key="ibge" href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html" className="whitespace-nowrap">
                 IBGE · Malhas
               </LinkExterno>,
               'Contornos dos estados e municípios, simplificados para carregar rápido no celular',

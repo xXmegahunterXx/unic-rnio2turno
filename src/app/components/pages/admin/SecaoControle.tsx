@@ -8,6 +8,7 @@ import { fmtHoraSeg } from '@/shared/format';
 import { useRace } from '@/app/data/hooks';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { EventFeed } from '@/app/components/apuracao/EventFeed';
+import { MapLegend } from '@/app/components/apuracao/MapLegend';
 import { Placar } from '@/app/components/apuracao/Placar';
 import { Skeleton } from '@/app/ui';
 import { useAdmin, useNacionalAdmin } from './dados';
@@ -113,12 +114,13 @@ export function SecaoControle() {
               ) : (
                 <Skeleton className="aspect-square w-full" rounded="lg" />
               )}
+              {placarRace ? <MapLegend modo="vencedor" race={placarRace} compacta className="mt-3" /> : null}
             </Painel>
             <Painel titulo="Últimos eventos" icone="lista" subtitulo="O que o feed público está mostrando." pt="pt-3">
               <EventFeed
                 eventos={placarDados?.eventos ?? []}
                 race={placarRace}
-                max={6}
+                max={5}
                 bleed={false}
                 emptyText={preEleicao ? 'Sem eventos na pré-eleição.' : 'Os eventos aparecem quando a apuração começar.'}
               />

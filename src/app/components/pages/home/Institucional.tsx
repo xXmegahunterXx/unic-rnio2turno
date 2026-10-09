@@ -249,35 +249,48 @@ export function Destaque({ icone = 'info', titulo, children, tom = 'neutro' }: {
   );
 }
 
-/** Tabela simples em cartão (rola na horizontal dentro do cartão se precisar). */
+/** Tabela simples em cartão. No celular vira uma lista de blocos (sem rolagem horizontal). */
 export function Ficha({ colunas, linhas, legenda }: { colunas: string[]; linhas: ReactNode[][]; legenda?: string }) {
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[520px] border-collapse text-left text-[14px] leading-snug">
-          {legenda ? <caption className="sr-only">{legenda}</caption> : null}
-          <thead>
-            <tr className="border-b border-line bg-surface-2/60">
-              {colunas.map((c) => (
-                <th key={c} scope="col" className="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
-                  {c}
-                </th>
+      <ul className="divide-y divide-line sm:hidden" aria-label={legenda}>
+        {linhas.map((l, i) => (
+          <li key={i} className="px-4 py-3.5 text-[14px] leading-snug">
+            <div className="font-semibold text-fg">{l[0]}</div>
+            <dl className="mt-1.5 space-y-1">
+              {l.slice(1).map((cel, j) => (
+                <div key={j}>
+                  <dt className="sr-only">{colunas[j + 1]}</dt>
+                  <dd className={cn(j === l.length - 2 ? 'text-[12.5px] text-fg-subtle' : 'text-fg-muted')}>{cel}</dd>
+                </div>
+              ))}
+            </dl>
+          </li>
+        ))}
+      </ul>
+      <table className="hidden w-full border-collapse text-left text-[14px] leading-snug sm:table">
+        {legenda ? <caption className="sr-only">{legenda}</caption> : null}
+        <thead>
+          <tr className="border-b border-line bg-surface-2/60">
+            {colunas.map((c) => (
+              <th key={c} scope="col" className="px-4 py-3 text-[11.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {linhas.map((l, i) => (
+            <tr key={i} className="align-top">
+              {l.map((cel, j) => (
+                <td key={j} className={cn('px-4 py-3', j === 0 ? 'font-medium text-fg' : 'text-fg-muted')}>
+                  {cel}
+                </td>
               ))}
             </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {linhas.map((l, i) => (
-              <tr key={i} className="align-top">
-                {l.map((cel, j) => (
-                  <td key={j} className={cn('px-4 py-3', j === 0 ? 'font-medium text-fg' : 'text-fg-muted')}>
-                    {cel}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -314,13 +327,15 @@ export function Resumo({ itens }: { itens: { icone: IconName; titulo: string; te
   return (
     <ul className="grid grid-cols-1 gap-3 md:grid-cols-3 md:gap-4">
       {itens.map((it) => (
-        <li key={it.titulo} className="relative overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-card">
+        <li key={it.titulo} className="relative flex gap-3.5 overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-card md:block md:p-5">
           <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-brand/[0.1] blur-2xl" />
-          <span className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-brand/25 bg-brand/[0.12] text-brand-fg">
+          <span className="relative inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-brand/25 bg-brand/[0.12] text-brand-fg">
             <Icon name={it.icone} size={20} />
           </span>
-          <h2 className="relative mt-3.5 font-display text-[17.5px] font-semibold leading-snug tracking-[-0.015em] text-fg">{it.titulo}</h2>
-          <p className="relative mt-1.5 text-pretty text-[14px] leading-relaxed text-fg-muted">{it.texto}</p>
+          <div className="relative min-w-0">
+            <h2 className="font-display text-[17px] font-semibold leading-snug tracking-[-0.015em] text-fg md:mt-3.5 md:text-[17.5px]">{it.titulo}</h2>
+            <p className="mt-1 text-pretty text-[13.5px] leading-relaxed text-fg-muted md:mt-1.5 md:text-[14px]">{it.texto}</p>
+          </div>
         </li>
       ))}
     </ul>
