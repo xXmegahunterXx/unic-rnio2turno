@@ -53,3 +53,10 @@ export const resPresBrT2 = () => paths.resultado('br', 'br', ELE_PRES_T2, CARGO_
 export const resGovUfT2 = (uf: string) => paths.resultado(uf, uf, ELE_GOV_T2, CARGO_GOV);
 
 export const url = (p: string) => `${TSE_BASE}/${p}`;
+
+/**
+ * Nomes oficiais dos municípios (IBGE, API de localidades v1): referência de grafia para exibição
+ * (acentos, hífens, numerais romanos). Fica no mesmo cache bruto, sob `_ibge/`.
+ */
+export const IBGE_MUNICIPIOS_URL = 'https://servicodados.ibge.gov.br/api/v1/localidades/municipios';
+export const ibgeMunicipios = () => '_ibge/localidades-v1-municipios.json';

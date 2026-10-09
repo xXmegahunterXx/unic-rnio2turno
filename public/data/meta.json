@@ -1,7 +1,7 @@
 {
  "versao": 1,
- "geradoEm": "2026-10-09T20:38:16.829Z",
- "fonte": "TSE — resultados oficiais do 1º turno das Eleições Gerais de 04/10/2026 (pleito 3220): Presidente (eleição 6257) e Governador (eleição 6259) por município; estrutura de zonas e seções do arquivo de urnas (3220); candidatos do 2º turno de 25/10/2026 (eleições 6258 e 6260). URLs: https://resultados.tse.jus.br/oficial/ele2026/6257/config/mun-e006257-cm.json · https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json · https://resultados.tse.jus.br/oficial/ele2026/6257/dados/{uf}/{uf}{mun}-c0001-e006257-u.json · https://resultados.tse.jus.br/oficial/ele2026/6259/dados/{uf}/{uf}{mun}-c0003-e006259-u.json · https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json. Malhas municipais: IBGE (servicodados.ibge.gov.br/api/v3/malhas).",
+ "geradoEm": "2026-10-09T20:59:54.596Z",
+ "fonte": "TSE — resultados oficiais do 1º turno das Eleições Gerais de 04/10/2026 (pleito 3220): Presidente (eleição 6257) e Governador (eleição 6259) por município; estrutura de zonas e seções do arquivo de urnas (3220); candidatos do 2º turno de 25/10/2026 (eleições 6258 e 6260). URLs: https://resultados.tse.jus.br/oficial/ele2026/6257/config/mun-e006257-cm.json · https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json · https://resultados.tse.jus.br/oficial/ele2026/6257/dados/{uf}/{uf}{mun}-c0001-e006257-u.json · https://resultados.tse.jus.br/oficial/ele2026/6259/dados/{uf}/{uf}{mun}-c0003-e006259-u.json · https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json. Malhas municipais e grafia oficial dos nomes dos municípios: IBGE (servicodados.ibge.gov.br/api/v4/malhas e api/v1/localidades/municipios).",
  "races": [
   {
    "id": "pres",
@@ -102,7 +102,7 @@
      "partido": "PP",
      "coligacao": "Avança Acre",
      "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
-     "vice": "Jessica Sales",
+     "vice": "Jéssica Sales",
      "cor": "b",
      "primeiroTurno": {
       "votos": 218760,
@@ -134,7 +134,7 @@
      "partido": "PL",
      "coligacao": "Mudar é Urgente",
      "composicao": "PL / NOVO",
-     "vice": "Coronel Anibal",
+     "vice": "Coronel Aníbal",
      "cor": "a",
      "primeiroTurno": {
       "votos": 507335,
@@ -507,7 +507,7 @@
      "partido": "PP",
      "coligacao": "Avança Acre",
      "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
-     "vice": "Jessica Sales",
+     "vice": "Jéssica Sales",
      "cor": "b",
      "primeiroTurno": {
       "votos": 218760,
@@ -551,7 +551,7 @@
      "partido": "PL",
      "coligacao": "Mudar é Urgente",
      "composicao": "PL / NOVO",
-     "vice": "Coronel Anibal",
+     "vice": "Coronel Aníbal",
      "cor": "a",
      "primeiroTurno": {
       "votos": 507335,

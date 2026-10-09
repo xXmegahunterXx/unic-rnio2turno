@@ -11,6 +11,14 @@
  *  3. Invariantes internas: Σ municípios = UF, Σ UFs + ZZ = Brasil, votos + brancos + nulos = comparecimento,
  *     faixas de seções canônicas e sem repetição, candidatos/cores/ordem das corridas etc.
  *  4. (Aviso, não falha) Cobertura das malhas em public/geo/mun/{uf}.json, se já geradas.
+ *  5. Conferência MUNICÍPIO A MUNICÍPIO contra os arquivos brutos do TSE (quando data-raw/ existe), lendo os campos
+ *     do feed diretamente (sem lib/resultado.ts): eleitorado, comparecimento, brancos, nulos e votos de cada candidato
+ *     (Presidente e Governador) e o conjunto exato de seções ativas (zona, seção) do arquivo de urnas. As somas por UF
+ *     não detectam, por exemplo, resultados trocados entre dois municípios; esta conferência detecta.
+ *  6. Nomes: estilo (sem CAIXA ALTA, numerais romanos, partícula d' minúscula), grafia oficial do IBGE quando é o mesmo
+ *     nome (se data-raw/ tiver a lista do IBGE) e país das cidades do exterior conforme lib/exterior.ts.
+ *  7. Candidatos das corridas × feed (com data-raw/): finalistas, partido, e nome de urna/nome/vice/coligação iguais
+ *     aos do feed a menos de acentos e caixa.
  *
  * Sai com código 1 se qualquer verificação falhar.
  */
@@ -24,8 +32,10 @@ import { UF_NOMES, UF_REGIAO, UFS_GOV_2T } from '../../src/shared/constants';
 import { decodeFaixas, encodeFaixas } from '../../src/shared/calc';
 import { ROOT, rawPath, readRaw } from './lib/cache';
 import { lerResultado, pct2 } from './lib/resultado';
-import { paths, resGovUf, resPresBr, resPresUf } from './lib/tse-feed';
-import type { TseAbrangencia, TseResultado } from './lib/tse-types';
+import { ibgeMunicipios, paths, resGovMun, resGovUf, resPresBr, resPresMun, resPresUf } from './lib/tse-feed';
+import { candidatosDe, type TseAbrangencia, type TseResultado, type TseSecoesConfig } from './lib/tse-types';
+import { chaveGrafia } from './lib/nomes';
+import { PAIS_EXTERIOR } from './lib/exterior';
 
 /** Totais oficiais do 1º turno de 2026 — Presidente, Brasil + exterior (TSE, divulgação final de 05/10/2026). */
 const OFICIAL_BR = {
@@ -50,6 +60,8 @@ const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : pat
 const GEO_DIR = path.join(ROOT, 'public', 'geo', 'mun');
 const OFICIAL_FILE = path.join(ROOT, 'scripts', 'data', 'lib', 'oficial-t1.json');
 const TODAS: UF[] = [...UFS, 'ZZ'];
+/** Palavra que é numeral romano (ex.: "Pio XII"): deve estar em maiúsculas. */
+const ROMANO = /^(?=[ivx]{2,}$)x{0,3}(?:ix|iv|v?i{0,3})$/i;
 
 let verificacoes = 0;
 const falhas: string[] = [];
@@ -153,6 +165,91 @@ function checkRace(r: Race, idEsperado: string, turno: 1 | 2, abr: 'BR' | UF) {
   }
 }
 
+/** Um resultado do dataset × o arquivo bruto do TSE, lendo os campos do feed diretamente. */
+function conferirResultado(ctx: string, r: ResultadoPrimeiroTurno, u: TseResultado, cod: string) {
+  check(u.cdabr === cod && u.tf === 's', `${ctx}: arquivo bruto não corresponde (cdabr ${u.cdabr}, tf ${u.tf})`);
+  check(r.eleitorado === +u.e.te, `${ctx}: eleitorado ${r.eleitorado} ≠ TSE e.te ${u.e.te}`);
+  check(r.comparecimento === +u.e.c, `${ctx}: comparecimento ${r.comparecimento} ≠ TSE e.c ${u.e.c}`);
+  check(r.brancos === +u.v.vb, `${ctx}: brancos ${r.brancos} ≠ TSE v.vb ${u.v.vb}`);
+  check(r.nulos === +u.v.tvn, `${ctx}: nulos ${r.nulos} ≠ TSE v.tvn ${u.v.tvn}`);
+  const tse = new Map(candidatosDe(u).map(({ cand }) => [String(+cand.n), +cand.vap]));
+  check(Object.keys(r.votos).length === tse.size, `${ctx}: ${Object.keys(r.votos).length} candidatos ≠ TSE ${tse.size}`);
+  for (const [n, v] of tse) check(r.votos[n] === v, `${ctx}: votos ${n} ${r.votos[n]} ≠ TSE ${v}`);
+}
+
+/**
+ * Candidatos das corridas × feed do 1º turno (st = "2º turno"): número, partido e os MESMOS nomes do feed a menos de
+ * acentos/caixa/separadores (nome de urna, nome completo, vice, coligação). Pega troca de candidato, vice ou partido.
+ */
+async function conferirCandidatos(race: Map<string, Race>) {
+  const arquivos: [string, string][] = [
+    ['pres', resPresBr()],
+    ...UFS_GOV_2T.map((uf): [string, string] => [`gov-${uf.toLowerCase()}`, resGovUf(uf.toLowerCase())]),
+  ];
+  for (const [id, arq] of arquivos) {
+    const feed = candidatosDe(await readRaw<TseResultado>(arq));
+    for (const r of [race.get(id)!, race.get(`${id}-t1`)!]) {
+      for (const c of r.candidatos.filter((x) => !x.agregado)) {
+        const ctx = `${r.id} ${c.numero}`;
+        const f = feed.find((x) => +x.cand.n === c.numero);
+        if (!check(!!f && f.cand.st === '2º turno', `${ctx}: não é finalista no feed`)) continue;
+        const { cand, par, agr } = f!;
+        check(chaveGrafia(c.nomeUrna) === chaveGrafia(cand.nmu), `${ctx}: nome de urna "${c.nomeUrna}" ≠ feed "${cand.nmu}"`);
+        check(chaveGrafia(c.nome) === chaveGrafia(cand.nm), `${ctx}: nome "${c.nome}" ≠ feed "${cand.nm}"`);
+        check(chaveGrafia(c.partido) === chaveGrafia(par.sg), `${ctx}: partido ${c.partido} ≠ feed ${par.sg}`);
+        const vice = cand.vs?.find((v) => v.tp === 'v') ?? cand.vs?.[0];
+        check(!!vice && chaveGrafia(c.vice ?? '') === chaveGrafia(vice.nmu), `${ctx}: vice "${c.vice}" ≠ feed "${vice?.nmu}"`);
+        check(
+          agr.tp === 'i' ? c.coligacao === undefined : chaveGrafia(c.coligacao ?? '') === chaveGrafia(agr.nm),
+          `${ctx}: coligação "${c.coligacao}" ≠ feed "${agr.nm}"`,
+        );
+      }
+    }
+  }
+}
+
+/** Conferência município a município contra data-raw/ (resultados, seções e nomes oficiais do IBGE). */
+async function conferirMunicipios(datasets: Map<UF, UfDataset>) {
+  const ibgeFile = rawPath(ibgeMunicipios());
+  const ibge = existsSync(ibgeFile)
+    ? new Map((await lerJson<{ id: number; nome: string }[]>(ibgeFile)).map((x) => [String(x.id), x.nome]))
+    : null;
+  if (!ibge) avisos.push('lista de municípios do IBGE ausente em data-raw/: grafia × IBGE não conferida');
+  let municipios = 0;
+  let divergentes = 0;
+  for (const [uf, ds] of datasets) {
+    const ufl = uf.toLowerCase();
+    const cs = await readRaw<TseSecoesConfig>(paths.secoes(ufl));
+    const csMun = new Map(cs.abr[0].mu.map((m) => [m.cd, m]));
+    for (const m of ds.municipios) {
+      const ctx = `[${uf} ${m.cod} ${m.nome}] bruto`;
+      municipios++;
+      conferirResultado(`${ctx} Presidente`, m.t1, await readRaw<TseResultado>(resPresMun(ufl, m.cod)), m.cod);
+      if (m.t1gov) conferirResultado(`${ctx} Governador`, m.t1gov, await readRaw<TseResultado>(resGovMun(ufl, m.cod)), m.cod);
+      // Seções ativas (sem as agregadas `nsp`), como conjunto exato de (zona, seção).
+      const csm = csMun.get(m.cod);
+      if (!check(!!csm, `${ctx}: ausente do arquivo de seções`)) continue;
+      const tse = new Set<string>();
+      for (const z of csm!.zon) for (const sec of z.sec) if (sec.nsp === undefined) tse.add(`${+z.cd}/${+sec.ns}`);
+      const nosso = m.zonas.flatMap((z) => decodeFaixas(z.s).map((n) => `${z.z}/${n}`));
+      check(nosso.length === tse.size && nosso.every((k) => tse.has(k)), `${ctx}: seções ≠ arquivo de urnas (${nosso.length} × ${tse.size})`);
+      // Grafia: se o IBGE tem o mesmo nome (a menos de acentos/caixa/separadores), a exibição usa a grafia do IBGE.
+      if (ibge && uf !== 'ZZ') {
+        const oficial = ibge.get(m.ibge);
+        if (!check(!!oficial, `${ctx}: código IBGE ${m.ibge} ausente da lista do IBGE`)) continue;
+        if (chaveGrafia(oficial!) === chaveGrafia(m.nome)) {
+          const esperado = oficial!.replace(/([\s-])D'(\p{L})/gu, (_, a: string, c: string) => `${a}d'${c}`);
+          check(m.nome === esperado, `${ctx}: nome "${m.nome}" ≠ grafia oficial do IBGE "${esperado}"`);
+        } else divergentes++;
+      }
+    }
+  }
+  console.log(
+    `Município a município × data-raw/: ${fmt(municipios)} municípios/cidades (resultados de Presidente e Governador, ` +
+      `seções)${ibge ? ` · nomes × IBGE: ${divergentes} nome(s) do TSE diferentes do IBGE mantidos (ver build-data)` : ''}`,
+  );
+}
+
 async function lerJson<T>(f: string): Promise<T> {
   return JSON.parse(await readFile(f, 'utf8')) as T;
 }
@@ -187,6 +284,7 @@ async function main() {
     .join();
 
   const br = novaSoma();
+  const datasets = new Map<UF, UfDataset>();
   const somasUf = new Map<UF, { pres: Soma; gov: Soma | null }>();
   const tabela: string[] = [];
   let totalMun = 0;
@@ -202,6 +300,7 @@ async function main() {
     bytes += (await stat(file)).size;
     check(!txt.includes('\n'), `${ctx} JSON não minificado`);
     const ds = JSON.parse(txt) as UfDataset;
+    datasets.set(uf, ds);
     check(ds.uf === uf, `${ctx} campo uf = ${ds.uf}`);
     check(um.nome === UF_NOMES[uf] && um.regiao === UF_REGIAO[uf], `${ctx} nome/região`);
     check(ds.municipios.length === um.municipios, `${ctx} municípios ${ds.municipios.length} ≠ meta ${um.municipios}`);
@@ -227,6 +326,16 @@ async function main() {
         ibges.add(m.ibge);
       }
       check(m.nome.trim() !== '' && m.nome !== m.nome.toUpperCase(), `${mctx}: nome vazio ou em CAIXA ALTA`);
+      check(m.nome === m.nome.trim().replace(/\s+/g, ' '), `${mctx}: espaços sobrando no nome`);
+      check(
+        m.nome.split(/[\s-]/).every((w) => !ROMANO.test(w) || w === w.toUpperCase()),
+        `${mctx}: numeral romano fora de maiúsculas`,
+      );
+      check(!/[\s-]D'/.test(m.nome), `${mctx}: partícula D' maiúscula no meio do nome`);
+      if (uf === 'ZZ') {
+        const esperado = PAIS_EXTERIOR[m.cod]?.[1] ?? undefined;
+        check(!!PAIS_EXTERIOR[m.cod] && m.pais === esperado, `${mctx}: país ${m.pais} ≠ tabela ${esperado}`);
+      } else check(m.pais === undefined, `${mctx}: país fora do exterior`);
       if (m.capital) {
         capitais++;
         check(um.capitalCod === m.cod, `${mctx}: capital ≠ meta.capitalCod ${um.capitalCod}`);
@@ -361,6 +470,8 @@ async function main() {
         if (snapshot) comparar(`[${uf}] instantâneo oficial-t1.json (Gov)`, s.gov, snapshot[uf].governador!);
       }
     }
+    await conferirMunicipios(datasets);
+    await conferirCandidatos(race);
   } else if (snapshot) {
     fonteUf = 'instantâneo scripts/data/lib/oficial-t1.json (data-raw/ ausente)';
     comparar('Brasil (instantâneo)', br, snapshot.BR.presidente);
@@ -371,6 +482,8 @@ async function main() {
   } else {
     check(false, 'sem fonte oficial por UF: nem data-raw/ nem scripts/data/lib/oficial-t1.json');
   }
+
+  if (!temRaw) avisos.push('data-raw/ ausente: conferência município a município e de nomes × IBGE não executada');
 
   // ---------- Relatório ----------
   console.log('UF  mun. zonas   seções   eleitorado  comparecim.');

@@ -15,6 +15,7 @@
  *   - ele2026/6259/dados/{uf}/{uf}[{mun}]-c0003-e006259-u.json  (Governador 1º turno, só nas 7 UFs com 2º turno)
  *   - ele2026/6258/dados/br/br-c0001-e006258-u.json         (2º turno Presidente: candidatos; sempre atualizado)
  *   - ele2026/6260/dados/{uf}/{uf}-c0003-e006260-u.json     (2º turno Governador: opcional, pode não existir ainda)
+ *   - IBGE api/v1/localidades/municipios → _ibge/…            (nomes oficiais: referência de grafia para exibição)
  */
 import { createFetcher, rawPath, readRaw } from './lib/cache';
 import { existsSync } from 'node:fs';
@@ -26,7 +27,9 @@ import {
   PLEITO_T1,
   PLEITO_T2,
   CICLO,
+  IBGE_MUNICIPIOS_URL,
   UFS_GOV,
+  ibgeMunicipios,
   paths,
   resGovMun,
   resGovUf,
@@ -45,7 +48,7 @@ const OFFLINE = args.has('--offline');
 const t0 = Date.now();
 const fetcher = createFetcher({ concorrencia: 12, refresh: FORCE });
 
-async function etapa(nome: string, lista: { p: string; opcional?: boolean; refresh?: boolean }[]) {
+async function etapa(nome: string, lista: { p: string; opcional?: boolean; refresh?: boolean; url?: string }[]) {
   const t = Date.now();
   if (OFFLINE) {
     const ausentes = lista.filter((x) => !existsSync(rawPath(x.p)));
@@ -59,7 +62,7 @@ async function etapa(nome: string, lista: { p: string; opcional?: boolean; refre
   const passo = Math.max(250, Math.ceil(lista.length / 10));
   const resultados = await Promise.allSettled(
     lista.map(async (x) => {
-      const r = await fetcher.ensure(x.p, { opcional: x.opcional, refresh: x.refresh });
+      const r = await fetcher.ensure(x.p, { opcional: x.opcional, refresh: x.refresh, url: x.url });
       if (r === 'inexistente') inexistentes.push(x.p);
       feitos++;
       if (lista.length > passo && feitos % passo === 0) console.log(`  … ${nome}: ${feitos}/${lista.length}`);
@@ -101,6 +104,11 @@ async function main() {
   const totalMun = cm.abr.reduce((s, a) => s + a.mu.length, 0);
   console.log(`  ${ufs.length} abrangências (${ufs.join(' ')}), ${totalMun} municípios/cidades`);
   if (ufs.length !== 28 || !ufs.includes('zz')) throw new Error('Esperadas 27 UFs + zz no arquivo de municípios');
+
+  // 2b) Nomes oficiais dos municípios (IBGE): referência de grafia para exibição (ver lib/nomes.ts).
+  await etapa('IBGE · nomes dos municípios', [{ p: ibgeMunicipios(), url: IBGE_MUNICIPIOS_URL }]);
+  const ibge = await readRaw<{ id: number; nome: string }[]>(ibgeMunicipios());
+  console.log(`  ${ibge.length} municípios no IBGE`);
 
   // 3) Por UF: seções, abrangência e resultado agregado da UF.
   await etapa(

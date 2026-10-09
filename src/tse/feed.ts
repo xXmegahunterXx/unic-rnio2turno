@@ -151,8 +151,16 @@ export interface TseResultadoArquivo {
   dv?: string;
   /** 's' = totalização finalizada */
   tf: string;
-  /** andamento: 'n' não iniciada · 'f' finalizada (demais valores = em andamento) */
+  /** andamento (enum do app oficial): 'n' não iniciada · 'p' parcial (em andamento) · 'f' finalizada */
   and?: string;
+  /**
+   * 's' quando a eleição está matematicamente definida antes do fim (`tf` = 'n'). O app oficial mostra
+   * "Eleição matematicamente definida (Eleito)" no 2º turno e "(Segundo turno)" no 1º. Ausente em 2026 até agora.
+   */
+  md?: string;
+  /** mensagem informativa do TSE (texto livre, opcional) */
+  mntf?: string;
+  /** 's' quando há eleição sub judice / anulada ("esae"); acompanha `mnae` (mensagens) */
   esae?: string;
   mnae?: unknown[];
   carg: TseCargo[];

@@ -19,7 +19,10 @@
  *    Assim o índice 0/1 de um candidato é o mesmo no 1º e no 2º turno.
  *  - `primeiroTurno.pct` = votos ÷ válidos computados (`vvc`) × 100 com 2 casas — exatamente o `pvap` publicado
  *    pelo TSE (conferido). Votos "Anulado sub judice" entram em `votos` (ver scripts/data/lib/resultado.ts).
- *  - Exterior: o feed não traz o país das cidades, então `pais` não é preenchido.
+ *  - Nomes de municípios: grafia oficial do IBGE quando é o mesmo nome do TSE a menos de acentos/caixa/separadores
+ *    (lib/nomes.ts → nomeMunicipio); nomes realmente diferentes ficam como no TSE e são listados no relatório.
+ *  - Exterior: o feed não traz o país das cidades; `pais` vem da tabela editorial lib/exterior.ts (conferida contra o
+ *    nome do feed; o build para se surgir cidade nova).
  *  - Seções: só as ativas, isto é, as que NÃO têm `nsp` (agregadas a outra seção). Seções sem `da` (não
  *    instaladas no 1º turno — 41 seções, todas no exterior) CONTAM: o TSE as inclui em `s.ts` e o eleitorado delas
  *    está em `e.te`. Com isso, seções ativas por município = `s.ts` exatamente.
@@ -45,6 +48,7 @@ import {
   PLEITO_T1,
   PLEITO_T2,
   TSE_BASE,
+  ibgeMunicipios,
   paths,
   resGovMun,
   resGovUf,
@@ -63,7 +67,8 @@ import {
   type TseSecoesConfig,
 } from './lib/tse-types';
 import { lerResultado, paraDataset, pct2, Totais, type ResultadoLido } from './lib/resultado';
-import { composicao, nomeColigacao, nomeLugar, nomePessoa, sigla } from './lib/nomes';
+import { composicao, nomeColigacao, nomeLugar, nomeMunicipio, nomePessoa, sigla } from './lib/nomes';
+import { paisExterior } from './lib/exterior';
 
 const OUT_DIR = path.join(ROOT, 'public', 'data');
 const OUT_UF = path.join(OUT_DIR, 'uf');
@@ -100,7 +105,16 @@ function oficial(r: ResultadoLido) {
   };
 }
 
-async function construirUf(ufLower: string, cmUf: TseMunicipiosConfig['abr'][number], oficiais: Record<string, unknown>) {
+/** Nomes que o build ajustou pela grafia do IBGE e nomes TSE × IBGE realmente diferentes (para o relatório). */
+const nomesAjustados: string[] = [];
+const nomesDivergentes: string[] = [];
+
+async function construirUf(
+  ufLower: string,
+  cmUf: TseMunicipiosConfig['abr'][number],
+  oficiais: Record<string, unknown>,
+  nomesIbge: Map<string, string>,
+) {
   const uf = ufLower.toUpperCase() as UF;
   const temGov = UFS_GOV_2T.includes(uf);
 
@@ -172,20 +186,30 @@ async function construirUf(ufLower: string, cmUf: TseMunicipiosConfig['abr'][num
     else if (t1.comparecimento === 0) semVotos++;
     pres.add(t1);
 
+    let nome: string;
+    let pais: string | undefined;
+    if (uf === 'ZZ') {
+      if (m.cdi !== '') fail(`[${ctx}] cidade do exterior com código IBGE`);
+      nome = nomeLugar(m.nm);
+      pais = paisExterior(m.cd, m.nm);
+    } else {
+      if (!/^\d{7}$/.test(m.cdi) || m.cdi.slice(0, 2) === '00') fail(`[${ctx}] código IBGE inválido: ${m.cdi}`);
+      const nomeIbge = nomesIbge.get(m.cdi) ?? fail(`[${ctx}] código IBGE ${m.cdi} ausente da lista de municípios do IBGE`);
+      const r = nomeMunicipio(m.nm, nomeIbge);
+      nome = r.nome;
+      if (r.origem === 'tse-divergente') nomesDivergentes.push(`${uf} ${m.cdi} TSE "${nome}" × IBGE "${nomeIbge}"`);
+      else if (nome !== nomeLugar(m.nm)) nomesAjustados.push(`${uf} "${nomeLugar(m.nm)}" → "${nome}"`);
+    }
     const mun: MunicipioDataset = {
       cod: m.cd,
       ibge: m.cdi,
-      nome: nomeLugar(m.nm),
+      nome,
       capital: m.c === 's',
+      ...(pais ? { pais } : {}),
       eleitorado: t1.eleitorado,
       zonas,
       t1: paraDataset(t1),
     };
-    if (uf === 'ZZ') {
-      if (m.cdi !== '') fail(`[${ctx}] cidade do exterior com código IBGE`);
-    } else if (!/^\d{7}$/.test(m.cdi) || m.cdi.slice(0, 2) === '00') {
-      fail(`[${ctx}] código IBGE inválido: ${m.cdi}`);
-    }
     if (!/^\d{5}$/.test(m.cd)) fail(`[${ctx}] código TSE inválido`);
     if (mun.capital) {
       capitais++;
@@ -314,13 +338,18 @@ async function main() {
   const porUf = new Map(cm.abr.map((a) => [a.cd, a]));
   if (porUf.size !== 28) fail(`esperadas 28 abrangências no cm, há ${porUf.size}`);
 
+  // Nomes oficiais do IBGE (referência de grafia): código de 7 dígitos → nome.
+  const listaIbge = await readRaw<{ id: number; nome: string }[]>(ibgeMunicipios());
+  const nomesIbge = new Map(listaIbge.map((x) => [String(x.id), x.nome]));
+  if (nomesIbge.size < 5570) fail(`lista de municípios do IBGE incompleta (${nomesIbge.size})`);
+
   const oficiais: Record<string, unknown> = {};
   const builds: UfBuild[] = [];
   let semInstalacao = 0;
   let semVotos = 0;
   for (const uf of TODAS) {
     const a = porUf.get(uf.toLowerCase()) ?? fail(`UF ${uf} ausente do cm`);
-    const r = await construirUf(uf.toLowerCase(), a, oficiais);
+    const r = await construirUf(uf.toLowerCase(), a, oficiais, nomesIbge);
     builds.push(r.build);
     semInstalacao += r.semInstalacao;
     semVotos += r.semVotos;
@@ -430,7 +459,8 @@ async function main() {
       `${TSE_BASE}/${CICLO}/${ELE_PRES_T1}/dados/{uf}/{uf}{mun}-c0001-e00${ELE_PRES_T1}-u.json · ` +
       `${TSE_BASE}/${CICLO}/${ELE_GOV_T1}/dados/{uf}/{uf}{mun}-c0003-e00${ELE_GOV_T1}-u.json · ` +
       `${TSE_BASE}/${resPresBrT2()}. ` +
-      'Malhas municipais: IBGE (servicodados.ibge.gov.br/api/v3/malhas).',
+      'Malhas municipais e grafia oficial dos nomes dos municípios: IBGE (servicodados.ibge.gov.br/api/v4/malhas e ' +
+      'api/v1/localidades/municipios).',
     races: [...races2t, ...races1t],
     ufs: builds.map((b) => b.meta),
     totaisPrimeiroTurno: {
@@ -503,6 +533,10 @@ async function main() {
       `eleitorado ${br.eleitorado} · comparecimento ${br.comparecimento} · válidos ${br.validos}`,
   );
   console.log(`Arquivos: meta.json ${(metaSz / 1024).toFixed(1)} KB · uf/*.json ${(bytes / 1024 / 1024).toFixed(2)} MB (28 arquivos)`);
+  console.log(`\nNomes ajustados pela grafia oficial do IBGE (${nomesAjustados.length}):`);
+  for (const n of nomesAjustados) console.log(`  ${n}`);
+  console.log(`Nomes TSE × IBGE diferentes, mantido o do TSE (${nomesDivergentes.length}):`);
+  for (const n of nomesDivergentes) console.log(`  ${n}`);
   for (const a of avisos) console.log(`aviso: ${a}`);
   console.log(`✓ build-data em ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }

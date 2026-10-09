@@ -8,6 +8,10 @@
  *    Só entram correções verificadas (a grafia com acento é a usada pelo próprio candidato e/ou pelo TSE em
  *    outro campo — ex.: o nome de urna "CELINA LEÃO" vs. o nome completo "CELINA LEAO ..."). Nunca "adivinhe":
  *    nomes civis podem legitimamente não ter acento.
+ *  - Municípios: grafia oficial do IBGE (`nomeMunicipio`) sempre que ela for o MESMO nome do TSE a menos de acentos,
+ *    caixa e separadores ("LUIS CORREIA" → "Luís Correia", "OLHOS D'ÁGUA" → "Olhos-d'Água", "PIO XII"); nomes
+ *    realmente diferentes (ex.: TSE "BOA SAÚDE" × IBGE "Januário Cicco") ficam como no TSE, que é o nome do título
+ *    de eleitor e o da apuração oficial.
  *  - Coligações: título com partículas em minúsculas ("Brasil Pronto pra Mais", "Mudar é Urgente"),
  *    siglas de UF preservadas ("DF do Povo") e apóstrofos soltos removidos (o feed traz "ESPERANÇA E TRABALHO'").
  *  - Composição: siglas como no feed, com a grafia oficial do PCdoB.
@@ -25,6 +29,12 @@ export const CORRECOES_PESSOA: Readonly<Record<string, string>> = {
   FLAVIO: 'Flávio',
   JOSE: 'José',
   LEAO: 'Leão',
+  // Vice de Maria do Carmo (AM): nome de urna "CORONEL ANIBAL"; o TSE (notícia de 05/10/2026) e a imprensa grafam
+  // "Coronel Aníbal" (nome civil Mário Aníbal Gomes da Costa Júnior; o feed traz "MARIO ANIBAL ..." sem acentos).
+  ANIBAL: 'Aníbal',
+  // Vice de Mailza Assis (AC): nome de urna "JESSICA SALES"; como deputada federal (Câmara, id 178839) o nome
+  // parlamentar/eleitoral é "Jéssica Sales" (o nome civil "JESSICA ROJAS SALES" não tem acento — não exibimos).
+  JESSICA: 'Jéssica',
 };
 
 /** Ajustes pós-titleCasePt: titleCasePt só reconhece a–z sem acento depois do apóstrofo. */
@@ -56,7 +66,19 @@ export const CORRECOES_LUGAR: Readonly<Record<string, string>> = {
   PANAMA: 'Panamá',
   NICOSIA: 'Nicósia',
   'SANTA CRUZ DE LA SIERRA': 'Santa Cruz de la Sierra',
+  'DAR ES SALAAM': 'Dar es Salaam',
+  // Nome real da cidade argentina (fronteira com Uruguaiana); o feed abrevia "PASO LOS LIBRES".
+  'PASO LOS LIBRES': 'Paso de los Libres',
+  // St. John's (Antígua e Barbuda); o feed perde o apóstrofo.
+  'SAINT JOHNS': "Saint John's",
+  // Saint-Georges-de-l'Oyapock (Guiana Francesa), grafia do vice-consulado brasileiro; o feed traz "ST GEORGES DE LOYAPOCK".
+  'ST GEORGES DE LOYAPOCK': "Saint-Georges de l'Oyapock",
+  // O feed desambigua com o país no nome; o país vai em `pais` (lib/exterior.ts).
+  'KINGSTON-JAMAICA': 'Kingston',
 };
+
+/** Numerais romanos em nomes ("PIO XII", "PEDRO II", "PIO IX"): titleCasePt os deixaria "Xii", "Ii", "Ix". */
+const ROMANO = /^(?=[ivx]{2,}$)x{0,3}(?:ix|iv|v?i{0,3})$/i;
 
 /** Nome de município/cidade: "OLHO D'ÁGUA DO BORGES" → "Olho d'Água do Borges"; "SÃO JOÃO DEL REI" → "São João del Rei". */
 export function nomeLugar(nm: string): string {
@@ -64,8 +86,42 @@ export function nomeLugar(nm: string): string {
   if (CORRECOES_LUGAR[bruto]) return CORRECOES_LUGAR[bruto];
   return ajustarApostrofos(titleCasePt(bruto))
     .split(' ')
-    .map((w, i) => (i > 0 && PARTICULAS_LUGAR.has(w.toLowerCase()) ? w.toLowerCase() : w))
+    .map((w, i) => {
+      if (ROMANO.test(w)) return w.toUpperCase();
+      return i > 0 && PARTICULAS_LUGAR.has(w.toLowerCase()) ? w.toLowerCase() : w;
+    })
     .join(' ');
+}
+
+/** Chave de comparação de grafias: sem acentos, sem caixa e sem separadores (espaço, hífen, apóstrofo). */
+export const chaveGrafia = (s: string) =>
+  s
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[\s\-'’`´]/g, '');
+
+/**
+ * A partícula "d'" fica sempre minúscula no meio do nome. O IBGE é inconsistente ("Santa Bárbara d'Oeste" ×
+ * "Alta Floresta D'Oeste", "Pau D'Arco"); a forma minúscula é a ortográfica e a que já usamos nos demais.
+ */
+const dMinusculo = (s: string) => s.replace(/([\s-])D'(\p{L})/gu, (_, pre: string, c: string) => `${pre}d'${c.toUpperCase()}`);
+
+export type OrigemNome = 'ibge' | 'tse' | 'tse-divergente';
+
+/**
+ * Nome de exibição de um município brasileiro.
+ *  - Se o nome oficial do IBGE for o mesmo nome do TSE a menos de acentos, caixa e separadores, usa a grafia do IBGE
+ *    (com "d'" minúsculo): corrige acentos que o TSE omite ou erra, hífens oficiais e numerais romanos.
+ *  - Se forem nomes diferentes (ex.: "Boa Saúde" × "Januário Cicco", "Dona Eusébia" × "Dona Euzébia"), mantém o TSE
+ *    e devolve origem 'tse-divergente' para o relatório do build.
+ *  - Sem nome do IBGE: o do TSE.
+ */
+export function nomeMunicipio(nmTse: string, nomeIbge: string | undefined): { nome: string; origem: OrigemNome } {
+  const tse = nomeLugar(nmTse);
+  if (!nomeIbge) return { nome: tse, origem: 'tse' };
+  if (chaveGrafia(nomeIbge) !== chaveGrafia(tse)) return { nome: tse, origem: 'tse-divergente' };
+  return { nome: dMinusculo(limpar(nomeIbge)), origem: 'ibge' };
 }
 
 /** Nome de pessoa (nome de urna ou completo), com a tabela de correções de acento. */

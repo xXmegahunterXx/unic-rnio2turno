@@ -1,0 +1,364 @@
+[
+ {
+  "id": "pres",
+  "cargo": "Presidente",
+  "turno": 2,
+  "abrangencia": "BR",
+  "titulo": "Presidente",
+  "candidatos": [
+   {
+    "numero": 13,
+    "nomeUrna": "Lula",
+    "nome": "Luiz Inácio Lula da Silva",
+    "partido": "PT",
+    "coligacao": "Brasil Pronto pra Mais",
+    "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
+    "vice": "Geraldo Alckmin",
+    "cor": "a",
+    "primeiroTurno": {
+     "votos": 53879538,
+     "pct": 45.16
+    }
+   },
+   {
+    "numero": 22,
+    "nomeUrna": "Flávio Bolsonaro",
+    "nome": "Flávio Nantes Bolsonaro",
+    "partido": "PL",
+    "vice": "Alfredo Gaspar",
+    "cor": "b",
+    "primeiroTurno": {
+     "votos": 56104503,
+     "pct": 47.03
+    }
+   }
+  ],
+  "ufs": [
+   "AC",
+   "AL",
+   "AM",
+   "AP",
+   "BA",
+   "CE",
+   "DF",
+   "ES",
+   "GO",
+   "MA",
+   "MG",
+   "MS",
+   "MT",
+   "PA",
+   "PB",
+   "PE",
+   "PI",
+   "PR",
+   "RJ",
+   "RN",
+   "RO",
+   "RR",
+   "RS",
+   "SC",
+   "SE",
+   "SP",
+   "TO",
+   "ZZ"
+  ],
+  "tse": {
+   "ciclo": "ele2026",
+   "eleicao": "6258",
+   "cargo": "1",
+   "pleito": "3221"
+  }
+ },
+ {
+  "id": "gov-ac",
+  "cargo": "Governador",
+  "turno": 2,
+  "abrangencia": "AC",
+  "titulo": "Governador · Acre",
+  "candidatos": [
+   {
+    "numero": 10,
+    "nomeUrna": "Alan Rick",
+    "nome": "Alan Rick Miranda",
+    "partido": "REPUBLICANOS",
+    "coligacao": "Trabalho da Esperança",
+    "composicao": "REPUBLICANOS / NOVO / PSD / AVANTE",
+    "vice": "Ricardo Leite",
+    "cor": "a",
+    "primeiroTurno": {
+     "votos": 141859,
+     "pct": 32.27
+    }
+   },
+   {
+    "numero": 11,
+    "nomeUrna": "Mailza Assis",
+    "nome": "Mailza Assis Cameli",
+    "partido": "PP",
+    "coligacao": "Avança Acre",
+    "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
+    "vice": "Jéssica Sales",
+    "cor": "b",
+    "primeiroTurno": {
+     "votos": 218760,
+     "pct": 49.76
+    }
+   }
+  ],
+  "ufs": [
+   "AC"
+  ],
+  "tse": {
+   "ciclo": "ele2026",
+   "eleicao": "6260",
+   "cargo": "3",
+   "pleito": "3221"
+  }
+ },
+ {
+  "id": "gov-rj",
+  "cargo": "Governador",
+  "turno": 2,
+  "abrangencia": "RJ",
+  "titulo": "Governador · Rio de Janeiro",
+  "candidatos": [
+   {
+    "numero": 22,
+    "nomeUrna": "Douglas Ruas",
+    "nome": "Douglas Ruas dos Santos",
+    "partido": "PL",
+    "coligacao": "Rio Real",
+    "composicao": "PL / MOBILIZA / AGIR / AVANTE",
+    "vice": "Fernanda Louback",
+    "cor": "a",
+    "primeiroTurno": {
+     "votos": 4271199,
+     "pct": 49.27
+    }
+   },
+   {
+    "numero": 55,
+    "nomeUrna": "Eduardo Paes",
+    "nome": "Eduardo da Costa Paes",
+    "partido": "PSD",
+    "coligacao": "Juntos para Mudar Coragem para Reconstruir",
+    "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
+    "vice": "Jane Reis",
+    "cor": "b",
+    "primeiroTurno": {
+     "votos": 3706984,
+     "pct": 42.76
+    }
+   }
+  ],
+  "ufs": [
+   "RJ"
+  ],
+  "tse": {
+   "ciclo": "ele2026",
+   "eleicao": "6260",
+   "cargo": "3",
+   "pleito": "3221"
+  }
+ },
+ {
+  "id": "pres-t1",
+  "cargo": "Presidente",
+  "turno": 1,
+  "abrangencia": "BR",
+  "titulo": "Presidente · 1º turno",
+  "candidatos": [
+   {
+    "numero": 13,
+    "nomeUrna": "Lula",
+    "nome": "Luiz Inácio Lula da Silva",
+    "partido": "PT",
+    "coligacao": "Brasil Pronto pra Mais",
+    "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
+    "vice": "Geraldo Alckmin",
+    "cor": "a",
+    "primeiroTurno": {
+     "votos": 53879538,
+     "pct": 45.16
+    }
+   },
+   {
+    "numero": 22,
+    "nomeUrna": "Flávio Bolsonaro",
+    "nome": "Flávio Nantes Bolsonaro",
+    "partido": "PL",
+    "vice": "Alfredo Gaspar",
+    "cor": "b",
+    "primeiroTurno": {
+     "votos": 56104503,
+     "pct": 47.03
+    }
+   },
+   {
+    "numero": 0,
+    "nomeUrna": "Outros",
+    "nome": "Demais candidatos do 1º turno",
+    "partido": "",
+    "cor": "outros",
+    "agregado": true,
+    "primeiroTurno": {
+     "votos": 9316747,
+     "pct": 7.81
+    }
+   }
+  ],
+  "ufs": [
+   "AC",
+   "AL",
+   "AM",
+   "AP",
+   "BA",
+   "CE",
+   "DF",
+   "ES",
+   "GO",
+   "MA",
+   "MG",
+   "MS",
+   "MT",
+   "PA",
+   "PB",
+   "PE",
+   "PI",
+   "PR",
+   "RJ",
+   "RN",
+   "RO",
+   "RR",
+   "RS",
+   "SC",
+   "SE",
+   "SP",
+   "TO",
+   "ZZ"
+  ],
+  "tse": {
+   "ciclo": "ele2026",
+   "eleicao": "6257",
+   "cargo": "1",
+   "pleito": "3220"
+  }
+ },
+ {
+  "id": "gov-ac-t1",
+  "cargo": "Governador",
+  "turno": 1,
+  "abrangencia": "AC",
+  "titulo": "Governador · Acre · 1º turno",
+  "candidatos": [
+   {
+    "numero": 10,
+    "nomeUrna": "Alan Rick",
+    "nome": "Alan Rick Miranda",
+    "partido": "REPUBLICANOS",
+    "coligacao": "Trabalho da Esperança",
+    "composicao": "REPUBLICANOS / NOVO / PSD / AVANTE",
+    "vice": "Ricardo Leite",
+    "cor": "a",
+    "primeiroTurno": {
+     "votos": 141859,
+     "pct": 32.27
+    }
+   },
+   {
+    "numero": 11,
+    "nomeUrna": "Mailza Assis",
+    "nome": "Mailza Assis Cameli",
+    "partido": "PP",
+    "coligacao": "Avança Acre",
+    "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
+    "vice": "Jéssica Sales",
+    "cor": "b",
+    "primeiroTurno": {
+     "votos": 218760,
+     "pct": 49.76
+    }
+   },
+   {
+    "numero": 0,
+    "nomeUrna": "Outros",
+    "nome": "Demais candidatos do 1º turno",
+    "partido": "",
+    "cor": "outros",
+    "agregado": true,
+    "primeiroTurno": {
+     "votos": 79028,
+     "pct": 17.98
+    }
+   }
+  ],
+  "ufs": [
+   "AC"
+  ],
+  "tse": {
+   "ciclo": "ele2026",
+   "eleicao": "6259",
+   "cargo": "3",
+   "pleito": "3220"
+  }
+ },
+ {
+  "id": "gov-rj-t1",
+  "cargo": "Governador",
+  "turno": 1,
+  "abrangencia": "RJ",
+  "titulo": "Governador · Rio de Janeiro · 1º turno",
+  "candidatos": [
+   {
+    "numero": 22,
+    "nomeUrna": "Douglas Ruas",
+    "nome": "Douglas Ruas dos Santos",
+    "partido": "PL",
+    "coligacao": "Rio Real",
+    "composicao": "PL / MOBILIZA / AGIR / AVANTE",
+    "vice": "Fernanda Louback",
+    "cor": "a",
+    "primeiroTurno": {
+     "votos": 4271199,
+     "pct": 49.27
+    }
+   },
+   {
+    "numero": 55,
+    "nomeUrna": "Eduardo Paes",
+    "nome": "Eduardo da Costa Paes",
+    "partido": "PSD",
+    "coligacao": "Juntos para Mudar Coragem para Reconstruir",
+    "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
+    "vice": "Jane Reis",
+    "cor": "b",
+    "primeiroTurno": {
+     "votos": 3706984,
+     "pct": 42.76
+    }
+   },
+   {
+    "numero": 0,
+    "nomeUrna": "Outros",
+    "nome": "Demais candidatos do 1º turno",
+    "partido": "",
+    "cor": "outros",
+    "agregado": true,
+    "primeiroTurno": {
+     "votos": 690855,
+     "pct": 7.97
+    }
+   }
+  ],
+  "ufs": [
+   "RJ"
+  ],
+  "tse": {
+   "ciclo": "ele2026",
+   "eleicao": "6259",
+   "cargo": "3",
+   "pleito": "3220"
+  }
+ }
+]

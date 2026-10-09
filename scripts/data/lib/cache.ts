@@ -90,7 +90,7 @@ export function createFetcher(opts: CachedFetcherOptions = {}) {
     }
   }
 
-  async function baixar(p: string): Promise<string | null> {
+  async function baixar(p: string, urlAbsoluta?: string): Promise<string | null> {
     let ultimoErro: unknown = null;
     for (let i = 0; i < tentativas; i++) {
       if (i > 0) {
@@ -99,7 +99,7 @@ export function createFetcher(opts: CachedFetcherOptions = {}) {
         await sleep(espera);
       }
       try {
-        const res = await fetch(tseUrl(p), {
+        const res = await fetch(urlAbsoluta ?? tseUrl(p), {
           signal: AbortSignal.timeout(timeoutMs),
           headers: { accept: 'application/json', 'user-agent': 'sintonia-data-pipeline/1.0' },
         });
@@ -135,8 +135,9 @@ export function createFetcher(opts: CachedFetcherOptions = {}) {
   /**
    * Garante o arquivo no cache. Retorna 'cache' | 'baixado' | 'inexistente'.
    * Com `refresh`, tenta baixar de novo; se falhar e houver cache, mantém o cache (com aviso).
+   * `url`: endereço absoluto de outra fonte (ex.: API de localidades do IBGE); `p` continua sendo o caminho no cache.
    */
-  async function ensure(p: string, o: { refresh?: boolean; opcional?: boolean } = {}) {
+  async function ensure(p: string, o: { refresh?: boolean; opcional?: boolean; url?: string } = {}) {
     return limit(async () => {
       const refresh = o.refresh ?? opts.refresh ?? false;
       if (!refresh) {
@@ -147,7 +148,7 @@ export function createFetcher(opts: CachedFetcherOptions = {}) {
         }
       }
       try {
-        const txt = await baixar(p);
+        const txt = await baixar(p, o.url);
         if (txt === null) {
           stats.inexistentes++;
           if (!o.opcional) throw new Error(`Arquivo obrigatório inexistente no feed (404): ${p}`);

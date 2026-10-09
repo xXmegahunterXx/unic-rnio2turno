@@ -43,8 +43,12 @@ export interface Controller {
   meta(): PublicMeta;
   status(): LiveStatus;
   state(): AdminState;
-  /** Substitui o estado inteiro (sincronização entre abas no demo / restauração). */
+  /**
+   * Substitui o estado inteiro (sincronização entre abas no demo / restauração). Valida e completa campos
+   * ausentes; reconstrói o modelo se o cenário mudou. NÃO chama `onStateChange` (evita laços de broadcast).
+   */
   setState(state: AdminState): void;
+  /** Aplica um comando do admin (lança `CommandError` (400) se inválido). `versao` incrementa a cada mudança. */
   command(cmd: AdminCommand): AdminSnapshot;
   adminSnapshot(extra?: Partial<AdminMetrics>): AdminSnapshot;
   presets(): PresetInfo[];
@@ -55,6 +59,18 @@ export interface Controller {
   municipio(race: RaceId, uf: UF, cod: string): MunicipioSnapshot;
   zona(race: RaceId, uf: UF, cod: string, zona: number): ZonaSnapshot;
   secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number): SecaoDetalhe | null;
+
+  // --- extensões (retrocompatíveis) -------------------------------------------------------------
+  /** Relógio da apuração agora (simulado; = wallNow nas fontes 'pre' e 'tse'). */
+  simNow(): number;
+  /** Instantes (simNow) em que 'pres' atinge 1, 10, 25, 50, 75, 90, 99 e 100% das seções. */
+  marcos(): { pct: number; t: number }[];
+  /** simNow em que a simulação atinge 100% ('pres'). */
+  fimPrevisto(): number | null;
+  /** Métricas operacionais (o servidor completa requisições/clientes via `extra`). */
+  metrics(extra?: Partial<AdminMetrics>): AdminMetrics;
+  /** Estado serializado (JSON) para persistir; restaure com `parseAdminState` + `initialState`/`setState`. */
+  toJSON(): string;
 }
 
 export class NotFoundError extends Error {
@@ -62,6 +78,15 @@ export class NotFoundError extends Error {
   constructor(msg: string) {
     super(msg);
     this.name = 'NotFoundError';
+  }
+}
+
+/** Comando/cenário inválido (o servidor responde 400 com `message`). */
+export class CommandError extends Error {
+  readonly status = 400;
+  constructor(msg: string) {
+    super(msg);
+    this.name = 'CommandError';
   }
 }
 

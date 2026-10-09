@@ -1,0 +1,22 @@
+/** Design system do Sintonia — primitivos de UI. Importe daqui: `import { Button, Card } from '@/app/ui'`. */
+export { Icon, ICON_NAMES, type IconName, type IconProps } from './Icon';
+export { Button, ButtonLink, IconButton, Spinner, buttonClasses, type ButtonProps, type ButtonLinkProps, type IconButtonProps, type ButtonVariant, type ButtonSize } from './Button';
+export { Card, CardHeader, type CardProps } from './Card';
+export { Badge, Pill, toneFromCor, type BadgeProps, type BadgeTone } from './Badge';
+export { Segmented, type SegmentedProps, type SegmentedOption } from './Segmented';
+export { Tooltip, type TooltipProps } from './Tooltip';
+export { Sheet, type SheetProps } from './Sheet';
+export { Dialog, type DialogProps } from './Dialog';
+export { Skeleton, SkeletonText } from './Skeleton';
+export { NumberRoll, type NumberRollProps } from './NumberRoll';
+export { LiveDot, type LiveDotTone } from './LiveDot';
+export { Countdown, fmtFaltam, partesTempo, type CountdownProps } from './Countdown';
+export { SearchBox, Combobox, type SearchBoxProps, type ComboboxProps, type ComboOption } from './SearchBox';
+export { casa, pontuar, realcar } from './textMatch';
+export { DataTable, type DataTableProps, type Column, type SortState, type SortDir } from './DataTable';
+export { Toggle, type ToggleProps } from './Toggle';
+export { Slider, type SliderProps, type SliderMark } from './Slider';
+export { Select, type SelectProps, type SelectOption } from './Select';
+export { Stat, type StatProps } from './Stat';
+export { ThemeToggle } from './ThemeToggle';
+export { Toaster, toast, dismissToast, type ToastTone } from './Toast';
