@@ -295,9 +295,20 @@ Meta de < 120 ms por desenho: cumprida em todos os casos no desktop e nas atuali
 |---|---|
 | `useNaTela(margem?)` | `src/app/lib/useNaTela.ts` — `[ref, visto]`: libera o download de dados pesados só quando o bloco chega perto da tela. Usado por `LocaisVotacao`, `PerfilEleitorado` (prop `adiar`, padrão sim) e `EleitosUf`/fotos dos cargos. |
 | Perfil do eleitorado na UF | `UfPage` → seção "Quem vota aqui" com `<PerfilEleitorado uf nome />` (sem `cod` = total da UF; exterior incluído). |
-| Governadores eleitos no 1º turno | `/governadores` termina com `<GovernadoresEleitosT1 mostrarSegundoTurno={false} onSelectUf2t=… />` (as 7 disputas já aparecem acima). Nova prop `mostrarSegundoTurno` (padrão `true`). No celular os blocos de 2º turno do cartograma dizem "2º T". |
+| Governadores eleitos no 1º turno | `/governadores` termina com `<GovernadoresEleitosT1 mostrarSegundoTurno={false} onSelectUf2t=… />` (as 7 disputas já aparecem acima). Nova prop `mostrarSegundoTurno` (padrão `true`). O mapa (`MapaUfs`) usa a geometria IBGE real: UFs de 2º turno com listras na cor da marca. |
 | Nome → ficha | `Placar` (hero/default) liga o nome a `/candidato/:sqcand` quando a corrida tem `sqcand` — nunca na simulação anonimizada (`anonimizarRace` remove a chave) nem no `compact` (já é link). `CandidateName linkFicha` faz o mesmo. |
 | Cores dos partidos | Tokens `--partido-1..10` agora em `src/app/styles.css` (escuro, claro e `prefers-color-scheme`), na ordem de `PARTIDOS_COM_COR`. `partidos.ts` não injeta mais `<style>` (`garantirPaletaPartidos` virou no-op por compatibilidade). |
 | Textos com artigo | `deUf(uf, nome)` em `components/pages/detalhe/fmt.ts` ("do Amazonas", "da Bahia") — use com `emUf` em vez de "de/em" + nome. |
 | `NomeLink quebra` / `PartidoChip` | `quebra` = até 2 linhas em vez de reticências (cartões estreitos do Senado); a sigla do `PartidoChip` cede espaço e o número nunca é cortado. |
 <!-- integracao:end -->
+
+### Fase 2 · ajustes finais do orquestrador
+
+- `pages/cargos/MapaUfs` deixou de ser cartograma de blocos: agora desenha o **mapa geográfico real** (public/geo/br.json)
+  com as mesmas caixas fora da costa (RN, PB, PE, AL, SE) e o callout do DF do `BrazilMap` (helpers `layoutCaixas`,
+  `posicionarCalloutDf`, `OFFSHORE`, `EXTRA_DIREITA` exportados de `apuracao/BrazilMap.tsx`). `CelulaUf.especial`
+  (ReactNode) virou `CelulaUf.marca?: 'segundo-turno' | 'pendente'`; duas cores diferentes = listrado (Senado: as 2 vagas;
+  bancadas: empate).
+- `MunicipioPage` e `ZonasExplorer` (prop `t`) leem `?t=`; a UfPage leva o instante ao abrir um município.
+- Paleta: `--partido-2` (PT) e `--partido-3` (MDB) trocaram de valor para separar os dois maiores partidos (PL rosa × PT anil).
+
