@@ -7,7 +7,18 @@ import { useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
-import { ativoNoMais } from './nav';
+import { NAV, ativoNoMais, type NavItem } from './nav';
+
+/**
+ * A rota também tem link próprio no header a partir de um breakpoint (Curiosidades, "E se…?", Governadores): dali em
+ * diante o "Mais" não fica marcado junto (dois itens ativos). Classes escritas por extenso para o Tailwind.
+ */
+const SEM_DESTAQUE: Record<NonNullable<NavItem['header']>, string> = {
+  md: 'md:bg-transparent md:text-fg-muted md:hover:text-fg',
+  lg: 'lg:bg-transparent lg:text-fg-muted lg:hover:text-fg',
+  xl: 'xl:bg-transparent xl:text-fg-muted xl:hover:text-fg',
+  xxl: 'min-[1400px]:bg-transparent min-[1400px]:text-fg-muted min-[1400px]:hover:text-fg',
+};
 
 const carregar = () => import('./MenuMais');
 const PainelMais = lazy(() => carregar().then((m) => ({ default: m.PainelMais })));
@@ -31,6 +42,7 @@ export function BotaoMaisDesktop({ className }: { className?: string }) {
   const botao = useRef<HTMLButtonElement>(null);
   const id = useId();
   const ativo = ativoNoMais(pathname);
+  const noHeader = NAV.find((n) => n.header && n.match(pathname))?.header;
 
   useEffect(() => setAberto(false), [pathname]);
   useEffect(() => {
@@ -66,6 +78,7 @@ export function BotaoMaisDesktop({ className }: { className?: string }) {
           'relative inline-flex items-center gap-1 whitespace-nowrap rounded-[10px] px-2.5 py-2 text-[14px] font-medium transition-colors lg:px-3',
           aberto || ativo ? 'text-fg' : 'text-fg-muted hover:text-fg',
           (aberto || ativo) && 'bg-surface-3/80',
+          ativo && !aberto && noHeader && SEM_DESTAQUE[noHeader],
         )}
       >
         Mais
