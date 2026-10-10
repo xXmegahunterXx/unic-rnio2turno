@@ -7,6 +7,9 @@
  *  - 'hero'    → página nacional (números gigantes, barra, progresso).
  *  - 'default' → mesma estrutura, escala menor (UF, município).
  *  - 'compact' → cartões de UF/governador (linhas por candidato).
+ *
+ * Fotos oficiais (useFotosRace): aparecem nas três variantes quando a corrida não está anonimizada e os dois
+ * finalistas têm foto; senão, monograma para os dois. Mesmo tamanho e moldura para os dois lados.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -20,6 +23,7 @@ import { Icon } from '@/app/ui/Icon';
 import { NumberRoll } from '@/app/ui/NumberRoll';
 import { ApuracaoProgress } from './ApuracaoProgress';
 import { CandidateAvatar } from './CandidateAvatar';
+import { useFotosRace } from './fotos';
 import { SimulationRibbon } from './SimulationRibbon';
 import { VoteSplitBar } from './VoteSplitBar';
 
@@ -141,6 +145,7 @@ function PlacarDuelo({
   const hero = variant === 'hero';
   const anunciar = live ?? hero;
   const { finalistas, outros } = linhas(race, resumo);
+  const fotos = useFotosRace(race);
   const semVotos = validos(resumo) === 0;
   const vice = showVice ?? hero;
   const eleito = finalistas.find((l) => l.eleito);
@@ -186,9 +191,9 @@ function PlacarDuelo({
         </div>
 
         <div className={cn('grid grid-cols-2 gap-x-3 sm:gap-x-8', hero && 'lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]')}>
-          {a ? <LadoDuelo l={a} lado="esq" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} /> : <div />}
+          {a ? <LadoDuelo l={a} lado="esq" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} foto={fotos[a.i]} /> : <div />}
           {hero ? <Diferenca resumo={resumo} /> : null}
-          {b ? <LadoDuelo l={b} lado="dir" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} /> : <div />}
+          {b ? <LadoDuelo l={b} lado="dir" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} foto={fotos[b.i]} /> : <div />}
         </div>
 
         <div className={cn(hero ? 'mt-5 sm:mt-7' : 'mt-4 sm:mt-5')}>
@@ -249,6 +254,7 @@ function LadoDuelo({
   semVotos,
   vice,
   resumo,
+  foto,
 }: {
   l: Linha;
   lado: 'esq' | 'dir';
@@ -257,6 +263,7 @@ function LadoDuelo({
   semVotos: boolean;
   vice: boolean;
   resumo: Summary;
+  foto?: string;
 }) {
   const s = corSlot(l.c.cor);
   const dir = lado === 'dir';
@@ -266,9 +273,18 @@ function LadoDuelo({
       <div className={cn('flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3', dir ? 'items-end sm:flex-row-reverse' : 'items-start')}>
         <CandidateAvatar
           candidato={l.c}
-          size={hero ? 'md' : 'sm'}
+          foto={foto}
+          size={foto ? (hero ? 'lg' : 'md') : hero ? 'md' : 'sm'}
           eleito={l.eleito}
-          className={hero ? 'sm:h-14 sm:w-14 sm:text-[19px]' : 'sm:h-11 sm:w-11 sm:text-[15px]'}
+          className={
+            foto
+              ? hero
+                ? 'sm:h-[72px] sm:w-[72px]'
+                : 'sm:h-14 sm:w-14'
+              : hero
+                ? 'sm:h-14 sm:w-14 sm:text-[19px]'
+                : 'sm:h-11 sm:w-11 sm:text-[15px]'
+          }
         />
         <div className={cn('min-w-0', dir && 'text-right')}>
           <div className={cn('font-display font-semibold leading-[1.08] tracking-[-0.02em] text-fg', hero ? 'text-[17px] sm:text-[26px]' : 'text-[16px] sm:text-[20px]')}>
@@ -316,6 +332,7 @@ function LadoDuelo({
 
 function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProgress = true, simulado, actions, live = false, className }: PlacarProps) {
   const { finalistas, outros } = linhas(race, resumo);
+  const fotos = useFotosRace(race);
   const semVotos = validos(resumo) === 0;
   const eleito = finalistas.find((l) => l.eleito);
   const corpo = (
@@ -346,7 +363,7 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
           const s = corSlot(l.c.cor);
           return (
             <li key={l.i} className="flex items-center gap-3">
-              <CandidateAvatar candidato={l.c} size="sm" eleito={l.eleito} />
+              <CandidateAvatar candidato={l.c} foto={fotos[l.i]} size={fotos[l.i] ? 'md' : 'sm'} eleito={l.eleito} className={fotos[l.i] ? '!h-10 !w-10' : undefined} />
               <div className="min-w-0 flex-1">
                 <div className={cn('truncate text-[14.5px] leading-tight', l.lider && !semVotos ? 'font-semibold text-fg' : 'font-medium text-fg')}>
                   {l.c.nomeUrna}

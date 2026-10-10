@@ -35,7 +35,7 @@ export const PASSOS_TESTE: NonNullable<IntroTesteProps['passos']> = [
   {
     icone: 'check-circulo',
     titulo: 'Diga o quanto concorda',
-    texto: 'De “concordo totalmente” a “discordo totalmente”. Pule o que preferir e marque o que pesa mais para você.',
+    texto: 'De “concordo totalmente” a “discordo totalmente”. “Neutro” conta como meio-termo; se não souber, pule. Marque o que pesa mais para você.',
   },
   {
     icone: 'selo',

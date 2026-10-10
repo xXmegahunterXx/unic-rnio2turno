@@ -27,6 +27,7 @@ import {
   type Resposta,
   type Respostas,
 } from './afirmacoes';
+import { fmtPct } from '@/shared/format';
 
 /** Responde exatamente o que o candidato defende (+2/0/−2) e pula onde ele não tem posição. */
 function respostasIguaisA(c: Candidato): Respostas {
@@ -173,13 +174,14 @@ describe('calcularSintonia', () => {
   });
 
   it('caso à mão: um item em que 13 concorda e 22 discorda, resposta "Concordo" (+1)', () => {
-    const s = calcularSintonia({ 'eco-a': 1 });
+    // eco-b: 13 concorda, 22 discorda
+    const s = calcularSintonia({ 'eco-b': 1 });
     // 13: 1 − |1 − 2|/4 = 0,75 · 22: 1 − |1 − (−2)|/4 = 0,25
     expect(s[13]).toBeCloseTo(75, 10);
     expect(s[22]).toBeCloseTo(25, 10);
     expect(s.respondidas).toBe(1);
     expect(s.puladas).toBe(23);
-    expect(s.porAfirmacao['eco-a'].pct).toEqual({ 13: 75, 22: 25 });
+    expect(s.porAfirmacao['eco-b'].pct).toEqual({ 13: 75, 22: 25 });
     expect(s.porTema.economia[13]).toBeCloseTo(75, 10);
     expect(s.porTema.impostos[13]).toBeNull();
   });
@@ -192,14 +194,57 @@ describe('calcularSintonia', () => {
   });
 
   it('caso à mão com peso: item importante conta em dobro', () => {
-    // eco-a (13 concorda) resposta +2 → 13: 1 · eco-b (13 discorda) resposta +2 → 13: 0
+    // eco-b (13 concorda) resposta +2 → 13: 1 · eco-a (13 discorda) resposta +2 → 13: 0
     const sem = calcularSintonia({ 'eco-a': 2, 'eco-b': 2 });
     expect(sem[13]).toBe(50);
-    const com = calcularSintonia({ 'eco-a': 2, 'eco-b': 2 }, ['eco-a']);
+    const com = calcularSintonia({ 'eco-a': 2, 'eco-b': 2 }, ['eco-b']);
     expect(com[13]).toBeCloseTo((PESO_IMPORTANTE * 1 + 1 * 0) / (PESO_IMPORTANTE + 1) * 100, 10);
-    expect(calcularSintonia({ 'eco-a': 2, 'eco-b': 2 }, new Set(['eco-a']))[13]).toBeCloseTo(com[13]!, 10);
-    expect(calcularSintonia({ 'eco-a': 2, 'eco-b': 2 }, { 'eco-a': 2 })[13]).toBeCloseTo(com[13]!, 10);
-    expect(com.porAfirmacao['eco-a'].peso).toBe(PESO_IMPORTANTE);
+    expect(calcularSintonia({ 'eco-a': 2, 'eco-b': 2 }, new Set(['eco-b']))[13]).toBeCloseTo(com[13]!, 10);
+    expect(calcularSintonia({ 'eco-a': 2, 'eco-b': 2 }, { 'eco-b': 2 })[13]).toBeCloseTo(com[13]!, 10);
+    expect(com.porAfirmacao['eco-b'].peso).toBe(PESO_IMPORTANTE);
+  });
+
+  it('peso em item pulado ou sem posição não mexe na conta do outro candidato', () => {
+    const base = calcularSintonia({ 'eco-a': 2, 'eco-b': -1 });
+    // eco-a pulado e marcado: nada muda
+    const pulado = calcularSintonia({ 'eco-a': 'pular', 'eco-b': -1 }, ['eco-a']);
+    const semMarca = calcularSintonia({ 'eco-a': 'pular', 'eco-b': -1 });
+    expect([pulado[13], pulado[22], pulado.consideradas]).toEqual([semMarca[13], semMarca[22], semMarca.consideradas]);
+    // trb-b: só o 13 tem posição; o peso nele não altera a sintonia com o 22
+    const comPeso = calcularSintonia({ 'eco-a': 2, 'eco-b': -1, 'trb-b': -2 }, ['trb-b']);
+    expect(comPeso[22]).toBe(base[22]);
+    expect(comPeso.consideradas[22]).toBe(base.consideradas[22]);
+    expect(comPeso.consideradas[13]).toBe(base.consideradas[13] + 1);
+  });
+
+  it('arredondamento exato: meio ponto percentual sobe (sem resíduo de ponto flutuante)', () => {
+    // 10 afirmações sintéticas em que o 13 concorda: 5 × 100% + 1 × 75% + 4 × 0% = 57,5%
+    const sint: Afirmacao[] = Array.from({ length: 10 }, (_, i) => ({ ...AFIRMACAO_POR_ID['sau-a'], id: `x${i}` }));
+    const r: Record<string, Resposta> = {};
+    sint.forEach((a, i) => (r[a.id] = i < 5 ? 2 : i === 5 ? 1 : -2));
+    const s = calcularSintonia(r, undefined, sint);
+    expect(s[13]).toBe(57.5); // (5,75 ÷ 10) × 100 daria 57,49999…
+    expect(fmtPct(s[13]!, 0)).toBe('58%');
+    expect(calcularConcordancia(r, Object.fromEntries(sint.map((a) => [a.id, 2])), sint).pct).toBe(57.5);
+  });
+
+  it('todos os resultados possíveis com até 48 de peso saem exatos (múltiplos de 25/peso)', () => {
+    for (let peso = 1; peso <= 48; peso++)
+      for (let m = 0; m <= 4 * peso; m++) {
+        const sint: Afirmacao[] = Array.from({ length: peso }, (_, i) => ({ ...AFIRMACAO_POR_ID['sau-a'], id: `y${i}` }));
+        // m quartos de ponto distribuídos: cada item vale 0, 0,25, 0,5, 0,75 ou 1
+        const r: Record<string, Resposta> = {};
+        let resto = m;
+        for (const a of sint) {
+          const q = Math.min(4, resto);
+          resto -= q;
+          r[a.id] = (q - 2) as Resposta; // q quartos → resposta q − 2 contra "concorda" (+2)
+        }
+        const v = calcularSintonia(r, undefined, sint)[13]!;
+        expect(v * peso).toBeCloseTo(25 * m, 9);
+        // o valor é o quociente exato arredondado uma única vez: igual a 25·m/peso calculado em inteiros
+        expect(v).toBe((25 * m) / peso);
+      }
   });
 
   it('ignora "pular", não respondidas e sem-posicao', () => {

@@ -46,7 +46,7 @@ Nos dois documentos, a página impressa no rodapé coincide com a página do PDF
    do mesmo assunto com posições opostas**. Isso é raro: os planos quase nunca discutem as mesmas medidas. Por
    isso há muitas posições `sem-posicao` (ver §6).
 2. **Redação das afirmações** (24, sendo 2 por tema em 12 temas). Regras:
-   - frase curta (74 a 107 caracteres, média de 96; limite de 110), afirmativa, concreta, em linguagem simples;
+   - frase curta (74 a 107 caracteres, média de 95,5; limite de 110), afirmativa, concreta, em linguagem simples;
    - nenhum nome, partido, número, marca de programa ("voucher-creche", "cívico-militar", "arcabouço",
      "6x1"...), slogan ou palavra de enquadramento ("censura", "privilégio", "soberania", "garantir direitos"...);
      a lista está em `TERMOS_PROIBIDOS` e é testada;
@@ -83,6 +83,9 @@ Sintonia (0–100):      S = 100 × Σ w·a / Σ w
   do assunto (`sem-posicao`). Por isso o resultado informa quantos itens entraram para cada um
   (`consideradas`), e a UI deve mostrar "com base em N afirmações".
 - Os dois percentuais são independentes: **não somam 100%**. Sem nenhum item válido, o resultado é `null`.
+- Arredondamento: a UI mostra inteiros (`fmtPct(x, 0)`, meio ponto sobe). O código multiplica por 100 **antes** de
+  dividir pelo peso total, para que um 57,5% exato não vire 57,4999… e apareça como "57%" (testado para todos os
+  resultados possíveis com peso total até 48). Não há "vencedor": empate ou diferença, a UI mostra os dois números.
 - Exemplo: "Concordo" (+1) numa afirmação em que o 13 concorda e o 22 discorda dá 75% com o 13
   (1 − 1/4) e 25% com o 22 (1 − 3/4). "Neutro" contra "concorda" dá 50%.
 - Quem responde exatamente a posição de um candidato em tudo tem 100% com ele (testado).
@@ -100,12 +103,12 @@ Legenda: ✅ concorda · ❌ discorda · ➖ neutro · ∅ sem posição no plan
 
 | id | Tema | Afirmação (o que a pessoa vê) | 13 | 22 | Concordo → |
 |---|---|---|---|---|---|
-| eco-a | Economia | As regras atuais que limitam o crescimento dos gastos do governo federal devem ser mantidas. | ✅ p. 49 | ❌ p. 71 | 13 |
-| eco-b | Economia | O crescimento da economia deve ser puxado principalmente pelo investimento privado, e não pelo público. | ❌ p. 48 (m) | ✅ p. 49 | 22 |
+| eco-a | Economia | As regras de controle dos gastos federais devem ficar mais rígidas, com foco em reduzir a dívida pública. | ❌ p. 49 (m) | ✅ p. 71 | 22 |
+| eco-b | Economia | O investimento público deve ser um dos principais motores do crescimento da economia. | ✅ p. 48 | ❌ p. 49 (m) | 13 |
 | imp-a | Impostos | A reforma dos impostos sobre o consumo, que está em fase de implantação, deve ser revista. | ❌ p. 48 (m) | ✅ p. 30 | 22 |
-| imp-b | Impostos | O governo deve reduzir os impostos sobre combustíveis para baixar o preço na bomba. | ❌ p. 8 (m) | ✅ p. 31 | 22 |
+| imp-b | Impostos | O governo deve cortar impostos sobre combustíveis para baixar o preço, mesmo que arrecade menos. | ❌ p. 8 (m) | ✅ p. 31 | 22 |
 | trb-a | Trabalho e renda | A jornada máxima de trabalho deve ser reduzida por lei para 40 horas semanais, sem corte de salário. | ✅ p. 75 | ❌ p. 45 (m) | 13 |
-| trb-b | Trabalho e renda | O salário mínimo deve subir só o necessário para repor a inflação, sem ganho acima dela. | ❌ p. 74 | ∅ | 22 |
+| trb-b | Trabalho e renda | O salário mínimo deve ser reajustado apenas pela inflação, sem aumento acima dela. | ❌ p. 74 | ∅ | 22 |
 | soc-a | Programas sociais | Onde faltar vaga em creche pública, o governo deve pagar a vaga em uma creche particular. | ∅ | ✅ p. 21 | 22 |
 | soc-b | Programas sociais | O governo deve ampliar os programas de transferência de renda para atender mais famílias. | ✅ p. 18 (m) | ❌ p. 43 (m) | 13 |
 | sau-a | Saúde | O SUS deve usar hospitais e clínicas particulares para fazer exames e cirurgias e reduzir as filas. | ✅ p. 37 | ✅ p. 37 | controle |
@@ -118,17 +121,17 @@ Legenda: ✅ concorda · ❌ discorda · ➖ neutro · ∅ sem posição no plan
 | amb-b | Meio ambiente | Mais terras públicas devem ser destinadas a áreas de conservação e a territórios indígenas e quilombolas. | ✅ p. 70 | ∅ | 13 |
 | inf-a | Infraestrutura | Estradas, ferrovias e portos devem ser construídos e operados principalmente por empresas privadas. | ➖ p. 53 (m) | ✅ p. 50 | 22 |
 | inf-b | Infraestrutura | Compras, obras e concessões do governo devem preferir produtos brasileiros, mesmo que custem um pouco mais. | ✅ p. 51 | ∅ | 13 |
-| est-a | Estado e instituições | A lei deve obrigar as redes sociais a remover conteúdo considerado desinformação ou discurso de ódio. | ✅ p. 16 (m) | ❌ p. 66 (m) | 13 |
+| est-a | Estado e instituições | A lei deve obrigar as redes sociais a impedir a circulação de conteúdos considerados desinformação. | ✅ p. 16 (m) | ❌ p. 66 (m) | 13 |
 | est-b | Estado e instituições | Decisões tomadas por um único ministro do STF devem ser limitadas, dando prioridade às decisões coletivas. | ∅ | ✅ p. 65 | 22 |
-| agr-a | Agricultura | O governo deve avançar na reforma agrária, assentando famílias que vivem em acampamentos à espera de terra. | ✅ p. 60 | ∅ | 13 |
+| agr-a | Agricultura | O governo deve ampliar a reforma agrária, assentando mais famílias de trabalhadores rurais. | ✅ p. 60 | ∅ | 13 |
 | agr-b | Agricultura | O direito de propriedade de terras no campo deve ser garantido sem margem para exceções. | ∅ | ✅ p. 54 | 22 |
 | ext-a | Relações exteriores | O Brasil deve tratar como prioridade a entrada na OCDE, organização internacional de cooperação econômica. | ∅ | ✅ p. 63 | 22 |
 | ext-b | Relações exteriores | O Brasil deve aprofundar a aproximação política com o BRICS e com outros países em desenvolvimento. | ✅ p. 81 | ∅ | 13 |
 
 Contagens (`resumoEquilibrio()`):
 
-- **Posições opostas** (um concorda e o outro discorda): 7, sendo 4 em que o 13 concorda (eco-a, trb-a, soc-b,
-  est-a) e 3 em que o 22 concorda (eco-b, imp-a, imp-b).
+- **Posições opostas** (um concorda e o outro discorda): 7, sendo 4 em que o 13 concorda (eco-b, trb-a, soc-b,
+  est-a) e 3 em que o 22 concorda (eco-a, imp-a, imp-b).
 - **Controles** (os dois concordam): 2 (sau-a, sau-b).
 - **Um lado só** (o outro plano não trata): 14, sendo 7 com posição só do 13 e 7 só do 22. Mais inf-a, em que o
   13 é neutro.
@@ -142,12 +145,12 @@ Os trechos literais, as seções e as notas estão em `afirmacoes.ts` (campo `po
 
 | id | Escolhas de redação |
 |---|---|
-| eco-a | Descreve a regra (limite ao crescimento do gasto) sem o nome dela nem adjetivo ("responsável", "frouxa"). Quem quer manter as regras concorda; quem quer regras novas, focadas na dívida, discorda. |
-| eco-b | Opõe investimento privado e público sem qualificar nenhum dos dois ("ineficiente", "estratégico"). |
+| eco-a | Eixo ordinal (endurecer ou não), sem o nome da regra nem adjetivo ("responsável", "frouxa"). A versão anterior ("as regras atuais devem ser mantidas") misturava dois eixos: quem quer conter gastos tendia a concordar ("manter os limites") e caía perto do 13, embora seja o 22 quem pede regras mais duras; quem quer gastar mais discordava e caía perto do 22. |
+| eco-b | Fala do investimento público sem qualificá-lo ("ineficiente", "estratégico"); "um dos principais" deixa espaço a quem quer os dois. Direção invertida na revisão para compensar a troca de eco-a. |
 | imp-a | Não julga a reforma nem repete o "IVA entre os mais altos do mundo"; pergunta só se ela deve ser revista. |
-| imp-b | Dá o objetivo declarado (preço). Um lado concorda pelo alívio no preço, o outro discorda pelo custo fiscal. Ver risco 6. |
+| imp-b | Traz o benefício (preço) **e** o custo (arrecadação), para não virar pergunta de resposta óbvia. O custo é justamente a objeção documentada do 13. |
 | trb-a | Medida concreta, sem o slogan "fim da 6x1". Quem prefere acordo entre as partes pode discordar. |
-| trb-b | Escrita na direção oposta (repor só a inflação) para alternar o lado; sem "valorização" ou "arrocho". |
+| trb-b | Escrita na direção oposta (só a inflação) para alternar o lado; sem "valorização" ou "arrocho" e sem o "só o necessário" da versão anterior. O contexto factual (benefícios atrelados ao mínimo) mostra o que está em jogo para os dois lados. |
 | soc-a | Descreve o mecanismo sem a marca "voucher-creche". |
 | soc-b | "Transferência de renda" é descritivo; sem nome de programa nem "assistencialismo" ou "dependência". |
 | sau-a | Controle. Evita "privatizar o SUS" e "parceria". |
@@ -160,17 +163,18 @@ Os trechos literais, as seções e as notas estão em `afirmacoes.ts` (campo `po
 | amb-b | Descreve a destinação; sem "demarcação", "reparação" ou "terra improdutiva". |
 | inf-a | Sem "privatizar" ou "entregar"; "principalmente" deixa espaço aos modelos mistos (por isso o 13 é neutro). |
 | inf-b | Traz o custo ("mesmo que custem um pouco mais") para não virar pergunta patriótica de resposta óbvia. |
-| est-a | "Considerado" deixa claro que alguém julga o conteúdo, que é justamente a objeção de quem discorda; sem "censura" nem "regulação democrática". |
+| est-a | "Considerados" deixa claro que alguém julga o conteúdo, que é justamente a objeção de quem discorda; sem "censura" nem "regulação democrática". Saiu "discurso de ódio" (puxava para o "concordo" e o plano 22 não trata disso) e "remover" virou "impedir a circulação", mais perto do texto do 13. |
 | est-b | Descreve a regra sem "ativismo judicial" ou "ataque ao Supremo". O contexto explica a decisão individual. |
-| agr-a | "Famílias que vivem em acampamentos à espera de terra" em vez de "sem-terra" ou "invasores". |
+| agr-a | "Famílias de trabalhadores rurais", sem "sem-terra", "invasores" nem a imagem dos acampamentos (a versão anterior, "famílias que vivem em acampamentos à espera de terra", tinha apelo emocional). |
 | agr-b | Traduz "sem margem para relativizações" do plano; quem defende a função social da propriedade pode discordar. |
-| ext-a | Explica a OCDE sem "clube dos ricos" nem "selo de qualidade". |
+| ext-a | Explica a OCDE sem "clube dos ricos" nem "selo de qualidade". O contexto não diz mais o ano em que a adesão foi aberta (2022 apontava um governo). |
 | ext-b | Sem "Sul Global" nem "alinhamento"; o contexto explica o BRICS. |
 
-O campo opcional `contexto` (11 afirmações) explica um termo e pode aparecer antes da resposta. Ele passa pelo
-mesmo filtro de termos proibidos, mas traz fatos (lei de 2023 sobre gastos, jornada de 44 horas, ECA, adesão à
-OCDE aberta em 2022, composição original do BRICS, transição da reforma até 2033, decisões individuais no STF) que
-**precisam de checagem da redação**.
+O campo opcional `contexto` (12 afirmações) explica um termo e pode aparecer antes da resposta. Ele passa pelo
+mesmo filtro de termos proibidos e evita datas que apontem um governo. Traz fatos que **precisam de checagem da
+redação**: lei que limita o crescimento das despesas federais, jornada constitucional de 44 horas, benefícios
+atrelados ao salário mínimo, ECA, reforma do consumo com transição até 2033, candidatura do Brasil à OCDE,
+membros do BRICS, decisões individuais no STF, licença ambiental e reforma agrária.
 
 ## 6. Itens sem posição (`sem-posicao`)
 
@@ -201,8 +205,12 @@ plano foi feita pelo texto inteiro e por palavras-chave (ex.: "maioridade", "OCD
    dois conjuntos são diferentes. A UI deve mostrar "com base em N afirmações" para cada um e não apresentar os
    dois números como placar de disputa. Alternativa editorial: trocar itens de um lado só por pares com posição
    oposta explícita, se a revisão achar mais trechos.
-2. **Posições de confiança média** (9): eco-b/13, imp-a/13, imp-b/13, trb-a/22, soc-b/13, soc-b/22, est-a/13,
-   est-a/22 e inf-a/13 (neutro). Revisar primeiro. Os casos mais discutíveis:
+2. **Posições de confiança média** (10): eco-a/13, eco-b/22, imp-a/13, imp-b/13, trb-a/22, soc-b/13, soc-b/22,
+   est-a/13, est-a/22 e inf-a/13 (neutro). Revisar primeiro. Os casos mais discutíveis:
+   - **eco-a/13**: o plano promete "manter" as regras fiscais; o "discorda" de torná-las mais rígidas é a leitura
+     direta disso, mas o plano não diz "somos contra regras mais duras".
+   - **eco-b/22**: o plano apoia o crescimento "no investimento privado" e diz que o Estado "não é o empresário",
+     sem rejeitar com todas as letras o investimento público como motor.
    - **imp-b/13**: o "discorda" vem de uma crítica a um corte de impostos sobre combustíveis no **passado**
      ("desoneração artificial", p. 8), não de uma promessa futura. A alternativa é `sem-posicao`.
    - **trb-a/22**: o plano chama de "retrocesso" a proposta de jornada do governo atual por ignorar o
@@ -221,8 +229,8 @@ plano foi feita pelo texto inteiro e por palavras-chave (ex.: "maioridade", "OCD
 5. **Saúde sem discriminação.** As duas de Saúde são controles: os planos convergem (ver a lista de convergências
    na Versão anterior, §5). O resultado por tema em Saúde tende a ser igual para os dois, o que é informação
    verdadeira e precisa ser explicada na tela.
-6. **Frases populares.** imp-b (cortar imposto de combustível) e edu-b (ajuda a estudante pobre) tendem a ter
-   muita concordância. A revisão pode acrescentar o custo, como foi feito em inf-b.
+6. **Frases populares.** edu-b (ajuda a estudante pobre) tende a ter muita concordância. imp-b ganhou o custo
+   ("mesmo que arrecade menos") na revisão de 10/10, como inf-b; a redação pode fazer o mesmo em edu-b.
 7. **"Neutro" não é "não sei".** A UI deve deixar claro que "Pular" serve para "não sei / prefiro não responder".
    Um "Neutro" conta como posição do meio.
 8. **Incumbência.** Afirmações sobre "regras atuais" ou "continuar" (eco-a, seg-a) são naturalmente associadas a
@@ -233,6 +241,29 @@ plano foi feita pelo texto inteiro e por palavras-chave (ex.: "maioridade", "OCD
     antes de publicar.
 11. **Escopo.** Só os programas registrados. Falas de campanha, debates, entrevistas e o histórico de governo não
     foram usados, nem para "completar" posições.
+
+## 7.1 Revisão de neutralidade (10/10/2026, segunda leitura)
+
+Releitura das 24 frases "como eleitor de cada campo", procurando frase que entregue o autor, enquadramento
+carregado ou resposta óbvia. Toda posição alterada foi reconferida no PDF (página e trecho literal).
+
+| id | Problema | Correção |
+|---|---|---|
+| eco-a | "As regras atuais [...] devem ser mantidas" misturava dois eixos: quem quer conter gastos tendia a concordar ("manter os limites") e caía perto do 13, embora o 22 critique as regras atuais por frouxas; quem quer gastar mais discordava e caía perto do 22. O contexto citava "lei de 2023" (aponta um governo). | Eixo ordinal: "devem ficar mais rígidas, com foco em reduzir a dívida". 22 concorda (p. 71, trecho ampliado com a crítica às exceções), 13 discorda (p. 49, média). Contexto sem data. |
+| eco-b | Para manter a direção 11 × 11 depois da troca de eco-a. | "O investimento público deve ser um dos principais motores do crescimento": 13 concorda (p. 48, agora alta), 22 discorda (p. 49, média). |
+| imp-b | Só o benefício ("baixar o preço na bomba"): resposta óbvia, e o "discorda" do 13 vem de uma objeção de custo que a frase escondia. | "[...] mesmo que arrecade menos". |
+| trb-b | "Só o necessário" diminuía a posição. | "Reajustado apenas pela inflação, sem aumento acima dela" + contexto factual sobre benefícios atrelados ao mínimo. |
+| est-a | "Discurso de ódio" puxava para o "concordo" e não é tratado pelo plano 22; "remover" era mais forte que o texto do 13. | "Impedir a circulação de conteúdos considerados desinformação". |
+| agr-a | "Famílias que vivem em acampamentos à espera de terra": imagem com apelo emocional. | "Assentando mais famílias de trabalhadores rurais". |
+| imp-a, ext-a | Contextos com ano (2023, 2022) que apontam um governo. | Contextos sem ano. |
+| ext-b | "Formado inicialmente por Brasil, Rússia, Índia, China e África do Sul" é impreciso (a África do Sul entrou depois). | "Que inclui Brasil, Rússia, Índia, China e África do Sul". |
+
+Também conferidas, sem mudança: as outras 16 frases. Sorteio de 8 citações (semente 20261025: est-a/13, inf-a/13,
+sau-a/13, imp-b/13, seg-b/13, amb-b/13, edu-a/22, agr-b/22) relidas no contexto da página: as 8 sustentam a posição
+marcada. Por script, os 34 trechos (inclusive o novo de eco-a/22) seguem literais na página citada.
+
+**Código de URL:** eco-a e eco-b mudaram de sentido na mesma posição do código v2. Como nenhum link v2 foi
+publicado (só prévias locais), `VERSAO_CODIGO` continua "2". Se algum link v2 já tiver circulado, suba para "3".
 
 ## 8. Notas de integração (para quem faz a UI)
 

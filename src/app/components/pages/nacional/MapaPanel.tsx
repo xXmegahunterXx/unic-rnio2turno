@@ -1,5 +1,7 @@
 /**
- * Cartão do mapa nacional: modo de coloração, alternância Mapa | Cartograma, legenda e resumo.
+ * Cartão do mapa nacional: modo de coloração, alternância Estados | Municípios | Blocos (cartograma), legenda e
+ * resumo. "Municípios" (5.571, canvas) só baixa a geometria (~2 MB) quando escolhido e não fica salvo como padrão
+ * entre visitas (dados móveis), só na sessão.
  *
  * - Desktop (mouse/teclado): hover mostra o tooltip do mapa; clique navega para a UF.
  * - Toque: abre um Sheet com o placar compacto da UF e o botão "Ver <UF>" (interceptamos o clique na
@@ -7,7 +9,7 @@
  * - Memoizado: só re-renderiza quando os dados das UFs (referência estável do React Query, que faz
  *   structural sharing) ou o modo mudam — não a cada poll do status.
  */
-import { memo, useCallback, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
+import { lazy, memo, Suspense, useCallback, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { Race, RaceId, Summary, Tally, UF } from '@/shared/types';
 import { REGIAO_NOMES, UF_NOMES, UF_REGIAO } from '@/shared/constants';
@@ -20,20 +22,29 @@ import { Icon } from '@/app/ui/Icon';
 import { Segmented } from '@/app/ui/Segmented';
 import { Sheet } from '@/app/ui/Sheet';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
+import { useMunicipiosBr } from '@/app/data/hooks';
+import { comInstante } from '@/app/components/apuracao/LinhaDoTempo';
+import type { MunicipioSelecionado } from '@/app/components/apuracao/BrazilMunicipiosMap';
 import { TileMap } from '@/app/components/apuracao/TileMap';
 import { MapLegend } from '@/app/components/apuracao/MapLegend';
 import { MapModeSwitch } from '@/app/components/apuracao/MapModeSwitch';
 import { Placar } from '@/app/components/apuracao/Placar';
 import { EmptyState } from '@/app/components/apuracao/States';
 import type { MapMode } from '@/app/components/apuracao/mapModes';
-import { linkUf } from './fase';
+import { linkUf, qsRace, semT1 } from './fase';
 
-type Vista = 'mapa' | 'cartograma';
+// Canvas dos municípios num pedaço à parte (só baixa quando a pessoa escolhe "Municípios").
+const BrazilMunicipiosMap = lazy(() => import('@/app/components/apuracao/BrazilMunicipiosMap').then((m) => ({ default: m.BrazilMunicipiosMap })));
+
+type Vista = 'mapa' | 'municipios' | 'cartograma';
 // v2: o padrão passou a ser sempre o mapa geográfico do Brasil (escolhas antigas do padrão automático são descartadas).
 const CHAVE_VISTA = 'sintonia:nacional:vista:v2';
+/** "Municípios" vale só na sessão (não força ~2 MB de geometria a cada visita). */
+const CHAVE_VISTA_SESSAO = 'sintonia:nacional:vista:sessao';
 
 function vistaInicial(): Vista {
   try {
+    if (sessionStorage.getItem(CHAVE_VISTA_SESSAO) === 'municipios') return 'municipios';
     const v = localStorage.getItem(CHAVE_VISTA);
     if (v === 'mapa' || v === 'cartograma') return v;
   } catch {
@@ -59,10 +70,12 @@ export interface MapaPanelProps {
   simulado?: boolean;
   /** Simulação com nomes ocultos: o Sheet não mostra os números (reais) do 1º turno. */
   anonimizado?: boolean;
+  /** "Reveja a noite": instante exibido (undefined = ao vivo) — vale também para o mapa por município e os links. */
+  t?: number;
   className?: string;
 }
 
-export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, raceT1, raceLink, simulado, anonimizado, className }: MapaPanelProps) {
+export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, raceT1, raceLink, simulado, anonimizado, t, className }: MapaPanelProps) {
   const navigate = useNavigate();
   const t1 = race.turno === 1;
   const modos = t1 ? MODOS_1T : primeiroTurno ? MODOS_2T : MODOS_2T_SEM_T1;
@@ -72,16 +85,31 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
   const setVista = useCallback((v: Vista) => {
     setVistaEstado(v);
     try {
-      localStorage.setItem(CHAVE_VISTA, v);
+      if (v === 'municipios') sessionStorage.setItem(CHAVE_VISTA_SESSAO, v);
+      else {
+        sessionStorage.removeItem(CHAVE_VISTA_SESSAO);
+        localStorage.setItem(CHAVE_VISTA, v);
+      }
     } catch {
       /* ignora */
     }
   }, []);
 
+  // Mapa por município: só consulta com a vista ativa (e o 1º turno só no modo "variação").
+  const municipios = vista === 'municipios';
+  const tMapa = t1 ? undefined : t;
+  const brMun = useMunicipiosBr(race.id, tMapa, municipios);
+  const brMunT1 = useMunicipiosBr(`${semT1(race.id)}-t1`, undefined, municipios && modo === 'variacao' && !t1);
+  const snapMun = brMun.data && brMun.data.race === race.id ? brMun.data : undefined;
+  const abrirMunicipio = useCallback(
+    (m: MunicipioSelecionado) => navigate(comInstante(`/apuracao/${m.uf.toLowerCase()}/${m.cod}${qsRace(raceLink)}`, tMapa)),
+    [navigate, raceLink, tMapa],
+  );
+
   // Sheet do toque (guarda a última UF para a animação de saída).
   const [sheet, setSheet] = useState<{ uf: UF; aberto: boolean } | null>(null);
   const toqueEm = useRef(0);
-  const abrirUf = useCallback((uf: UF) => navigate(linkUf(uf, raceLink)), [navigate, raceLink]);
+  const abrirUf = useCallback((uf: UF) => navigate(comInstante(linkUf(uf, raceLink), t)), [navigate, raceLink, t]);
 
   function onPointerDownCapture(e: PointerEvent) {
     toqueEm.current = e.pointerType === 'touch' ? performance.now() : 0;
@@ -134,8 +162,17 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
               {t1 ? 'Mapa do 1º turno' : 'Mapa da apuração'}
             </h2>
             <p className="mt-0.5 text-[12.5px] leading-snug text-fg-muted">
-              <span className="hidden md:inline">Clique num estado para ver municípios e seções</span>
-              <span className="md:hidden">Toque num estado para ver o placar</span>
+              {municipios ? (
+                <>
+                  <span className="hidden md:inline">Os 5.571 municípios · clique para abrir</span>
+                  <span className="md:hidden">Os 5.571 municípios · toque para ver</span>
+                </>
+              ) : (
+                <>
+                  <span className="hidden md:inline">Clique num estado para ver municípios e seções</span>
+                  <span className="md:hidden">Toque num estado para ver o placar</span>
+                </>
+              )}
             </p>
           </div>
           <Segmented<Vista>
@@ -143,12 +180,11 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
             size="sm"
             value={vista}
             onChange={setVista}
-            options={[
-              { value: 'mapa', label: <span className="hidden min-[400px]:inline">Mapa</span>, icon: 'mapa', ariaLabel: 'Mapa geográfico' },
-              { value: 'cartograma', label: <span className="hidden min-[400px]:inline">Cartograma</span>, icon: 'grade', ariaLabel: 'Cartograma de blocos' },
-            ]}
+            className="hidden shrink-0 sm:inline-flex"
+            options={OPCOES_VISTA}
           />
         </div>
+        <Segmented<Vista> ariaLabel="Forma do mapa" size="sm" value={vista} onChange={setVista} block className="mt-3 sm:hidden" options={OPCOES_VISTA} />
         <MapModeSwitch className="mt-3" value={modo} onChange={setModo} modos={modos} />
       </div>
 
@@ -163,6 +199,18 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
       >
         {vista === 'mapa' ? (
           <BrazilMap {...props} onSelect={abrirUf} ariaLabel={`Mapa do Brasil por estado · ${race.titulo}`} />
+        ) : vista === 'municipios' ? (
+          <Suspense fallback={<div className="aspect-square w-full animate-pulse rounded-xl bg-surface-2" aria-busy="true" />}>
+            <BrazilMunicipiosMap
+              snapshot={snapMun}
+              race={race}
+              modo={modo}
+              primeiroTurno={modo === 'variacao' ? brMunT1.data : undefined}
+              onSelect={abrirMunicipio}
+              rotuloAcao={(m) => `Ver ${m.nome}`}
+              ariaLabel={`Mapa do Brasil por município · ${race.titulo}`}
+            />
+          </Suspense>
         ) : (
           <TileMap {...props} onSelect={abrirUf} ariaLabel={`Cartograma dos estados · ${race.titulo}`} />
         )}
@@ -170,7 +218,9 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
 
       <div className="flex flex-col gap-3 border-t border-line px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-x-6 sm:px-5">
         <MapLegend modo={modo} race={race} compacta semTitulo={modo === 'vencedor'} />
-        {!t1 ? (
+        {municipios ? (
+          <Liderados race={race} liderados={snapMun?.municipiosLiderados} />
+        ) : !t1 ? (
           <p className="num text-[12px] leading-snug text-fg-muted sm:ml-auto sm:text-right">
             <span className="font-semibold text-fg">{resumoMapa.comVotos}</span> de {resumoMapa.total} estados com seções totalizadas
             {resumoMapa.encerradas > 0 ? (
@@ -200,6 +250,32 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
     </section>
   );
 });
+
+const OPCOES_VISTA = [
+  { value: 'mapa' as const, label: 'Estados', icon: 'mapa' as const, ariaLabel: 'Mapa por estado' },
+  { value: 'municipios' as const, label: 'Municípios', icon: 'pin' as const, ariaLabel: 'Mapa por município' },
+  { value: 'cartograma' as const, label: <span className="hidden min-[1500px]:inline">Blocos</span>, icon: 'grade' as const, ariaLabel: 'Cartograma de blocos' },
+];
+
+/** "Candidato A à frente em N municípios · Candidato B em M" (1º turno: "mais votado"). */
+function Liderados({ race, liderados }: { race: Race; liderados: number[] | undefined }) {
+  const fin = race.candidatos.map((c, i) => ({ c, i })).filter(({ c }) => !c.agregado);
+  const verbo = race.turno === 1 ? 'mais votado' : 'à frente';
+  if (!liderados) return <p className="text-[12px] text-fg-subtle sm:ml-auto">Contando municípios…</p>;
+  return (
+    <p className="num text-[12.5px] leading-snug text-fg-muted sm:ml-auto sm:text-right">
+      {fin.map(({ c, i }, k) => (
+        <span key={c.numero} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          {k > 0 ? <span className="mx-1.5 text-fg-subtle">·</span> : null}
+          <span aria-hidden className={cn('h-2 w-2 rounded-full', corSlot(c.cor).bg)} />
+          <span className="font-semibold text-fg">{c.nomeUrna}</span>
+          {k === 0 ? ` ${verbo} em` : ' em'} <span className="font-semibold text-fg">{fmtInt(liderados[i] ?? 0)}</span>
+          {k === 0 ? ' municípios' : ''}
+        </span>
+      ))}
+    </p>
+  );
+}
 
 /** Sheet do toque: placar compacto da UF, participação e comparação com o 1º turno. */
 function UfSheet({

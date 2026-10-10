@@ -1,7 +1,11 @@
 /**
- * Monograma do candidato (nunca foto — ARCHITECTURE §1.1): iniciais com anel na cor do slot.
+ * Avatar do candidato: foto OFICIAL do TSE (quando passada em `foto`) ou o monograma (iniciais) — os dois com o
+ * anel na cor do slot e exatamente o mesmo tamanho. A foto só é recortada em círculo (sem filtro nem edição).
+ * Quem decide se há foto é quem chama, via `useFotosRace` (./fotos.ts): nunca na simulação anonimizada, e só
+ * quando os dois finalistas têm foto (mesmo tratamento para todos — ARCHITECTURE §1.1).
  * CandidateName: nome de urna + partido/número/vice.
  */
+import { useState } from 'react';
 import type { Candidate, CorCandidato } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
@@ -28,12 +32,12 @@ export function iniciais(nome: string): string {
 }
 
 export type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
-const tamanhos: Record<AvatarSize, { box: string; txt: string; ring: string; selo: number }> = {
-  xs: { box: 'h-6 w-6', txt: 'text-[10px]', ring: 'ring-[1.5px]', selo: 10 },
-  sm: { box: 'h-8 w-8', txt: 'text-[12px]', ring: 'ring-2', selo: 12 },
-  md: { box: 'h-11 w-11', txt: 'text-[15px]', ring: 'ring-2', selo: 14 },
-  lg: { box: 'h-14 w-14', txt: 'text-[19px]', ring: 'ring-[2.5px]', selo: 16 },
-  xl: { box: 'h-20 w-20', txt: 'text-[26px]', ring: 'ring-[3px]', selo: 20 },
+const tamanhos: Record<AvatarSize, { box: string; txt: string; ring: string; selo: number; moldura: string; filete: string }> = {
+  xs: { box: 'h-6 w-6', txt: 'text-[10px]', ring: 'ring-[1.5px]', selo: 10, moldura: 'p-[1.5px]', filete: 'border' },
+  sm: { box: 'h-8 w-8', txt: 'text-[12px]', ring: 'ring-2', selo: 12, moldura: 'p-[2px]', filete: 'border' },
+  md: { box: 'h-11 w-11', txt: 'text-[15px]', ring: 'ring-2', selo: 14, moldura: 'p-[2px]', filete: 'border-[1.5px]' },
+  lg: { box: 'h-14 w-14', txt: 'text-[19px]', ring: 'ring-[2.5px]', selo: 16, moldura: 'p-[2.5px]', filete: 'border-2' },
+  xl: { box: 'h-20 w-20', txt: 'text-[26px]', ring: 'ring-[3px]', selo: 20, moldura: 'p-[3px]', filete: 'border-2' },
 };
 
 export interface CandidateAvatarProps {
@@ -46,31 +50,47 @@ export interface CandidateAvatarProps {
   eleito?: boolean;
   /** Atenua (ex.: quem não lidera numa linha compacta). */
   dim?: boolean;
+  /**
+   * Foto oficial (data URI do pacote do TSE). Ausente/nula → monograma. Obtenha com `useFotosRace(race)[i]`, que já
+   * aplica as regras (anonimização, tudo ou nada). Se a imagem falhar ao carregar, cai no monograma.
+   */
+  foto?: string | null;
   className?: string;
 }
 
-export function CandidateAvatar({ candidato, nome, cor, size = 'md', eleito, dim, className }: CandidateAvatarProps) {
+export function CandidateAvatar({ candidato, nome, cor, size = 'md', eleito, dim, foto, className }: CandidateAvatarProps) {
   const n = candidato?.nomeUrna ?? nome ?? '?';
   const c = candidato?.cor ?? cor ?? 'outros';
   const s = corSlot(c);
   const t = tamanhos[size];
+  const [falhou, setFalhou] = useState<string | null>(null);
+  const comFoto = !!foto && falhou !== foto;
   return (
     <span
       aria-hidden
       className={cn(
         'relative inline-flex shrink-0 select-none items-center justify-center rounded-full font-display font-semibold tracking-[-0.02em]',
-        'ring-inset',
         t.box,
-        t.txt,
-        t.ring,
-        s.ring,
-        s.bgSoft,
-        s.text,
-        dim && 'opacity-60 saturate-50',
+        comFoto ? [t.moldura, s.bg] : ['ring-inset', t.txt, t.ring, s.ring, s.bgSoft, s.text],
+        dim && (comFoto ? 'opacity-60' : 'opacity-60 saturate-50'),
         className,
       )}
     >
-      {iniciais(n)}
+      {comFoto ? (
+        // Moldura: anel na cor do slot + filete da superfície; a foto só é recortada (object-cover), sem filtro.
+        <span className={cn('block h-full w-full overflow-hidden rounded-full border-surface bg-surface-2', t.filete)}>
+          <img
+            src={foto!}
+            alt=""
+            draggable={false}
+            decoding="async"
+            onError={() => setFalhou(foto!)}
+            className="h-full w-full object-cover object-[50%_22%]"
+          />
+        </span>
+      ) : (
+        iniciais(n)
+      )}
       {eleito ? (
         <span
           className={cn(

@@ -224,20 +224,29 @@ export const AFIRMACOES: readonly Afirmacao[] = [
   {
     id: 'eco-a',
     tema: 'economia',
-    texto: 'As regras atuais que limitam o crescimento dos gastos do governo federal devem ser mantidas.',
-    contexto: 'Uma lei de 2023 limita quanto as despesas do governo federal podem crescer a cada ano.',
+    // Revisão 10/10: a versão "as regras atuais devem ser mantidas" misturava dois eixos (quem quer conter gastos
+    // concordava e caía perto do 13, embora o 22 critique as regras atuais por frouxas). Agora o eixo é ordinal.
+    texto: 'As regras de controle dos gastos federais devem ficar mais rígidas, com foco em reduzir a dívida pública.',
+    contexto: 'Hoje uma lei limita quanto as despesas do governo federal podem crescer a cada ano.',
     posicoes: {
-      13: concorda(
+      13: discorda(
         13,
         49,
         S13.d8,
         'manteremos o novo arcabouço fiscal, que controlou o crescimento das despesas sem prejudicar as políticas sociais',
+        {
+          confianca: 'media',
+          nota: 'O plano promete manter as regras fiscais em vigor, que, segundo ele, já controlam o crescimento das despesas; não propõe endurecê-las.',
+        },
       ),
-      22: discorda(
+      22: concorda(
         22,
         71,
         'Brasil que Não Volta Atrás — Contas em ordem para juros e inflação menores',
-        'Apresentaremos uma reformulação nas atuais regras fiscais, com regras claras focadas na estabilização e na redução da dívida pública',
+        'uma legislação que já nasceu cheia de exceções e teve as próprias regras furadas mais de uma dezena de vezes […] Apresentaremos uma reformulação nas atuais regras fiscais, com regras claras focadas na estabilização e na redução da dívida pública',
+        {
+          nota: 'Na mesma página o plano promete "superávits primários" e "uma regra clara de controle de gastos discricionários dos três Poderes".',
+        },
       ),
     },
     revisado: false,
@@ -245,23 +254,25 @@ export const AFIRMACOES: readonly Afirmacao[] = [
   {
     id: 'eco-b',
     tema: 'economia',
-    texto: 'O crescimento da economia deve ser puxado principalmente pelo investimento privado, e não pelo público.',
+    // Revisão 10/10: direção invertida (antes: "puxado pelo investimento privado, e não pelo público") para
+    // manter o equilíbrio depois da troca de eco-a; o 13 passa a ter o trecho mais explícito.
+    texto: 'O investimento público deve ser um dos principais motores do crescimento da economia.',
     posicoes: {
-      13: discorda(
+      13: concorda(
         13,
         48,
         S13.d8,
         'principais frentes de expansão: os investimentos produtivos públicos e privados […] Ao investir em infraestrutura, indústria e crédito produtivo, o Estado induz o aumento da produtividade',
-        {
-          confianca: 'media',
-          nota: 'O plano põe o investimento público ao lado do privado como motor do crescimento; rejeita, portanto, o "e não pelo público".',
-        },
       ),
-      22: concorda(
+      22: discorda(
         22,
         49,
         'Brasil que Cresce (abertura do capítulo)',
         'alcançar um crescimento sustentado de 4% ao ano ao longo da próxima década, apoiado no investimento privado […] O papel do Estado aqui não é ser o empresário',
+        {
+          confianca: 'media',
+          nota: 'O plano apoia o crescimento no investimento privado e diz que o papel do Estado "não é ser o empresário"; na infraestrutura, "o investimento privado assume a construção e a operação" (p. 50).',
+        },
       ),
     },
     revisado: false,
@@ -272,7 +283,7 @@ export const AFIRMACOES: readonly Afirmacao[] = [
     id: 'imp-a',
     tema: 'impostos',
     texto: 'A reforma dos impostos sobre o consumo, que está em fase de implantação, deve ser revista.',
-    contexto: 'A reforma aprovada em 2023 unifica tributos sobre o consumo num modelo de IVA, com transição até 2033.',
+    contexto: 'A reforma, já aprovada, unifica tributos sobre o consumo num modelo de IVA, com transição até 2033.',
     posicoes: {
       13: discorda(13, 48, S13.d8, 'Nosso desafio é […] consolidar os avanços promovidos pela reforma tributária', {
         confianca: 'media',
@@ -290,7 +301,9 @@ export const AFIRMACOES: readonly Afirmacao[] = [
   {
     id: 'imp-b',
     tema: 'impostos',
-    texto: 'O governo deve reduzir os impostos sobre combustíveis para baixar o preço na bomba.',
+    // Revisão 10/10: a frase só trazia o benefício (resposta "óbvia"); agora traz também o custo, que é
+    // justamente a objeção documentada do 13.
+    texto: 'O governo deve cortar impostos sobre combustíveis para baixar o preço, mesmo que arrecade menos.',
     posicoes: {
       13: discorda(
         13,
@@ -299,7 +312,7 @@ export const AFIRMACOES: readonly Afirmacao[] = [
         'armou uma bomba fiscal para estados e municípios com a desoneração artificial de combustíveis',
         {
           confianca: 'media',
-          nota: 'Crítica explícita a um corte de impostos sobre combustíveis feito no passado. Para os preços, o plano propõe outra via: política de preços da estatal e subvenções (p. 66).',
+          nota: 'Crítica explícita a um corte de impostos sobre combustíveis feito no passado, pelo custo fiscal. Para os preços, o plano propõe outra via: política de preços da estatal e subvenções (p. 66).',
         },
       ),
       22: concorda(
@@ -341,7 +354,8 @@ export const AFIRMACOES: readonly Afirmacao[] = [
   {
     id: 'trb-b',
     tema: 'trabalho',
-    texto: 'O salário mínimo deve subir só o necessário para repor a inflação, sem ganho acima dela.',
+    texto: 'O salário mínimo deve ser reajustado apenas pela inflação, sem aumento acima dela.',
+    contexto: 'Aposentadorias e outros benefícios do governo atrelados ao salário mínimo sobem junto com ele.',
     posicoes: {
       13: discorda(
         13,
@@ -596,7 +610,9 @@ export const AFIRMACOES: readonly Afirmacao[] = [
   {
     id: 'est-a',
     tema: 'estado',
-    texto: 'A lei deve obrigar as redes sociais a remover conteúdo considerado desinformação ou discurso de ódio.',
+    // Revisão 10/10: sai "discurso de ódio" (puxava para o "concordo" e o plano 22 não trata disso) e "remover"
+    // vira "impedir a circulação", mais perto do que o plano 13 diz.
+    texto: 'A lei deve obrigar as redes sociais a impedir a circulação de conteúdos considerados desinformação.',
     posicoes: {
       13: concorda(
         13,
@@ -605,7 +621,7 @@ export const AFIRMACOES: readonly Afirmacao[] = [
         'avançar ainda mais na regulação democrática das redes sociais e das plataformas digitais, de modo a impedir que elas difundam desinformação, acolham campanhas de ódio',
         {
           confianca: 'media',
-          nota: 'O plano propõe regular as plataformas para "impedir que elas difundam desinformação", sem detalhar o mecanismo (remoção ou outro). Na mesma página defende "a garantia plena da liberdade de expressão".',
+          nota: 'O plano propõe regular as plataformas para "impedir que elas difundam desinformação", sem detalhar o mecanismo. Na mesma página defende "a garantia plena da liberdade de expressão".',
         },
       ),
       22: discorda(
@@ -644,7 +660,7 @@ export const AFIRMACOES: readonly Afirmacao[] = [
   {
     id: 'agr-a',
     tema: 'agricultura',
-    texto: 'O governo deve avançar na reforma agrária, assentando famílias que vivem em acampamentos à espera de terra.',
+    texto: 'O governo deve ampliar a reforma agrária, assentando mais famílias de trabalhadores rurais.',
     contexto: 'Na reforma agrária, o governo destina terras a famílias de trabalhadores rurais para que produzam nelas.',
     posicoes: {
       13: concorda(
@@ -682,7 +698,7 @@ export const AFIRMACOES: readonly Afirmacao[] = [
     id: 'ext-a',
     tema: 'relacoes-exteriores',
     texto: 'O Brasil deve tratar como prioridade a entrada na OCDE, organização internacional de cooperação econômica.',
-    contexto: 'O processo de adesão do Brasil à OCDE foi aberto em 2022.',
+    contexto: 'O Brasil é candidato a membro da OCDE; para entrar, precisa adotar padrões da organização em várias áreas.',
     posicoes: {
       13: semPosicao('O plano não trata de adesão à OCDE (a sigla só aparece numa comparação de matriz elétrica, p. 64).'),
       22: concorda(
@@ -698,7 +714,7 @@ export const AFIRMACOES: readonly Afirmacao[] = [
     id: 'ext-b',
     tema: 'relacoes-exteriores',
     texto: 'O Brasil deve aprofundar a aproximação política com o BRICS e com outros países em desenvolvimento.',
-    contexto: 'O BRICS é um bloco de países emergentes formado inicialmente por Brasil, Rússia, Índia, China e África do Sul.',
+    contexto: 'O BRICS é um bloco de países emergentes que inclui Brasil, Rússia, Índia, China e África do Sul.',
     posicoes: {
       13: concorda(
         13,
@@ -842,9 +858,12 @@ interface Acumulador {
   n: PorCandidato<number>;
 }
 const novoAcumulador = (): Acumulador => ({ soma: { 13: 0, 22: 0 }, pesos: { 13: 0, 22: 0 }, n: { 13: 0, 22: 0 } });
+// Multiplica por 100 ANTES de dividir: Σ w·a é múltiplo exato de 0,25, então 100·Σ é inteiro e a divisão sai
+// corretamente arredondada. Na ordem inversa, 5,75 ÷ 10 × 100 dá 57,4999… e o "58%" vira "57%".
+const pct100 = (soma: number, peso: number): number | null => (peso > 0 ? (soma * 100) / peso : null);
 const fechar = (ac: Acumulador): ParcialSintonia => ({
-  13: ac.pesos[13] > 0 ? (ac.soma[13] / ac.pesos[13]) * 100 : null,
-  22: ac.pesos[22] > 0 ? (ac.soma[22] / ac.pesos[22]) * 100 : null,
+  13: pct100(ac.soma[13], ac.pesos[13]),
+  22: pct100(ac.soma[22], ac.pesos[22]),
   consideradas: { ...ac.n },
 });
 
@@ -914,7 +933,7 @@ export function calcularConcordancia(
     soma += afinidadeItem(ra, rb);
     n++;
   }
-  return { pct: n > 0 ? (soma / n) * 100 : null, emComum: n };
+  return { pct: pct100(soma, n), emComum: n };
 }
 
 // ── Embaralhamento determinístico ─────────────────────────────────────────────

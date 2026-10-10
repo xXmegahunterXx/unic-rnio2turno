@@ -3,6 +3,8 @@
  * exportado como PNG com html-to-image. Leva a marca SIMULAÇÃO quando simulado e a URL do site.
  * ShareButton: botão que abre um Sheet com a prévia, escolha de formato e as ações
  * (compartilhar imagem, baixar PNG, WhatsApp, copiar link).
+ * Fotos oficiais no cartão só com dados reais (nunca na imagem de uma SIMULAÇÃO, nem anonimizada: uma imagem
+ * com rosto real e números fictícios não pode circular).
  */
 import { forwardRef, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Race, Summary } from '@/shared/types';
@@ -25,6 +27,7 @@ import { Sheet } from '@/app/ui/Sheet';
 import { toast } from '@/app/ui/Toast';
 import { LogoMark } from '../layout/Logo';
 import { iniciais } from './CandidateAvatar';
+import { useFotosRace } from './fotos';
 
 export type ShareFormato = 'feed' | 'story';
 export const SHARE_DIMENSOES: Record<ShareFormato, { w: number; h: number; rotulo: string }> = {
@@ -68,6 +71,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
   const eleito = race.turno === 2 && resumo.eleito !== null ? race.candidatos[resumo.eleito] : null;
   const onde = local ?? (race.abrangencia === 'BR' ? 'Brasil' : race.titulo.split('·').pop()?.trim());
   const host = hostExibicao() || 'sintonia';
+  const fotos = useFotosRace(race, { desligado: simulado });
 
   return (
     <div
@@ -106,7 +110,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
       {story ? (
         <div className="relative flex flex-1 flex-col justify-center gap-[72px]">
           {finalistas.map(({ i }) => (
-            <LinhaStory key={i} race={race} resumo={resumo} i={i} />
+            <LinhaStory key={i} race={race} resumo={resumo} i={i} foto={fotos[i]} />
           ))}
           <BarraGrande race={race} resumo={resumo} alto={48} />
         </div>
@@ -116,7 +120,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
             const s = corSlot(c.cor);
             return (
               <div key={i} className={cn('flex flex-col', k === 1 && 'items-end text-right')}>
-                <Mono cor={c.cor} nome={c.nomeUrna} size={120} eleito={eleito === c} />
+                <Mono cor={c.cor} nome={c.nomeUrna} size={120} eleito={eleito === c} foto={fotos[i]} />
                 <div className="mt-7 font-display text-[50px] font-semibold leading-[1.05] tracking-[-0.025em]">{c.nomeUrna}</div>
                 <div className="num mt-2 text-[26px] text-fg-muted">
                   {c.partido} · {c.numero}
@@ -167,14 +171,23 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
   );
 });
 
-function Mono({ cor, nome, size, eleito }: { cor: Race['candidatos'][number]['cor']; nome: string; size: number; eleito?: boolean }) {
+function Mono({ cor, nome, size, eleito, foto }: { cor: Race['candidatos'][number]['cor']; nome: string; size: number; eleito?: boolean; foto?: string }) {
   const s = corSlot(cor);
   return (
     <div
-      className={cn('relative flex shrink-0 items-center justify-center rounded-full font-display font-semibold ring-[5px] ring-inset', s.bgSoft, s.ring, s.text)}
+      className={cn(
+        'relative flex shrink-0 items-center justify-center rounded-full font-display font-semibold',
+        foto ? ['p-[5px]', s.bg] : ['ring-[5px] ring-inset', s.bgSoft, s.ring, s.text],
+      )}
       style={{ width: size, height: size, fontSize: size * 0.36 }}
     >
-      {iniciais(nome)}
+      {foto ? (
+        <span className="block h-full w-full overflow-hidden rounded-full border-[4px] border-bg bg-surface-2">
+          <img src={foto} alt="" className="h-full w-full object-cover object-[50%_22%]" />
+        </span>
+      ) : (
+        iniciais(nome)
+      )}
       {eleito ? (
         <span className={cn('absolute -bottom-1 -right-1 flex items-center justify-center rounded-full ring-[6px] ring-bg', s.bg, s.ink)} style={{ width: size * 0.36, height: size * 0.36 }}>
           <Icon name="check" size={size * 0.24} strokeWidth={3} />
@@ -184,7 +197,7 @@ function Mono({ cor, nome, size, eleito }: { cor: Race['candidatos'][number]['co
   );
 }
 
-function LinhaStory({ race, resumo, i }: { race: Race; resumo: Summary; i: number }) {
+function LinhaStory({ race, resumo, i, foto }: { race: Race; resumo: Summary; i: number; foto?: string }) {
   const c = race.candidatos[i];
   const s = corSlot(c.cor);
   const tem = validos(resumo) > 0;
@@ -192,7 +205,7 @@ function LinhaStory({ race, resumo, i }: { race: Race; resumo: Summary; i: numbe
   return (
     <div>
       <div className="flex items-center gap-7">
-        <Mono cor={c.cor} nome={c.nomeUrna} size={120} eleito={eleito} />
+        <Mono cor={c.cor} nome={c.nomeUrna} size={120} eleito={eleito} foto={foto} />
         <div className="min-w-0 flex-1">
           <div className="font-display text-[56px] font-semibold leading-[1.05] tracking-[-0.025em]">{c.nomeUrna}</div>
           <div className="num mt-2 text-[28px] text-fg-muted">

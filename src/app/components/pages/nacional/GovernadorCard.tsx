@@ -19,6 +19,7 @@ import { Icon } from '@/app/ui/Icon';
 import { NumberRoll } from '@/app/ui/NumberRoll';
 import { ApuracaoProgress } from '@/app/components/apuracao/ApuracaoProgress';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
+import { useFotosRace } from '@/app/components/apuracao/fotos';
 import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { MiniBrMap, MiniUfMap } from './MiniUfMap';
@@ -50,6 +51,8 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
   const eleito = !t1 && resumo.eleito !== null ? race.candidatos[resumo.eleito] : null;
   const dif = difFinalistas(resumo);
   const iOutros = race.candidatos.findIndex((c) => c.agregado);
+  // Fotos oficiais quando a corrida não está anonimizada (o 1º turno é real: pode mostrar mesmo na simulação).
+  const fotos = useFotosRace(race, { real: t1 });
   const resumoTexto = tem
     ? `${race.candidatos
         .filter((c) => !c.agregado)
@@ -111,7 +114,13 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
             const lider = tem && resumo.lider === i;
             return (
               <li key={c.numero} className="flex items-center gap-2.5">
-                <CandidateAvatar candidato={c} size="sm" eleito={eleito === c} className="hidden min-[420px]:inline-flex" />
+                <CandidateAvatar
+                  candidato={c}
+                  foto={fotos[i]}
+                  size={fotos[i] ? 'md' : 'sm'}
+                  eleito={eleito === c}
+                  className={cn('hidden min-[420px]:inline-flex', fotos[i] && '!h-10 !w-10')}
+                />
                 <div className="min-w-0 flex-1">
                   <div className={cn('line-clamp-2 text-[14.5px] leading-tight text-fg', lider ? 'font-semibold' : 'font-medium')}>{c.nomeUrna}</div>
                   <div className="num mt-0.5 flex min-w-0 text-[12px] text-fg-muted">

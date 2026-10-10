@@ -23,7 +23,7 @@ import type { Autor } from './sintonia';
 const N = AFIRMACOES.length;
 
 export const TEXTO_CONVITE = `Fiz o Teste Cego do 2º turno: ${N} afirmações sobre temas do país, sem saber o que cada candidato defende. No fim, dá para comparar com os programas de governo. Faça o seu:`;
-export const TEXTO_DESAFIO = `Te desafio no Teste Cego do 2º turno: ${N} afirmações, sem saber de quem são as propostas. No fim, a gente vê em quantas ficou do mesmo lado.`;
+export const TEXTO_DESAFIO = `Te desafio no Teste Cego do 2º turno: ${N} afirmações sobre temas do país, sem saber o que cada candidato defende. No fim, a gente vê em quantas ficou do mesmo lado.`;
 
 interface BotaoProps {
   variant?: ButtonVariant;
@@ -42,7 +42,9 @@ export function CompartilharCartao({
   label = 'Compartilhar cartão',
 }: BotaoProps & { resultado: ResultadoSintonia; candidatos: Candidate[]; fotos: Partial<Record<Autor, string>> }) {
   const [aberto, setAberto] = useState(false);
-  const [comResultado, setComResultado] = useState(true);
+  // Privacidade por padrão (LGPD: opinião política é dado sensível): o cartão começa como convite; mostrar o
+  // resultado é escolha explícita da pessoa.
+  const [comResultado, setComResultado] = useState(false);
   const [ocupado, setOcupado] = useState<null | 'img' | 'png'>(null);
   const card = useRef<HTMLDivElement>(null);
   const url = urlAbsoluta('/teste');
@@ -110,7 +112,7 @@ export function CompartilharCartao({
           checked={comResultado}
           onChange={setComResultado}
           label="Mostrar meu resultado na imagem"
-          description="Desligado, o cartão vira só um convite para o teste."
+          description="Desligado, o cartão é só um convite para o teste."
         />
         <div className="mx-auto mt-4 max-w-[230px]">
           <ShareCardPreview formato="story">
@@ -190,8 +192,8 @@ export function DesafiarAmigo({
         <p className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-[12.5px] leading-snug text-fg-muted">
           <Icon name="olho-fechado" size={16} className="mt-px shrink-0 text-brand-fg" />
           <span>
-            Suas respostas viajam <strong className="font-semibold text-fg">só dentro do link</strong>, depois do “#” — essa parte não é
-            enviada a nenhum servidor. Mas quem abrir o link verá suas respostas na comparação: envie só para quem você quiser.
+            Suas respostas viajam <strong className="font-semibold text-fg">só dentro do link</strong>, depois do “#” — o Sintonia nunca as
+            recebe. Mas quem abrir o link verá suas respostas e sua sintonia com os candidatos na comparação: envie só para quem você quiser.
           </span>
         </p>
       </Sheet>

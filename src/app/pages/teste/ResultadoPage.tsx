@@ -156,7 +156,8 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
 
       <section aria-labelledby="por-tema" className="mt-10 sm:mt-14">
         <TituloSecao id="por-tema" titulo="Tema a tema">
-          A mesma conta, separada pelos 12 temas do teste (duas afirmações em cada).
+          A mesma conta, separada pelos 12 temas do teste (duas afirmações em cada). Em alguns temas cada plano só trata de uma das duas
+          afirmações; aí cada número se refere a uma afirmação diferente.
         </TituloSecao>
         <div className="mt-4">
           <PorTema resultado={s} candidatos={lista} fotos={fotos} revelado={revelado} />

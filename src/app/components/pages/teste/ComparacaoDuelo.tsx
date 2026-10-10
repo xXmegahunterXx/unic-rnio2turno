@@ -134,7 +134,8 @@ export function SintoniaEmBarras({
               <div className="flex items-center gap-2.5">
                 <AvatarCandidato candidato={c} foto={fotos[c.numero as Autor]} size="xs" />
                 <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-fg">{c.nomeUrna}</span>
-                <span className={cn('num font-display text-[20px] font-semibold leading-none tracking-[-0.02em]', pct === null ? 'text-fg-subtle' : s.textDisplay)}>
+                {/* 20 px não é "texto grande" (WCAG): usa o token AA do slot, não a cor pura */}
+                <span className={cn('num font-display text-[20px] font-semibold leading-none tracking-[-0.02em]', pct === null ? 'text-fg-subtle' : s.text)}>
                   {fmtSintonia(pct)}
                 </span>
               </div>

@@ -255,6 +255,8 @@ export function Quiz({ seed, inicial, onProgresso, onConcluir, onSair, className
             type="button"
             onClick={() => responder('pular')}
             aria-pressed={resposta === 'pular'}
+            aria-keyshortcuts="P"
+            title="Não sei ou prefiro não responder: fica fora da conta"
             className={cn(
               'inline-flex h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-[14px] font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
@@ -263,7 +265,8 @@ export function Quiz({ seed, inicial, onProgresso, onConcluir, onSair, className
           >
             {resposta === 'pular' ? <Icon name="check" size={16} strokeWidth={2.5} /> : null}
             Pular
-            <Kbd className="hidden md:inline-flex">P</Kbd>
+            <span className="sr-only"> (não sei ou prefiro não responder; fica fora da conta)</span>
+            <Kbd oculto className="hidden md:inline-flex">P</Kbd>
             {resposta !== 'pular' ? <Icon name="chevron-direita" size={16} className="-ml-0.5 md:hidden" /> : null}
           </button>
         </div>
@@ -381,7 +384,7 @@ function Escala({
                 >
                   {o.rotulo}
                 </span>
-                <Kbd className="mt-2 hidden md:inline-flex">{i + 1}</Kbd>
+                <Kbd oculto className="mt-2 hidden md:inline-flex">{i + 1}</Kbd>
               </button>
             </li>
           );
@@ -398,6 +401,7 @@ function InterruptorPeso({ ligado, desabilitado, onAlternar }: { ligado: boolean
       type="button"
       role="switch"
       aria-checked={ligado}
+      aria-keyshortcuts="I"
       disabled={desabilitado}
       onClick={onAlternar}
       title="Afirmações marcadas contam em dobro no cálculo"
@@ -415,7 +419,7 @@ function InterruptorPeso({ ligado, desabilitado, onAlternar }: { ligado: boolean
         />
       </span>
       <span className="truncate">Isso pesa mais para mim</span>
-      <Kbd className="hidden md:inline-flex">I</Kbd>
+      <Kbd oculto className="hidden md:inline-flex">I</Kbd>
     </button>
   );
 }
@@ -501,9 +505,11 @@ function Progresso({
   );
 }
 
-export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
+/** Tecla de atalho. Dentro de botão, passe `oculto`: o atalho já vai em `aria-keyshortcuts` e não entra no nome. */
+export function Kbd({ children, className, oculto }: { children: ReactNode; className?: string; oculto?: boolean }) {
   return (
     <kbd
+      aria-hidden={oculto || undefined}
       className={cn(
         'inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-line bg-surface-2 px-1.5 font-sans text-[11.5px] font-semibold text-fg-muted shadow-[inset_0_-1px_0_0_rgb(var(--line)/calc(var(--line-alpha)*2))]',
         className,

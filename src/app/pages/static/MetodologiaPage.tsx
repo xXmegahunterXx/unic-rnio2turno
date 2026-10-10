@@ -259,10 +259,15 @@ export default function MetodologiaPage() {
               Em cada afirmação, a resposta (de +2 a −2) é comparada com a posição do candidato (+2 concorda, 0 intermediária, −2 discorda):
               igual vale 100% e cada passo de distância na escala tira 25%.
             </>,
+            <>
+              “Neutro” é uma resposta: fica no meio da escala e entra na conta. Para “não sei” ou “prefiro não opinar”, use “Pular”, que deixa
+              a afirmação de fora.
+            </>,
             <>As afirmações marcadas como “isso pesa mais para mim” contam em dobro.</>,
             <>
               Ficam fora da conta de um candidato as afirmações puladas e aquelas que o plano dele não trata. Por isso o resultado diz “com base
-              em N afirmações” para cada um, e os dois números são independentes: <strong>não somam 100%</strong>.
+              em N afirmações” para cada um, e os dois números são independentes: <strong>não somam 100%</strong>. Eles aparecem
+              arredondados para inteiro, e nenhum é apresentado como “vencedor”.
             </>,
             <>A quebra por tema usa a mesma conta, restrita às duas afirmações de cada tema.</>,
             <>

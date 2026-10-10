@@ -1,6 +1,8 @@
 /**
  * Feed de eventos da apuração (FeedEvent[], mais recentes primeiro): ícone por tipo, hora (Brasília),
  * entrada animada. Variante 'ticker': faixa horizontal deslizável (celular).
+ * Eventos de liderança, virada e eleito mostram o rosto do candidato (foto oficial) com o ícone do tipo num
+ * selo — só quando a corrida tem fotos (useFotosRace: nunca na simulação anonimizada); senão, o ícone.
  */
 import { AnimatePresence, motion } from 'framer-motion';
 import type { FeedEvent, Race, TipoEvento } from '@/shared/types';
@@ -9,6 +11,8 @@ import { fmtHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Icon, type IconName } from '@/app/ui/Icon';
+import { CandidateAvatar } from './CandidateAvatar';
+import { useFotosRace } from './fotos';
 
 export interface EventFeedProps {
   eventos: FeedEvent[];
@@ -37,6 +41,31 @@ const ICONE: Record<TipoEvento, IconName> = {
   aviso: 'alerta',
 };
 
+const COM_ROSTO = new Set<TipoEvento>(['lideranca', 'virada', 'eleito']);
+
+/** Rosto do candidato do evento (foto oficial) com o ícone do tipo num selo; null se não houver foto. */
+function RostoEvento({ e, race, fotos, ticker }: { e: FeedEvent; race?: Race; fotos: (string | undefined)[]; ticker?: boolean }) {
+  if (!COM_ROSTO.has(e.tipo) || e.candidato === undefined || !race?.candidatos[e.candidato]) return null;
+  const foto = fotos[e.candidato];
+  if (!foto) return null;
+  return (
+    <span className={cn('relative z-[1] inline-flex shrink-0', ticker ? 'mt-px' : 'rounded-full ring-4 ring-surface')}>
+      <CandidateAvatar candidato={race.candidatos[e.candidato]} foto={foto} size="sm" className={ticker ? '!h-7 !w-7' : undefined} />
+      <span
+        aria-hidden
+        className={cn(
+          'absolute -bottom-1 -right-1.5 inline-flex h-[18px] w-[18px] items-center justify-center rounded-full ring-2',
+          'ring-surface',
+          corSlot(race.candidatos[e.candidato].cor).bg,
+          corSlot(race.candidatos[e.candidato].cor).ink,
+        )}
+      >
+        <Icon name={ICONE[e.tipo]} size={11} strokeWidth={2.5} />
+      </span>
+    </span>
+  );
+}
+
 function tomEvento(e: FeedEvent, race?: Race) {
   if (e.tipo === 'aviso') return 'bg-alert/15 text-alert-fg';
   if (e.candidato !== undefined && race?.candidatos[e.candidato]) {
@@ -48,6 +77,7 @@ function tomEvento(e: FeedEvent, race?: Race) {
 }
 
 export function EventFeed({ eventos, race, variant = 'list', max, showUf = true, emptyText = 'Os acontecimentos da apuração aparecem aqui.', bleed = true, className }: EventFeedProps) {
+  const fotos = useFotosRace(race);
   const lista = eventos.slice(0, max ?? (variant === 'ticker' ? 8 : 12));
   if (lista.length === 0) {
     return (
@@ -81,9 +111,11 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
                   i === 0 && 'border-brand/35',
                 )}
               >
-                <span className={cn('mt-px inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', tomEvento(e, race))}>
-                  <Icon name={ICONE[e.tipo]} size={15} strokeWidth={2} />
-                </span>
+                {RostoEvento({ e, race, fotos, ticker: true }) ?? (
+                  <span className={cn('mt-px inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', tomEvento(e, race))}>
+                    <Icon name={ICONE[e.tipo]} size={15} strokeWidth={2} />
+                  </span>
+                )}
                 <div className="min-w-0">
                   <div className="num text-[11px] font-medium text-fg-muted">
                     {fmtHora(e.t)}
@@ -115,9 +147,11 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
             {/* conector da linha do tempo: liga este ícone ao próximo (some no último item) */}
             {i < lista.length - 1 ? <span aria-hidden className="absolute bottom-0 left-[15.5px] top-8 w-px bg-line/[2]" /> : null}
             <div className={cn('flex gap-3', i < lista.length - 1 && 'pb-4')}>
-              <span className={cn('relative z-[1] inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-4 ring-surface', tomEvento(e, race))}>
-                <Icon name={ICONE[e.tipo]} size={15} strokeWidth={2} />
-              </span>
+              {RostoEvento({ e, race, fotos }) ?? (
+                <span className={cn('relative z-[1] inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ring-4 ring-surface', tomEvento(e, race))}>
+                  <Icon name={ICONE[e.tipo]} size={15} strokeWidth={2} />
+                </span>
+              )}
               <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex flex-wrap items-baseline gap-x-2">
                   <time dateTime={new Date(e.t).toISOString()} className="num text-[12px] font-medium text-fg-muted">
