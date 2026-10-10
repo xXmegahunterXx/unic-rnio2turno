@@ -9,13 +9,14 @@
  *
  * O arquivo de locais é por UF (até ~2,5 MB em SP): só é baixado quando o bloco chega perto da tela.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { LocalVotacao } from '@/shared/dataset';
 import type { Race, UF, ZonaMosaico } from '@/shared/types';
 import { decodeFaixas } from '@/shared/calc';
 import { fmtInt } from '@/shared/format';
 import { useLocais } from '@/app/data/estatico';
 import { cn } from '@/app/lib/cn';
+import { useNaTela } from '@/app/lib/useNaTela';
 import { fillMosaico, MARGEM_ROTULOS } from '@/app/lib/raceUi';
 import { Button } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
@@ -31,23 +32,6 @@ type Ordem = 'zona' | 'secoes' | 'nome';
 interface LocalLinha extends LocalVotacao {
   nums: number[];
   chave: string;
-}
-
-function useNaTela<T extends HTMLElement>(margem = '500px'): [React.RefObject<T | null>, boolean] {
-  const ref = useRef<T>(null);
-  const [visto, setVisto] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || visto) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisto(true);
-      return;
-    }
-    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && setVisto(true), { rootMargin: margem });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [visto, margem]);
-  return [ref, visto];
 }
 
 function descrever(ch: string | undefined, race: Pick<Race, 'candidatos'>): string {
@@ -76,7 +60,7 @@ export interface LocaisVotacaoProps {
 }
 
 export function LocaisVotacao({ uf, cod, nomeMunicipio, mosaico, race, onSecao, variante = 'lista', zona, className }: LocaisVotacaoProps) {
-  const [ref, visto] = useNaTela<HTMLDivElement>();
+  const [ref, visto] = useNaTela<HTMLDivElement>('500px');
   const q = useLocais(visto ? uf : null);
   const [busca, setBusca] = useState('');
   const [ordem, setOrdem] = useState<Ordem>('zona');

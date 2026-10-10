@@ -50,18 +50,18 @@ export function Bancadas({
   const resto = cortar ? lista.slice(max) : [];
   return (
     <div className={className}>
-      <table className="w-full border-collapse text-left">
+      <table className="w-full table-fixed border-collapse text-left">
         <caption className="sr-only">Cadeiras por partido, da maior para a menor bancada</caption>
         <thead>
           <tr className="text-[11px] font-semibold uppercase tracking-[0.08em] text-fg-muted">
             <th scope="col" className="pb-2 pl-1 font-semibold">
               Partido
             </th>
-            <th scope="col" className="pb-2 text-right font-semibold">
+            <th scope="col" className="w-[4.75rem] pb-2 text-right font-semibold">
               Cadeiras
             </th>
             {votosValidos ? (
-              <th scope="col" className="hidden pb-2 pr-1 text-right font-semibold min-[440px]:table-cell">
+              <th scope="col" className="hidden w-[6.5rem] pb-2 pr-1 text-right font-semibold min-[440px]:table-cell">
                 Votos
               </th>
             ) : null}
@@ -124,7 +124,8 @@ export function Bancadas({
                   Ver os outros {resto.length} partidos
                   <Icon name="chevron" size={14} />
                 </button>
-                <span className="block truncate text-[11.5px]">{resto.map((b) => b.sigla).join(', ')}</span>
+                {/* Quebra em linhas (célula de tabela com layout automático não trunca: estourava a largura no celular). */}
+                <span className="mt-0.5 block text-pretty text-[11.5px] leading-snug">{resto.map((b) => b.sigla).join(' · ')}</span>
               </th>
               <td className="num py-2 text-right text-[14px] font-semibold text-fg">{fmtInt(resto.reduce((a, b) => a + b.eleitos, 0))}</td>
               {votosValidos ? <td className="hidden min-[440px]:table-cell" /> : null}
@@ -197,7 +198,8 @@ export function BancadasGrade({
 }) {
   const lista = bancadas.filter((b) => b.eleitos > 0);
   return (
-    <ul className={cn('grid grid-cols-2 gap-x-4 gap-y-1 min-[480px]:grid-cols-3 lg:grid-cols-4', className)} aria-label="Cadeiras por partido">
+    // Colunas pela largura disponível (nunca corta "REPUBLICANOS"); o % some quando o item fica estreito.
+    <ul className={cn('grid grid-cols-[repeat(auto-fill,minmax(9.25rem,1fr))] gap-x-3 gap-y-1', className)} aria-label="Cadeiras por partido">
       {lista.map((b) => {
         const apagado = !!destaque && destaque !== b.sigla;
         return (
@@ -209,23 +211,31 @@ export function BancadasGrade({
             onFocus={() => onDestaque?.(b.sigla)}
             onBlur={() => onDestaque?.(null)}
             className={cn(
-              'flex min-w-0 items-center gap-2 rounded-lg px-1.5 py-1.5 transition-[opacity,background-color] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              'rounded-lg px-1 py-1.5 transition-[opacity,background-color] [container-type:inline-size] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
               apagado && 'opacity-40',
             )}
           >
-            <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px]" style={{ background: corPartido(b.sigla) }} />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-fg">{b.sigla}</span>
-            <span className="num shrink-0 text-[13.5px] font-semibold text-fg">{fmtInt(b.eleitos)}</span>
-            <span className="num w-11 shrink-0 text-right text-[11px] text-fg-muted">{fmtPct((b.eleitos / Math.max(1, total)) * 100, 1)}</span>
+            <span className="flex min-w-0 items-center gap-2">
+              <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px]" style={{ background: corPartido(b.sigla) }} />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-fg" title={b.sigla}>
+                {b.sigla}
+              </span>
+              <span className="num shrink-0 text-[13.5px] font-semibold text-fg">{fmtInt(b.eleitos)}</span>
+              <span className="num hidden w-11 shrink-0 text-right text-[11px] text-fg-muted [@container(min-width:12.5rem)]:inline">
+                {fmtPct((b.eleitos / Math.max(1, total)) * 100, 1)}
+              </span>
+            </span>
           </li>
         );
       })}
       {pendentes > 0 ? (
-        <li className="flex min-w-0 items-center gap-2 px-1.5 py-1.5">
-          <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-line" style={hachuraStyle()} />
-          <span className="min-w-0 flex-1 truncate text-[13px] text-fg-muted">{rotuloPendentes}</span>
-          <span className="num shrink-0 text-[13.5px] font-semibold text-fg-muted">{fmtInt(pendentes)}</span>
-          <span className="w-11 shrink-0" />
+        <li className="px-1 py-1.5 [container-type:inline-size]">
+          <span className="flex min-w-0 items-center gap-2">
+            <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-line" style={hachuraStyle()} />
+            <span className="min-w-0 flex-1 truncate text-[13px] text-fg-muted">{rotuloPendentes}</span>
+            <span className="num shrink-0 text-[13.5px] font-semibold text-fg-muted">{fmtInt(pendentes)}</span>
+            <span className="hidden w-11 shrink-0 [@container(min-width:12.5rem)]:inline" />
+          </span>
         </li>
       ) : null}
     </ul>

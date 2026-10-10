@@ -6,6 +6,7 @@
  * gráfico da apuração e eventos; tabela completa de municípios. No exterior não há mapa: lista de cidades
  * e países. Na fase 'pre' mostra o 1º turno oficial com contagem regressiva.
  * "Reveja a noite": `?t=18h42` mostra placar, mapa, série e eventos da UF naquele instante (LinhaDoTempo).
+ * "Quem vota aqui": perfil do eleitorado da UF (dados abertos do TSE), baixado só quando chega perto da tela.
  * Patrocínio discreto quando configurado no admin.
  */
 import { useEffect, useMemo, useState } from 'react';
@@ -55,6 +56,7 @@ import { ExteriorTabela, usePaisesExterior } from '@/app/components/pages/detalh
 import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
 import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
+import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
 import { emUf } from '@/app/components/pages/detalhe/fmt';
 
 const MODOS_2T: MapMode[] = ['vencedor', 'margem', 'apurado', 'comparecimento', 'variacao'];
@@ -482,6 +484,19 @@ export default function UfPage() {
           )}
         </Section>
       ) : null}
+
+      {/* ------------------------------------------------------------ quem vota (perfil do eleitorado, dado real e público) */}
+      <Section
+        id="eleitorado"
+        title="Quem vota aqui"
+        description={
+          exterior
+            ? 'Perfil dos eleitores que votam no exterior: idade, sexo e escolaridade.'
+            : `Perfil do eleitorado ${local}: idade, sexo e escolaridade.`
+        }
+      >
+        <PerfilEleitorado uf={uf} nome={exterior ? 'Exterior' : nomeUf} />
+      </Section>
 
       {statusQ.data?.patrocinio ? <PatrocinioSlot patrocinio={statusQ.data.patrocinio} variant="cartao" className="mt-8" /> : null}
 

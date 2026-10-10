@@ -2,6 +2,7 @@
  * /governadores — as 7 disputas de governador do 2º turno lado a lado (AC, AM, DF, ES, RJ, RN, TO):
  * mini mapa por município, placar, diferença, progresso e selo de resultado definido; ordenável por
  * "mais apertadas". Na fase 'pre', contagem regressiva + o 1º turno real de governador nessas UFs.
+ * No fim, os governadores eleitos no 1º turno nas outras 20 UFs (cartograma por partido, fotos oficiais).
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -25,6 +26,7 @@ import { GovernadorCard, PresidenteCard, difFinalistas } from '@/app/components/
 import { GovernadorCartaoSk, GovernadoresEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
 import { useGovernadoresUf } from '@/app/components/pages/nacional/useGovernadores';
 import { GOV_RACES, linkUf } from '@/app/components/pages/nacional/fase';
+import { GovernadoresEleitosT1 } from '@/app/components/pages/cargos/GovernadoresEleitosT1';
 import { cn } from '@/app/lib/cn';
 
 type Ordem = 'apertadas' | 'apuradas' | 'az';
@@ -244,9 +246,12 @@ export default function GovernadoresPage() {
         </motion.li>
       </ul>
 
-      <p className="mt-6 text-[12.5px] leading-snug text-fg-muted">
-        Nas outras 20 unidades da federação o governador foi definido no 1º turno. Fonte dos dados reais: TSE.
-      </p>
+      {/* As outras 20 UFs elegeram o governador no 1º turno (resultado oficial, dado real: fotos sempre). */}
+      <GovernadoresEleitosT1
+        className="mt-10 border-t border-line pt-8 sm:mt-14 sm:pt-10"
+        mostrarSegundoTurno={false}
+        onSelectUf2t={(uf) => navigate(linkUf(uf, `gov-${uf.toLowerCase()}`))}
+      />
     </Container>
   );
 }

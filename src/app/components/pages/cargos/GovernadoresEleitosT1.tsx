@@ -36,10 +36,21 @@ export interface GovernadoresEleitosT1Props {
   mostrarFinalistas?: boolean;
   /** Título interno (padrão "Eleitos no 1º turno"); `null` omite o cabeçalho. */
   titulo?: string | null;
+  /**
+   * Lista "Decidem no 2º turno" (padrão sim). Na /governadores as 7 disputas já aparecem acima, então a página
+   * passa `false` (o cartograma continua marcando as 7 UFs e levando à apuração).
+   */
+  mostrarSegundoTurno?: boolean;
   className?: string;
 }
 
-export function GovernadoresEleitosT1({ onSelectUf2t, mostrarFinalistas, titulo = 'Eleitos no 1º turno', className }: GovernadoresEleitosT1Props) {
+export function GovernadoresEleitosT1({
+  onSelectUf2t,
+  mostrarFinalistas,
+  titulo = 'Eleitos no 1º turno',
+  mostrarSegundoTurno = true,
+  className,
+}: GovernadoresEleitosT1Props) {
   const q = useCargo('governador-t1');
   const indice = useIndiceCandidatos();
   const anonimizado = useAnonimizado();
@@ -198,55 +209,57 @@ export function GovernadoresEleitosT1({ onSelectUf2t, mostrarFinalistas, titulo 
         </div>
       </div>
 
-      <section className="mt-5" aria-labelledby="gov-t1-2t">
-        <h3 id="gov-t1-2t" className="mb-3 font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">
-          Decidem no 2º turno
-        </h3>
-        <ul className="grid grid-cols-1 gap-2 min-[560px]:grid-cols-2 lg:grid-cols-4">
-          {segundo.map(({ uf, fin }) => {
-            const conteudo = (
-              <>
-                <span className="flex items-center justify-between gap-2">
-                  <span className="text-[13.5px] font-semibold text-fg">
-                    {UF_NOMES[uf]} <span className="font-mono text-[11.5px] text-fg-subtle">{uf}</span>
+      {mostrarSegundoTurno ? (
+        <section className="mt-5" aria-labelledby="gov-t1-2t">
+          <h3 id="gov-t1-2t" className="mb-3 font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">
+            Decidem no 2º turno
+          </h3>
+          <ul className="grid grid-cols-1 gap-2 min-[560px]:grid-cols-2 lg:grid-cols-4">
+            {segundo.map(({ uf, fin }) => {
+              const conteudo = (
+                <>
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="text-[13.5px] font-semibold text-fg">
+                      {UF_NOMES[uf]} <span className="font-mono text-[11.5px] text-fg-subtle">{uf}</span>
+                    </span>
+                    <Icon name="chevron-direita" size={15} className="text-fg-subtle" />
                   </span>
-                  <Icon name="chevron-direita" size={15} className="text-fg-subtle" />
-                </span>
-                {verFinalistas ? (
-                  <span className="mt-2 block space-y-1">
-                    {fin.map((c) => (
-                      <span key={c.sqcand} className="flex items-center justify-between gap-2 text-[12.5px]">
-                        <span className="min-w-0 truncate text-fg">
-                          {c.nomeUrna} <span className="text-fg-muted">· {c.partido}</span>
+                  {verFinalistas ? (
+                    <span className="mt-2 block space-y-1">
+                      {fin.map((c) => (
+                        <span key={c.sqcand} className="flex items-center justify-between gap-2 text-[12.5px]">
+                          <span className="min-w-0 truncate text-fg">
+                            {c.nomeUrna} <span className="text-fg-muted">· {c.partido}</span>
+                          </span>
+                          <span className="num shrink-0 text-fg-muted">{fmtPct(c.pct, 1)}</span>
                         </span>
-                        <span className="num shrink-0 text-fg-muted">{fmtPct(c.pct, 1)}</span>
-                      </span>
-                    ))}
-                    <span className="block pt-0.5 text-[11px] text-fg-subtle">% dos válidos no 1º turno</span>
-                  </span>
-                ) : (
-                  <span className="mt-1 block text-[12.5px] text-fg-muted">2º turno em 25 de outubro</span>
-                )}
-              </>
-            );
-            const cls =
-              'block h-full rounded-2xl border border-brand/30 bg-surface p-3.5 shadow-card transition-colors hover:border-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
-            return (
-              <li key={uf} id={`gov-t1-${uf}`} className="scroll-mt-28">
-                {onSelectUf2t ? (
-                  <button type="button" onClick={() => onSelectUf2t(uf)} className={cn(cls, 'w-full text-left')}>
-                    {conteudo}
-                  </button>
-                ) : (
-                  <Link to={`/apuracao/${uf.toLowerCase()}?race=gov-${uf.toLowerCase()}`} className={cls}>
-                    {conteudo}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+                      ))}
+                      <span className="block pt-0.5 text-[11px] text-fg-subtle">% dos válidos no 1º turno</span>
+                    </span>
+                  ) : (
+                    <span className="mt-1 block text-[12.5px] text-fg-muted">2º turno em 25 de outubro</span>
+                  )}
+                </>
+              );
+              const cls =
+                'block h-full rounded-2xl border border-brand/30 bg-surface p-3.5 shadow-card transition-colors hover:border-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
+              return (
+                <li key={uf} id={`gov-t1-${uf}`} className="scroll-mt-28">
+                  {onSelectUf2t ? (
+                    <button type="button" onClick={() => onSelectUf2t(uf)} className={cn(cls, 'w-full text-left')}>
+                      {conteudo}
+                    </button>
+                  ) : (
+                    <Link to={`/apuracao/${uf.toLowerCase()}?race=gov-${uf.toLowerCase()}`} className={cls}>
+                      {conteudo}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
       <FonteTse className="mt-4" />
     </div>
   );

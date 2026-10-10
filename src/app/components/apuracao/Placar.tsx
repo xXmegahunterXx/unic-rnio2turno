@@ -10,6 +10,7 @@
  *
  * Fotos oficiais (useFotosRace): aparecem nas três variantes quando a corrida não está anonimizada e os dois
  * finalistas têm foto; senão, monograma para os dois. Mesmo tamanho e moldura para os dois lados.
+ * No hero/default o nome leva à ficha do candidato (/candidato/:sqcand) quando há `sqcand` (nunca anonimizado).
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -288,7 +289,7 @@ function LadoDuelo({
         />
         <div className={cn('min-w-0', dir && 'text-right')}>
           <div className={cn('font-display font-semibold leading-[1.08] tracking-[-0.02em] text-fg', hero ? 'text-[17px] sm:text-[26px]' : 'text-[16px] sm:text-[20px]')}>
-            {l.c.nomeUrna}
+            <NomeFicha c={l.c} />
           </div>
           <div className="num mt-0.5 text-[12px] text-fg-muted sm:text-[13px]">{meta}</div>
         </div>
@@ -327,6 +328,23 @@ function LadoDuelo({
         <div className="mt-1.5 hidden max-w-full truncate text-[12.5px] text-fg-muted sm:block">Vice: {l.c.vice}</div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Nome de urna com link para a ficha pública (/candidato/:sqcand) quando a corrida traz o `sqcand` — nunca na
+ * simulação anonimizada (`anonimizarRace` remove a chave) nem para "Outros". Sublinhado discreto, sem mudar o visual.
+ */
+function NomeFicha({ c }: { c: Candidate }) {
+  if (!c.sqcand || c.agregado) return <>{c.nomeUrna}</>;
+  return (
+    <Link
+      to={`/candidato/${c.sqcand}`}
+      className="rounded-sm underline decoration-transparent decoration-1 underline-offset-[5px] transition-colors hover:decoration-line/[4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      title={`Ficha de ${c.nomeUrna}`}
+    >
+      {c.nomeUrna}
+    </Link>
   );
 }
 

@@ -951,7 +951,8 @@ function TooltipMunicipio({
       <div className={cn('flex items-start justify-between gap-3', fixo && onFechar && 'pr-7')}>
         <div className="min-w-0">
           <p className="truncate font-display text-[15px] font-semibold leading-tight text-fg">{m.nome}</p>
-          <p className="mt-0.5 truncate text-[11.5px] text-fg-subtle">
+          {/* Quebra em vez de cortar ("Mato Grosso do Sul · Centro-Oeste" ao lado do selo de % apurado). */}
+          <p className="mt-0.5 text-pretty text-[11.5px] leading-snug text-fg-subtle">
             {UF_NOMES[m.uf]} · {regiao}
           </p>
         </div>

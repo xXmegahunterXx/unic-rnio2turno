@@ -6,6 +6,7 @@
  * CandidateName: nome de urna + partido/número/vice.
  */
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Candidate, CorCandidato } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
@@ -120,6 +121,11 @@ export interface CandidateNameProps {
   align?: 'left' | 'right';
   /** Pinta o nome na cor do slot. */
   colored?: boolean;
+  /**
+   * Nome com link para a ficha (/candidato/:sqcand) quando há `sqcand` — as corridas anonimizadas não têm, então
+   * a simulação nunca linka. Não use dentro de outro link (cartão clicável).
+   */
+  linkFicha?: boolean;
   className?: string;
 }
 
@@ -138,6 +144,7 @@ export function CandidateName({
   size = 'md',
   align = 'left',
   colored,
+  linkFicha,
   className,
 }: CandidateNameProps) {
   const s = corSlot(candidato.cor);
@@ -147,7 +154,16 @@ export function CandidateName({
   return (
     <span className={cn('flex min-w-0 flex-col', align === 'right' && 'items-end text-right', className)}>
       <span className={cn('max-w-full text-balance font-display leading-[1.1] text-fg', nomeTam[size], colored && s.text)}>
-        {candidato.nomeUrna}
+        {linkFicha && candidato.sqcand && !candidato.agregado ? (
+          <Link
+            to={`/candidato/${candidato.sqcand}`}
+            className="rounded-sm underline decoration-transparent decoration-1 underline-offset-[4px] transition-colors hover:decoration-line/[4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            {candidato.nomeUrna}
+          </Link>
+        ) : (
+          candidato.nomeUrna
+        )}
       </span>
       {meta ? <span className="num mt-1 whitespace-nowrap text-[12.5px] leading-tight text-fg-muted">{meta}</span> : null}
       {showVice && candidato.vice ? (

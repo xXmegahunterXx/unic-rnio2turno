@@ -302,7 +302,8 @@ function CartaoUf({
                 sqcand={c.sqcand}
                 nome={c.nomeUrna}
                 comFicha={comFicha(c.sqcand)}
-                className="block text-[14.5px] font-semibold leading-tight text-fg"
+                quebra
+                className="text-[14.5px] font-semibold leading-tight text-fg"
               />
               <PartidoChip sigla={c.partido} numero={c.numero} className="mt-1 max-w-full" />
               <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">

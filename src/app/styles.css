@@ -51,6 +51,22 @@
   --alert: 251 113 133;
   --alert-fg: 251 113 133;
   --pending: 58 58 80; /* território ainda não apurado */
+  /*
+   * Partidos (cargos do 1º turno: Senado, Câmara, Assembleias, governadores eleitos): paleta categórica NEUTRA,
+   * estável, sem relação com as cores oficiais. Sem vermelho/azul saturados, sem turquesa/âmbar (slots A/B) e sem
+   * o violeta da marca. Ordem = PARTIDOS_COM_COR em components/pages/cargos/partidos.ts (por tamanho, nunca por
+   * espectro). Identidade nunca só pela cor: sempre há sigla ao lado.
+   */
+  --partido-1: 202 109 173; /* orquídea */
+  --partido-2: 149 61 124; /* ameixa */
+  --partido-3: 99 85 162; /* anil */
+  --partido-4: 160 124 219; /* lavanda */
+  --partido-5: 194 115 95; /* salmão */
+  --partido-6: 152 153 18; /* oliva */
+  --partido-7: 30 119 41; /* floresta */
+  --partido-8: 192 85 114; /* rosa */
+  --partido-9: 146 98 157; /* malva */
+  --partido-10: 87 143 49; /* folha */
 }
 
 :root[data-theme='light'] {
@@ -84,6 +100,16 @@
   --alert: 225 60 90;
   --alert-fg: 190 34 66;
   --pending: 214 214 228;
+  --partido-1: 228 134 198;
+  --partido-2: 136 49 112;
+  --partido-3: 88 73 149;
+  --partido-4: 185 149 246;
+  --partido-5: 229 146 125;
+  --partido-6: 177 178 57;
+  --partido-7: 10 107 29;
+  --partido-8: 201 93 123;
+  --partido-9: 150 101 161;
+  --partido-10: 95 152 58;
 }
 
 @media (prefers-color-scheme: light) {
@@ -118,6 +144,16 @@
     --alert: 225 60 90;
     --alert-fg: 190 34 66;
     --pending: 214 214 228;
+    --partido-1: 228 134 198;
+    --partido-2: 136 49 112;
+    --partido-3: 88 73 149;
+    --partido-4: 185 149 246;
+    --partido-5: 229 146 125;
+    --partido-6: 177 178 57;
+    --partido-7: 10 107 29;
+    --partido-8: 201 93 123;
+    --partido-9: 150 101 161;
+    --partido-10: 95 152 58;
   }
 }
 

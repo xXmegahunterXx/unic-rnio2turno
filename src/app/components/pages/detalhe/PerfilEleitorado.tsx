@@ -4,6 +4,7 @@
  * escolaridade e totais. Só dado agregado e público: nada sobre voto.
  *
  * Uso: <PerfilEleitorado uf="SP" cod="71072" nome="São Paulo" />  ·  na UF: <PerfilEleitorado uf="SP" nome="São Paulo" />
+ * O arquivo da UF (até ~300 KB em SP) só é baixado quando o bloco chega perto da tela (`adiar`, padrão).
  */
 import { useMemo } from 'react';
 import type { PerfilAgregado } from '@/shared/dataset';
@@ -11,6 +12,7 @@ import type { UF } from '@/shared/types';
 import { fmtInt, fmtPct } from '@/shared/format';
 import { usePerfil } from '@/app/data/estatico';
 import { cn } from '@/app/lib/cn';
+import { useNaTela } from '@/app/lib/useNaTela';
 import { Skeleton } from '@/app/ui/Skeleton';
 
 /** Agrupa as faixas do TSE em blocos legíveis: 16–17, 18–20, 21–24 … 80–84, 85–89, 90+. */
@@ -35,8 +37,22 @@ function agrupar(faixas: string[], [f, m]: [number[], number[]]): { rotulo: stri
   }));
 }
 
-export function PerfilEleitorado({ uf, cod, nome, className }: { uf: UF; cod?: string; nome: string; className?: string }) {
-  const q = usePerfil(uf);
+export function PerfilEleitorado({
+  uf,
+  cod,
+  nome,
+  adiar = true,
+  className,
+}: {
+  uf: UF;
+  cod?: string;
+  nome: string;
+  /** Só baixa o perfil quando o bloco chega perto da tela (padrão). */
+  adiar?: boolean;
+  className?: string;
+}) {
+  const [ref, visto] = useNaTela<HTMLDivElement>();
+  const q = usePerfil(adiar && !visto ? null : uf);
   const p: PerfilAgregado | undefined = q.data ? (cod ? q.data.municipios[cod] : q.data.total) : undefined;
   const faixas = q.data?.faixas ?? [];
   const esc = q.data?.escolaridade ?? [];
@@ -57,11 +73,15 @@ export function PerfilEleitorado({ uf, cod, nome, className }: { uf: UF; cod?: s
   const totIdade = somaF + somaM;
 
   if (q.isError) {
-    return <p className={cn('rounded-2xl border border-dashed border-line px-4 py-8 text-center text-[14px] text-fg-muted', className)}>O perfil do eleitorado não está disponível agora.</p>;
+    return (
+      <p className={cn('rounded-2xl border border-dashed border-line px-4 py-8 text-center text-[14px] text-fg-muted', className)}>
+        O perfil do eleitorado não está disponível agora.
+      </p>
+    );
   }
   if (!q.data) {
     return (
-      <div className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2', className)}>
+      <div ref={ref} className={cn('grid grid-cols-1 gap-4 lg:grid-cols-2', className)}>
         <Skeleton className="h-[420px] rounded-2xl" />
         <Skeleton className="h-[420px] rounded-2xl" />
       </div>
@@ -76,7 +96,7 @@ export function PerfilEleitorado({ uf, cod, nome, className }: { uf: UF; cod?: s
       {/* ------------------------------------------------ totais + pirâmide */}
       <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5 lg:col-span-7" aria-labelledby="perfil-idade">
         <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Total rotulo="Eleitores" valor={fmtInt(p.eleitores)} />
+          <Total rotulo="No cadastro" valor={fmtInt(p.eleitores)} sub="eleitores" />
           <Total rotulo="Mulheres" valor={fmtPct((somaF / Math.max(1, totIdade)) * 100, 1)} sub={fmtInt(somaF)} />
           <Total rotulo="Homens" valor={fmtPct((somaM / Math.max(1, totIdade)) * 100, 1)} sub={fmtInt(somaM)} />
           <Total rotulo="16 a 24 anos" valor={fmtPct((jovens / Math.max(1, totIdade)) * 100, 1)} sub={`60+: ${fmtPct((idosos / Math.max(1, totIdade)) * 100, 1)}`} />

@@ -18,60 +18,16 @@
  * evita a cor oficial de cada partido (e nada de verde-amarelo para o PT nem tons avermelhados para o PL).
  * Contraste < 3:1 de algumas cores sobre a superfície → sempre há rótulo (regra de alívio).
  *
- * Os valores ficam como variáveis CSS `--partido-1..10` ("R G B", mesma convenção de src/app/styles.css),
- * injetadas uma vez no <head>; os componentes só usam `rgb(var(--partido-n))` via `corPartido()`.
- * (Pendência registrada: mover estes tokens para styles.css/tailwind.config quando o dono do tema puder.)
+ * Os valores são tokens do tema em src/app/styles.css (`--partido-1..10`, "R G B", tema escuro e claro), na ordem
+ * de PARTIDOS_COM_COR; os componentes só usam `rgb(var(--partido-n))` via `corPartido()`.
  */
 import { tokenCss } from '@/app/lib/tokens';
 
 /** Ordem por tamanho (nº de eleitos em 2026: Câmara + Assembleias + Senado, dados do TSE). */
 export const PARTIDOS_COM_COR = ['PL', 'PT', 'MDB', 'PSD', 'PP', 'REPUBLICANOS', 'UNIÃO', 'PODE', 'PSB', 'PSOL'] as const;
 
-/** "R G B" por slot (1..10), tema escuro e claro. Mesma ordem de PARTIDOS_COM_COR. */
-const ESCURO = [
-  '202 109 173', // orquídea
-  '149 61 124', // ameixa
-  '99 85 162', // anil
-  '160 124 219', // lavanda
-  '194 115 95', // salmão
-  '152 153 18', // oliva
-  '30 119 41', // floresta
-  '192 85 114', // rosa
-  '146 98 157', // malva
-  '87 143 49', // folha
-];
-const CLARO = [
-  '228 134 198',
-  '136 49 112',
-  '88 73 149',
-  '185 149 246',
-  '229 146 125',
-  '177 178 57',
-  '10 107 29',
-  '201 93 123',
-  '150 101 161',
-  '95 152 58',
-];
-
-function css(): string {
-  const bloco = (vals: string[]) => vals.map((v, i) => `--partido-${i + 1}: ${v};`).join(' ');
-  return [
-    `:root, :root[data-theme='dark'] { ${bloco(ESCURO)} }`,
-    `:root[data-theme='light'] { ${bloco(CLARO)} }`,
-    `@media (prefers-color-scheme: light) { :root:not([data-theme='dark']) { ${bloco(CLARO)} } }`,
-  ].join('\n');
-}
-
-/** Injeta as variáveis uma única vez (idempotente; no-op fora do navegador). */
-export function garantirPaletaPartidos(): void {
-  if (typeof document === 'undefined') return;
-  if (document.getElementById('sintonia-paleta-partidos')) return;
-  const el = document.createElement('style');
-  el.id = 'sintonia-paleta-partidos';
-  el.textContent = css();
-  document.head.appendChild(el);
-}
-garantirPaletaPartidos();
+/** Mantido por compatibilidade: as variáveis agora vêm de styles.css (nada a injetar). */
+export function garantirPaletaPartidos(): void {}
 
 const normSigla = (s: string) => s.trim().toUpperCase().replace('UNIAO', 'UNIÃO');
 

@@ -50,7 +50,7 @@ const AR_BRASIL = 1116 / 1000;
 type Foco = 'BR' | UF;
 
 // Unidade da tela (`--u`): ~1% da altura útil na TV (paisagem); em retrato (tablet), guiada pela largura.
-const UNIDADE = '[--u:min(1dvh,0.6vw)] portrait:[--u:min(0.8dvh,1.1vw)]';
+const UNIDADE = '[--u:min(1dvh,0.6vw)] portrait:[--u:min(0.72dvh,1vw)]';
 
 export default function TvPage() {
   const [params, setParams] = useSearchParams();
@@ -602,7 +602,8 @@ function Rodape({ patrocinio }: { patrocinio: Patrocinio | null }) {
     }
   }, [url]);
   return (
-    <div className="mt-[calc(var(--u)*1.6)] flex shrink-0 items-center gap-[calc(var(--u)*2)] rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 p-[calc(var(--u)*1.4)]">
+    // Em retrato (tablet) o espaço vai para o mapa: o QR fica só na TV (paisagem).
+    <div className="mt-[calc(var(--u)*1.6)] flex shrink-0 items-center gap-[calc(var(--u)*2)] rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 p-[calc(var(--u)*1.4)] portrait:hidden">
       {qr ? (
         <svg
           viewBox={`0 0 ${qr.tamanho + 4} ${qr.tamanho + 4}`}

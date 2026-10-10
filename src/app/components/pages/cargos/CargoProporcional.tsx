@@ -3,13 +3,14 @@
  * hemiciclo + ranking de bancadas (maior primeiro), eleitos com foto oficial e os mais votados.
  * Usado por /camara (Brasil ou `?uf=`) e por /assembleias/:uf.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { CargoDataset, CargoUfResultado } from '@/shared/dataset';
 import type { UFBr } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
+import { useNaTela } from '@/app/lib/useNaTela';
 import { Icon } from '@/app/ui/Icon';
 import { SearchBox } from '@/app/ui/SearchBox';
 import { Segmented } from '@/app/ui/Segmented';
@@ -144,24 +145,6 @@ export function VisaoComposicao({
       </section>
     </div>
   );
-}
-
-/** Monta o conteúdo só quando chega perto da tela (pacotes de fotos são pesados). */
-export function useNaTela<T extends HTMLElement>(margem = '600px'): [React.RefObject<T | null>, boolean] {
-  const ref = useRef<T>(null);
-  const [visto, setVisto] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || visto) return;
-    if (typeof IntersectionObserver === 'undefined') {
-      setVisto(true);
-      return;
-    }
-    const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && setVisto(true), { rootMargin: margem });
-    io.observe(el);
-    return () => io.disconnect();
-  }, [visto, margem]);
-  return [ref, visto];
 }
 
 type OrdemEleitos = 'votos' | 'partido';

@@ -20,10 +20,13 @@ export function Amostra({ sigla, className }: { sigla: string; className?: strin
 /** "■ PL" — identidade nunca só pela cor. */
 export function PartidoChip({ sigla, numero, className }: { sigla: string; numero?: number; className?: string }) {
   return (
-    <span className={cn('inline-flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[12.5px] text-fg-muted', className)}>
+    <span className={cn('inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-[12.5px] text-fg-muted', className)}>
       <Amostra sigla={sigla} />
-      <span className="font-medium text-fg">{sigla}</span>
-      {numero !== undefined ? <span className="num text-fg-muted">· {numero}</span> : null}
+      {/* A sigla cede espaço (REPUBLICANOS em colunas estreitas); o número nunca é cortado. */}
+      <span className="min-w-0 truncate font-medium text-fg" title={sigla}>
+        {sigla}
+      </span>
+      {numero !== undefined ? <span className="num shrink-0 text-fg-muted">· {numero}</span> : null}
     </span>
   );
 }
@@ -54,19 +57,26 @@ export function NomeLink({
   sqcand,
   nome,
   comFicha,
+  quebra,
   className,
 }: {
   sqcand?: string;
   nome: string;
   comFicha: boolean;
+  /** Quebra em até 2 linhas em vez de cortar com reticências (colunas estreitas). */
+  quebra?: boolean;
   className?: string;
 }) {
-  if (!sqcand || !comFicha) return <span className={cn('min-w-0 truncate', className)}>{nome}</span>;
+  const corte = quebra ? 'line-clamp-2 break-words' : 'truncate';
+  if (!sqcand || !comFicha) return <span className={cn('min-w-0', corte, className)} title={nome}>{nome}</span>;
   return (
     <Link
       to={`/candidato/${sqcand}`}
+      title={nome}
       className={cn(
-        'min-w-0 truncate rounded-sm underline decoration-line/[3] decoration-1 underline-offset-[3px] transition-colors hover:text-brand-fg hover:decoration-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+        'min-w-0 rounded-sm',
+        corte,
+        'underline decoration-line/[3] decoration-1 underline-offset-[3px] transition-colors hover:text-brand-fg hover:decoration-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         className,
       )}
     >
