@@ -5,6 +5,8 @@
  */
 import { useId, useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react';
 import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
+import type { CorCandidato } from '@/shared/types';
 import { Button, Dialog, Icon, type IconName } from '@/app/ui';
 import { fmtPct } from '@/shared/format';
 import { useNow } from '@/app/lib/useNow';
@@ -316,11 +318,13 @@ const polegar =
 /**
  * Cabo de guerra A × B: o valor é o % de A; a trilha à esquerda do polegar tem a cor de A e à direita a de B.
  * Nomes e percentuais dos dois lados (B = 100 − A). Candidatos sempre na ordem da urna (A à esquerda).
+ * `cores`: as cores que vêm dos dados (`race.candidatos[i].cor`); padrão, os slots neutros turquesa/âmbar.
  */
 export function DuelSlider({
   valor,
   onChange,
   nomes,
+  cores = ['a', 'b'],
   min = 40,
   max = 60,
   passo = 0.05,
@@ -332,6 +336,7 @@ export function DuelSlider({
   valor: number;
   onChange: (v: number) => void;
   nomes: [string, string];
+  cores?: readonly [CorCandidato, CorCandidato];
   min?: number;
   max?: number;
   passo?: number;
@@ -350,7 +355,7 @@ export function DuelSlider({
       <div className={cn('flex items-end justify-between gap-3', compacto ? 'mb-2' : 'mb-3')}>
         <div className="min-w-0">
           <span className={cn('block truncate font-medium text-fg', compacto ? 'text-[13px]' : 'text-sm')}>{nomes[0]}</span>
-          <span className={cn('num block font-display font-semibold leading-none tracking-[-0.02em] text-cand-a-fg', compacto ? 'mt-1 text-[17px]' : 'mt-1.5 text-[24px]')}>
+          <span className={cn('num block font-display font-semibold leading-none tracking-[-0.02em]', corSlot(cores[0]).text, compacto ? 'mt-1 text-[17px]' : 'mt-1.5 text-[24px]')}>
             {fmtPct(valor)}
           </span>
         </div>
@@ -361,15 +366,15 @@ export function DuelSlider({
         ) : null}
         <div className="min-w-0 text-right">
           <span className={cn('block truncate font-medium text-fg', compacto ? 'text-[13px]' : 'text-sm')}>{nomes[1]}</span>
-          <span className={cn('num block font-display font-semibold leading-none tracking-[-0.02em] text-cand-b-fg', compacto ? 'mt-1 text-[17px]' : 'mt-1.5 text-[24px]')}>
+          <span className={cn('num block font-display font-semibold leading-none tracking-[-0.02em]', corSlot(cores[1]).text, compacto ? 'mt-1 text-[17px]' : 'mt-1.5 text-[24px]')}>
             {fmtPct(100 - valor)}
           </span>
         </div>
       </div>
       <div className={cn('relative', compacto ? 'h-6' : 'h-7')}>
         <div className="absolute inset-x-0 top-1/2 flex h-2.5 -translate-y-1/2 overflow-hidden rounded-full">
-          <div className="h-full bg-cand-a transition-[width] duration-100" style={{ width: `${p}%` }} />
-          <div className="h-full flex-1 bg-cand-b" />
+          <div className={cn('h-full transition-[width] duration-100', corSlot(cores[0]).bg)} style={{ width: `${p}%` }} />
+          <div className={cn('h-full flex-1', corSlot(cores[1]).bg)} />
         </div>
         <span aria-hidden className="absolute top-1/2 h-4 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg/70" style={{ left: `${meio}%` }} />
         <input
@@ -414,6 +419,7 @@ export function ViesSlider({
   valor,
   onChange,
   nomes,
+  cores = ['a', 'b'],
   limite = 10,
   passo = 0.5,
   rotulo,
@@ -421,6 +427,8 @@ export function ViesSlider({
   valor: number;
   onChange: (v: number) => void;
   nomes: [string, string];
+  /** Cores dos dois candidatos (dos dados); padrão, os slots neutros. */
+  cores?: readonly [CorCandidato, CorCandidato];
   limite?: number;
   passo?: number;
   rotulo: string;
@@ -433,7 +441,7 @@ export function ViesSlider({
     <div className="relative h-7 w-full">
       <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-surface-3" />
       <div
-        className={cn('absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full', valor > 0 ? 'bg-cand-a' : 'bg-cand-b')}
+        className={cn('absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full', corSlot(valor > 0 ? cores[0] : cores[1]).bg)}
         style={{ left: `${ini}%`, width: `${fim - ini}%` }}
       />
       <span aria-hidden className="absolute left-1/2 top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-subtle" />

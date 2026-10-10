@@ -1,5 +1,5 @@
 /**
- * Mapa do cenário: as 27 UFs coloridas por quem fica à frente NO CENÁRIO (cor do slot, intensidade pela margem em 4
+ * Mapa do cenário: as 27 UFs coloridas por quem fica à frente NO CENÁRIO (cor do candidato — ./cores.ts —, intensidade pela margem em 4
  * faixas, como nos mapas da apuração). Mesma geometria e mesmos encaixes do BrazilMap (caixas das UFs pequenas do
  * Nordeste fora da costa e callout do DF), mas sem nada de "apuração" (não há seções nem % apurado aqui).
  *
@@ -21,18 +21,21 @@ import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { bboxes, parseViewBox } from '@/app/components/apuracao/geo';
 import { EXTRA_DIREITA, OFFSHORE, layoutCaixas, posicionarCalloutDf } from '@/app/components/apuracao/BrazilMap';
 import { useElementSize } from '@/app/components/apuracao/MapHooks';
+import { coresCenario, type CoresCenario } from './cores';
 
 /** Preenchimento de uma UF no cenário (tokens, nunca hex). */
-export function fillUfCenario(r: ResultadoUfCenario | undefined): string {
+export function fillUfCenario(r: ResultadoUfCenario | undefined, cores: CoresCenario = coresCenario()): string {
   if (!r || r.votos[0] + r.votos[1] <= 0) return FILL_PENDENTE;
   const v = vencedorArea(r);
   if (v === null) return FILL_EMPATE;
-  return fillMargem(v === 0 ? 'a' : 'b', bucketMargem(margemArea(r).pp));
+  return fillMargem(cores[v], bucketMargem(margemArea(r).pp));
 }
 
 export interface MapaCenarioProps {
   geo: GeoBrasil;
   resultado: ResultadoCenario;
+  /** Cores dos dois finalistas (ordem da urna). Padrão: as de identificação (./cores.ts). */
+  cores?: CoresCenario;
   /** Largura fixa em px (cartão). Sem ela, o mapa mede o contêiner. */
   largura?: number;
   selecionada?: UFBr | null;
@@ -61,6 +64,7 @@ export function MapaCenario(props: MapaCenarioProps) {
 const Svg = memo(function Svg({
   geo,
   resultado,
+  cores,
   larguraPx,
   selecionada,
   destaque,
@@ -89,7 +93,7 @@ const Svg = memo(function Svg({
     return m;
   }, [resultado]);
   const mudou = useMemo(() => new Set<string>(resultado.mudaram), [resultado]);
-  const fill = (uf: UFBr) => fillUfCenario(porUf.get(uf));
+  const fill = (uf: UFBr) => fillUfCenario(porUf.get(uf), cores);
   const tinta = (uf: UFBr) => `rgb(var(--${inkToken(fill(uf), tokens)}))`;
   const transicao = estatico ? undefined : 'fill 450ms cubic-bezier(.2,.8,.2,1)';
 
@@ -272,16 +276,16 @@ const Svg = memo(function Svg({
 const FAIXAS = ['< 5', '5–15', '15–30', '≥ 30'];
 
 /** Legenda: as 4 faixas de margem para cada finalista (identidade sempre com o nome, nunca só pela cor). */
-export function LegendaMapaCenario({ nomes, mudancas, className }: { nomes: { a: string; b: string }; mudancas?: boolean; className?: string }) {
+export function LegendaMapaCenario({ nomes, mudancas, className }: { nomes: { a: string; b: string; cores: CoresCenario }; mudancas?: boolean; className?: string }) {
   return (
     <div className={cn('text-[12px] text-fg-muted', className)}>
       <div className="grid grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1.5">
-        {(['a', 'b'] as const).map((s) => (
-          <div key={s} className="contents">
-            <span className="truncate font-medium text-fg">{s === 'a' ? nomes.a : nomes.b}</span>
+        {([0, 1] as const).map((i) => (
+          <div key={i} className="contents">
+            <span className="truncate font-medium text-fg">{i === 0 ? nomes.a : nomes.b}</span>
             <span className="flex gap-1" aria-hidden>
               {[0, 1, 2, 3].map((bkt) => (
-                <span key={bkt} className="h-3 flex-1 rounded-[4px] ring-1 ring-inset ring-line" style={{ background: fillMargem(s, bkt as 0 | 1 | 2 | 3) }} />
+                <span key={bkt} className="h-3 flex-1 rounded-[4px] ring-1 ring-inset ring-line" style={{ background: fillMargem(nomes.cores[i], bkt as 0 | 1 | 2 | 3) }} />
               ))}
             </span>
           </div>

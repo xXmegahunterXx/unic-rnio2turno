@@ -16,7 +16,7 @@ import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { type ButtonSize, type ButtonVariant } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
-import { BotaoCompartilhar, CartaoBase, DIMENSOES_CARTAO, PreviaCartao, SeloOficial, useCartao, type FormatoCartao } from '@/app/components/share';
+import { BotaoCompartilhar, CartaoBase, DIMENSOES_CARTAO, brilhoDe, PreviaCartao, SeloOficial, useCartao, type FormatoCartao } from '@/app/components/share';
 import { AvatarCartao, BarraDuelo, PctGigante, PilulaApurado, RotuloCartao } from '@/app/components/share/cartoes/partes';
 import { hashtags, textoPlacar } from '@/app/components/share/textos';
 import { useFotosRace } from './fotos';
@@ -66,6 +66,7 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
       rotuloInstante={t1 ? undefined : 'Dados de'}
       fonte={t1 ? 'Fonte: TSE · votação de 4 de outubro' : undefined}
       selo={t1 ? <SeloOficial>Resultado oficial</SeloOficial> : undefined}
+      brilho={brilhoDe(race)}
     >
       <MioloPlacar race={race} resumo={resumo} onde={onde} fotos={fotos} />
     </CartaoBase>

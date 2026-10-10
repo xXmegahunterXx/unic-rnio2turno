@@ -3,10 +3,10 @@
  *
  * Marca d'água forte "CENÁRIO HIPOTÉTICO · não é pesquisa nem previsão" em três camadas (selo no topo, faixa sólida
  * sob os números e texto diagonal atrás de tudo, para sobreviver a recortes). As premissas principais vão impressas.
- * Sem fotos (os números são hipotéticos): monograma na cor do slot, igual para os dois finalistas.
+ * Sem fotos (os números são hipotéticos): monograma na cor de identificação de cada finalista (./cores.ts), igual para os dois.
  */
 import type { ReactNode } from 'react';
-import type { Candidate } from '@/shared/types';
+import type { Candidate, CorCandidato } from '@/shared/types';
 import type { GeoBrasil } from '@/shared/dataset';
 import type { Cenario, Premissa, PresidenteT1Dataset, ResultadoCenario } from '@/shared/cenarios';
 import { MARCA_CENARIO, finalistasDe, margemArea, pctFinalista, premissasCenario } from '@/shared/cenarios';
@@ -16,6 +16,7 @@ import { corSlot } from '@/app/lib/raceUi';
 import { CartaoBase, useCartao, type FormatoCartao } from '@/app/components/share';
 import { AvatarCartao, BarraDuelo, RotuloCartao } from '@/app/components/share';
 import { MapaCenario } from './MapaCenario';
+import { coresCenario, type CoresCenario } from './cores';
 
 export interface CartaoCenarioProps {
   formato: FormatoCartao;
@@ -36,6 +37,7 @@ export function CartaoCenario({ formato, ds, cenario, resultado, geo, caminho }:
       fonte="Base: resultado oficial do 1º turno (TSE)"
       selo={<SeloHipotetico />}
       titulo={formato === 'x' ? undefined : 'Meu cenário para o 2º turno'}
+      brilho={[...coresCenario(ds)]}
     >
       <Miolo ds={ds} cenario={cenario} resultado={resultado} geo={geo} />
     </CartaoBase>
@@ -87,7 +89,7 @@ function MarcaDagua() {
   );
 }
 
-const comoCandidato = (c: { numero: number; nomeUrna: string; nome: string; partido: string }, cor: 'a' | 'b'): Candidate => ({
+const comoCandidato = (c: { numero: number; nomeUrna: string; nome: string; partido: string }, cor: CorCandidato): Candidate => ({
   numero: c.numero,
   nomeUrna: c.nomeUrna,
   nome: c.nome,
@@ -95,16 +97,16 @@ const comoCandidato = (c: { numero: number; nomeUrna: string; nome: string; part
   cor,
 });
 
-function Lado({ i, nome, partido, numero, pct, votos, alinhar }: { i: 0 | 1; nome: string; partido: string; numero: number; pct: number; votos: number; alinhar: 'esq' | 'dir' }) {
+function Lado({ cor, nome, partido, numero, pct, votos, alinhar }: { cor: CorCandidato; nome: string; partido: string; numero: number; pct: number; votos: number; alinhar: 'esq' | 'dir' }) {
   const { k, formato } = useCartao();
-  const s = corSlot(i === 0 ? 'a' : 'b');
+  const s = corSlot(cor);
   const kk = k;
   // story: os dois números lado a lado precisam caber em 920 px
   const tamPct = (formato === 'x' ? 82 : formato === 'feed' ? 104 : 92) * kk;
   return (
     <div className={cn('flex min-w-0 flex-1 flex-col', alinhar === 'dir' ? 'items-end text-right' : 'items-start')}>
       <div className={cn('flex min-w-0 max-w-full items-center', alinhar === 'dir' && 'flex-row-reverse')} style={{ gap: 12 * kk }}>
-        <AvatarCartao cor={i === 0 ? 'a' : 'b'} nome={nome} size={Math.round(52 * kk)} />
+        <AvatarCartao cor={cor} nome={nome} size={Math.round(52 * kk)} />
         <div className="min-w-0">
           <div className="truncate font-display font-semibold leading-tight tracking-[-0.02em]" style={{ fontSize: 26 * kk }}>
             {nome}
@@ -158,7 +160,7 @@ function ListaPremissas({ itens }: { itens: Premissa[] }) {
   );
 }
 
-function LinhaEstados({ r }: { r: ResultadoCenario }) {
+function LinhaEstados({ r, cores }: { r: ResultadoCenario; cores: CoresCenario }) {
   const { k, formato } = useCartao();
   const m = margemArea(r.brasil);
   const fs = (formato === 'x' ? 16 : 17) * k;
@@ -177,9 +179,9 @@ function LinhaEstados({ r }: { r: ResultadoCenario }) {
       {item(
         'Estados à frente',
         <>
-          <span className={corSlot('a').text}>{fmtInt(r.estados[0])}</span>
+          <span className={corSlot(cores[0]).text}>{fmtInt(r.estados[0])}</span>
           <span className="text-fg-subtle"> × </span>
-          <span className={corSlot('b').text}>{fmtInt(r.estados[1])}</span>
+          <span className={corSlot(cores[1]).text}>{fmtInt(r.estados[1])}</span>
           {r.empates ? <span className="text-fg-muted"> · {fmtInt(r.empates)} empate</span> : null}
         </>,
       )}
@@ -192,12 +194,13 @@ function LinhaEstados({ r }: { r: ResultadoCenario }) {
 function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; cenario: Cenario; resultado: ResultadoCenario; geo?: GeoBrasil }) {
   const { k, formato } = useCartao();
   const { a, b } = finalistasDe(ds);
-  const race = { candidatos: [comoCandidato(a, 'a'), comoCandidato(b, 'b')] };
+  const cores = coresCenario(ds);
+  const race = { candidatos: [comoCandidato(a, cores[0]), comoCandidato(b, cores[1])] };
   const ps = premissasCenario(ds, cenario, r, { detalheCandidatos: 2, nomesCurtos: true });
   const nomes = (
     <div className="flex items-start justify-between" style={{ gap: 24 * k }}>
-      <Lado i={0} nome={a.nomeUrna} partido={a.partido} numero={a.numero} pct={pctFinalista(r.brasil, 0)} votos={r.brasil.votos[0]} alinhar="esq" />
-      <Lado i={1} nome={b.nomeUrna} partido={b.partido} numero={b.numero} pct={pctFinalista(r.brasil, 1)} votos={r.brasil.votos[1]} alinhar="dir" />
+      <Lado cor={cores[0]} nome={a.nomeUrna} partido={a.partido} numero={a.numero} pct={pctFinalista(r.brasil, 0)} votos={r.brasil.votos[0]} alinhar="esq" />
+      <Lado cor={cores[1]} nome={b.nomeUrna} partido={b.partido} numero={b.numero} pct={pctFinalista(r.brasil, 1)} votos={r.brasil.votos[1]} alinhar="dir" />
     </div>
   );
   const barra = (
@@ -207,7 +210,7 @@ function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; ce
   );
   const mapa = (largura: number) =>
     geo ? (
-      <MapaCenario geo={geo} resultado={r} largura={largura} estatico rotulos fontePx={formato === 'story' ? 15 : formato === 'feed' ? 13 : 10.5} ariaLabel="Mapa do cenário por estado" />
+      <MapaCenario geo={geo} resultado={r} cores={cores} largura={largura} estatico rotulos fontePx={formato === 'story' ? 15 : formato === 'feed' ? 13 : 10.5} ariaLabel="Mapa do cenário por estado" />
     ) : null;
 
   if (formato === 'x') {
@@ -221,7 +224,7 @@ function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; ce
             </div>
             <div style={{ marginTop: 18 * k }}>{nomes}</div>
             {barra}
-            <LinhaEstados r={r} />
+            <LinhaEstados r={r} cores={cores} />
             <div className="min-h-0 flex-1 overflow-hidden" style={{ marginTop: 14 * k }}>
               <ListaPremissas itens={premissasDoCartao(ps, 2)} />
             </div>
@@ -242,7 +245,7 @@ function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; ce
       <div className="relative flex min-h-0 flex-1 flex-col">
         {nomes}
         {barra}
-        <LinhaEstados r={r} />
+        <LinhaEstados r={r} cores={cores} />
         {feed ? (
           <div className="flex min-h-0 flex-1 items-center" style={{ gap: 28 * k, marginTop: 18 * k }}>
             <div className="shrink-0">{mapa(500)}</div>

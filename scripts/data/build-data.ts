@@ -11,7 +11,8 @@
  *                                     quando data-raw/ não está disponível
  *
  * Convenções (ver também ARCHITECTURE.md §1 e §4):
- *  - Candidatos ordenados pelo número na urna; cor 'a' = menor número, 'b' = maior.
+ *  - Candidatos ordenados pelo número na urna. Cor: Presidente com as cores de identificação de CORES_IDENTIDADE
+ *    (Lula vermelho, Flávio Bolsonaro azul); governador com slots neutros ('a' = menor número, 'b' = maior).
  *  - Corridas de 2º turno ('pres', 'gov-xx'): exatamente os 2 finalistas.
  *  - Corridas de 1º turno ('pres-t1', 'gov-xx-t1'): [finalista de menor nº (cor 'a'), finalista de maior nº
  *    (cor 'b'), pseudo-candidato { nomeUrna: 'Outros', numero: 0, cor: 'outros', agregado: true }].
@@ -36,6 +37,7 @@ import type { Candidate, Race, UF } from '../../src/shared/types';
 import { UFS } from '../../src/shared/types';
 import { UF_NOMES, UF_REGIAO, UFS_GOV_2T } from '../../src/shared/constants';
 import { encodeFaixas } from '../../src/shared/calc';
+import { corCandidato } from '../../src/shared/cores';
 import { ROOT, readRaw, readRawOpcional } from './lib/cache';
 import {
   CARGO_GOV,
@@ -307,12 +309,17 @@ function finalistas(r: TseResultado, de2oTurno: boolean, ctx: string): Finalista
     .sort((a, b) => a.numero - b.numero);
 }
 
-function candidatosDaCorrida(fin: Finalista[], tot: Totais, comOutros: boolean): Candidate[] {
+/**
+ * Candidatos de uma corrida. A cor sai da fonte única (`corCandidato`, CORES_IDENTIDADE em src/shared/constants.ts):
+ * Presidente ('pres'/'pres-t1') com as cores de identificação (Lula vermelho, Flávio Bolsonaro azul); governador
+ * com os slots neutros pela ordem do número ('a' = menor). Assim uma regeneração mantém as cores.
+ */
+function candidatosDaCorrida(raceId: string, fin: Finalista[], tot: Totais, comOutros: boolean): Candidate[] {
   const cands: Candidate[] = fin.map((f, i) => {
     const votos = tot.votos[String(f.numero)] ?? fail(`candidato ${f.numero} sem votos no 1º turno`);
     return {
       ...f,
-      cor: i === 0 ? 'a' : 'b',
+      cor: corCandidato(raceId, f.numero, i),
       primeiroTurno: { votos, pct: pct2(votos, tot.validos) },
       fotoGrupo: FOTO_GRUPO_FINALISTAS,
     };
@@ -393,8 +400,8 @@ async function main() {
   } else {
     avisos.push('Arquivo do 2º turno de Presidente ausente; candidatos derivados do 1º turno.');
   }
-  const presCands = candidatosDaCorrida(finPres, br, false);
-  const presCandsT1 = candidatosDaCorrida(fin1Pres, br, true);
+  const presCands = candidatosDaCorrida('pres', finPres, br, false);
+  const presCandsT1 = candidatosDaCorrida('pres-t1', fin1Pres, br, true);
   conferirPct(presCands, brFile, 'Presidente');
   races2t.push({
     id: 'pres',
@@ -433,8 +440,8 @@ async function main() {
       }
       origem = `arquivo do 2º turno (${ELE_GOV_T2})`;
     }
-    const cands = candidatosDaCorrida(fin, b.gov!, false);
-    const candsT1 = candidatosDaCorrida(fin1, b.gov!, true);
+    const cands = candidatosDaCorrida(`gov-${ufLower}`, fin, b.gov!, false);
+    const candsT1 = candidatosDaCorrida(`gov-${ufLower}-t1`, fin1, b.gov!, true);
     conferirPct(cands, govFile, `Governador ${uf}`);
     console.log(`  gov-${ufLower}: ${cands.map((c) => `${c.numero} ${c.nomeUrna} (${c.partido})`).join(' × ')} · candidatos de: ${origem}`);
     races2t.push({

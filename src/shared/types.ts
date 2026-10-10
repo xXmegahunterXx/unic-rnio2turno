@@ -22,8 +22,16 @@ export type Regiao = 'N' | 'NE' | 'CO' | 'SE' | 'S' | 'EX';
 /** 'pres' (Presidente 2º turno), 'gov-rj' etc. (Governador 2º turno), 'pres-t1' / 'gov-rj-t1' (1º turno, final). */
 export type RaceId = string;
 
-/** Slot de cor neutra. Atribuído pela ordem do número na urna (menor número = 'a'). Nunca usar cor de partido. */
-export type CorCandidato = 'a' | 'b' | 'outros';
+/**
+ * Cor do candidato na interface.
+ *  - 'a' | 'b': slots NEUTROS pela ordem do número na urna (menor número = 'a', turquesa; maior = 'b', âmbar).
+ *    Usados nas disputas de governador e na simulação com nomes ocultos (`LiveStatus.anonimizado`).
+ *  - 'vermelho' | 'azul': cores de IDENTIFICAÇÃO dos dois candidatos a Presidente (decisão do dono do produto:
+ *    Lula em vermelho, Flávio Bolsonaro em azul). Atribuídas SÓ por `CORES_IDENTIDADE` (constants.ts / cores.ts).
+ *  - 'outros': cinza neutro do agregado "Outros".
+ * A ORDEM dos candidatos nunca se deduz da cor: use o índice em `Race.candidatos` (ordem do número na urna).
+ */
+export type CorCandidato = 'a' | 'b' | 'vermelho' | 'azul' | 'outros';
 
 export interface Candidate {
   numero: number; // 13

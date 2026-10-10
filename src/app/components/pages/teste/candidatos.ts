@@ -6,7 +6,9 @@
  * Fotos oficiais do TSE (pacote public/data/fotos/segundo-turno.json, chave = Candidate.sqcand) só quando:
  *  - o pacote existe e traz foto de TODOS os finalistas (mesmo tratamento para os dois);
  *  - o status NÃO está anonimizado (simulação com nomes ocultos nunca mostra rosto real).
- * Sem foto: monograma com a cor do slot (CandidateAvatar).
+ * Sem foto: monograma na cor do candidato (CandidateAvatar): Lula vermelho, Flávio Bolsonaro azul (CORES_IDENTIDADE).
+ * O Teste é sobre propostas REAIS (não há número simulado): as cores de identificação valem aqui, mas só aparecem
+ * depois da revelação — o quiz nunca mostra autoria nem cor de candidato.
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -14,6 +16,7 @@ import { useAnonimizado, useMeta } from '@/app/data/hooks';
 import { assetUrl } from '@/app/lib/assets';
 import type { FotoPacote } from '@/shared/dataset';
 import type { Candidate } from '@/shared/types';
+import { corCandidato } from '@/shared/cores';
 import { AUTORES, type Autor } from './sintonia';
 
 export interface CandidatosTeste {
@@ -28,9 +31,10 @@ export interface CandidatosTeste {
 const GRUPO_PADRAO = 'segundo-turno';
 const DATA_URI_IMAGEM = /^data:image\/(webp|jpeg|jpg|png);base64,[A-Za-z0-9+/=]+$/;
 
-/** Enquanto o meta não chega (ou se falhar): rótulos neutros só com o número, cores pela ordem da urna. */
+/** Enquanto o meta não chega (ou se falhar): rótulos só com o número; cor da fonte única (CORES_IDENTIDADE). */
 function provisorio(numero: Autor): Candidate {
-  return { numero, nomeUrna: `Nº ${numero}`, nome: `Candidatura nº ${numero}`, partido: '', cor: numero === 13 ? 'a' : 'b' };
+  const ordem = [...AUTORES].sort((a, b) => a - b).indexOf(numero);
+  return { numero, nomeUrna: `Nº ${numero}`, nome: `Candidatura nº ${numero}`, partido: '', cor: corCandidato('pres', numero, ordem) };
 }
 
 /** Pacote de fotos de um grupo (arquivo estático; GET sem nenhum dado do teste). null se não existir. */

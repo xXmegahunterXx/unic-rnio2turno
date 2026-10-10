@@ -159,7 +159,8 @@ export function MedidorSintonia({
             animate={{ rotate: 360, opacity: 1 }}
             transition={{ rotate: { duration: 0.9, repeat: Infinity, ease: 'linear' }, opacity: { duration: 0.2 } }}
           >
-            <circle cx="60" cy="60" r={R} fill="none" strokeWidth="7" strokeLinecap="round" strokeDasharray="70 400" className={s.stroke} />
+            {/* antes da revelação, nada na cor do candidato (vermelho/azul diriam quem é quem): anel na cor da marca */}
+            <circle cx="60" cy="60" r={R} fill="none" strokeWidth="7" strokeLinecap="round" strokeDasharray="70 400" className="stroke-brand" />
           </motion.svg>
         ) : null}
         <div className="absolute inset-0 flex items-center justify-center [perspective:600px]">

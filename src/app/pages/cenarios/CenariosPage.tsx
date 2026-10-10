@@ -5,7 +5,8 @@
  *
  * NÃO é pesquisa nem previsão (aviso permanente). Nada é coletado nem agregado: o cenário vive no aparelho e no link
  * (?c=…, codec em src/shared/cenarios.ts) que a pessoa decidir compartilhar. Nomes reais do 1º turno são dados
- * oficiais; cores por slot (A = menor número na urna, turquesa); sem fotos (os números são hipotéticos).
+ * oficiais; cores de identificação dos finalistas (Lula vermelho, Flávio Bolsonaro azul — cenarios/cores.ts); sem
+ * fotos (os números são hipotéticos).
  *
  * Celular: placar → mapa → controles → estados (com mini-placar fixo enquanto o placar está fora da tela).
  * Desktop: controles à esquerda; placar e mapa fixos à direita.
@@ -24,6 +25,7 @@ import {
 import { fmtCompact, fmtDataHora, fmtInt } from '@/shared/format';
 import { assetUrl } from '@/app/lib/assets';
 import { cn } from '@/app/lib/cn';
+import { brilhoDuplo } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { Container } from '@/app/components/layout/Container';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
@@ -34,6 +36,7 @@ import { ControleBrancos, ControleComparecimento, ControleTodos, ListaEliminados
 import { BarraFixa, MiniPlacar, PlacarCenario, type CompartilharCenario } from '@/app/components/pages/cenarios/Placar';
 import { ListaUfs, PainelMapa } from '@/app/components/pages/cenarios/Estados';
 import { CartaoCenario } from '@/app/components/pages/cenarios/CartaoCenario';
+import { coresCenario } from '@/app/components/pages/cenarios/cores';
 import { HASHTAGS_CENARIO, NOME_ARQUIVO_CENARIO, textoCenario } from '@/app/components/pages/cenarios/textos';
 
 export default function CenariosPage() {
@@ -61,7 +64,7 @@ function Hero({ ds }: { ds: PresidenteT1Dataset | undefined }) {
   const total = elim.reduce((s, c) => s + c.votos, 0);
   return (
     <section aria-labelledby="cenarios-titulo" className="relative isolate overflow-hidden">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_55%_70%_at_0%_0%,rgb(var(--cand-a)/0.12),transparent_70%),radial-gradient(ellipse_55%_70%_at_100%_0%,rgb(var(--cand-b)/0.12),transparent_70%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10" style={{ background: brilhoDuplo(coresCenario(ds), 0.12, '55% 70%') }} />
       <Container wide className="pb-5 pt-5 sm:pb-8 sm:pt-10">
         <span className="inline-flex h-8 items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg">
           <Icon name="ajustes" size={15} className="text-brand-fg" />

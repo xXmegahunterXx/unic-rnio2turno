@@ -21,7 +21,7 @@ import { siteExibicao } from '@/app/lib/share';
 import { corSlot, rgbSlot } from '@/app/lib/raceUi';
 import { tokenCss } from '@/app/lib/tokens';
 import { Icon } from '@/app/ui/Icon';
-import { CartaoBase, SeloOficial, useCartao, type BrilhoCartao } from '@/app/components/share/CartaoBase';
+import { CartaoBase, SeloOficial, brilhoDe, useCartao, type BrilhoCartao } from '@/app/components/share/CartaoBase';
 import { AvatarCartao } from '@/app/components/share/cartoes/partes';
 import type { FormatoCartao } from '@/app/components/share/tipos';
 import type { Autor, ComparacaoDuelo } from './sintonia';
@@ -216,7 +216,7 @@ export interface CartaoMeuResultadoProps {
 
 export function CartaoMeuResultado({ formato, resultado, candidatos, fotos, n, rapido }: CartaoMeuResultadoProps) {
   return (
-    <Moldura formato={formato} brilho="duelo" fonte="Fonte: programas registrados no TSE" selo={<SeloOficial>{rapido ? 'Modo rápido' : 'Meu resultado'}</SeloOficial>}>
+    <Moldura formato={formato} brilho={brilhoDe({ candidatos })} fonte="Fonte: programas registrados no TSE" selo={<SeloOficial>{rapido ? 'Modo rápido' : 'Meu resultado'}</SeloOficial>}>
       <MioloResultado resultado={resultado} candidatos={candidatos} fotos={fotos} n={n} />
     </Moldura>
   );

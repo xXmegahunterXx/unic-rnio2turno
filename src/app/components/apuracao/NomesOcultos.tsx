@@ -13,7 +13,7 @@ import { Icon } from '@/app/ui/Icon';
 import { Tooltip } from '@/app/ui/Tooltip';
 
 export const TEXTO_NOMES_OCULTOS =
-  'Na simulação os candidatos aparecem como “Candidato A” e “Candidato B”, na ordem do número na urna, para que números fictícios nunca sejam associados a pessoas reais.';
+  'Na simulação os candidatos aparecem como “Candidato A” e “Candidato B”, na ordem do número na urna e com cores neutras, para que números fictícios nunca sejam associados a pessoas reais.';
 
 export interface NomesOcultosProps {
   chip?: boolean;

@@ -2,15 +2,17 @@
  * Cartão de compartilhamento de uma curiosidade (miolo sobre a moldura `CartaoBase` do kit de compartilhamento).
  * Desenhado em px reais nos 3 formatos (x 1200×675 · feed 1080×1350 · story 1080×1920); `k` escala as medidas.
  *
- * Neutralidade: fatos dos finalistas mostram os DOIS lados com o mesmo peso (a = turquesa, menor número; b = âmbar).
- * Números reais do 1º turno (nunca simulados) e sem fotos: só nome, número na urna e a cor do slot.
+ * Neutralidade: fatos dos finalistas mostram os DOIS lados com o mesmo peso, na ordem da urna, cada um com a sua cor
+ * de identificação (Lula vermelho, Flávio Bolsonaro azul — CORES_IDENTIDADE via `corFinalista`).
+ * Números reais do 1º turno (nunca simulados) e sem fotos: só nome, número na urna e a cor do candidato.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Curiosidade, CuriosidadesDataset, FinalistaCuriosidade, LadoCuriosidade } from '@/shared/curiosidades';
 import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { CartaoBase, SeloOficial, useCartao, type FormatoCartao } from '@/app/components/share';
-import { ICONE_TEMA, fmtValor, nivelTamanho, rotuloTema } from './formato';
+import { ICONE_TEMA, corFinalista, fmtValor, nivelTamanho, rotuloTema } from './formato';
 
 export interface CartaoCuriosidadeProps {
   fato: Curiosidade;
@@ -27,7 +29,7 @@ export function CartaoCuriosidade({ fato, finalistas, formato }: CartaoCuriosida
       caminho="/curiosidades"
       instante={null}
       fonte="Fonte: TSE · 1º turno, 4 out. 2026"
-      brilho={fato.par ? 'duelo' : 'marca'}
+      brilho={fato.par ? [corFinalista(finalistas.a), corFinalista(finalistas.b)] : 'marca'}
     >
       <Miolo fato={fato} finalistas={finalistas} />
     </CartaoBase>
@@ -135,17 +137,14 @@ function Miolo({ fato, finalistas }: Omit<CartaoCuriosidadeProps, 'formato'>) {
   );
 }
 
-const SLOT = {
-  a: { barra: 'bg-cand-a', texto: 'text-cand-a-fg', caixa: 'border-cand-a/40 bg-cand-a/[0.08]' },
-  b: { barra: 'bg-cand-b', texto: 'text-cand-b-fg', caixa: 'border-cand-b/40 bg-cand-b/[0.08]' },
-} as const;
 
 /** Respiro lateral da moldura por formato (o mesmo do CartaoBase), para limitar o número à largura da coluna. */
 const PAD_X = { x: 56, feed: 72, story: 80 } as const;
 
 function Lado({ lado, fin, compacto, k }: { lado: LadoCuriosidade; fin: FinalistaCuriosidade; compacto: boolean; k: number }) {
   const { retrato, w, formato } = useCartao();
-  const s = SLOT[fin.slot];
+  const cor = corSlot(corFinalista(fin));
+  const s = { barra: cor.bg, texto: cor.text, caixa: cn(cor.borderSoft, cor.bgFaint) };
   const v = fmtValor(lado.valor);
   const base = (compacto ? 66 : TAM_NUMERO[nivelTamanho(v)] * 0.78) * (retrato ? 1.1 : 1) * k;
   // Largura útil da coluna (metade do miolo, menos respiros) ÷ largura média de um algarismo (~0,6 em).

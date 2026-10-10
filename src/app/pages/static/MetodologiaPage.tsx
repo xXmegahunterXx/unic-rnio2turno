@@ -1,6 +1,6 @@
 /**
  * /metodologia — de onde vêm os dados (TSE, IBGE), como funciona a apuração e o "matematicamente eleito",
- * a simulação e como ela é sinalizada, as cores neutras por ordem do número e a metodologia do Teste Cego
+ * a simulação e como ela é sinalizada, a regra de cores (identificação para Presidente, neutras no resto) e a metodologia do Teste Cego
  * (afirmações únicas com escala de concordância: redação, posições documentadas, fórmula, documentos-fonte e
  * aviso de revisão editorial).
  */
@@ -19,8 +19,11 @@ import {
   type ValorLikert,
 } from '@/app/content/afirmacoes';
 import { fmtInt, fmtPct } from '@/shared/format';
+import { REGRA_CORES, coresPresidente } from '@/shared/cores';
+import type { CorCandidato } from '@/shared/types';
 import { useMeta } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import {
   CONTATO,
@@ -189,13 +192,16 @@ export default function MetodologiaPage() {
       </Secao>
 
       <Secao id="neutralidade" titulo="Cores e neutralidade">
+        <p>{REGRA_CORES}</p>
         <p>
-          As cores dos candidatos seguem só a <strong>ordem do número na urna</strong>: o menor número fica com o turquesa e o maior, com o âmbar.
-          Nunca usamos as cores dos partidos (vermelho, azul, verde e amarelo). O par turquesa × âmbar também funciona para quem tem daltonismo.
+          Com os nomes ocultos, a simulação não usa vermelho nem azul: a cor diria quem é quem. Os pares vermelho × azul e turquesa × âmbar
+          também se distinguem para quem tem daltonismo, e a identidade nunca depende só da cor (sempre há nome ao lado).
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Amostra cor="a" titulo="Menor número na urna" texto="Turquesa · sempre à esquerda ou em cima" />
-          <Amostra cor="b" titulo="Maior número na urna" texto="Âmbar · sempre à direita ou embaixo" />
+          <Amostra cor="vermelho" titulo="Lula · Presidente" texto="Vermelho · cor de identificação" />
+          <Amostra cor="azul" titulo="Flávio Bolsonaro · Presidente" texto="Azul · cor de identificação" />
+          <Amostra cor="a" titulo="Menor número na urna" texto="Turquesa · governadores e simulação com nomes ocultos" />
+          <Amostra cor="b" titulo="Maior número na urna" texto="Âmbar · governadores e simulação com nomes ocultos" />
         </div>
         <Lista
           itens={[
@@ -393,10 +399,10 @@ function ExemploEleito() {
   );
 }
 
-function Amostra({ cor, titulo, texto }: { cor: 'a' | 'b'; titulo: string; texto: string }) {
+function Amostra({ cor, titulo, texto }: { cor: CorCandidato; titulo: string; texto: string }) {
   return (
     <div className="flex items-center gap-3.5 rounded-2xl border border-line bg-surface p-4">
-      <span aria-hidden className={cn('h-11 w-11 shrink-0 rounded-xl', cor === 'a' ? 'bg-cand-a' : 'bg-cand-b')} />
+      <span aria-hidden className={cn('h-11 w-11 shrink-0 rounded-xl', corSlot(cor).bg)} />
       <div className="min-w-0">
         <p className="text-[15px] font-semibold text-fg">{titulo}</p>
         <p className="text-[13.5px] text-fg-muted">{texto}</p>
@@ -540,13 +546,20 @@ function ListaAfirmacoesFontes() {
   );
 }
 
+/** Cor de identificação do candidato (CORES_IDENTIDADE), pela ordem da urna entre os dois. */
+const corDoAutor = (n: Candidato): CorCandidato => {
+  const [x, y] = [...CANDIDATOS].sort((p, q) => p - q) as [Candidato, Candidato];
+  return coresPresidente([x, y])[n === x ? 0 : 1];
+};
+
 function PosicaoCurta({ n, p }: { n: Candidato; p: Posicao }) {
   return (
     <li className="inline-flex items-center gap-2 text-[12.5px] text-fg-muted">
       <span
         className={cn(
           'num inline-flex h-6 min-w-[2rem] shrink-0 items-center justify-center rounded-md px-1.5 text-[12px] font-bold',
-          n === 13 ? 'bg-cand-a/15 text-cand-a-fg' : 'bg-cand-b/15 text-cand-b-fg',
+          corSlot(corDoAutor(n)).bgSoft,
+          corSlot(corDoAutor(n)).text,
         )}
       >
         {n}

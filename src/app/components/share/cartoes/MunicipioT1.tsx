@@ -10,7 +10,7 @@ import { corSlot } from '@/app/lib/raceUi';
 import type { ButtonSize, ButtonVariant } from '@/app/ui/Button';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
 import { BotaoCompartilhar } from '../BotaoCompartilhar';
-import { CartaoBase, SeloOficial, useCartao } from '../CartaoBase';
+import { CartaoBase, SeloOficial, brilhoDe, useCartao } from '../CartaoBase';
 import { hashtags, textoMunicipioT1 } from '../textos';
 import type { FormatoCartao } from '../tipos';
 import { AvatarCartao, PctGigante, RotuloCartao } from './partes';
@@ -45,7 +45,7 @@ export function CartaoMunicipioT1({ formato, nome, uf, race, t, caminho }: Carta
       instante={null}
       fonte="Fonte: TSE · votação de 4 de outubro"
       selo={<SeloOficial>Resultado oficial</SeloOficial>}
-      brilho="duelo"
+      brilho={brilhoDe(race)}
     >
       <Miolo nome={nome} uf={uf} race={race} t={t} fotos={fotos} />
     </CartaoBase>

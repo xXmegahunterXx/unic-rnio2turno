@@ -30,6 +30,8 @@ export interface FeedPanelProps {
 const BORDA: Record<CorCandidato, string> = {
   a: 'border-cand-a/40',
   b: 'border-cand-b/40',
+  vermelho: 'border-cand-vermelho/40',
+  azul: 'border-cand-azul/40',
   outros: 'border-line',
 };
 

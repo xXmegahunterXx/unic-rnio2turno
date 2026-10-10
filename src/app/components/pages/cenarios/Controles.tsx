@@ -23,13 +23,17 @@ import {
 import { pctBrancos, pctComparecimento, pctValidos } from '@/shared/calc';
 import { fmtCompact, fmtInt, fmtPP, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { brilhoDuplo } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { Slider } from '@/app/ui/Slider';
 import { BarraPartes, SliderDivisao } from './SliderDivisao';
+import { coresCenario, type CoresCenario } from './cores';
 
 export interface Nomes {
   a: string;
   b: string;
+  /** Cores dos dois finalistas (ordem da urna), da fonte única — ver ./cores.ts. */
+  cores: CoresCenario;
 }
 
 const cartao = 'rounded-2xl border border-line bg-surface shadow-card';
@@ -96,7 +100,7 @@ export function ControleTodos({ ds, cenario, nomes, onChange }: { ds: Presidente
   const ninguem = media.escolhe === 0;
   return (
     <div className={cn(cartao, 'relative overflow-hidden p-4 sm:p-5')}>
-      <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_80%_at_0%_0%,rgb(var(--cand-a)/0.10),transparent_70%),radial-gradient(ellipse_60%_80%_at_100%_0%,rgb(var(--cand-b)/0.10),transparent_70%)]" />
+      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: brilhoDuplo(nomes.cores, 0.1, '60% 80%') }} />
       <div className="relative">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -114,8 +118,8 @@ export function ControleTodos({ ds, cenario, nomes, onChange }: { ds: Presidente
           className="mt-3"
           valor={media.paraA}
           onChange={(v) => onChange(definirTodos(cenario, ds, { paraA: v }))}
-          esquerda={{ rotulo: nomes.a, cor: 'a' }}
-          direita={{ rotulo: nomes.b, cor: 'b' }}
+          esquerda={{ rotulo: nomes.a, cor: nomes.cores[0] }}
+          direita={{ rotulo: nomes.b, cor: nomes.cores[1] }}
           ariaLabel={`Todos os eleitores dos candidatos eliminados que escolhem um finalista: divisão entre ${nomes.a} e ${nomes.b}`}
           desabilitado={ninguem}
           avisoDesabilitado="Ninguém escolhe um finalista"
@@ -166,8 +170,8 @@ export function ControleGrupo({ titulo, subtitulo, votos, pct, rotuloPct, divisa
     <SliderDivisao
       valor={divisao.paraA}
       onChange={(v) => set({ paraA: v })}
-      esquerda={{ rotulo: nomes.a, cor: 'a' }}
-      direita={{ rotulo: nomes.b, cor: 'b' }}
+      esquerda={{ rotulo: nomes.a, cor: nomes.cores[0] }}
+      direita={{ rotulo: nomes.b, cor: nomes.cores[1] }}
       ariaLabel={`${titulo}: entre quem escolhe um finalista, divisão entre ${nomes.a} e ${nomes.b}`}
       desabilitado={ninguem}
       avisoDesabilitado="Ninguém escolhe um finalista"
@@ -385,8 +389,8 @@ export function ControleComparecimento({ ds, cenario, nomes, onChange }: { ds: P
             tamanho="sm"
             valor={paraA}
             onChange={(v) => onChange({ ...cenario, comparecimento: { delta, paraA: v } })}
-            esquerda={{ rotulo: nomes.a, cor: 'a' }}
-            direita={{ rotulo: nomes.b, cor: 'b' }}
+            esquerda={{ rotulo: nomes.a, cor: nomes.cores[0] }}
+            direita={{ rotulo: nomes.b, cor: nomes.cores[1] }}
             ariaLabel={`Variação do comparecimento: divisão entre ${nomes.a} e ${nomes.b}`}
           />
           <p className="mt-1 text-[12px] text-fg-subtle">Com a mesma taxa de brancos e nulos do 1º turno em cada estado.</p>
@@ -399,5 +403,5 @@ export function ControleComparecimento({ ds, cenario, nomes, onChange }: { ds: P
 /** Nomes dos finalistas para os controles. */
 export const nomesDe = (ds: PresidenteT1Dataset): Nomes => {
   const { a, b } = finalistasDe(ds);
-  return { a: a.nomeUrna, b: b.nomeUrna };
+  return { a: a.nomeUrna, b: b.nomeUrna, cores: coresCenario(ds) };
 };

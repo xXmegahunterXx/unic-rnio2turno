@@ -3,7 +3,7 @@
  * do cenário: viés (ufVies, p.p.) e atraso na totalização (ufAtraso, min). Edição em rascunho, aplicada em lote.
  */
 import { useMemo, useState } from 'react';
-import type { Regiao, Summary, UF } from '@/shared/types';
+import type { CorCandidato, Regiao, Summary, UF } from '@/shared/types';
 import { REGIAO_NOMES, UF_NOMES, UF_REGIAO } from '@/shared/constants';
 import { UFS } from '@/shared/types';
 import { margem, pctTotalizadas } from '@/shared/calc';
@@ -218,7 +218,7 @@ function LinhaUf({
   uf: UF;
   resumo: Summary | undefined;
   nomes: [string, string];
-  cores: ['a' | 'b' | 'outros', 'a' | 'b' | 'outros'];
+  cores: [CorCandidato, CorCandidato];
   vies: number;
   atraso: number;
   alterada: boolean;
@@ -299,11 +299,11 @@ function LinhaUf({
       {/* viés */}
       <div className="min-w-0">
         <div className="flex items-center gap-3">
-          <span className={cn('shrink-0 truncate text-right text-[11.5px] font-semibold text-cand-a-fg', anonimos ? 'w-7' : 'w-[4.75rem]')} aria-hidden>
+          <span className={cn('shrink-0 truncate text-right text-[11.5px] font-semibold', corSlot(cores[0]).text, anonimos ? 'w-7' : 'w-[4.75rem]')} aria-hidden>
             ← {curtos[0]}
           </span>
-          <ViesSlider valor={vies} onChange={onVies} nomes={nomes} rotulo={`Viés em ${UF_NOMES[uf]}`} />
-          <span className={cn('shrink-0 truncate text-[11.5px] font-semibold text-cand-b-fg', anonimos ? 'w-7' : 'w-[4.75rem]')} aria-hidden>
+          <ViesSlider valor={vies} onChange={onVies} nomes={nomes} cores={cores} rotulo={`Viés em ${UF_NOMES[uf]}`} />
+          <span className={cn('shrink-0 truncate text-[11.5px] font-semibold', corSlot(cores[1]).text, anonimos ? 'w-7' : 'w-[4.75rem]')} aria-hidden>
             {curtos[1]} →
           </span>
         </div>

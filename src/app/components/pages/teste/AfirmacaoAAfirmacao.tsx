@@ -42,7 +42,9 @@ interface Contexto {
 const xDe = (v: number) => 10 + ((v + 2) / 4) * 80;
 const pontos = (p: Posicao) => (p.valor === 'concorda' ? 2 : p.valor === 'discorda' ? -2 : p.valor === 'neutro' ? 0 : null);
 
-export function LegendaRegua({ duelo, className }: { duelo?: boolean; className?: string }) {
+export function LegendaRegua({ duelo, lista, className }: { duelo?: boolean; lista?: Candidate[]; className?: string }) {
+  // cores dos dois candidatos como vêm dos dados (ordem da urna); sem lista, os slots neutros
+  const pontosCor = lista && lista.length >= 2 ? lista.slice(0, 2).map((c) => corSlot(c.cor).bg) : ['bg-cand-a', 'bg-cand-b'];
   return (
     <div className={cn('flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px] text-fg-muted', className)}>
       <span className="inline-flex items-center gap-1.5">
@@ -62,8 +64,9 @@ export function LegendaRegua({ duelo, className }: { duelo?: boolean; className?
       ) : null}
       <span className="inline-flex items-center gap-1.5">
         <span className="inline-flex -space-x-1">
-          <span className="h-3.5 w-3.5 rounded-full bg-cand-a ring-2 ring-surface" />
-          <span className="h-3.5 w-3.5 rounded-full bg-cand-b ring-2 ring-surface" />
+          {pontosCor.map((cls, i) => (
+            <span key={i} className={cn('h-3.5 w-3.5 rounded-full ring-2 ring-surface', cls)} />
+          ))}
         </span>
         Posição documentada no plano
       </span>
@@ -177,7 +180,7 @@ export function ListaAfirmacoes({
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <LegendaRegua duelo={duelo} />
+        <LegendaRegua duelo={duelo} lista={lista} />
         <button
           type="button"
           onClick={() => setAbertos(todos ? new Set() : new Set(linhas.map((l) => l.afirmacao.id)))}
@@ -294,7 +297,13 @@ function Detalhe({ linha, ctx }: { linha: LinhaAfirmacao; ctx: Contexto }) {
 }
 
 /** Borda translúcida na cor do slot (classes por extenso para o Tailwind gerar). */
-const BORDA_CITACAO: Record<Candidate['cor'], string> = { a: 'border-cand-a/70', b: 'border-cand-b/70', outros: 'border-cand-outros/70' };
+const BORDA_CITACAO: Record<Candidate['cor'], string> = {
+  a: 'border-cand-a/70',
+  b: 'border-cand-b/70',
+  vermelho: 'border-cand-vermelho/70',
+  azul: 'border-cand-azul/70',
+  outros: 'border-cand-outros/70',
+};
 
 function PosicaoCandidato({
   candidato,

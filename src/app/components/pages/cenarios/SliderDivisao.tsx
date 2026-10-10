@@ -1,6 +1,6 @@
 /**
  * Controles da calculadora: o "divisor" (uma barra dividida em dois lados, arrastada pelo meio) e a barra das quatro
- * partes de uma divisão (finalista A, finalista B, branco/nulo, não vota).
+ * partes de uma divisão (finalista 1, finalista 2, branco/nulo, não vota). As cores dos finalistas vêm de ./cores.ts.
  *
  * O divisor é um <input type="range"> nativo (teclado: setas ±1, PageUp/PageDown ±10, Home/End; leitores de tela
  * com aria-valuetext completo) sobre uma trilha desenhada com tokens. O lado esquerdo cresce quando o divisor vai
@@ -11,17 +11,32 @@ import type { PartesDivisao } from '@/shared/cenarios';
 import { partesPct } from '@/shared/cenarios';
 import { fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
 import { valorNoTrilho } from '@/app/lib/trilho';
+import type { CorCandidato } from '@/shared/types';
+import type { CoresCenario } from './cores';
 
-export type CorLado = 'a' | 'b' | 'bn' | 'abs';
+/** Cor de um lado: a de um candidato (vinda dos dados, ver ./cores.ts), branco/nulo ou abstenção. */
+export type CorLado = CorCandidato | 'bn' | 'abs';
 
 const TRILHA: Record<CorLado, string> = {
-  a: 'bg-cand-a',
-  b: 'bg-cand-b',
+  a: corSlot('a').bg,
+  b: corSlot('b').bg,
+  vermelho: corSlot('vermelho').bg,
+  azul: corSlot('azul').bg,
+  outros: corSlot('outros').bg,
   bn: 'bg-cand-outros',
   abs: 'bg-surface-3 [background-image:repeating-linear-gradient(-45deg,rgb(var(--fg-subtle)/0.55)_0_2px,transparent_2px_6px)]',
 };
-const TEXTO: Record<CorLado, string> = { a: 'text-cand-a-fg', b: 'text-cand-b-fg', bn: 'text-fg', abs: 'text-fg-muted' };
+const TEXTO: Record<CorLado, string> = {
+  a: corSlot('a').text,
+  b: corSlot('b').text,
+  vermelho: corSlot('vermelho').text,
+  azul: corSlot('azul').text,
+  outros: corSlot('outros').text,
+  bn: 'text-fg',
+  abs: 'text-fg-muted',
+};
 
 /** Classes da cor de cada parte (barra, legenda). Escritas por extenso para o Tailwind. */
 export const corParte = (c: CorLado) => TRILHA[c];
@@ -173,23 +188,23 @@ export function BarraPartes({
   alto = 'h-2',
 }: {
   partes: PartesDivisao;
-  nomes: { a: string; b: string };
+  nomes: { a: string; b: string; cores: CoresCenario };
   legenda?: boolean;
   className?: string;
   alto?: string;
 }) {
   const q = partesPct(partes);
-  const itens: { k: CorLado; v: number; bruto: number; rotulo: string }[] = [
-    { k: 'a', v: q.a, bruto: partes.a, rotulo: nomes.a },
-    { k: 'b', v: q.b, bruto: partes.b, rotulo: nomes.b },
-    { k: 'bn', v: q.bn, bruto: partes.bn, rotulo: 'branco/nulo' },
-    { k: 'abs', v: q.abs, bruto: partes.abs, rotulo: 'não vota' },
+  const itens: { id: string; k: CorLado; v: number; bruto: number; rotulo: string }[] = [
+    { id: 'a', k: nomes.cores[0], v: q.a, bruto: partes.a, rotulo: nomes.a },
+    { id: 'b', k: nomes.cores[1], v: q.b, bruto: partes.b, rotulo: nomes.b },
+    { id: 'bn', k: 'bn', v: q.bn, bruto: partes.bn, rotulo: 'branco/nulo' },
+    { id: 'abs', k: 'abs', v: q.abs, bruto: partes.abs, rotulo: 'não vota' },
   ];
   return (
     <div className={className}>
       <div className={cn('flex w-full gap-[2px] overflow-hidden rounded-full', alto)} aria-hidden>
         {itens.map((it) =>
-          it.bruto > 0 ? <div key={it.k} className={cn('h-full transition-[flex-grow] duration-200', TRILHA[it.k])} style={{ flexGrow: it.bruto, flexBasis: 0 }} /> : null,
+          it.bruto > 0 ? <div key={it.id} className={cn('h-full transition-[flex-grow] duration-200', TRILHA[it.k])} style={{ flexGrow: it.bruto, flexBasis: 0 }} /> : null,
         )}
       </div>
       {legenda ? (
@@ -197,7 +212,7 @@ export function BarraPartes({
           {itens
             .filter((it, i) => it.v > 0 || i < 2)
             .map((it) => (
-              <li key={it.k} className="inline-flex items-center gap-1.5">
+              <li key={it.id} className="inline-flex items-center gap-1.5">
                 <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', TRILHA[it.k])} />
                 <span className="num font-medium text-fg">{fmtPct(it.v, 0)}</span>
                 <span className="truncate">{it.rotulo}</span>

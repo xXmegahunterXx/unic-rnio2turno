@@ -12,7 +12,7 @@ const PILARES: { icone: IconName; titulo: string; texto: string; link: { to: str
     icone: 'selo',
     titulo: 'Apartidário',
     texto:
-      'Sem vínculo com candidatos, partidos ou campanhas. As cores seguem a ordem do número na urna, nunca as dos partidos, e os textos descrevem, sem torcida.',
+      'Sem vínculo com candidatos, partidos ou campanhas. Os dois lados com o mesmo tamanho, na ordem da urna, e textos que descrevem, sem torcida.',
     link: { to: '/sobre', label: 'Sobre o Sintonia' },
   },
   {

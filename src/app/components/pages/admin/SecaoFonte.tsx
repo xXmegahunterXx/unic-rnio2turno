@@ -339,7 +339,7 @@ function NomesNaSimulacao() {
           <Rotulo>{sim ? 'No site agora' : 'Na simulação'}</Rotulo>
           <ul className="mt-3 space-y-3">
             {candidatos.map((c) => (
-              <li key={c.cor} className="flex items-center gap-3">
+              <li key={c.numero} className="flex items-center gap-3">
                 <CandidateAvatar candidato={c} size="md" />
                 <div className="min-w-0">
                   <p className="truncate text-[14.5px] font-semibold text-fg">{c.nomeUrna}</p>
@@ -351,7 +351,8 @@ function NomesNaSimulacao() {
             ))}
           </ul>
           <p className="mt-4 border-t border-line pt-3 text-[12px] leading-snug text-fg-subtle">
-            A ordem e as cores seguem o número na urna: A (turquesa) é o menor número; B (âmbar), o maior.
+            Com nomes ocultos, cores neutras pela ordem do número na urna: A (turquesa) é o menor número; B (âmbar), o maior.
+            Com nomes reais, Presidente usa as cores de identificação: Lula em vermelho e Flávio Bolsonaro em azul.
           </p>
         </div>
       </div>

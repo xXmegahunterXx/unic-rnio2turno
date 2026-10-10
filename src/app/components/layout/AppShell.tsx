@@ -5,6 +5,7 @@
  * Os links pré-carregam a página ao apontar/tocar (prefetch.ts). "Compartilhar o Sintonia" e "Incorporar" ficam
  * montados aqui (acoesGlobais.tsx), carregados só na 1ª abertura.
  */
+import { REGRA_CORES_CURTA } from '@/shared/cores';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
@@ -329,8 +330,7 @@ function Footer() {
               <Icon name="info" size={16} className="mt-px shrink-0 text-brand-fg" />
               <span>
                 Projeto independente e <strong className="font-semibold text-fg">apartidário</strong>: sem vínculo com
-                candidatos, partidos ou campanhas. Não fazemos enquetes. Cores dos candidatos seguem a ordem do número na
-                urna.
+                candidatos, partidos ou campanhas. Não fazemos enquetes. {REGRA_CORES_CURTA}
               </span>
             </p>
           </div>

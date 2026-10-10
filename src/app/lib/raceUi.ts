@@ -2,8 +2,13 @@
  * Cores por slot de candidato → classes Tailwind e valores CSS.
  *
  * CONTRATO com os componentes de mapa/gráfico/mosaico: as funções daqui são puras e devolvem só
- * referências a tokens (`rgb(var(--cand-a) / α)`), nunca hex. O slot vem de `Candidate.cor`
- * ('a' = menor número na urna, turquesa; 'b' = maior número, âmbar; 'outros' = cinza neutro).
+ * referências a tokens (`rgb(var(--cand-a) / α)`), nunca hex. O slot vem de `Candidate.cor`:
+ *  - 'vermelho' | 'azul': cores de identificação dos candidatos a Presidente (Lula vermelho, Flávio Bolsonaro azul,
+ *    decisão do dono do produto; ver CORES_IDENTIDADE em src/shared/constants.ts);
+ *  - 'a' | 'b': slots neutros (governadores e simulação com nomes ocultos) — 'a' = menor número na urna, turquesa;
+ *    'b' = maior número, âmbar;
+ *  - 'outros' = cinza neutro.
+ * Use sempre a cor que vem dos dados (`corSlot(c.cor)`, `slotDe(race, i)`); nunca deduza a cor pelo índice.
  *
  * As classes estão escritas por extenso de propósito: o Tailwind só gera classes que aparecem
  * literalmente no código-fonte.
@@ -33,6 +38,8 @@ export interface SlotUi {
   stroke: string;
   /** Borda. */
   border: string;
+  /** Borda translúcida (40%), para caixas sobre `bgFaint`. */
+  borderSoft: string;
   /** Anel (ring) de foco/destaque. */
   ring: string;
   /** Gradiente sutil para cartões de destaque (de cima para baixo). */
@@ -56,6 +63,7 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     fill: 'fill-cand-a',
     stroke: 'stroke-cand-a',
     border: 'border-cand-a',
+    borderSoft: 'border-cand-a/40',
     ring: 'ring-cand-a',
     glow: 'from-cand-a/[0.14] to-transparent',
     css: 'rgb(var(--cand-a))',
@@ -72,11 +80,46 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     fill: 'fill-cand-b',
     stroke: 'stroke-cand-b',
     border: 'border-cand-b',
+    borderSoft: 'border-cand-b/40',
     ring: 'ring-cand-b',
     glow: 'from-cand-b/[0.14] to-transparent',
     css: 'rgb(var(--cand-b))',
     cssVar: '--cand-b',
     token: 'cand-b',
+  },
+  vermelho: {
+    bg: 'bg-cand-vermelho',
+    bgSoft: 'bg-cand-vermelho/15',
+    bgFaint: 'bg-cand-vermelho/[0.07]',
+    text: 'text-cand-vermelho-fg',
+    textDisplay: 'text-cand-vermelho',
+    ink: 'text-cand-vermelho-ink',
+    fill: 'fill-cand-vermelho',
+    stroke: 'stroke-cand-vermelho',
+    border: 'border-cand-vermelho',
+    borderSoft: 'border-cand-vermelho/40',
+    ring: 'ring-cand-vermelho',
+    glow: 'from-cand-vermelho/[0.14] to-transparent',
+    css: 'rgb(var(--cand-vermelho))',
+    cssVar: '--cand-vermelho',
+    token: 'cand-vermelho',
+  },
+  azul: {
+    bg: 'bg-cand-azul',
+    bgSoft: 'bg-cand-azul/15',
+    bgFaint: 'bg-cand-azul/[0.07]',
+    text: 'text-cand-azul-fg',
+    textDisplay: 'text-cand-azul',
+    ink: 'text-cand-azul-ink',
+    fill: 'fill-cand-azul',
+    stroke: 'stroke-cand-azul',
+    border: 'border-cand-azul',
+    borderSoft: 'border-cand-azul/40',
+    ring: 'ring-cand-azul',
+    glow: 'from-cand-azul/[0.14] to-transparent',
+    css: 'rgb(var(--cand-azul))',
+    cssVar: '--cand-azul',
+    token: 'cand-azul',
   },
   outros: {
     bg: 'bg-cand-outros',
@@ -88,6 +131,7 @@ const SLOTS: Record<CorCandidato, SlotUi> = {
     fill: 'fill-cand-outros',
     stroke: 'stroke-cand-outros',
     border: 'border-cand-outros',
+    borderSoft: 'border-cand-outros/40',
     ring: 'ring-cand-outros',
     glow: 'from-cand-outros/[0.12] to-transparent',
     css: 'rgb(var(--cand-outros))',
@@ -180,3 +224,12 @@ export const MARGEM_ROTULOS: readonly [string, string, string, string] = [
   '15 a 30 p.p.',
   '30 p.p. ou mais',
 ];
+
+/**
+ * Dois brilhos radiais nos cantos de cima (esquerda = `cores[0]`, direita = `cores[1]`), como valor de `background`
+ * inline — só tokens (`rgb(var(--cand-x) / α)`). Use com as cores que vêm dos dados (ex.: `race.candidatos[i].cor`).
+ */
+export function brilhoDuplo(cores: readonly [CorCandidato, CorCandidato], alpha: number, elipse = '60% 80%'): string {
+  const g = (cor: CorCandidato, x: string) => `radial-gradient(ellipse ${elipse} at ${x} 0%, ${rgbSlot(cor, alpha)}, transparent 70%)`;
+  return `${g(cores[0], '0%')}, ${g(cores[1], '100%')}`;
+}

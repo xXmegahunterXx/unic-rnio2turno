@@ -19,6 +19,9 @@ export default {
         cand: {
           a: v('cand-a'), 'a-soft': v('cand-a-soft'), 'a-ink': v('cand-a-ink'), 'a-fg': v('cand-a-fg'),
           b: v('cand-b'), 'b-soft': v('cand-b-soft'), 'b-ink': v('cand-b-ink'), 'b-fg': v('cand-b-fg'),
+          // Presidente (cores de identificação, ver CORES_IDENTIDADE em src/shared/constants.ts)
+          vermelho: v('cand-vermelho'), 'vermelho-soft': v('cand-vermelho-soft'), 'vermelho-ink': v('cand-vermelho-ink'), 'vermelho-fg': v('cand-vermelho-fg'),
+          azul: v('cand-azul'), 'azul-soft': v('cand-azul-soft'), 'azul-ink': v('cand-azul-ink'), 'azul-fg': v('cand-azul-fg'),
           outros: v('cand-outros'),
         },
         ok: { DEFAULT: v('ok'), fg: v('ok-fg') },

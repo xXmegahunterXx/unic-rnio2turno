@@ -2,6 +2,7 @@
  * /sobre — o que é o Sintonia, princípios (neutralidade, precisão, privacidade, beleza), apartidarismo,
  * sem anúncios políticos, equipe (placeholder) e contato (provisório).
  */
+import { REGRA_CORES } from '@/shared/cores';
 import { ButtonLink } from '@/app/ui/Button';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import {
@@ -67,8 +68,8 @@ export default function SobrePage() {
           numerada
           itens={[
             <>
-              <strong>Neutralidade.</strong> Cores pela ordem do número na urna, os dois candidatos sempre do mesmo tamanho e na mesma ordem, textos
-              descritivos.
+              <strong>Neutralidade.</strong> Os dois candidatos sempre do mesmo tamanho e na mesma ordem (a da urna), textos descritivos.{' '}
+              {REGRA_CORES}
             </>,
             <>
               <strong>Precisão.</strong> Percentuais calculados como o TSE calcula, fontes citadas e simulação sempre sinalizada.

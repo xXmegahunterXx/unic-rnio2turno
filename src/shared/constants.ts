@@ -38,3 +38,17 @@ export const UFS_GOV_2T: UF[] = ['AC', 'AM', 'DF', 'ES', 'RJ', 'RN', 'TO'];
 
 /** Buckets de margem (pontos percentuais) usados no mapa e no mosaico de seções. */
 export const MARGEM_BUCKETS = [5, 15, 30] as const;
+
+/**
+ * Cores de IDENTIFICAÇÃO dos candidatos a Presidente — decisão do dono do produto (out/2026): Lula (13) em vermelho e
+ * Flávio Bolsonaro (22) em azul. Valem para a família de corridas 'pres' ('pres' e 'pres-t1'), inclusive na simulação
+ * com "nomes reais". FONTE ÚNICA: o gerador (scripts/data/build-data.ts), o meta.json, os fixtures e os textos
+ * derivam daqui (via `corCandidato` em ./cores.ts).
+ *
+ * Fora daqui as cores continuam NEUTRAS pela ordem do número na urna ('a' turquesa = menor número; 'b' âmbar):
+ * disputas de governador (vermelho/azul pela ordem do número nos estados seria enganoso) e a simulação com nomes
+ * ocultos (`anonimizarRace` neutraliza as cores: vermelho diria "é o Lula").
+ */
+export const CORES_IDENTIDADE: Readonly<Record<string, Readonly<Record<number, 'vermelho' | 'azul'>>>> = {
+  pres: { 13: 'vermelho', 22: 'azul' },
+};

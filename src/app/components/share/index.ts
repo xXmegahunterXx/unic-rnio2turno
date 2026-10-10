@@ -3,7 +3,7 @@
  * compartilhamento"). Importe sempre daqui: `import { BotaoCompartilhar, CartaoBase } from '@/app/components/share'`.
  */
 export { DIMENSOES_CARTAO, FORMATOS_PADRAO, type ConteudoCompartilhavel, type FormatoCartao } from './tipos';
-export { CartaoBase, SeloOficial, SeloSimulacao, medidasCartao, useCartao, type BrilhoCartao, type CartaoBaseProps, type MedidasCartao } from './CartaoBase';
+export { CartaoBase, SeloOficial, SeloSimulacao, brilhoDe, medidasCartao, useCartao, type BrilhoCartao, type CartaoBaseProps, type MedidasCartao } from './CartaoBase';
 export { PreviaCartao, type PreviaCartaoProps } from './PreviaCartao';
 export { CompartilharSheet, LogoX, CLASSE_BOTAO_X, type CompartilharSheetProps } from './CompartilharSheet';
 export { BotaoCompartilhar, type BotaoCompartilharProps } from './BotaoCompartilhar';

@@ -9,14 +9,18 @@
 
 /*
  * Design tokens — "Sintonia".
- * Paleta neutra de propósito: nenhum lado usa vermelho, verde-amarelo ou azul partidário.
- * Candidatos recebem slots por ordem do número na urna: A = turquesa, B = âmbar (par seguro para daltonismo).
+ * Cores dos candidatos (decisão do dono do produto):
+ *  - Presidente: cores de IDENTIFICAÇÃO — Lula em vermelho (`cand-vermelho`) e Flávio Bolsonaro em azul
+ *    (`cand-azul`), atribuídas em src/shared/constants.ts (CORES_IDENTIDADE);
+ *  - disputas de governador e simulação com nomes ocultos: slots NEUTROS pela ordem do número na urna,
+ *    A = turquesa (menor número), B = âmbar (par seguro para daltonismo).
  * Valores em "R G B" para uso com rgb(var(--x) / alpha).
  *
  * Contraste (WCAG 2.1, conferido nos dois temas):
- *  - `*-fg` (brand-fg, cand-a-fg, cand-b-fg, ok-fg, alert-fg) = cor para TEXTO pequeno: ≥ 4,5:1 sobre
+ *  - `*-fg` (brand-fg, cand-a-fg, cand-b-fg, cand-vermelho-fg, cand-azul-fg, ok-fg, alert-fg) = cor para TEXTO pequeno: ≥ 4,5:1 sobre
  *    surface/surface-2 e sobre o próprio fundo suave (`bg-x/15`). Use `text-cand-a-fg`, nunca `text-cand-a`, em texto corrido.
- *  - `cand-a`/`cand-b` puros: preenchimentos e números grandes (≥ 24 px): ≥ 3:1.
+ *  - `cand-a`/`cand-b`/`cand-vermelho`/`cand-azul` puros: preenchimentos e números grandes (≥ 24 px): ≥ 3:1;
+ *    `*-ink` sobre o preenchimento: ≥ 3:1 (só ícones/sinais).
  *  - `fg-subtle` ≥ 4,5:1 sobre surface e surface-2; `brand`/`brand-deep` aceitam texto branco (≥ 4,5:1).
  */
 :root,
@@ -45,6 +49,15 @@
   --cand-b-soft: 255 212 138;
   --cand-b-ink: 48 28 0;
   --cand-b-fg: 245 165 36;
+  /* Presidente (identificação): vermelho = Lula, azul = Flávio Bolsonaro. Contraste conferido (ver topo). */
+  --cand-vermelho: 239 68 68; /* 4,99:1 sobre surface */
+  --cand-vermelho-soft: 252 165 165;
+  --cand-vermelho-ink: 40 6 6;
+  --cand-vermelho-fg: 248 113 113; /* 6,78:1 surface · 5,45:1 sobre bg-x/15 em surface-2 */
+  --cand-azul: 59 130 246; /* 5,10:1 sobre surface */
+  --cand-azul-soft: 147 197 253;
+  --cand-azul-ink: 4 18 48;
+  --cand-azul-fg: 96 165 250; /* 7,38:1 surface · 5,75:1 sobre bg-x/15 em surface-2 */
   --cand-outros: 139 139 163;
   --ok: 52 211 153;
   --ok-fg: 52 211 153;
@@ -94,6 +107,14 @@
   --cand-b-soft: 255 214 150;
   --cand-b-ink: 255 255 255;
   --cand-b-fg: 138 84 8;
+  --cand-vermelho: 220 38 38; /* 4,83:1 sobre surface */
+  --cand-vermelho-soft: 254 202 202;
+  --cand-vermelho-ink: 255 255 255;
+  --cand-vermelho-fg: 185 28 28; /* 6,47:1 surface · 4,55:1 sobre bg-x/15 em surface-2 */
+  --cand-azul: 37 99 235; /* 5,17:1 sobre surface */
+  --cand-azul-soft: 191 219 254;
+  --cand-azul-ink: 255 255 255;
+  --cand-azul-fg: 29 78 216; /* 6,70:1 surface · 4,84:1 sobre bg-x/15 em surface-2 */
   --cand-outros: 120 120 145;
   --ok: 16 160 110;
   --ok-fg: 8 122 84;
@@ -138,6 +159,14 @@
     --cand-b-soft: 255 214 150;
     --cand-b-ink: 255 255 255;
     --cand-b-fg: 138 84 8;
+    --cand-vermelho: 220 38 38;
+    --cand-vermelho-soft: 254 202 202;
+    --cand-vermelho-ink: 255 255 255;
+    --cand-vermelho-fg: 185 28 28;
+    --cand-azul: 37 99 235;
+    --cand-azul-soft: 191 219 254;
+    --cand-azul-ink: 255 255 255;
+    --cand-azul-fg: 29 78 216;
     --cand-outros: 120 120 145;
     --ok: 16 160 110;
     --ok-fg: 8 122 84;

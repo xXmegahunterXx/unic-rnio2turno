@@ -103,16 +103,17 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
         aria-labelledby="titulo-resultado"
         className="relative overflow-hidden rounded-[28px] border border-line bg-surface px-4 pb-6 pt-6 shadow-card sm:px-10 sm:pb-10 sm:pt-10"
       >
-        {/* brilhos simétricos nos dois slots (ninguém em destaque) */}
+        {/* brilhos simétricos nos dois lados (ninguém em destaque). Antes da revelação, na cor da marca: as cores de
+            identificação (vermelho/azul) diriam quem é quem antes da hora. */}
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <motion.div
-            className={cn('absolute -left-32 -top-32 h-80 w-80 rounded-full blur-3xl', a ? corSlot(a.cor).bgSoft : '')}
+            className={cn('absolute -left-32 -top-32 h-80 w-80 rounded-full blur-3xl', !revelado ? 'bg-brand/15' : a ? corSlot(a.cor).bgSoft : '')}
             initial={{ opacity: 0 }}
             animate={{ opacity: revelado ? 0.9 : analisando ? 0.35 : 0 }}
             transition={{ duration: 1.2 }}
           />
           <motion.div
-            className={cn('absolute -right-32 -top-32 h-80 w-80 rounded-full blur-3xl', b ? corSlot(b.cor).bgSoft : '')}
+            className={cn('absolute -right-32 -top-32 h-80 w-80 rounded-full blur-3xl', !revelado ? 'bg-brand/15' : b ? corSlot(b.cor).bgSoft : '')}
             initial={{ opacity: 0 }}
             animate={{ opacity: revelado ? 0.9 : analisando ? 0.35 : 0 }}
             transition={{ duration: 1.2 }}

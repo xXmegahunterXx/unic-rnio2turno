@@ -3,10 +3,11 @@
  * (comando `cenario`/`preset`) — mostramos o carregamento e o tempo de construção.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import type { OrdemRegional, PresetInfo, Race, Ritmo, ScenarioConfig } from '@/shared/types';
+import type { CorCandidato, OrdemRegional, PresetInfo, Race, Ritmo, ScenarioConfig } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtPct, fmtPP } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { Badge, Button, Icon, Segmented, Select, Skeleton, Slider } from '@/app/ui';
 import { useAdmin, usePresets } from './dados';
@@ -77,6 +78,8 @@ export function SecaoCenario() {
   const presets = presetsQ.data;
   const padrao = presets?.find((p) => p.id === 'padrao');
   const nomes: [string, string] = [pres?.candidatos[0]?.nomeUrna ?? 'A', pres?.candidatos[1]?.nomeUrna ?? 'B'];
+  // cores como vêm dos dados: vermelho/azul com nomes reais; turquesa/âmbar com nomes ocultos
+  const cores: [CorCandidato, CorCandidato] = [pres?.candidatos[0]?.cor ?? 'a', pres?.candidatos[1]?.cor ?? 'b'];
   const govRaces = useMemo(() => (races ?? []).filter((r) => r.cargo === 'Governador' && r.turno === 2), [races]);
   const ocupado = pendente('cenario');
 
@@ -150,7 +153,7 @@ export function SecaoCenario() {
           <>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               {avulsos.map((p) => (
-                <CartaoPreset key={p.id} p={p} base={padrao} ativo={cen.preset === p.id} nomes={nomes} ocupado={ocupado} carregando={aplicando === p.id} onAplicar={aplicarPreset} />
+                <CartaoPreset key={p.id} p={p} base={padrao} ativo={cen.preset === p.id} nomes={nomes} cores={cores} ocupado={ocupado} carregando={aplicando === p.id} onAplicar={aplicarPreset} />
               ))}
             </div>
             <div className="mt-5 flex items-center gap-3">
@@ -160,8 +163,8 @@ export function SecaoCenario() {
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {pares.map(([a, b]) => (
                 <div key={a.id} className="relative grid grid-cols-1 gap-2 rounded-[22px] border border-dashed border-line p-2 sm:grid-cols-2">
-                  <CartaoPreset p={a} base={padrao} ativo={cen.preset === a.id} nomes={nomes} ocupado={ocupado} carregando={aplicando === a.id} onAplicar={aplicarPreset} compacto />
-                  <CartaoPreset p={b} base={padrao} ativo={cen.preset === b.id} nomes={nomes} ocupado={ocupado} carregando={aplicando === b.id} onAplicar={aplicarPreset} compacto />
+                  <CartaoPreset p={a} base={padrao} ativo={cen.preset === a.id} nomes={nomes} cores={cores} ocupado={ocupado} carregando={aplicando === a.id} onAplicar={aplicarPreset} compacto />
+                  <CartaoPreset p={b} base={padrao} ativo={cen.preset === b.id} nomes={nomes} cores={cores} ocupado={ocupado} carregando={aplicando === b.id} onAplicar={aplicarPreset} compacto />
                   <span
                     aria-hidden
                     title="Espelho"
@@ -180,6 +183,7 @@ export function SecaoCenario() {
         key={JSON.stringify(cen)}
         cen={cen}
         nomes={nomes}
+        cores={cores}
         govRaces={govRaces}
         ocupado={ocupado}
         desde={pendenteDesde('cenario')}
@@ -208,6 +212,7 @@ function CartaoPreset({
   base,
   ativo,
   nomes,
+  cores,
   ocupado,
   carregando,
   compacto,
@@ -217,6 +222,7 @@ function CartaoPreset({
   base: PresetInfo | undefined;
   ativo: boolean;
   nomes: [string, string];
+  cores: [CorCandidato, CorCandidato];
   ocupado: boolean;
   carregando?: boolean;
   compacto?: boolean;
@@ -242,15 +248,15 @@ function CartaoPreset({
       <div className="mt-3" title={`${nomes[0]} ${fmtPct(alvo)} × ${nomes[1]} ${fmtPct(100 - alvo)} (Presidente, % dos válidos)`}>
         <div className="mb-1.5 flex items-center justify-between gap-2 text-[12px]">
           <span className="inline-flex items-center gap-1.5">
-            <ChipSlot cor="a" />
-            <span className="num font-semibold text-cand-a-fg">{fmtPct(alvo)}</span>
+            <ChipSlot letra="A" cor={cores[0]} />
+            <span className={cn('num font-semibold', corSlot(cores[0]).text)}>{fmtPct(alvo)}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="num font-semibold text-cand-b-fg">{fmtPct(100 - alvo)}</span>
-            <ChipSlot cor="b" />
+            <span className={cn('num font-semibold', corSlot(cores[1]).text)}>{fmtPct(100 - alvo)}</span>
+            <ChipSlot letra="B" cor={cores[1]} />
           </span>
         </div>
-        <VoteSplitBar votos={[alvo, 100 - alvo]} size="xs" nomes={nomes} />
+        <VoteSplitBar votos={[alvo, 100 - alvo]} cores={[...cores]} size="xs" nomes={nomes} />
       </div>
       <p className={cn('mt-3 text-pretty text-[12.5px] leading-relaxed text-fg-muted', compacto ? 'line-clamp-5' : 'line-clamp-6')}>{p.descricao}</p>
       {chips.length ? (
@@ -280,17 +286,12 @@ function CartaoPreset({
   );
 }
 
-/** Letra do slot (A = menor número na urna, turquesa; B = âmbar), como nos monogramas. */
-function ChipSlot({ cor }: { cor: 'a' | 'b' }) {
+/** Letra da posição na urna (A = menor número), na cor do candidato que vem dos dados, como nos monogramas. */
+function ChipSlot({ letra, cor }: { letra: 'A' | 'B'; cor: CorCandidato }) {
+  const s = corSlot(cor);
   return (
-    <span
-      aria-hidden
-      className={cn(
-        'inline-flex h-[18px] w-[18px] items-center justify-center rounded-md text-[10.5px] font-bold',
-        cor === 'a' ? 'bg-cand-a/15 text-cand-a-fg' : 'bg-cand-b/15 text-cand-b-fg',
-      )}
-    >
-      {cor === 'a' ? 'A' : 'B'}
+    <span aria-hidden className={cn('inline-flex h-[18px] w-[18px] items-center justify-center rounded-md text-[10.5px] font-bold', s.bgSoft, s.text)}>
+      {letra}
     </span>
   );
 }
@@ -319,6 +320,7 @@ function Ajuste({ children, descricao, alterado }: { children: ReactNode; descri
 function EditorAvancado({
   cen,
   nomes,
+  cores,
   govRaces,
   ocupado,
   desde,
@@ -327,6 +329,7 @@ function EditorAvancado({
 }: {
   cen: ScenarioConfig;
   nomes: [string, string];
+  cores: [CorCandidato, CorCandidato];
   govRaces: Race[];
   ocupado: boolean;
   desde: number | null;
@@ -378,7 +381,7 @@ function EditorAvancado({
       <div className="space-y-6">
         <Grupo titulo="Presidente" descricao="Alvo nacional de votos válidos. A calibragem é aplicada antes do viés por UF.">
           <Ajuste alterado={mudou('alvoPres')}>
-            <DuelSlider valor={v('alvoPres')} onChange={(x) => set('alvoPres', Math.round(x * 100) / 100)} nomes={nomes} rotulo="Alvo nacional para Presidente" alterado={mudou('alvoPres')} />
+            <DuelSlider valor={v('alvoPres')} onChange={(x) => set('alvoPres', Math.round(x * 100) / 100)} nomes={nomes} cores={cores} rotulo="Alvo nacional para Presidente" alterado={mudou('alvoPres')} />
           </Ajuste>
         </Grupo>
 
@@ -400,6 +403,7 @@ function EditorAvancado({
                     valor={gov(id)}
                     onChange={(x) => setGov(id, Math.round(x * 100) / 100)}
                     nomes={nomeGov(r)}
+                    cores={[r.candidatos[0]?.cor ?? 'a', r.candidatos[1]?.cor ?? 'b']}
                     rotulo={`Alvo para ${r.titulo}`}
                     alterado={alt}
                   />

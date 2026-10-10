@@ -46,8 +46,8 @@ export const RACE_PRES: Race = {
   abrangencia: 'BR',
   titulo: 'Presidente',
   candidatos: [
-    { numero: 13, nomeUrna: 'Lula', nome: 'Luiz Inácio Lula da Silva', partido: 'PT', coligacao: 'Brasil Pronto pra Mais', vice: 'Geraldo Alckmin', cor: 'a', primeiroTurno: { votos: 53879538, pct: 45.16 } },
-    { numero: 22, nomeUrna: 'Flávio Bolsonaro', nome: 'Flávio Nantes Bolsonaro', partido: 'PL', vice: 'Alfredo Gaspar', cor: 'b', primeiroTurno: { votos: 56104503, pct: 47.03 } },
+    { numero: 13, nomeUrna: 'Lula', nome: 'Luiz Inácio Lula da Silva', partido: 'PT', coligacao: 'Brasil Pronto pra Mais', vice: 'Geraldo Alckmin', cor: 'vermelho', primeiroTurno: { votos: 53879538, pct: 45.16 } },
+    { numero: 22, nomeUrna: 'Flávio Bolsonaro', nome: 'Flávio Nantes Bolsonaro', partido: 'PL', vice: 'Alfredo Gaspar', cor: 'azul', primeiroTurno: { votos: 56104503, pct: 47.03 } },
   ],
   ufs: [...UFS, 'ZZ'],
   tse: tseStub('6258', '1'),

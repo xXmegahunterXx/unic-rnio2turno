@@ -8,7 +8,7 @@
  * relação ao 16:9 (texto de 40 px no 'x' → `40 * k` nos outros formatos).
  */
 import { createContext, forwardRef, useContext, type ReactNode } from 'react';
-import type { CorCandidato } from '@/shared/types';
+import type { CorCandidato, Race } from '@/shared/types';
 import { fmtDataHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { siteExibicao } from '@/app/lib/share';
@@ -68,7 +68,10 @@ export interface CartaoBaseProps {
   fonte?: ReactNode;
   /** Selo à direita do cabeçalho quando NÃO é simulação (ex.: "Resultado oficial"). */
   selo?: ReactNode;
-  /** Brilho do fundo: os dois slots (padrão), a marca, neutro ou um par de slots. */
+  /**
+   * Brilho do fundo: 'duelo' (padrão: os dois slots NEUTROS turquesa/âmbar), a marca, neutro ou um par de cores.
+   * Com candidatos, passe `brilhoDe(race)` para usar as cores que vêm dos dados.
+   */
   brilho?: BrilhoCartao;
 }
 
@@ -81,11 +84,28 @@ const BRILHO_SLOT: Record<CorCandidato, { esq: string; dir: string }> = {
     esq: 'bg-[radial-gradient(ellipse_70%_60%_at_0%_0%,rgb(var(--cand-b)/0.22),transparent_70%)]',
     dir: 'bg-[radial-gradient(ellipse_70%_60%_at_100%_0%,rgb(var(--cand-b)/0.22),transparent_70%)]',
   },
+  vermelho: {
+    esq: 'bg-[radial-gradient(ellipse_70%_60%_at_0%_0%,rgb(var(--cand-vermelho)/0.2),transparent_70%)]',
+    dir: 'bg-[radial-gradient(ellipse_70%_60%_at_100%_0%,rgb(var(--cand-vermelho)/0.2),transparent_70%)]',
+  },
+  azul: {
+    esq: 'bg-[radial-gradient(ellipse_70%_60%_at_0%_0%,rgb(var(--cand-azul)/0.2),transparent_70%)]',
+    dir: 'bg-[radial-gradient(ellipse_70%_60%_at_100%_0%,rgb(var(--cand-azul)/0.2),transparent_70%)]',
+  },
   outros: {
     esq: 'bg-[radial-gradient(ellipse_70%_60%_at_0%_0%,rgb(var(--cand-outros)/0.16),transparent_70%)]',
     dir: 'bg-[radial-gradient(ellipse_70%_60%_at_100%_0%,rgb(var(--cand-outros)/0.16),transparent_70%)]',
   },
 };
+
+/**
+ * Brilho com as cores dos dois candidatos REAIS de uma corrida (as que vêm dos dados: vermelho/azul para Presidente
+ * com nomes reais; turquesa/âmbar para governador e simulação com nomes ocultos). Prefira isto a 'duelo'.
+ */
+export function brilhoDe(race: Pick<Race, 'candidatos'> | undefined): BrilhoCartao {
+  const reais = race?.candidatos.filter((c) => !c.agregado) ?? [];
+  return reais.length >= 2 ? [reais[0].cor, reais[1].cor] : 'duelo';
+}
 
 function Fundo({ brilho, simulado }: { brilho: BrilhoCartao; simulado?: boolean }) {
   const par: [CorCandidato, CorCandidato] | null = brilho === 'duelo' ? ['a', 'b'] : Array.isArray(brilho) ? brilho : null;

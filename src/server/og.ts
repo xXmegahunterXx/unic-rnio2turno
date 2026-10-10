@@ -10,7 +10,9 @@
  *
  * Fontes (satori não lê woff2): TTF estáticos de Inter e Bricolage Grotesque em src/server/assets/fonts
  * (Google Fonts, SIL Open Font License 1.1 — ver OFL-*.txt). Reserva: JetBrains Mono .woff do @fontsource.
- * Cores: as mesmas dos tokens do app (src/app/styles.css, tema escuro), por slot neutro — nunca de partido.
+ * Cores: as mesmas dos tokens do app (src/app/styles.css, tema escuro), sempre a que vem dos dados (`Candidate.cor`):
+ * Presidente com as cores de identificação (Lula vermelho, Flávio Bolsonaro azul — CORES_IDENTIDADE); governador e
+ * simulação com nomes ocultos com os slots neutros (A turquesa = menor número; B âmbar).
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -22,7 +24,7 @@ import { pngDeRgba } from './png';
 import { pctTotalizadas, pctValidos } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
 import { fmtHora, fmtInt, fmtPct } from '../shared/format';
-import type { Candidate, Race, Summary, UF } from '../shared/types';
+import type { Candidate, CorCandidato, Race, Summary, UF } from '../shared/types';
 
 export const OG_W = 1200;
 export const OG_H = 630;
@@ -42,9 +44,45 @@ export const C = {
   aInk: 'rgb(4,40,36)',
   b: 'rgb(245,165,36)',
   bInk: 'rgb(48,28,0)',
+  vermelho: 'rgb(239,68,68)',
+  vermelhoInk: 'rgb(40,6,6)',
+  azul: 'rgb(59,130,246)',
+  azulInk: 'rgb(4,18,48)',
   outros: 'rgb(139,139,163)',
   pending: 'rgb(58,58,80)',
 };
+
+/** Cor (rgb) do candidato a partir de `Candidate.cor` — a que vem dos dados, nunca deduzida da posição. */
+export function corOg(cor: CorCandidato | string | undefined): string {
+  switch (cor) {
+    case 'a':
+      return C.a;
+    case 'b':
+      return C.b;
+    case 'vermelho':
+      return C.vermelho;
+    case 'azul':
+      return C.azul;
+    default:
+      return C.outros;
+  }
+}
+
+/** Tinta sobre o preenchimento da cor do candidato (monogramas, rótulos de UF). */
+export function tintaOg(cor: CorCandidato | string | undefined): string {
+  switch (cor) {
+    case 'a':
+      return C.aInk;
+    case 'b':
+      return C.bInk;
+    case 'vermelho':
+      return C.vermelhoInk;
+    case 'azul':
+      return C.azulInk;
+    default:
+      return C.bg;
+  }
+}
 
 // ---------------------------------------------------------------------------------------------
 // Fontes
@@ -232,8 +270,8 @@ const FOTO_W = 60;
 const FOTO_H = 80;
 
 function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar: 'left' | 'right', foto: string | null): No {
-  const cor = c.cor === 'b' ? C.b : C.a;
-  const ink = c.cor === 'b' ? C.bInk : C.aInk;
+  const cor = corOg(c.cor);
+  const ink = tintaOg(c.cor);
   const lado = alinhar === 'right' ? 'flex-end' : 'flex-start';
   const r = inp.resumo;
   const temVotos = r.votos.reduce((a, b) => a + b, 0) > 0;
@@ -317,9 +355,9 @@ function barra(inp: OgPlacarInput, ia: number, ib: number): No {
   return h(
     'div',
     { width: W, height: 16, marginTop: 26, position: 'relative' },
-    h('div', { width: wa, height: 16, background: C.a, borderRadius: '8px 0 0 8px' }),
+    h('div', { width: wa, height: 16, background: corOg(inp.race.candidatos[ia]?.cor), borderRadius: '8px 0 0 8px' }),
     h('div', { width: 6, height: 16 }),
-    h('div', { width: W - 6 - wa, height: 16, background: C.b, borderRadius: '0 8px 8px 0' }),
+    h('div', { width: W - 6 - wa, height: 16, background: corOg(inp.race.candidatos[ib]?.cor), borderRadius: '0 8px 8px 0' }),
     h('div', { position: 'absolute', left: W / 2 - 1, top: -7, width: 2, height: 30, background: 'rgba(244,244,250,0.85)' }),
   );
 }

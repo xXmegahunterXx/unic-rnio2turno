@@ -20,13 +20,13 @@ import type { Nomes } from './Controles';
 
 const cartao = 'rounded-2xl border border-line bg-surface shadow-card';
 
-function MiniBarra({ u, className }: { u: ResultadoUfCenario; className?: string }) {
+function MiniBarra({ u, cores, className }: { u: ResultadoUfCenario; cores: Nomes['cores']; className?: string }) {
   const pa = pctFinalista(u, 0);
   return (
     <div className={cn('relative', className)} aria-hidden>
       <div className="flex h-2 w-full gap-[2px] overflow-hidden rounded-full">
-        <div className="h-full bg-cand-a transition-[width] duration-300" style={{ width: `${pa}%` }} />
-        <div className="h-full flex-1 bg-cand-b" />
+        <div className={cn('h-full transition-[width] duration-300', corSlot(cores[0]).bg)} style={{ width: `${pa}%` }} />
+        <div className={cn('h-full flex-1', corSlot(cores[1]).bg)} />
       </div>
       <span className="absolute -bottom-0.5 -top-0.5 left-1/2 w-0.5 -translate-x-1/2 rounded-full bg-fg/70" />
     </div>
@@ -62,15 +62,15 @@ export function DetalheUf({ u, nomes, onFechar }: { u: ResultadoUfCenario; nomes
       </div>
       <div className="mt-2.5 flex items-baseline justify-between gap-3">
         <span className="min-w-0">
-          <span className={cn('num font-display text-[24px] font-semibold leading-none', corSlot('a').textDisplay)}>{fmtPct(pctFinalista(u, 0))}</span>
+          <span className={cn('num font-display text-[24px] font-semibold leading-none', corSlot(nomes.cores[0]).textDisplay)}>{fmtPct(pctFinalista(u, 0))}</span>
           <span className="ml-1.5 truncate text-[12.5px] text-fg-muted">{nomes.a}</span>
         </span>
         <span className="min-w-0 text-right">
           <span className="mr-1.5 truncate text-[12.5px] text-fg-muted">{nomes.b}</span>
-          <span className={cn('num font-display text-[24px] font-semibold leading-none', corSlot('b').textDisplay)}>{fmtPct(pctFinalista(u, 1))}</span>
+          <span className={cn('num font-display text-[24px] font-semibold leading-none', corSlot(nomes.cores[1]).textDisplay)}>{fmtPct(pctFinalista(u, 1))}</span>
         </span>
       </div>
-      <MiniBarra u={u} className="mt-2" />
+      <MiniBarra u={u} cores={nomes.cores} className="mt-2" />
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[12.5px]">
         <div className="flex justify-between gap-2">
           <dt className="text-fg-muted">{nomes.a}</dt>
@@ -95,7 +95,7 @@ export function DetalheUf({ u, nomes, onFechar }: { u: ResultadoUfCenario; nomes
         <div className="flex justify-between gap-2">
           <dt className="text-fg-muted">1º turno (entre os 2)</dt>
           <dd className="num text-fg">
-            <span className={corSlot('a').text}>{fmtPct(pctValidos(t1, 0), 1)}</span> × <span className={corSlot('b').text}>{fmtPct(pctValidos(t1, 1), 1)}</span>
+            <span className={corSlot(nomes.cores[0]).text}>{fmtPct(pctValidos(t1, 0), 1)}</span> × <span className={corSlot(nomes.cores[1]).text}>{fmtPct(pctValidos(t1, 1), 1)}</span>
           </dd>
         </div>
       </dl>
@@ -136,12 +136,12 @@ export function PainelMapa({
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1 text-[12px]">
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-cand-a" />
+            <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(nomes.cores[0]).bg)} />
             <span className="max-w-[9rem] truncate text-fg-muted">{nomes.a}</span>
             <span className="num font-semibold text-fg">{fmtInt(r.estados[0])}</span>
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-cand-b" />
+            <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(nomes.cores[1]).bg)} />
             <span className="max-w-[9rem] truncate text-fg-muted">{nomes.b}</span>
             <span className="num font-semibold text-fg">{fmtInt(r.estados[1])}</span>
           </span>
@@ -152,6 +152,7 @@ export function PainelMapa({
           <MapaCenario
             geo={geo}
             resultado={r}
+            cores={nomes.cores}
             selecionada={selecionada && selecionada !== 'ZZ' ? (selecionada as UFBr) : null}
             destaque={hover}
             onSelect={(uf) => onSelect(selecionada === uf ? null : uf)}
@@ -253,9 +254,9 @@ export function ListaUfs({
                   <span className="num shrink-0 text-[12px] text-fg-subtle">{margemArea(u).lider === null ? 'empate' : `dif. ${fmtMargem(margemArea(u).pp)}`}</span>
                 </div>
                 <div className="mt-1.5 flex items-center gap-2.5">
-                  <span className={cn('num w-[2.9rem] shrink-0 text-[12.5px] font-semibold', corSlot('a').text)}>{fmtPct(pctFinalista(u, 0), 1)}</span>
-                  <MiniBarra u={u} className="min-w-0 flex-1" />
-                  <span className={cn('num w-[2.9rem] shrink-0 text-right text-[12.5px] font-semibold', corSlot('b').text)}>{fmtPct(pctFinalista(u, 1), 1)}</span>
+                  <span className={cn('num w-[2.9rem] shrink-0 text-[12.5px] font-semibold', corSlot(nomes.cores[0]).text)}>{fmtPct(pctFinalista(u, 0), 1)}</span>
+                  <MiniBarra u={u} cores={nomes.cores} className="min-w-0 flex-1" />
+                  <span className={cn('num w-[2.9rem] shrink-0 text-right text-[12.5px] font-semibold', corSlot(nomes.cores[1]).text)}>{fmtPct(pctFinalista(u, 1), 1)}</span>
                 </div>
               </button>
               {aberto ? (

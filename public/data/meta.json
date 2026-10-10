@@ -19,7 +19,7 @@
      "coligacao": "Brasil Pronto pra Mais",
      "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
      "vice": "Geraldo Alckmin",
-     "cor": "a",
+     "cor": "vermelho",
      "primeiroTurno": {
       "votos": 53879538,
       "pct": 45.16
@@ -33,7 +33,7 @@
      "partido": "PL",
      "sqcand": "280002551544",
      "vice": "Alfredo Gaspar",
-     "cor": "b",
+     "cor": "azul",
      "primeiroTurno": {
       "votos": 56104503,
       "pct": 47.03
@@ -444,7 +444,7 @@
      "coligacao": "Brasil Pronto pra Mais",
      "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
      "vice": "Geraldo Alckmin",
-     "cor": "a",
+     "cor": "vermelho",
      "primeiroTurno": {
       "votos": 53879538,
       "pct": 45.16
@@ -458,7 +458,7 @@
      "partido": "PL",
      "sqcand": "280002551544",
      "vice": "Alfredo Gaspar",
-     "cor": "b",
+     "cor": "azul",
      "primeiroTurno": {
       "votos": 56104503,
       "pct": 47.03

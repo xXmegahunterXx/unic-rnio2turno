@@ -13,6 +13,8 @@ import type { CuriosidadesDataset, TemaCuriosidade } from '@/shared/curiosidades
 import { TEMAS_CURIOSIDADES } from '@/shared/curiosidades';
 import { fmtDataHora, fmtInt } from '@/shared/format';
 import { assetUrl } from '@/app/lib/assets';
+import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { Container } from '@/app/components/layout/Container';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
@@ -25,7 +27,7 @@ import { ComNumeros } from '@/app/components/pages/curiosidades/ComNumeros';
 import { FiltroTemas } from '@/app/components/pages/curiosidades/FiltroTemas';
 import { DestaquesCuriosidades, escolherDestaques } from '@/app/components/pages/curiosidades/DestaquesCuriosidades';
 import { CartaoResumoCuriosidades } from '@/app/components/pages/curiosidades/CartaoResumoCuriosidades';
-import { DESTAQUES_PADRAO, HASHTAGS_CURIOSIDADES, ICONE_TEMA, fatosDoTema, temaDoParam, temasComContagem, textoPagina } from '@/app/components/pages/curiosidades/formato';
+import { DESTAQUES_PADRAO, HASHTAGS_CURIOSIDADES, ICONE_TEMA, corFinalista, fatosDoTema, temaDoParam, temasComContagem, textoPagina } from '@/app/components/pages/curiosidades/formato';
 
 export default function CuriosidadesPage() {
   useTitulo('Curiosidades do 1º turno');
@@ -190,14 +192,14 @@ function ListaFatos({ ds, tema, foco }: { ds: CuriosidadesDataset; tema: TemaCur
             {g.id === 'finalistas' ? (
               <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-subtle">
                 <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-cand-a" />
+                  <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(corFinalista(a)).bg)} />
                   {a.nomeUrna} <span className="num">({a.numero})</span>
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-cand-b" />
+                  <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(corFinalista(b)).bg)} />
                   {b.nomeUrna} <span className="num">({b.numero})</span>
                 </span>
-                <span>Cores pela ordem do número na urna; o mesmo critério para os dois.</span>
+                <span>Cores de identificação dos candidatos; o mesmo critério e o mesmo destaque para os dois.</span>
               </p>
             ) : null}
           </header>

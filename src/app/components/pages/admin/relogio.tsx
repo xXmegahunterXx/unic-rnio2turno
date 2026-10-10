@@ -8,7 +8,7 @@ import { pctTotalizadas } from '@/shared/calc';
 import { cn } from '@/app/lib/cn';
 import { useNow } from '@/app/lib/useNow';
 import { corSlot } from '@/app/lib/raceUi';
-import { Badge, Button, Icon, IconButton, LiveDot, Segmented, Select } from '@/app/ui';
+import { Badge, Button, Icon, IconButton, LiveDot, Segmented, Select, toneFromCor } from '@/app/ui';
 import { useAdmin } from './dados';
 import { FASE_ROTULO, fmtVel, INICIO_SIMULACAO, relogioAgora, VELOCIDADES } from './rotulos';
 
@@ -165,7 +165,7 @@ export function ProgressoPres({ compacto, bloco, className }: { compacto?: boole
     </span>
   );
   const selo = eleito ? (
-    <Badge size="xs" tone={eleito.cor === 'a' ? 'cand-a' : 'cand-b'} icon="selo" caps className="whitespace-nowrap" title={`${eleito.nomeUrna} eleito`}>
+    <Badge size="xs" tone={toneFromCor(eleito.cor)} icon="selo" caps className="whitespace-nowrap" title={`${eleito.nomeUrna} eleito`}>
       {bloco ? (
         `${eleito.nomeUrna} eleito`
       ) : (

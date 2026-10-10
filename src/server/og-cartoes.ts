@@ -3,7 +3,9 @@
  * urna da seção, ficha do candidato, Senado/Câmara/Assembleias (hemiciclo), as 7 disputas de governador,
  * curiosidades e cenários. Mesma linguagem visual do placar (tema escuro, marca, selo, kicker, título, rodapé).
  *
- * Regras (ARCHITECTURE §1): cores por slot (A turquesa = menor número; B âmbar) e paleta neutra de partidos;
+ * Regras (ARCHITECTURE §1): a cor de cada candidato vem dos dados (`Candidate.cor`: Presidente vermelho/azul —
+ * CORES_IDENTIDADE —; governador e simulação com nomes ocultos A turquesa/B âmbar) e paleta de partidos (PT no
+ * vermelho do Lula, PL no azul do Flávio, demais em tons que não se confundem com eles);
  * textos descritivos; selo e faixa "SIMULAÇÃO · dados fictícios" em toda imagem com número simulado; nunca foto
  * real com número simulado (quem chama só passa foto em dado real); com nomes ocultos, quem chama já entrega as
  * corridas anonimizadas. Cenário: marca d'água forte "CENÁRIO HIPOTÉTICO · não é pesquisa nem previsão".
@@ -14,11 +16,12 @@ import type { Curiosidade, CuriosidadesDataset, ValorCuriosidade } from '../shar
 import { TEMAS_CURIOSIDADES } from '../shared/curiosidades';
 import type { Cenario, PresidenteT1Dataset, Premissa, ResultadoCenario } from '../shared/cenarios';
 import { MARCA_CENARIO, estadosTexto, finalistasDe, pctFinalista, vencedorArea } from '../shared/cenarios';
-import type { LocalResumo, Race, SecaoResumo, Summary, UF } from '../shared/types';
+import type { CorCandidato, LocalResumo, Race, SecaoResumo, Summary, UF } from '../shared/types';
+import { corCandidato, coresIdentidadePresidente, coresPresidente } from '../shared/cores';
 import { pctTotalizadas, pctValidos, validos } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
 import { fmtInt, fmtPP, fmtPct } from '../shared/format';
-import { C, OG_H, OG_W, fundo, h, iniciais, marca, pill, type Estilo, type No } from './og';
+import { C, OG_H, OG_W, corOg, fundo, h, iniciais, marca, pill, tintaOg, type Estilo, type No } from './og';
 import { COR_PENDENTE, corPartido, porTamanho, svgHemiciclo, type Bancada } from './og-hemiciclo';
 
 // ---------------------------------------------------------------------------------------------
@@ -31,8 +34,7 @@ const PAPEL = 'rgb(244,244,250)';
 const TINTA = 'rgb(17,17,26)';
 const TINTA_SUAVE = 'rgb(96,96,118)';
 
-const corSlot = (cor: string | undefined) => (cor === 'b' ? C.b : cor === 'a' ? C.a : C.outros);
-const tintaSlot = (cor: string | undefined) => (cor === 'b' ? C.bInk : C.aInk);
+const corSlot = corOg;
 
 export function img(src: string, w: number, alt: number, style: Estilo = {}): No {
   return { type: 'img', props: { src, width: w, height: alt, style: { width: w, height: alt, ...style } } };
@@ -535,6 +537,8 @@ function linhaGov(d: DisputaGov, anonimizado: boolean): No {
   const BW = 196;
   const wa = va + vb > 0 ? Math.round(((BW - 4) * va) / (va + vb)) : 0;
   const eleito = (i: number) => d.race.turno === 2 && r.eleito === i;
+  const corA = corOg(d.race.candidatos[ia]?.cor);
+  const corB = corOg(d.race.candidatos[ib]?.cor);
   const lado = (i: number, alinhar: 'flex-start' | 'flex-end') => {
     const c = d.race.candidatos[i];
     return h(
@@ -553,16 +557,16 @@ function linhaGov(d: DisputaGov, anonimizado: boolean): No {
     { alignItems: 'center', height: 48, gap: 12 },
     h('div', { width: 50, height: 38, borderRadius: 9, background: C.surface3, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 700, fontSize: 20, color: C.fg, flexShrink: 0 }, d.uf),
     lado(ia, 'flex-end'),
-    pct(ia, C.a, 'flex-end'),
+    pct(ia, corA, 'flex-end'),
     h(
       'div',
       { flexDirection: 'column', alignItems: 'center', width: BW },
       tem
-        ? h('div', { width: BW, height: 12, position: 'relative' }, h('div', { width: wa, height: 12, background: C.a, borderRadius: '6px 0 0 6px' }), h('div', { width: 4, height: 12 }), h('div', { width: BW - 4 - wa, height: 12, background: C.b, borderRadius: '0 6px 6px 0' }), h('div', { position: 'absolute', left: BW / 2 - 1, top: -4, width: 2, height: 20, background: 'rgba(244,244,250,0.8)' }))
+        ? h('div', { width: BW, height: 12, position: 'relative' }, h('div', { width: wa, height: 12, background: corA, borderRadius: '6px 0 0 6px' }), h('div', { width: 4, height: 12 }), h('div', { width: BW - 4 - wa, height: 12, background: corB, borderRadius: '0 6px 6px 0' }), h('div', { position: 'absolute', left: BW / 2 - 1, top: -4, width: 2, height: 20, background: 'rgba(244,244,250,0.8)' }))
         : h('div', { width: BW, height: 12, borderRadius: 6, background: C.pending }),
       d.race.turno === 1 ? null : h('div', { fontSize: 13, color: C.subtle, marginTop: 3 }, `${fmtPct(pctTotalizadas(r), 0)} das seções`),
     ),
-    pct(ib, C.b, 'flex-start'),
+    pct(ib, corB, 'flex-start'),
     lado(ib, 'flex-start'),
   );
 }
@@ -608,14 +612,16 @@ export function layoutCuriosidade(inp: { fato: Curiosidade; finalistas: Curiosid
       const l = f.par![slot];
       const fin = inp.finalistas[slot];
       const valor = fmtValorCuriosidade(l.valor);
+      // dado real do 1º turno com nomes reais: cor de identificação do finalista (CORES_IDENTIDADE)
+      const cor = corOg(corCandidato('pres', fin.numero, slot === 'a' ? 0 : 1));
       return h(
         'div',
         { flexDirection: 'column', width: 510 },
-        h('div', { alignItems: 'center', gap: 10 }, h('div', { width: 16, height: 16, borderRadius: 8, background: corSlot(slot) }), h('div', { fontSize: 24, fontWeight: 600, color: C.fg, ...umaLinha, maxWidth: 470 }, `${fin.nomeUrna} (${fin.partido})`)),
+        h('div', { alignItems: 'center', gap: 10 }, h('div', { width: 16, height: 16, borderRadius: 8, background: cor }), h('div', { fontSize: 24, fontWeight: 600, color: C.fg, ...umaLinha, maxWidth: 470 }, `${fin.nomeUrna} (${fin.partido})`)),
         h(
           'div',
           { alignItems: 'flex-end', gap: 12, marginTop: 6 },
-          h('div', { fontFamily: 'Bricolage', fontWeight: 800, fontSize: tamNumero(valor, 96), color: corSlot(slot), lineHeight: 1, letterSpacing: -3 }, valor),
+          h('div', { fontFamily: 'Bricolage', fontWeight: 800, fontSize: tamNumero(valor, 96), color: cor, lineHeight: 1, letterSpacing: -3 }, valor),
           l.valor.unidade ? h('div', { fontSize: 24, color: C.muted, marginBottom: 8, ...umaLinha, maxWidth: 220 }, l.valor.unidade) : null,
         ),
         h('div', { fontSize: 22, color: C.fg, marginTop: 8, ...umaLinha, maxWidth: 500 }, cortar(l.rotulo, 44)),
@@ -706,7 +712,7 @@ function faixaCenario(): No {
 }
 
 /** Os 27 estados em fila, na cor de quem fica à frente no cenário (empate em cinza). */
-function faixaEstados(r: ResultadoCenario, W: number): No {
+function faixaEstados(r: ResultadoCenario, W: number, cores: readonly [CorCandidato, CorCandidato]): No {
   const ufs = r.ufs.filter((u) => u.uf !== 'ZZ');
   const gap = 4;
   const tw = Math.floor((W - gap * (ufs.length - 1)) / Math.max(1, ufs.length));
@@ -715,8 +721,9 @@ function faixaEstados(r: ResultadoCenario, W: number): No {
     { gap, marginTop: 12 },
     ...ufs.map((u) => {
       const v = vencedorArea(u);
-      const bg = v === 0 ? C.a : v === 1 ? C.b : C.outros;
-      const tinta = v === 0 ? C.aInk : v === 1 ? C.bInk : C.bg;
+      const cor = v === 0 || v === 1 ? cores[v] : 'outros';
+      const bg = corOg(cor);
+      const tinta = tintaOg(cor);
       return h('div', { width: tw, height: 34, borderRadius: 7, background: bg, color: tinta, alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700 }, u.uf);
     }),
   );
@@ -732,6 +739,8 @@ export interface OgCenarioInput {
 
 export function layoutCenario(inp: OgCenarioInput): No {
   const { a, b } = finalistasDe(inp.ds);
+  // nomes reais com números hipotéticos (sem foto): cores de identificação (Lula vermelho, Flávio azul)
+  const cores = coresPresidente([a.numero, b.numero]);
   const r = inp.resultado;
   const va = r.brasil.votos[0];
   const vb = r.brasil.votos[1];
@@ -742,7 +751,7 @@ export function layoutCenario(inp: OgCenarioInput): No {
       'div',
       { flexDirection: 'column', alignItems: alinhar, width: 520 },
       h('div', { alignItems: 'center', gap: 10 }, h('div', { fontFamily: 'Bricolage', fontWeight: 700, fontSize: 34, color: C.fg, ...umaLinha, maxWidth: 440 }, cand.nomeUrna), h('div', { fontSize: 22, color: C.muted }, `${cand.partido} · ${cand.numero}`)),
-      h('div', { fontFamily: 'Bricolage', fontWeight: 800, fontSize: 92, color: i === 0 ? C.a : C.b, lineHeight: 1, letterSpacing: -3, marginTop: 4 }, fmtPct(pctFinalista(r.brasil, i))),
+      h('div', { fontFamily: 'Bricolage', fontWeight: 800, fontSize: 92, color: corOg(cores[i]), lineHeight: 1, letterSpacing: -3, marginTop: 4 }, fmtPct(pctFinalista(r.brasil, i))),
       h('div', { fontSize: 20, color: C.muted, marginTop: 2 }, `${fmtInt(r.brasil.votos[i])} votos (hipotéticos)`),
     );
   const premissas = inp.premissas
@@ -766,13 +775,13 @@ export function layoutCenario(inp: OgCenarioInput): No {
       h(
         'div',
         { width: W, height: 14, marginTop: 14, position: 'relative' },
-        h('div', { width: wa, height: 14, background: C.a, borderRadius: '7px 0 0 7px' }),
+        h('div', { width: wa, height: 14, background: corOg(cores[0]), borderRadius: '7px 0 0 7px' }),
         h('div', { width: 6, height: 14 }),
-        h('div', { width: W - 6 - wa, height: 14, background: C.b, borderRadius: '0 7px 7px 0' }),
+        h('div', { width: W - 6 - wa, height: 14, background: corOg(cores[1]), borderRadius: '0 7px 7px 0' }),
         h('div', { position: 'absolute', left: W / 2 - 1, top: -6, width: 2, height: 26, background: 'rgba(244,244,250,0.85)' }),
       ),
       h('div', { fontSize: 22, color: C.fg, marginTop: 12, ...umaLinha, maxWidth: W }, `Neste cenário: ${estadosTexto(inp.ds, r)}.`),
-      faixaEstados(r, W),
+      faixaEstados(r, W, cores),
       h('div', { flexDirection: 'column', marginTop: 12 }, ...premissas),
       h('div', { flexGrow: 1 }),
       h(
@@ -788,6 +797,8 @@ export function layoutCenario(inp: OgCenarioInput): No {
 /** Cartão genérico da calculadora (/cenarios sem código válido): sem números. */
 export function layoutCalculadora(inp: { dominio?: string }): No {
   const W = 500;
+  // mesmas cores da calculadora no app (finalistas de Presidente: vermelho = Lula, azul = Flávio)
+  const [ca, cb] = coresIdentidadePresidente().map(corOg);
   const controle = (rotulo: string, pa: number) =>
     h(
       'div',
@@ -796,8 +807,8 @@ export function layoutCalculadora(inp: { dominio?: string }): No {
       h(
         'div',
         { width: W, height: 14, marginTop: 10, position: 'relative', alignItems: 'center' },
-        h('div', { width: Math.round(W * pa), height: 14, background: C.a, borderRadius: '7px 0 0 7px' }),
-        h('div', { width: W - Math.round(W * pa), height: 14, background: C.b, borderRadius: '0 7px 7px 0' }),
+        h('div', { width: Math.round(W * pa), height: 14, background: ca, borderRadius: '7px 0 0 7px' }),
+        h('div', { width: W - Math.round(W * pa), height: 14, background: cb, borderRadius: '0 7px 7px 0' }),
         h('div', { position: 'absolute', left: Math.round(W * pa) - 15, top: -8, width: 30, height: 30, borderRadius: 15, background: C.fg, border: `4px solid ${C.bg}` }),
       ),
     );

@@ -6,11 +6,12 @@ import { forwardRef } from 'react';
 import { Link } from 'react-router-dom';
 import type { Curiosidade, CuriosidadesDataset, FinalistaCuriosidade, LadoCuriosidade } from '@/shared/curiosidades';
 import { cn } from '@/app/lib/cn';
+import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { BotaoCompartilhar, type FormatoCartao } from '@/app/components/share';
 import { CartaoCuriosidade } from './CartaoCuriosidade';
 import { ComNumeros } from './ComNumeros';
-import { HASHTAGS_CURIOSIDADES, ICONE_TEMA, caminhoFato, fmtValor, nivelTamanho, nomeArquivoFato, rotuloTema, textoParaCompartilhar } from './formato';
+import { HASHTAGS_CURIOSIDADES, ICONE_TEMA, caminhoFato, corFinalista, fmtValor, nivelTamanho, nomeArquivoFato, rotuloTema, textoParaCompartilhar } from './formato';
 
 export interface CartaoFatoProps {
   fato: Curiosidade;
@@ -55,8 +56,8 @@ export const CartaoFato = forwardRef<HTMLElement, CartaoFatoProps>(function Cart
     >
       {fato.par ? (
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 flex h-1">
-          <span className="flex-1 bg-cand-a" />
-          <span className="flex-1 bg-cand-b" />
+          <span className={cn('flex-1', corSlot(corFinalista(finalistas.a)).bg)} />
+          <span className={cn('flex-1', corSlot(corFinalista(finalistas.b)).bg)} />
         </div>
       ) : (
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-brand-grad opacity-70" />
@@ -134,13 +135,10 @@ export const CartaoFato = forwardRef<HTMLElement, CartaoFatoProps>(function Cart
   );
 });
 
-const SLOT = {
-  a: { caixa: 'border-cand-a/35 bg-cand-a/[0.07]', ponto: 'bg-cand-a', texto: 'text-cand-a-fg' },
-  b: { caixa: 'border-cand-b/35 bg-cand-b/[0.07]', ponto: 'bg-cand-b', texto: 'text-cand-b-fg' },
-} as const;
 
 function LadoFinalista({ lado, fin, compacto, grande }: { lado: LadoCuriosidade; fin: FinalistaCuriosidade; compacto: boolean; grande?: boolean }) {
-  const s = SLOT[fin.slot];
+  const cor = corSlot(corFinalista(fin));
+  const s = { caixa: cn(cor.borderSoft, cor.bgFaint), ponto: cor.bg, texto: cor.text };
   const v = fmtValor(lado.valor);
   const n = nivelTamanho(v);
   const tam = compacto

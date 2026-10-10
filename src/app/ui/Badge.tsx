@@ -3,7 +3,18 @@ import { cn } from '@/app/lib/cn';
 import type { CorCandidato } from '@/shared/types';
 import { Icon, type IconName } from './Icon';
 
-export type BadgeTone = 'neutral' | 'brand' | 'ok' | 'alert' | 'pending' | 'cand-a' | 'cand-b' | 'outros' | 'solid';
+export type BadgeTone =
+  | 'neutral'
+  | 'brand'
+  | 'ok'
+  | 'alert'
+  | 'pending'
+  | 'cand-a'
+  | 'cand-b'
+  | 'cand-vermelho'
+  | 'cand-azul'
+  | 'outros'
+  | 'solid';
 
 const tones: Record<BadgeTone, string> = {
   neutral: 'bg-surface-3 text-fg-muted',
@@ -14,11 +25,22 @@ const tones: Record<BadgeTone, string> = {
   pending: 'bg-pending/60 text-fg-muted',
   'cand-a': 'bg-cand-a/15 text-cand-a-fg',
   'cand-b': 'bg-cand-b/15 text-cand-b-fg',
+  'cand-vermelho': 'bg-cand-vermelho/15 text-cand-vermelho-fg',
+  'cand-azul': 'bg-cand-azul/15 text-cand-azul-fg',
   outros: 'bg-cand-outros/15 text-fg-muted',
   solid: 'bg-fg text-bg',
 };
 
-export const toneFromCor = (cor: CorCandidato): BadgeTone => (cor === 'a' ? 'cand-a' : cor === 'b' ? 'cand-b' : 'outros');
+const TOM_DA_COR: Record<CorCandidato, BadgeTone> = {
+  a: 'cand-a',
+  b: 'cand-b',
+  vermelho: 'cand-vermelho',
+  azul: 'cand-azul',
+  outros: 'outros',
+};
+
+/** Tom do selo na cor do candidato (vinda dos dados: `Candidate.cor`). */
+export const toneFromCor = (cor: CorCandidato): BadgeTone => TOM_DA_COR[cor] ?? 'outros';
 
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;

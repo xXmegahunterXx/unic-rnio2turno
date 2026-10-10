@@ -2,7 +2,9 @@
  * Curiosidades do 1º turno — utilitários puros (sem React/DOM), testados em formato.test.ts.
  * Os fatos vêm prontos de public/data/curiosidades.json (scripts/data/curiosidades.ts); aqui só formatamos.
  */
-import type { Curiosidade, CuriosidadesDataset, TemaCuriosidade, ValorCuriosidade } from '@/shared/curiosidades';
+import type { Curiosidade, CuriosidadesDataset, FinalistaCuriosidade, TemaCuriosidade, ValorCuriosidade } from '@/shared/curiosidades';
+import { corCandidato } from '@/shared/cores';
+import type { CorCandidato } from '@/shared/types';
 import { TEMAS_CURIOSIDADES } from '@/shared/curiosidades';
 import { fmtInt, fmtPP, fmtPct } from '@/shared/format';
 import type { IconName } from '@/app/ui/Icon';
@@ -24,6 +26,13 @@ export const ICONE_TEMA: Record<TemaCuriosidade, IconName> = {
   eleitorado: 'usuarios',
   cargos: 'selo',
 };
+
+/**
+ * Cor de um finalista nas curiosidades (dado REAL do 1º turno, com nomes reais): a de identificação de
+ * CORES_IDENTIDADE (Lula vermelho, Flávio Bolsonaro azul). `slot` continua sendo só a POSIÇÃO na urna (a = menor).
+ */
+export const corFinalista = (fin: Pick<FinalistaCuriosidade, 'numero' | 'slot'>): CorCandidato =>
+  corCandidato('pres', fin.numero, fin.slot === 'a' ? 0 : 1);
 
 export const rotuloTema = (t: TemaCuriosidade) => TEMAS_CURIOSIDADES.find((x) => x.id === t)?.rotulo ?? t;
 

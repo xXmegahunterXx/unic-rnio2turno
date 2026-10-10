@@ -30,6 +30,7 @@ import type { Race, UF } from '../../src/shared/types';
 import { UFS } from '../../src/shared/types';
 import { UF_NOMES, UF_REGIAO, UFS_GOV_2T } from '../../src/shared/constants';
 import { decodeFaixas, encodeFaixas } from '../../src/shared/calc';
+import { corCandidato } from '../../src/shared/cores';
 import { ROOT, rawPath, readRaw } from './lib/cache';
 import { lerResultado, pct2 } from './lib/resultado';
 import { ibgeMunicipios, paths, resGovMun, resGovUf, resPresBr, resPresMun, resPresUf } from './lib/tse-feed';
@@ -148,13 +149,17 @@ function checkRace(r: Race, idEsperado: string, turno: 1 | 2, abr: 'BR' | UF) {
   const reais = r.candidatos.filter((c) => !c.agregado);
   check(reais.length === 2, `${ctx}: ${reais.length} finalistas`);
   check(reais[0].numero < reais[1].numero, `${ctx}: finalistas fora de ordem de número`);
-  check(reais[0].cor === 'a' && reais[1].cor === 'b', `${ctx}: cores dos finalistas`);
+  // cores da fonte única: Presidente com as de identificação (CORES_IDENTIDADE), governador com 'a'/'b' pela ordem
+  check(
+    reais[0].cor === corCandidato(r.id, reais[0].numero, 0) && reais[1].cor === corCandidato(r.id, reais[1].numero, 1),
+    `${ctx}: cores dos finalistas (${reais.map((c) => c.cor).join('/')})`,
+  );
   if (turno === 2) check(r.candidatos.length === 2, `${ctx}: 2º turno com ${r.candidatos.length} candidatos`);
   else {
     const o = r.candidatos[2];
     check(
       r.candidatos.length === 3 && o?.agregado === true && o.numero === 0 && o.cor === 'outros' && o.nomeUrna === 'Outros',
-      `${ctx}: 1º turno deve ser [a, b, Outros]`,
+      `${ctx}: 1º turno deve ser [finalista, finalista, Outros]`,
     );
   }
   for (const c of r.candidatos) {

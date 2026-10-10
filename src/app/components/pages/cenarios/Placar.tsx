@@ -1,7 +1,8 @@
 /**
- * Placar do cenário (Brasil): os dois finalistas lado a lado na ordem da urna (A = menor número, turquesa), % dos
- * válidos rolando a cada ajuste, barra com a marca dos 50%, diferença, estados e quem muda de lado — mais as
- * premissas, sempre visíveis. Sem fotos: os números são hipotéticos (monograma na cor do slot, igual para os dois).
+ * Placar do cenário (Brasil): os dois finalistas lado a lado na ordem da urna (menor número à esquerda), cada um na
+ * sua cor de identificação (./cores.ts), % dos válidos rolando a cada ajuste, barra com a marca dos 50%, diferença,
+ * estados e quem muda de lado — mais as premissas, sempre visíveis. Sem fotos: os números são hipotéticos (monograma
+ * na cor do candidato, igual para os dois).
  *
  * `BarraFixa`: mini-placar que desce sob o cabeçalho no celular quando o placar sai da tela (quem mexe nos
  * controles lá embaixo continua vendo o resultado mudar).
@@ -13,26 +14,28 @@ import { finalistasDe, margemArea, nomeCurto, pctFinalista, premissasCenario } f
 import { UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt, fmtPP, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
-import { corSlot } from '@/app/lib/raceUi';
+import { brilhoDuplo, corSlot } from '@/app/lib/raceUi';
 import { copiarLink, urlAbsoluta } from '@/app/lib/share';
 import { Icon } from '@/app/ui/Icon';
 import { NumberRoll } from '@/app/ui/NumberRoll';
 import { toast } from '@/app/ui/Toast';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { BotaoCompartilhar, type ConteudoCompartilhavel } from '@/app/components/share';
+import type { CorCandidato } from '@/shared/types';
+import { coresCenario, type CoresCenario } from './cores';
 
 /** Diferença sem sinal: "2,0 p.p.". */
 export const fmtMargem = (pp: number, casas: 1 | 2 = 1) => fmtPP(Math.abs(pp), casas).replace('+', '');
 
 export type CompartilharCenario = ConteudoCompartilhavel & { descricao?: ReactNode; carregando?: boolean };
 
-function Lado({ i, nome, partido, numero, pct, votos }: { i: 0 | 1; nome: string; partido: string; numero: number; pct: number; votos: number }) {
-  const s = corSlot(i === 0 ? 'a' : 'b');
+function Lado({ i, cor, nome, partido, numero, pct, votos }: { i: 0 | 1; cor: CorCandidato; nome: string; partido: string; numero: number; pct: number; votos: number }) {
+  const s = corSlot(cor);
   const dir = i === 1;
   return (
     <div className={cn('min-w-0', dir && 'text-right')}>
       <div className={cn('flex min-h-[3.6rem] items-center gap-2.5', dir && 'flex-row-reverse')}>
-        <CandidateAvatar nome={nome} cor={i === 0 ? 'a' : 'b'} size="md" />
+        <CandidateAvatar nome={nome} cor={cor} size="md" />
         <div className="min-w-0">
           <p className="line-clamp-2 break-words text-[14px] font-semibold leading-tight text-fg min-[400px]:text-[15px]">{nome}</p>
           <p className="num truncate text-[12px] text-fg-muted">
@@ -54,14 +57,14 @@ function Lado({ i, nome, partido, numero, pct, votos }: { i: 0 | 1; nome: string
   );
 }
 
-/** Barra A|B com a marca dos 50% (largura animada). */
-export function BarraCenario({ r, alto = 'h-3.5', className }: { r: ResultadoCenario; alto?: string; className?: string }) {
+/** Barra dos dois finalistas com a marca dos 50% (largura animada), nas cores de ./cores.ts. */
+export function BarraCenario({ r, cores = coresCenario(), alto = 'h-3.5', className }: { r: ResultadoCenario; cores?: CoresCenario; alto?: string; className?: string }) {
   const pa = pctFinalista(r.brasil, 0);
   return (
     <div className={cn('relative', className)} aria-hidden>
       <div className={cn('flex w-full gap-[3px] overflow-hidden rounded-full', alto)}>
-        <div className="h-full bg-cand-a transition-[width] duration-300 ease-out" style={{ width: `${pa}%` }} />
-        <div className="h-full flex-1 bg-cand-b" />
+        <div className={cn('h-full transition-[width] duration-300 ease-out', corSlot(cores[0]).bg)} style={{ width: `${pa}%` }} />
+        <div className={cn('h-full flex-1', corSlot(cores[1]).bg)} />
       </div>
       <span className="absolute -bottom-1 -top-1 left-1/2 w-[3px] -translate-x-1/2 rounded-full bg-fg" />
     </div>
@@ -80,6 +83,7 @@ export function PlacarCenario({
   compartilhar: CompartilharCenario;
 }) {
   const { a, b } = finalistasDe(ds);
+  const cores = coresCenario(ds);
   const m = margemArea(r.brasil);
   const premissas = premissasCenario(ds, cenario, r, { detalheCandidatos: 3 });
   const anuncio = useAnuncio(`${a.nomeUrna} ${fmtPct(pctFinalista(r.brasil, 0))}, ${b.nomeUrna} ${fmtPct(pctFinalista(r.brasil, 1))} dos votos válidos neste cenário.`);
@@ -87,7 +91,8 @@ export function PlacarCenario({
     <section aria-labelledby="placar-cenario" className="relative overflow-hidden rounded-3xl border border-line bg-surface shadow-card">
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(ellipse_60%_100%_at_0%_0%,rgb(var(--cand-a)/0.16),transparent_70%),radial-gradient(ellipse_60%_100%_at_100%_0%,rgb(var(--cand-b)/0.16),transparent_70%)]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-48"
+        style={{ background: brilhoDuplo(cores, 0.16, '60% 100%') }}
       />
       <div className="relative p-4 sm:p-6">
         <div className="flex items-center justify-between gap-3">
@@ -102,10 +107,10 @@ export function PlacarCenario({
           {anuncio}
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <Lado i={0} nome={a.nomeUrna} partido={a.partido} numero={a.numero} pct={pctFinalista(r.brasil, 0)} votos={r.brasil.votos[0]} />
-          <Lado i={1} nome={b.nomeUrna} partido={b.partido} numero={b.numero} pct={pctFinalista(r.brasil, 1)} votos={r.brasil.votos[1]} />
+          <Lado i={0} cor={cores[0]} nome={a.nomeUrna} partido={a.partido} numero={a.numero} pct={pctFinalista(r.brasil, 0)} votos={r.brasil.votos[0]} />
+          <Lado i={1} cor={cores[1]} nome={b.nomeUrna} partido={b.partido} numero={b.numero} pct={pctFinalista(r.brasil, 1)} votos={r.brasil.votos[1]} />
         </div>
-        <BarraCenario r={r} className="mt-4" />
+        <BarraCenario r={r} cores={cores} className="mt-4" />
         <p className="mt-2 text-center text-[11.5px] text-fg-subtle">50% dos votos válidos</p>
 
         <dl className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-surface-2/70 p-3 text-center">
@@ -117,9 +122,9 @@ export function PlacarCenario({
           <div className="min-w-0">
             <dt className="whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.1em] text-fg-subtle">Estados</dt>
             <dd className="num mt-1 text-[15px] font-semibold">
-              <span className={corSlot('a').text}>{fmtInt(r.estados[0])}</span>
+              <span className={corSlot(cores[0]).text}>{fmtInt(r.estados[0])}</span>
               <span className="text-fg-subtle"> × </span>
-              <span className={corSlot('b').text}>{fmtInt(r.estados[1])}</span>
+              <span className={corSlot(cores[1]).text}>{fmtInt(r.estados[1])}</span>
             </dd>
             <dd className="truncate text-[11.5px] text-fg-muted">{r.empates ? `${fmtInt(r.empates)} empate` : 'à frente'}</dd>
           </div>
@@ -192,20 +197,21 @@ export function Premissas({ itens }: { itens: ReturnType<typeof premissasCenario
 /** Conteúdo do mini-placar: % de cada um, barra com os 50% e estados (A sempre à esquerda). */
 export function MiniPlacar({ ds, resultado: r, acao, className }: { ds: PresidenteT1Dataset; resultado: ResultadoCenario; acao?: ReactNode; className?: string }) {
   const { a, b } = finalistasDe(ds);
+  const cores = coresCenario(ds);
   return (
     <div className={cn('flex items-center gap-2.5 rounded-2xl border border-line bg-surface/95 py-2 pl-3 shadow-card backdrop-blur-md', acao ? 'pr-1.5' : 'pr-3', className)}>
-      <span className={cn('num font-display text-[19px] font-semibold leading-none tracking-[-0.03em]', corSlot('a').textDisplay)}>{fmtPct(pctFinalista(r.brasil, 0), 1)}</span>
+      <span className={cn('num font-display text-[19px] font-semibold leading-none tracking-[-0.03em]', corSlot(cores[0]).textDisplay)}>{fmtPct(pctFinalista(r.brasil, 0), 1)}</span>
       <div className="min-w-0 flex-1">
         <div className="flex justify-between gap-2 text-[11px] leading-none text-fg-muted">
           <span className="min-w-0 truncate">{nomeCurto(a.nomeUrna)}</span>
           <span className="min-w-0 truncate text-right">{nomeCurto(b.nomeUrna)}</span>
         </div>
-        <BarraCenario r={r} alto="h-2" className="mt-1.5" />
+        <BarraCenario r={r} cores={cores} alto="h-2" className="mt-1.5" />
         <div className="num mt-1.5 text-center text-[10.5px] leading-none text-fg-subtle">
-          estados: <span className={corSlot('a').text}>{fmtInt(r.estados[0])}</span> × <span className={corSlot('b').text}>{fmtInt(r.estados[1])}</span>
+          estados: <span className={corSlot(cores[0]).text}>{fmtInt(r.estados[0])}</span> × <span className={corSlot(cores[1]).text}>{fmtInt(r.estados[1])}</span>
         </div>
       </div>
-      <span className={cn('num font-display text-[19px] font-semibold leading-none tracking-[-0.03em]', corSlot('b').textDisplay)}>{fmtPct(pctFinalista(r.brasil, 1), 1)}</span>
+      <span className={cn('num font-display text-[19px] font-semibold leading-none tracking-[-0.03em]', corSlot(cores[1]).textDisplay)}>{fmtPct(pctFinalista(r.brasil, 1), 1)}</span>
       {acao}
     </div>
   );
