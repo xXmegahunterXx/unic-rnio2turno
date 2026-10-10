@@ -42,19 +42,29 @@ export function AppShell({ children }: { children?: ReactNode }) {
  * conteúdo; some dentro da pré-visualização do próprio admin (iframe).
  */
 function AtalhoPainelDemo() {
-  const emIframe = typeof window !== 'undefined' && window.self !== window.top;
-  if (emIframe) return null;
+  // Esconde só dentro da "Visão do eleitor" do próprio admin (iframe de MESMA origem com o admin aberto).
+  // O preview publicado também roda num iframe, mas de outra origem: lá o acesso ao pai lança e o atalho aparece.
+  if (dentroDoPainel()) return null;
   return (
     <Link
       to="/admin"
       aria-label="Painel de simulação"
       title="Painel de simulação"
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-line text-[13px] font-semibold text-fg-muted transition-colors hover:border-line/[2] hover:text-fg max-[359px]:hidden lg:w-auto lg:px-3.5"
+      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-2.5 text-[13px] font-semibold text-fg transition-colors hover:bg-brand/20 max-[359px]:hidden sm:px-3.5"
     >
       <Icon name="ajustes" size={16} />
-      <span className="hidden lg:inline">Painel</span>
+      <span>Painel</span>
     </Link>
   );
+}
+
+function dentroDoPainel(): boolean {
+  if (typeof window === 'undefined' || window.self === window.top) return false;
+  try {
+    return window.parent.location.hash.startsWith('#/admin') || window.parent.location.pathname.startsWith('/admin');
+  } catch {
+    return false;
+  }
 }
 
 /** Rotas que exibem números da apuração (e, portanto, a faixa de SIMULAÇÃO quando for o caso). */
