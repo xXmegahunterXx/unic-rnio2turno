@@ -25,8 +25,12 @@ import { fmtPct } from '@/shared/format';
 export type Autor = Candidato;
 export const AUTORES: readonly Autor[] = CANDIDATOS;
 
-/** As 5 opções da escala (sem "Pular"), na ordem de exibição: concordo totalmente → discordo totalmente. */
-export const OPCOES_ESCALA = ESCALA.filter((o): o is { valor: ValorLikert; rotulo: string } => o.valor !== 'pular');
+/**
+ * As 5 opções da escala (sem "Pular"), na ordem de EXIBIÇÃO: discordo totalmente (à esquerda) → concordo totalmente
+ * (à direita), a convenção mais comum das escalas Likert. Atalhos 1–5 seguem a mesma ordem visual. A ordem de
+ * `ESCALA` (conteúdo) não muda — o código das respostas depende só dos valores.
+ */
+export const OPCOES_ESCALA = ESCALA.filter((o): o is { valor: ValorLikert; rotulo: string } => o.valor !== 'pular').reverse();
 
 const ROTULO_POR_VALOR = new Map<Resposta, string>(ESCALA.map((o) => [o.valor, o.rotulo]));
 

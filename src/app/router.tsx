@@ -34,6 +34,8 @@ const routes: RouteObject[] = [
       { path: '/assembleias', element: page(() => import('./pages/cargos/AssembleiaPage')) },
       { path: '/assembleias/:uf', element: page(() => import('./pages/cargos/AssembleiaPage')) },
       { path: '/candidato/:sqcand', element: page(() => import('./pages/cargos/CandidatoPage')) },
+      { path: '/curiosidades', element: page(() => import('./pages/curiosidades/CuriosidadesPage')) },
+      { path: '/cenarios', element: page(() => import('./pages/cenarios/CenariosPage')) },
       { path: '/metodologia', element: page(() => import('./pages/static/MetodologiaPage')) },
       { path: '/privacidade', element: page(() => import('./pages/static/PrivacidadePage')) },
       { path: '/sobre', element: page(() => import('./pages/static/SobrePage')) },
@@ -46,6 +48,8 @@ const routes: RouteObject[] = [
   { path: '/admin', element: page(() => import('./pages/admin/AdminPage')) },
   // Modo TV: tela cheia própria (fora do AppShell), para transmissão.
   { path: '/tv', element: page(() => import('./pages/tv/TvPage')) },
+  // Widgets para incorporar (iframe em sites de terceiros): sem AppShell.
+  { path: '/embed/:tipo', element: page(() => import('./pages/embed/EmbedPage')) },
 ];
 
 export const router = __DEMO__ ? createHashRouter(routes) : createBrowserRouter(routes);
