@@ -632,6 +632,30 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     return pr;
   };
 
+  /** Locais já carregados das seções de uma zona (nº da seção → local); null sem locais/município/zona. */
+  const locaisDaZona = (uf: UF | string, cod: string, zona: number): Map<number, LocalResumo> | null => {
+    const U = String(uf).toUpperCase();
+    const u = st.ufIndex.get(U);
+    if (u === undefined) return null;
+    const l = locaisDe(u);
+    if (!l) return null;
+    const c = /^\d+$/.test(String(cod)) ? String(cod).padStart(5, '0') : String(cod);
+    const m = st.munKey.get(`${U}|${c}`);
+    if (m === undefined) return null;
+    const z = Number(zona);
+    const s0 = st.ufSecStart[u];
+    for (let p = st.munPairStart[m]; p < st.munPairEnd[m]; p++) {
+      if (st.pairZona[p] !== z) continue;
+      const out = new Map<number, LocalResumo>();
+      for (let i = st.pairSecStart[p]; i < st.pairSecEnd[p]; i++) {
+        const li = l.idx[i - s0];
+        if (li >= 0) out.set(st.secNum[i], l.lista[li]);
+      }
+      return out;
+    }
+    return null;
+  };
+
   /** Função de local por seção da UF (dispara o carregamento em segundo plano se ainda não houver). */
   const localDe = (u: number): { fn: LocalDe | undefined; tag: string } => {
     const l = locaisDe(u);
@@ -703,6 +727,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     metrics,
     toJSON: () => serializeAdminState(state),
     carregaLocais,
+    locaisDaZona,
 
     nacional(race: RaceId, t?: number): NationalSnapshot {
       const wall = clock();

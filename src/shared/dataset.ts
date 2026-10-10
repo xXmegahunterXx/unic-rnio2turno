@@ -104,8 +104,12 @@ export interface SecaoUfDataset {
   aptos: string;
   /** Presidente 1º turno: comparecimento, finalista a (menor nº, 13), finalista b (22), demais candidatos, brancos, nulos */
   pres: { comp: string; a: string; b: string; outros: string; brancos: string; nulos: string };
-  /** Governador 1º turno (só nas 7 UFs com 2º turno): mesma convenção, a/b = finalistas por ordem do número */
-  gov?: { comp: string; a: string; b: string; outros: string; brancos: string; nulos: string };
+  /**
+   * Governador 1º turno (só nas 7 UFs com 2º turno): mesma convenção, a/b = finalistas por ordem do número.
+   * `aptos` (opcional): eleitorado do cargo por seção — menor que o de Presidente por causa dos eleitores em
+   * trânsito (que votam só para Presidente); soma exatamente o eleitorado oficial de Governador.
+   */
+  gov?: { comp: string; a: string; b: string; outros: string; brancos: string; nulos: string; aptos?: string };
   /** índice do local de votação da seção em LocaisUfDataset.locais (0xFFFF = desconhecido) */
   local: string;
 }

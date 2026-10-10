@@ -4,6 +4,9 @@
  *  - 'tse' → adaptador do feed oficial (src/tse) para as corridas de 2º turno. As corridas de 1º turno
  *    (`-t1`) vêm sempre do dataset (resultado oficial final, sem depender da rede).
  *
+ * Zona e seção trazem o local de votação (`local`) em todas as fontes: o controller carrega os locais da UF
+ * antes de responder, e na fonte 'tse' (o feed oficial não traz o local) eles são acrescentados aqui.
+ *
  * Também calcula o "balde" do instante dos dados, que entra no ETag: enquanto o balde não muda, os números
  * não mudam (pausado, congelado, antes das 17h, encerrada, 1º turno…), e o cliente/CDN recebe 304.
  *
@@ -26,9 +29,12 @@ import type {
   UfSnapshot,
   ZonaSnapshot,
 } from '../shared/types';
+import { INICIO_APURACAO } from '../shared/constants';
 import { NotFoundError, type Controller } from '../engine/api';
 import type { TseManager } from './tse';
 
+/** Começo da "noite" para o `?t=` (= INICIO_SIMULACAO do motor): 30 s antes da divulgação. */
+const INICIO_NOITE = INICIO_APURACAO - 30_000;
 /** Balde do TSE: o feed é lido a cada ≥ 5 s, os municípios chegam em segundo plano. */
 const BALDE_TSE_MS = 5_000;
 /**
@@ -118,7 +124,9 @@ export class Dados {
     const tse = this.fonteDe(race) === 'tse';
     if (tse && (nivel === 'mun' || nivel === 'zona' || nivel === 'secao')) return agora;
     const ref = this.agoraDados(s);
-    const tq = Math.floor(t / 1000) * 1000;
+    // antes do começo da noite (16:59:30) o estado é sempre o mesmo (nada totalizado): um único instante/ETag, em
+    // vez de um por segundo pedido (o motor limitaria igual, mas cada t viraria uma entrada de cache diferente)
+    const tq = Math.max(INICIO_NOITE, Math.floor(t / 1000) * 1000);
     if (tq >= Math.floor(ref / 1000) * 1000) return agora;
     return { t: tq, consolidado: tq <= ref - (tse ? MARGEM_CONSOLIDADO_TSE_MS : MARGEM_CONSOLIDADO_SIM_MS) };
   }
@@ -160,13 +168,35 @@ export class Dados {
   }
 
   async zona(race: RaceId, uf: UF, cod: string, zona: number, t?: number): Promise<ZonaSnapshot> {
-    return this.fonteDe(race) === 'tse' ? this.tseSrc().zona(race, uf, cod, zona) : this.controller.zona(race, uf, cod, zona, t);
+    if (this.fonteDe(race) === 'tse') {
+      const [z] = await Promise.all([this.tseSrc().zona(race, uf, cod, zona), this.locais(uf)]);
+      const locais = this.controller.locaisDaZona?.(uf, z.cod, z.zona);
+      if (!locais?.size) return z;
+      // cópia: o objeto do adaptador pode ser reaproveitado internamente
+      return { ...z, secoes: z.secoes.map((s) => (s.local || !locais.has(s.secao) ? s : { ...s, local: locais.get(s.secao) })) };
+    }
+    await this.locais(uf);
+    return this.controller.zona(race, uf, cod, zona, t);
   }
 
   async secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number, t?: number): Promise<SecaoDetalhe | null> {
-    return this.fonteDe(race) === 'tse'
-      ? this.tseSrc().secao(race, uf, cod, zona, secao)
-      : this.controller.secao(race, uf, cod, zona, secao, t);
+    if (this.fonteDe(race) === 'tse') {
+      const [d] = await Promise.all([this.tseSrc().secao(race, uf, cod, zona, secao), this.locais(uf)]);
+      if (!d || d.local) return d;
+      const local = this.controller.locaisDaZona?.(uf, d.cod, d.zona)?.get(d.secao);
+      return local ? { ...d, local } : d; // cópia: o boletim fica no cache do adaptador
+    }
+    await this.locais(uf);
+    return this.controller.secao(race, uf, cod, zona, secao, t);
+  }
+
+  /**
+   * Locais de votação da UF carregados ANTES de montar zona/seção (uma vez por UF, com cache no controller).
+   * Sem isso, a 1ª resposta sairia sem `local` (o controller só dispara a leitura em segundo plano) e com o MESMO
+   * ETag das seguintes — navegador e CDN revalidariam com 304 e ficariam sem a escola até a versão mudar.
+   */
+  private locais(uf: UF): Promise<boolean> {
+    return this.controller.carregaLocais ? this.controller.carregaLocais(uf) : Promise.resolve(false);
   }
 
   /**

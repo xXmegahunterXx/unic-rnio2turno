@@ -15,7 +15,10 @@ de prioridade (palavra = trecho entre espaços, hífens, barras, parênteses, v�
  5. Numerais romanos ficam em maiúsculas: "II", "XXIII", "XV de Novembro".
  6. Palavras sem nenhuma vogal (a, e, i, o, u, y, com ou sem acento) com 2+ letras são siglas: "PSF", "CTG", "BNH",
     "JK", "QN", "SP", "RJ".
- 7. "EM" e "E" como 1ª palavra do nome são siglas ("EM Prof. João…" = Escola Municipal); no meio, preposição.
+ 7. "EM" e "E" como 1ª palavra do nome são siglas ("EM Prof. João…" = Escola Municipal), assim como "EM" logo
+    depois de "-", "(" ou "/" no nome ("Serapião - EM Major Aquiles"); no meio, preposição ("Embaixada do Brasil em
+    Beirute", "em Tempo Integral", "em Frente ao…"). Palavras que casam com o padrão de sigla de escola mas são
+    palavras/sobrenomes ("UNIAO", "UEMURA"…) ficam em NAO_SIGLA; "CEU" depois de "do" é nome ("Maria do Ceu").
  8. Sigla de UF depois de "/" ou "-" no fim ("Segredo/RS", "Caiçara-PB") fica em maiúsculas.
  9. Partículas em minúsculas fora da 1ª posição: de, da, do, das, dos, e, d', em, na, no, nas, nos, com, para, ao,
     aos, à, às, pela, pelo, sob — exceto "E" logo depois de Quadra/Lote/Rua/Bloco… (é a letra da quadra/rua).
@@ -78,7 +81,10 @@ RODOVIA = re.compile(r'^(BR|AC|AL|AM|AP|BA|CE|DF|ES|GO|MA|MG|MS|MT|PA|PB|PE|PI|P
 SIGLA_PONTOS = re.compile(r'^(?:[A-Za-zÀ-ÿ]\.){2,}[A-Za-zÀ-ÿ]?$')
 SIGLA_PADRAO = re.compile(r'^(IF[A-Z]{2,3}|UF[A-Z]{1,4}|UE[A-Z]{2,4}|UNI[A-Z]{1,2}|E{1,3}M?[IEFMBT]{1,5})$')
 # palavras que casariam com o padrão de sigla de escola mas são palavras/nomes
-NAO_SIGLA = {'emi', 'eme', 'ete', 'efe', 'emme', 'emma', 'unir', 'unia', 'unio', 'ufa'}
+NAO_SIGLA = {'emi', 'eme', 'ete', 'efe', 'emme', 'emma', 'unir', 'unia', 'unio', 'ufa',
+             # palavras e sobrenomes que a auditoria achou em maiúsculas por casarem com o padrão
+             'uniao', 'unico', 'unica', 'unido', 'unida', 'unidos', 'unidas', 'unini', 'uemura', 'ueda', 'uebel',
+             'uebe', 'effie', 'emmi', 'emmie'}
 ETIQUETA_TSE = re.compile(r'[\s\-–]*\b(?:UE|LC|UN)\s*-\s*(?:MUN|EST|PTC|FED|PUB|PRIV)\s*$', re.I)
 
 # token = palavra (letras, números, º ª, apóstrofo interno) ou separador
@@ -143,8 +149,10 @@ def titulo(s: str, nome_local: bool = False) -> str:
             else:
                 out[i] = _cap(t)
             continue
-        # 4. siglas conhecidas
-        if low in SIGLAS or (SIGLA_PADRAO.match(t.upper()) and low not in NAO_SIGLA and not t.islower()):
+        # 4. siglas conhecidas ("EM" fica para a regra 7: no meio do nome é a preposição "em";
+        #    "CEU" depois de "do" é nome: "Maria do Ceu")
+        if (low in SIGLAS and not (low == 'ceu' and ant_palavra == 'do')) or (
+                SIGLA_PADRAO.match(t.upper()) and low not in NAO_SIGLA and low != 'em' and not t.islower()):
             out[i] = t.upper()
             continue
         # 5. romanos
@@ -155,8 +163,15 @@ def titulo(s: str, nome_local: bool = False) -> str:
         if _sem_vogal(t) and not any(ch.isdigit() for ch in t):
             out[i] = t.upper()
             continue
-        # 7. EM / E no início = sigla
+        # 7. EM / E no início = sigla; "EM" logo depois de "-", "(" ou "/" no nome do local também ("Serapião - EM
+        #    Major Aquiles"), exceto "em frente"; no resto, "em" é preposição ("Embaixada do Brasil em Beirute")
         if pos == 0 and low in ('em', 'e') and nome_local:
+            out[i] = t.upper()
+            continue
+        if (low == 'em' and nome_local and re.search(r'[-–(/]\s*$', ant)
+                and prox_palavra.lower() not in ('frente', 'fte', 'tempo', 'período', 'periodo', 'cima', 'extinção',
+                                                 'extincao', 'reforma', 'construção', 'construcao', 'obras', 'subst',
+                                                 'substituição', 'substituicao', 'subtituiçao', 'anexo')):
             out[i] = t.upper()
             continue
         # 8. UF no fim depois de / ou -
@@ -234,6 +249,19 @@ if __name__ == '__main__':
         ("SÍTIO OLHO D' ÁGUA", False, "Sítio Olho d'Água"),
         ("'ESCOLA DESATIVADA'", True, "'Escola Desativada'"),
         ("RUA 'A', 12", False, "Rua 'A', 12"),
+        # auditoria da fase 2
+        ('EMBAIXADA DO BRASIL EM BEIRUTE - M1 BUILDING', True, 'Embaixada do Brasil em Beirute - M1 Building'),
+        ('COLÉGIO ESTADUAL EM TEMPO INTEGRAL RUI BARBOSA', True, 'Colégio Estadual em Tempo Integral Rui Barbosa'),
+        ('RUA CASTRO ALVES, S/N, EM FRENTE À CODEVASF', False, 'Rua Castro Alves, S/N, em Frente à Codevasf'),
+        ('SERAPIÃO - EM MAJOR AQUILES', True, 'Serapião - EM Major Aquiles'),
+        ('CENTRO PASTORAL (EM CIMA DO SALÃO PAROQUIAL)', True, 'Centro Pastoral (em Cima do Salão Paroquial)'),
+        ('AZALEIA - EM', True, 'Azaleia - EM'),
+        ('RAMAL UNIAO KM 009', False, 'Ramal Uniao Km 009'),
+        ('ESCOLA MUNICIPAL YUKIO UEMURA', True, 'Escola Municipal Yukio Uemura'),
+        ('CMEI PROF. MARIA DO CEU VAZ DE OLIVEIRA', True, 'CMEI Prof. Maria do Ceu Vaz de Oliveira'),
+        ('CEU JAMBEIRO', True, 'CEU Jambeiro'),
+        ('UNIP', True, 'UNIP'),
+        ('UFMG - CAMPUS PAMPULHA', True, 'UFMG - Campus Pampulha'),
     ]
     falhas = 0
     for entrada, local, esperado in casos:

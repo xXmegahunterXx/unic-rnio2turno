@@ -1,56 +1,70 @@
 /**
- * Quiz do Teste Cego: uma rodada por tema, duas propostas SEM qualquer pista de autoria (só o texto e o
- * tema; rótulos neutros "Opção 1/2"; mesma tipografia, tamanho e cor para as duas). A cor de destaque da
- * escolha é a da marca — nunca a de um candidato, para não denunciar o autor.
+ * Quiz do Teste Cego (formato v2): UMA afirmação por tela, em tipografia display, e a escala de concordância
+ * (Concordo totalmente · Concordo · Neutro · Discordo · Discordo totalmente), mais "Pular" e o interruptor
+ * "Isso pesa mais para mim" (peso 2).
  *
- * Interação: tocar/clicar no cartão, arrastá-lo para a direita (celular) ou teclado
- * (← / 1 = opção 1, → / 2 = opção 2, N = nenhuma, T = tanto faz, Backspace = voltar).
+ * Neutralidade: a escala usa só a cor da marca, com intensidade SIMÉTRICA em torno do "Neutro" (nada de
+ * verde/vermelho, nada de cor de candidato). Antes da resposta aparecem só o texto, o tema e o contexto
+ * opcional — nunca posição, fonte ou autoria.
+ *
+ * Interação: tocar/clicar; teclado 1–5 (da esquerda para a direita), P pula, I alterna "pesa mais",
+ * ← volta, → avança (se já respondida); no celular, arrastar a afirmação para os lados navega.
  * As respostas ficam só na memória da aba (o pai decide se grava em sessionStorage).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, motion, useMotionValue, useReducedMotion, useTransform, type PanInfo } from 'framer-motion';
-import { rodadas, type Proposta } from '@/app/content/propostas';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-motion';
+import { ordemDoTeste, TEMA_POR_ID, type Resposta, type ValorLikert } from '@/app/content/afirmacoes';
 import { cn } from '@/app/lib/cn';
+import { Button } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
-import { NENHUMA, N_RODADAS, TANTO_FAZ, type Escolha } from './codigo';
-import { vazio, type Parcial } from './sessao';
-import { TemaEmoji } from './TemaEmoji';
+import type { MapaRespostas } from './sessao';
+import { OPCOES_ESCALA } from './sintonia';
+
+export interface EstadoQuiz {
+  respostas: MapaRespostas;
+  importantes: string[];
+  idx: number;
+}
 
 export interface QuizProps {
   seed: number;
-  inicial?: Parcial;
-  inicialIdx?: number;
-  onProgresso?: (respostas: Parcial, idx: number) => void;
-  onConcluir: (respostas: Escolha[]) => void;
-  /** Chamado ao "voltar" na 1ª rodada. */
+  inicial?: EstadoQuiz | null;
+  onProgresso?: (estado: EstadoQuiz) => void;
+  onConcluir: (respostas: MapaRespostas, importantes: string[]) => void;
+  /** Chamado ao "voltar" na 1ª afirmação. */
   onSair?: () => void;
   className?: string;
 }
 
-const ATRASO_ACENDE = 460;
+const ATRASO_AVANCO = 380;
 
-export function Quiz({ seed, inicial, inicialIdx = 0, onProgresso, onConcluir, onSair, className }: QuizProps) {
-  const rs = useMemo(() => rodadas(seed), [seed]);
-  const [respostas, setRespostas] = useState<Parcial>(() => (inicial && inicial.length === N_RODADAS ? inicial.slice() : vazio()));
-  const [idx, setIdx] = useState(() => Math.max(0, Math.min(N_RODADAS - 1, inicialIdx)));
+export function Quiz({ seed, inicial, onProgresso, onConcluir, onSair, className }: QuizProps) {
+  const ordem = useMemo(() => ordemDoTeste(seed), [seed]);
+  const total = ordem.length;
+  const [respostas, setRespostas] = useState<MapaRespostas>(() => ({ ...(inicial?.respostas ?? {}) }));
+  const [importantes, setImportantes] = useState<string[]>(() => [...(inicial?.importantes ?? [])]);
+  const [idx, setIdx] = useState(() => Math.max(0, Math.min(total - 1, inicial?.idx ?? 0)));
   const [dir, setDir] = useState(1);
-  const [acendendo, setAcendendo] = useState<Escolha | null>(null);
+  const [acendendo, setAcendendo] = useState<Resposta | null>(null);
   const timer = useRef<number | undefined>(undefined);
-  const topo = useRef<HTMLDivElement>(null);
   const titulo = useRef<HTMLHeadingElement>(null);
+  const topo = useRef<HTMLDivElement>(null);
   const primeiraPintura = useRef(true);
   const reduzir = useReducedMotion();
 
-  const rodada = rs[idx];
-  const atual = acendendo ?? respostas[idx];
-  const feitas = respostas.filter((r) => r !== null).length;
+  const atual = ordem[idx];
+  const tema = TEMA_POR_ID[atual.tema];
+  const resposta = acendendo ?? respostas[atual.id];
+  const importante = importantes.includes(atual.id);
+  const feitas = ordem.reduce((n, a) => n + (respostas[a.id] !== undefined ? 1 : 0), 0);
+  const completo = feitas === total;
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
   useEffect(() => {
-    onProgresso?.(respostas, idx);
-  }, [respostas, idx, onProgresso]);
+    onProgresso?.({ respostas, importantes, idx });
+  }, [respostas, importantes, idx, onProgresso]);
 
-  // A cada tema novo: foco no título (leitores de tela) e, se o topo do quiz saiu da tela, volta para ele.
+  // A cada afirmação nova: foco no texto (leitores de tela) e, se o topo do quiz saiu da tela, volta para ele.
   useEffect(() => {
     if (primeiraPintura.current) {
       primeiraPintura.current = false;
@@ -59,56 +73,73 @@ export function Quiz({ seed, inicial, inicialIdx = 0, onProgresso, onConcluir, o
     titulo.current?.focus({ preventScroll: true });
     const el = topo.current;
     if (!el) return;
-    const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 64;
+    const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 56;
     const y = el.getBoundingClientRect().top;
-    if (y < headerH || y > window.innerHeight * 0.4) {
-      window.scrollTo({ top: window.scrollY + y - headerH - 12, behavior: reduzir ? 'auto' : 'smooth' });
+    if (y < headerH - 1 || y > window.innerHeight * 0.4) {
+      window.scrollTo({ top: Math.max(0, window.scrollY + y - headerH - 8), behavior: reduzir ? 'auto' : 'smooth' });
     }
   }, [idx, reduzir]);
 
   const irPara = useCallback(
     (i: number) => {
-      if (i === idx || i < 0 || i >= N_RODADAS) return;
+      if (i === idx || i < 0 || i >= total) return;
       window.clearTimeout(timer.current);
       setAcendendo(null);
       setDir(i > idx ? 1 : -1);
       setIdx(i);
     },
-    [idx],
+    [idx, total],
   );
 
-  const escolher = useCallback(
-    (e: Escolha) => {
+  const concluir = useCallback(() => onConcluir(respostas, importantes), [onConcluir, respostas, importantes]);
+
+  const responder = useCallback(
+    (r: Resposta) => {
       if (acendendo !== null) return;
-      const novas = respostas.slice();
-      novas[idx] = e;
+      const id = atual.id;
+      const novas = { ...respostas, [id]: r };
+      const imps = r === 'pular' ? importantes.filter((x) => x !== id) : importantes;
       setRespostas(novas);
-      setAcendendo(e);
+      setImportantes(imps);
+      setAcendendo(r);
       window.clearTimeout(timer.current);
       timer.current = window.setTimeout(
         () => {
           setAcendendo(null);
-          const pendente = novas.findIndex((r) => r === null);
-          if (idx < N_RODADAS - 1) {
+          // Próxima sem resposta depois desta (ou a primeira sem resposta antes dela).
+          const depois = ordem.findIndex((a, i) => i > idx && novas[a.id] === undefined);
+          const qualquer = depois !== -1 ? depois : ordem.findIndex((a) => novas[a.id] === undefined);
+          if (qualquer !== -1) {
+            setDir(qualquer > idx ? 1 : -1);
+            setIdx(qualquer);
+          } else if (idx === total - 1) {
+            onConcluir(novas, imps);
+          } else {
+            // Revisão (tudo respondido): segue em ordem; o botão "Ver resultado" fica à mão.
             setDir(1);
             setIdx(idx + 1);
-          } else if (pendente === -1) {
-            onConcluir(novas as Escolha[]);
-          } else {
-            setDir(-1);
-            setIdx(pendente);
           }
         },
-        reduzir ? 140 : ATRASO_ACENDE,
+        reduzir ? 120 : ATRASO_AVANCO,
       );
     },
-    [acendendo, respostas, idx, onConcluir, reduzir],
+    [acendendo, atual.id, respostas, importantes, ordem, idx, total, onConcluir, reduzir],
   );
+
+  const alternarImportante = useCallback(() => {
+    if (respostas[atual.id] === 'pular') return;
+    setImportantes((l) => (l.includes(atual.id) ? l.filter((x) => x !== atual.id) : [...l, atual.id]));
+  }, [atual.id, respostas]);
 
   const voltar = useCallback(() => {
     if (idx === 0) onSair?.();
     else irPara(idx - 1);
   }, [idx, irPara, onSair]);
+
+  const podeAvancar = respostas[atual.id] !== undefined && idx < total - 1;
+  const avancar = useCallback(() => {
+    if (podeAvancar) irPara(idx + 1);
+  }, [podeAvancar, irPara, idx]);
 
   // Teclado
   useEffect(() => {
@@ -119,11 +150,11 @@ export function Quiz({ seed, inicial, inicialIdx = 0, onProgresso, onConcluir, o
       if (document.querySelector('[role="dialog"]')) return;
       const k = ev.key.toLowerCase();
       let acao: (() => void) | null = null;
-      if (k === 'arrowleft' || k === '1') acao = () => escolher(0);
-      else if (k === 'arrowright' || k === '2') acao = () => escolher(1);
-      else if (k === 'n') acao = () => escolher(NENHUMA);
-      else if (k === 't') acao = () => escolher(TANTO_FAZ);
-      else if (k === 'backspace') acao = voltar;
+      if (/^[1-5]$/.test(k)) acao = () => responder(OPCOES_ESCALA[Number(k) - 1].valor);
+      else if (k === 'p') acao = () => responder('pular');
+      else if (k === 'i') acao = alternarImportante;
+      else if (k === 'arrowleft' || k === 'backspace') acao = voltar;
+      else if (k === 'arrowright') acao = avancar;
       if (acao) {
         ev.preventDefault();
         acao();
@@ -131,296 +162,301 @@ export function Quiz({ seed, inicial, inicialIdx = 0, onProgresso, onConcluir, o
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [escolher, voltar]);
+  }, [responder, alternarImportante, voltar, avancar]);
 
-  const deslocar = reduzir ? 0 : 44;
+  function fimArraste(_: unknown, info: PanInfo) {
+    const forte = Math.abs(info.velocity.x) > 500;
+    if (info.offset.x < -90 || (info.offset.x < -36 && forte)) avancar();
+    else if (info.offset.x > 90 || (info.offset.x > 36 && forte)) {
+      if (idx > 0) voltar();
+    }
+  }
+
+  const deslocar = reduzir ? 0 : 48;
 
   return (
-    <div ref={topo} className={cn('mx-auto w-full max-w-[1040px] scroll-mt-24', className)}>
-      <Progresso idx={idx} respostas={respostas} feitas={feitas} onIr={irPara} onVoltar={voltar} primeira={idx === 0} />
+    <div
+      ref={topo}
+      className={cn(
+        'mx-auto flex w-full max-w-[1040px] flex-col',
+        // Celular: ocupa a altura útil (entre o header e a tab bar), com a escala embaixo, perto do polegar.
+        'min-h-[calc(100dvh-var(--app-header-h,56px)-60px-env(safe-area-inset-bottom)-16px)] md:min-h-[calc(100dvh-var(--app-header-h,64px)-48px)]',
+        className,
+      )}
+    >
+      <Progresso
+        ordem={ordem.map((a) => a.id)}
+        idx={idx}
+        respostas={respostas}
+        feitas={feitas}
+        completo={completo}
+        onIr={irPara}
+        onVoltar={voltar}
+        onConcluir={concluir}
+      />
 
       <p className="sr-only" aria-live="polite" aria-atomic="true">
-        Tema {idx + 1} de {N_RODADAS}: {rodada.tema.rotulo}.
+        Afirmação {idx + 1} de {total}. Tema: {tema.rotulo}.
       </p>
 
-      <AnimatePresence mode="wait" initial={false} custom={dir}>
-        <motion.div
-          key={idx}
-          custom={dir}
-          initial={{ opacity: 0, x: dir * deslocar }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -dir * deslocar }}
-          transition={{ duration: 0.26, ease: [0.22, 0.9, 0.24, 1] }}
-          className="pt-4 sm:pt-9"
-        >
-          <header className="flex items-center gap-3 sm:gap-4">
-            <TemaEmoji tema={rodada.tema} size="lg" className="max-sm:h-12 max-sm:w-12 max-sm:rounded-[14px] max-sm:text-[24px]" />
-            <div className="min-w-0">
-              <p className="num text-[11.5px] font-semibold uppercase tracking-[0.16em] text-fg-muted">
-                Tema {idx + 1} de {N_RODADAS}
+      {/* Afirmação */}
+      <div className="relative flex flex-1 flex-col justify-center py-6 sm:py-10">
+        <div aria-hidden className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[60%] w-[90%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/[0.07] blur-[70px]" />
+        <AnimatePresence mode="wait" initial={false} custom={dir}>
+          <motion.div
+            key={atual.id}
+            custom={dir}
+            initial={{ opacity: 0, x: dir * deslocar }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -dir * deslocar }}
+            transition={{ duration: 0.28, ease: [0.22, 0.9, 0.24, 1] }}
+          >
+            <motion.div
+              drag={reduzir ? false : 'x'}
+              dragDirectionLock
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.18}
+              dragSnapToOrigin
+              onDragEnd={fimArraste}
+              style={{ touchAction: 'pan-y' }}
+              className="mx-auto w-full max-w-[940px] cursor-default md:text-center"
+            >
+              <p className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.16em] text-fg-muted md:justify-center">
+                <span aria-hidden className="text-[15px] leading-none">
+                  {tema.emoji}
+                </span>
+                {tema.rotulo}
               </p>
               <h2
                 ref={titulo}
                 tabIndex={-1}
-                className="mt-1 text-balance font-display text-[25px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg outline-none sm:text-[38px]"
+                className="mt-3 text-balance font-display text-[clamp(27px,7.6vw,34px)] font-semibold leading-[1.1] tracking-[-0.03em] text-fg outline-none sm:mt-4 sm:text-[44px] sm:leading-[1.06] lg:text-[54px] lg:leading-[1.04]"
               >
-                {rodada.tema.rotulo}
+                {atual.texto}
               </h2>
-            </div>
-          </header>
-          <p className="mt-2.5 text-[14.5px] text-fg-muted sm:mt-4 sm:text-[16px]">Qual destas propostas você prefere?</p>
+              {atual.contexto ? (
+                <p className="mt-4 flex max-w-[44rem] items-start gap-2 text-pretty text-[14px] leading-snug text-fg-muted sm:mt-6 sm:text-[15.5px] md:mx-auto md:justify-center">
+                  <Icon name="info" size={16} className="mt-[2px] shrink-0 text-fg-subtle" />
+                  <span>{atual.contexto}</span>
+                </p>
+              ) : null}
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-          <div className="mt-3 grid grid-cols-1 items-stretch gap-1.5 sm:mt-6 sm:gap-2 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-4">
-            {rodada.opcoes.map((p, pos) => (
-              <FragmentoOpcao key={p.id} pos={pos as 0 | 1}>
-                <CartaoProposta
-                  proposta={p}
-                  pos={pos as 0 | 1}
-                  estado={atual === null ? 'livre' : atual === pos ? 'escolhida' : 'apagada'}
-                  acendendo={acendendo === pos}
-                  bloqueado={acendendo !== null}
-                  onEscolher={() => escolher(pos as Escolha)}
-                />
-              </FragmentoOpcao>
-            ))}
-          </div>
+      {/* Resposta */}
+      <div className="pb-1">
+        <Escala key={atual.id} valor={resposta} acendendo={acendendo} onEscolher={responder} />
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-6 sm:flex sm:justify-center sm:gap-3">
-            <BotaoAlternativo ativo={atual === NENHUMA} acendendo={acendendo === NENHUMA} tecla="N" onClick={() => escolher(NENHUMA)} bloqueado={acendendo !== null}>
-              Nenhuma das duas
-            </BotaoAlternativo>
-            <BotaoAlternativo ativo={atual === TANTO_FAZ} acendendo={acendendo === TANTO_FAZ} tecla="T" onClick={() => escolher(TANTO_FAZ)} bloqueado={acendendo !== null}>
-              Tanto faz
-            </BotaoAlternativo>
-          </div>
-        </motion.div>
-      </AnimatePresence>
+        <div className="mx-auto mt-5 flex w-full max-w-[760px] items-center justify-between gap-3 sm:mt-7">
+          <InterruptorPeso ligado={importante} desabilitado={respostas[atual.id] === 'pular'} onAlternar={alternarImportante} />
+          <button
+            type="button"
+            onClick={() => responder('pular')}
+            aria-pressed={resposta === 'pular'}
+            className={cn(
+              'inline-flex h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-[14px] font-medium transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              resposta === 'pular' ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-2 hover:text-fg',
+            )}
+          >
+            {resposta === 'pular' ? <Icon name="check" size={16} strokeWidth={2.5} /> : null}
+            Pular
+            <Kbd className="hidden md:inline-flex">P</Kbd>
+            {resposta !== 'pular' ? <Icon name="chevron-direita" size={16} className="-ml-0.5 md:hidden" /> : null}
+          </button>
+        </div>
 
-      <p className="mt-6 hidden items-center justify-center gap-x-4 gap-y-1 text-[12.5px] text-fg-subtle md:flex">
-        <span>
-          <Kbd>←</Kbd> <Kbd>→</Kbd> escolhem
-        </span>
-        <span>
-          <Kbd>N</Kbd> nenhuma
-        </span>
-        <span>
-          <Kbd>T</Kbd> tanto faz
-        </span>
-        <span>
-          <Kbd>⌫</Kbd> volta
-        </span>
-      </p>
-      <p className="mt-5 text-center text-[12.5px] text-fg-subtle md:hidden">Toque para escolher — ou arraste a proposta para a direita.</p>
+        <p className="mt-5 hidden items-center justify-center gap-x-4 gap-y-1 text-[12.5px] text-fg-subtle md:flex">
+          <span>
+            <Kbd>1</Kbd>–<Kbd>5</Kbd> respondem
+          </span>
+          <span>
+            <Kbd>P</Kbd> pula
+          </span>
+          <span>
+            <Kbd>I</Kbd> pesa mais
+          </span>
+          <span>
+            <Kbd>←</Kbd> <Kbd>→</Kbd> navegam
+          </span>
+        </p>
+        {idx === 0 && feitas === 0 ? (
+          <p className="mt-3 text-center text-[12px] text-fg-subtle md:hidden">Deslize a afirmação para os lados para voltar ou avançar.</p>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-/** Insere o separador "ou" entre as duas opções. */
-function FragmentoOpcao({ pos, children }: { pos: 0 | 1; children: React.ReactNode }) {
-  if (pos === 0) return <>{children}</>;
-  return (
-    <>
-      <div aria-hidden className="flex items-center justify-center md:flex-col">
-        <span className="h-px flex-1 bg-gradient-to-r from-transparent to-[rgb(var(--line)/calc(var(--line-alpha)*2))] md:h-auto md:w-px md:bg-gradient-to-b" />
-        <span className="mx-3 inline-flex h-7 w-7 items-center justify-center rounded-full border border-line bg-surface-2 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-fg-muted md:mx-0 md:my-3 md:h-10 md:w-10 md:text-[12px]">
-          ou
-        </span>
-        <span className="h-px flex-1 bg-gradient-to-l from-transparent to-[rgb(var(--line)/calc(var(--line-alpha)*2))] md:h-auto md:w-px md:bg-gradient-to-t" />
-      </div>
-      {children}
-    </>
-  );
-}
+// ── Escala ────────────────────────────────────────────────────────────────────
 
-type EstadoCartao = 'livre' | 'escolhida' | 'apagada';
+/** Intensidade simétrica: extremos mais fortes, "Neutro" sem cor. Classes por extenso (Tailwind). */
+const ESTILO_NIVEL: Record<0 | 1 | 2, { tam: string; idle: string }> = {
+  2: {
+    tam: 'h-[54px] w-[54px] sm:h-[68px] sm:w-[68px]',
+    idle: 'border-brand/70 bg-brand/[0.12] group-hover:bg-brand/25',
+  },
+  1: {
+    tam: 'h-[44px] w-[44px] sm:h-[56px] sm:w-[56px]',
+    idle: 'border-brand/45 bg-brand/[0.06] group-hover:bg-brand/20',
+  },
+  0: {
+    tam: 'h-[36px] w-[36px] sm:h-[46px] sm:w-[46px]',
+    idle: 'border-fg-subtle/50 bg-surface-2 group-hover:border-fg-subtle group-hover:bg-surface-3',
+  },
+};
 
-function CartaoProposta({
-  proposta,
-  pos,
-  estado,
+function Escala({
+  valor,
   acendendo,
-  bloqueado,
   onEscolher,
 }: {
-  proposta: Proposta;
-  pos: 0 | 1;
-  estado: EstadoCartao;
-  acendendo: boolean;
-  bloqueado: boolean;
-  onEscolher: () => void;
+  valor: Resposta | undefined | null;
+  acendendo: Resposta | null;
+  onEscolher: (r: ValorLikert) => void;
 }) {
   const reduzir = useReducedMotion();
-  const x = useMotionValue(0);
-  const girar = useTransform(x, [-200, 0, 220], [-2, 0, 4]);
-  const selo = useTransform(x, [24, 120], [0, 1]);
-  const arrastou = useRef(false);
-  const escolhida = estado === 'escolhida';
-
-  function fimArraste(_: unknown, info: PanInfo) {
-    if (!bloqueado && (info.offset.x > 110 || (info.offset.x > 40 && info.velocity.x > 600))) onEscolher();
-    window.setTimeout(() => (arrastou.current = false), 80);
-  }
-
   return (
-    <motion.button
+    <div role="group" aria-label="Quanto você concorda com a afirmação?" className="relative mx-auto w-full max-w-[760px]">
+      {/* trilho que liga os cinco pontos (do centro do 1º ao centro do 5º) */}
+      <div aria-hidden className="absolute left-[10%] right-[10%] top-[27px] h-[2px] rounded-full bg-line/[2] sm:top-[34px]" />
+      <ul className="relative grid grid-cols-5">
+        {OPCOES_ESCALA.map((o, i) => {
+          const nivel = Math.abs(o.valor) as 0 | 1 | 2;
+          const est = ESTILO_NIVEL[nivel];
+          const marcado = valor === o.valor;
+          const outro = valor !== undefined && valor !== null && !marcado;
+          return (
+            <li key={o.valor} className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => onEscolher(o.valor)}
+                aria-pressed={marcado}
+                aria-keyshortcuts={String(i + 1)}
+                className="group flex w-full flex-col items-center rounded-2xl pb-1 outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              >
+                <span className="flex h-[54px] items-center justify-center sm:h-[68px]">
+                  <motion.span
+                    animate={{ scale: acendendo === o.valor && !reduzir ? [1, 1.16, 1.06] : marcado ? 1.06 : 1 }}
+                    transition={acendendo === o.valor ? { duration: 0.34, times: [0, 0.5, 1] } : { type: 'spring', stiffness: 500, damping: 30 }}
+                    className={cn('relative inline-flex items-center justify-center rounded-full bg-bg', est.tam)}
+                  >
+                    {/* fundo opaco (bg-bg) por baixo da tinta translúcida: o trilho não aparece dentro do círculo */}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        'absolute inset-0 rounded-full border-2 transition-[background-color,border-color,opacity] duration-200',
+                        marcado ? 'border-transparent bg-brand-cta shadow-glow' : est.idle,
+                        outro && 'opacity-55',
+                      )}
+                    />
+                    {marcado ? (
+                      <motion.span
+                        initial={reduzir ? false : { scale: 0.3, rotate: -25 }}
+                        animate={{ scale: 1, rotate: 0 }}
+                        transition={{ type: 'spring', stiffness: 520, damping: 22 }}
+                        className="relative inline-flex text-brand-ink"
+                      >
+                        <Icon name="check" size={nivel === 0 ? 18 : 22} strokeWidth={2.75} />
+                      </motion.span>
+                    ) : null}
+                    {acendendo === o.valor && !reduzir ? (
+                      <motion.span
+                        aria-hidden
+                        className="absolute inset-0 rounded-full border-2 border-brand"
+                        initial={{ scale: 1, opacity: 0.8 }}
+                        animate={{ scale: 1.7, opacity: 0 }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                      />
+                    ) : null}
+                  </motion.span>
+                </span>
+                <span
+                  className={cn(
+                    'mt-2 max-w-[9ch] text-balance text-center text-[12px] leading-[1.2] transition-colors sm:mt-3 sm:max-w-none sm:text-[13.5px]',
+                    marcado ? 'font-semibold text-fg' : 'font-medium text-fg-muted group-hover:text-fg',
+                  )}
+                >
+                  {o.rotulo}
+                </span>
+                <Kbd className="mt-2 hidden md:inline-flex">{i + 1}</Kbd>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** "Isso pesa mais para mim": interruptor (role="switch") em forma de pílula. */
+function InterruptorPeso({ ligado, desabilitado, onAlternar }: { ligado: boolean; desabilitado: boolean; onAlternar: () => void }) {
+  return (
+    <button
       type="button"
-      onClick={() => {
-        if (arrastou.current || bloqueado) return;
-        onEscolher();
-      }}
-      aria-pressed={escolhida}
-      initial={reduzir ? false : { opacity: 0, y: 12 }}
-      animate={{
-        opacity: estado === 'apagada' ? 0.42 : 1,
-        y: 0,
-        scale: acendendo ? 1.015 : estado === 'apagada' ? 0.985 : 1,
-      }}
-      transition={{ duration: 0.3, delay: reduzir ? 0 : pos * 0.06, ease: [0.22, 0.9, 0.24, 1] }}
-      style={{ x, rotate: girar, touchAction: 'pan-y' }}
-      drag={bloqueado ? false : 'x'}
-      dragDirectionLock
-      dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={{ left: 0.06, right: 0.75 }}
-      dragSnapToOrigin
-      onDragStart={() => (arrastou.current = true)}
-      onDragEnd={fimArraste}
+      role="switch"
+      aria-checked={ligado}
+      disabled={desabilitado}
+      onClick={onAlternar}
+      title="Afirmações marcadas contam em dobro no cálculo"
       className={cn(
-        'group relative flex w-full flex-col overflow-hidden rounded-[22px] border p-4 text-left shadow-card outline-none sm:min-h-[260px] sm:rounded-3xl sm:p-7',
-        'cursor-pointer select-none transition-[border-color,background-color,box-shadow] duration-200',
-        'focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
-        escolhida
-          ? 'border-brand/60 bg-surface shadow-glow'
-          : 'border-line bg-surface hover:border-brand/35 hover:bg-[color:color-mix(in_srgb,rgb(var(--surface))_94%,rgb(var(--brand)))]',
+        'group inline-flex h-11 min-w-0 items-center gap-2.5 rounded-xl border px-3 text-left text-[13.5px] font-medium transition-colors sm:text-[14px]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-45',
+        ligado ? 'border-brand/50 bg-brand/[0.12] text-fg' : 'border-line bg-surface text-fg-muted hover:border-line/[2.5] hover:text-fg',
       )}
     >
-      {/* brilho da marca quando escolhida (nunca a cor de um candidato) */}
-      <span
-        aria-hidden
-        className={cn(
-          'pointer-events-none absolute inset-0 bg-gradient-to-br from-brand/[0.16] via-brand/[0.05] to-transparent transition-opacity duration-300',
-          escolhida ? 'opacity-100' : 'opacity-0',
-        )}
-      />
-      {acendendo && !reduzir ? (
+      <span aria-hidden className={cn('relative inline-flex h-5 w-9 shrink-0 items-center rounded-full p-[2px] transition-colors', ligado ? 'bg-brand' : 'bg-surface-3 ring-1 ring-inset ring-line/[1.5]')}>
         <motion.span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-3xl bg-brand/25"
-          initial={{ opacity: 0.9 }}
-          animate={{ opacity: 0 }}
-          transition={{ duration: 0.5, ease: 'easeOut' }}
+          className="block h-4 w-4 rounded-full bg-brand-ink shadow-[0_1px_3px_rgb(0_0_0/0.35)]"
+          animate={{ x: ligado ? 16 : 0 }}
+          transition={{ type: 'spring', stiffness: 600, damping: 36 }}
         />
-      ) : null}
-      {/* selo do arraste */}
-      <motion.span
-        aria-hidden
-        style={{ opacity: selo }}
-        className="pointer-events-none absolute right-4 top-4 inline-flex -rotate-6 items-center gap-1.5 rounded-full border-2 border-brand bg-brand/15 px-3 py-1 text-[12px] font-bold uppercase tracking-[0.12em] text-brand-fg"
-      >
-        <Icon name="check" size={14} strokeWidth={2.5} />
-        Prefiro esta
-      </motion.span>
-
-      <span className="relative flex items-center justify-between gap-3">
-        <span className="text-[11.5px] font-semibold uppercase tracking-[0.16em] text-fg-muted">Opção {pos + 1}</span>
-        <Kbd className="hidden md:inline-flex">{pos === 0 ? '←' : '→'}</Kbd>
       </span>
-
-      <span aria-hidden className="relative mt-3 hidden h-8 font-display text-[56px] leading-none text-brand-fg/50 sm:block">
-        “
-      </span>
-      <span className="relative mt-2 block text-pretty font-display text-[17.5px] font-medium leading-[1.33] tracking-[-0.01em] text-fg sm:mt-1 sm:text-[23px] sm:leading-[1.3]">
-        {proposta.texto}
-      </span>
-
-      <span className="relative mt-auto flex pt-3.5 sm:pt-7">
-        <span
-          className={cn(
-            'inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-[13.5px] font-semibold transition-all duration-200 sm:h-11 sm:px-5 sm:text-[14px]',
-            escolhida
-              ? 'bg-brand-cta text-brand-ink shadow-[0_8px_24px_-10px_rgb(var(--brand)/0.8)]'
-              : 'border border-line bg-surface-2 text-fg group-hover:border-brand/40 group-hover:text-fg',
-          )}
-        >
-          {escolhida ? (
-            <motion.span initial={reduzir ? false : { scale: 0.4, rotate: -20 }} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 520, damping: 22 }} className="inline-flex">
-              <Icon name="check" size={17} strokeWidth={2.5} />
-            </motion.span>
-          ) : (
-            <Icon name="check" size={17} className="text-fg-subtle" />
-          )}
-          {escolhida ? 'Sua escolha' : 'Prefiro esta'}
-        </span>
-      </span>
-    </motion.button>
+      <span className="truncate">Isso pesa mais para mim</span>
+      <Kbd className="hidden md:inline-flex">I</Kbd>
+    </button>
   );
 }
 
-function BotaoAlternativo({
-  ativo,
-  acendendo,
-  bloqueado,
-  tecla,
-  onClick,
-  children,
-}: {
-  ativo: boolean;
-  acendendo: boolean;
-  bloqueado: boolean;
-  tecla: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <motion.button
-      type="button"
-      aria-pressed={ativo}
-      onClick={() => !bloqueado && onClick()}
-      animate={{ scale: acendendo ? 1.03 : 1 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 26 }}
-      className={cn(
-        'inline-flex h-12 items-center justify-center gap-2 rounded-2xl border px-3 text-[14px] font-semibold transition-colors duration-150 sm:min-w-[200px] sm:px-4 sm:text-[14.5px]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
-        ativo ? 'border-brand/60 bg-brand/15 text-fg' : 'border-line bg-surface text-fg-muted hover:border-line/[2.5] hover:bg-surface-2 hover:text-fg',
-      )}
-    >
-      {ativo ? <Icon name="check" size={16} strokeWidth={2.5} className="text-brand-fg" /> : null}
-      {children}
-      <Kbd className="ml-1 hidden md:inline-flex">{tecla}</Kbd>
-    </motion.button>
-  );
-}
+// ── Progresso ─────────────────────────────────────────────────────────────────
 
 function Progresso({
+  ordem,
   idx,
   respostas,
   feitas,
+  completo,
   onIr,
   onVoltar,
-  primeira,
+  onConcluir,
 }: {
+  ordem: string[];
   idx: number;
-  respostas: Parcial;
+  respostas: MapaRespostas;
   feitas: number;
+  completo: boolean;
   onIr: (i: number) => void;
   onVoltar: () => void;
-  primeira: boolean;
+  onConcluir: () => void;
 }) {
-  // Pode pular para qualquer tema já respondido ou para o primeiro ainda sem resposta.
-  const fronteira = respostas.findIndex((r) => r === null);
+  // Pode ir para qualquer afirmação já respondida ou para a primeira ainda sem resposta.
+  const fronteira = ordem.findIndex((id) => respostas[id] === undefined);
   return (
-    <div className="flex items-center gap-2.5 sm:gap-4">
+    <div className="flex items-center gap-2 sm:gap-4">
       <button
         type="button"
         onClick={onVoltar}
-        className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 text-[13.5px] font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className="-ml-2 inline-flex h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 text-[13.5px] font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         <Icon name="seta-esquerda" size={18} />
-        <span>{primeira ? 'Sair' : 'Voltar'}</span>
+        <span>{idx === 0 ? 'Sair' : 'Voltar'}</span>
       </button>
       <div className="min-w-0 flex-1">
-        <div className="mb-2 flex items-center justify-between gap-3 text-[12px]">
+        <div className="mb-1.5 flex items-center justify-between gap-3 text-[12px]">
           <span className="num font-medium text-fg-muted">
-            <span className="font-semibold text-fg">{feitas}</span> de {N_RODADAS} respondidas
+            <span className="font-semibold text-fg">{idx + 1}</span> de {ordem.length}
           </span>
           <span className="inline-flex items-center gap-1.5 text-fg-subtle">
             <Icon name="olho-fechado" size={14} />
@@ -428,24 +464,25 @@ function Progresso({
             <span className="sm:hidden">Só no seu aparelho</span>
           </span>
         </div>
-        <ol className="flex gap-1" aria-label="Progresso do teste">
-          {respostas.map((r, i) => {
-            const pode = r !== null || i === fronteira || i === idx;
-            const atual = i === idx;
+        <ol className="flex gap-[3px]" aria-label={`Progresso: ${feitas} de ${ordem.length} respondidas`}>
+          {ordem.map((id, i) => {
+            const r = respostas[id];
+            const pode = r !== undefined || i === fronteira || i === idx;
+            const ehAtual = i === idx;
             return (
-              <li key={i} className="flex-1">
+              <li key={id} className="flex-1">
                 <button
                   type="button"
                   disabled={!pode}
                   onClick={() => onIr(i)}
-                  aria-current={atual ? 'step' : undefined}
-                  aria-label={`Tema ${i + 1}${r !== null ? ' (respondido)' : ''}`}
+                  aria-current={ehAtual ? 'step' : undefined}
+                  aria-label={`Afirmação ${i + 1}${r === 'pular' ? ' (pulada)' : r !== undefined ? ' (respondida)' : ''}`}
                   className="group block w-full py-1.5 disabled:cursor-default"
                 >
                   <span
                     className={cn(
                       'block h-1.5 w-full rounded-full transition-colors duration-300',
-                      atual ? 'bg-fg' : r !== null ? 'bg-brand group-hover:bg-brand-2' : 'bg-surface-3',
+                      ehAtual ? 'bg-fg' : r === 'pular' ? 'bg-fg-subtle/45' : r !== undefined ? 'bg-brand group-hover:bg-brand-2' : 'bg-surface-3',
                     )}
                   />
                 </button>
@@ -454,11 +491,17 @@ function Progresso({
           })}
         </ol>
       </div>
+      {completo ? (
+        <Button variant="primary" size="sm" iconRight="seta" onClick={onConcluir} className="shrink-0">
+          <span className="hidden sm:inline">Ver resultado</span>
+          <span className="sm:hidden">Resultado</span>
+        </Button>
+      ) : null}
     </div>
   );
 }
 
-export function Kbd({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Kbd({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <kbd
       className={cn(

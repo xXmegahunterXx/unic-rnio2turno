@@ -28,8 +28,10 @@ Regras:
    (NR_TURNO = 2, 25/10/2026) — mesmas seções e agregações, mas ~0,9% das seções votam em OUTRO local. Para o
    "Consulte sua seção" antes/durante o 2º turno:
        segundoTurno.mudancas: { "cod:zona:secao": índice }  → índice em [...locais, ...segundoTurno.locais]
-       segundoTurno.locais:   LocalVotacao[] dos locais que só existem no 2º turno (secoes/aptos do 2º turno)
-   Seção ausente de `mudancas` = mesmo local nos dois turnos.
+       segundoTurno.locais:   LocalVotacao[] (dados, secoes e aptos do 2º turno) dos locais que só existem no 2º turno
+                              OU que mantêm o NR_LOCAL_VOTACAO mas mudam de nome/endereço/bairro no 2º turno (o TSE
+                              reaproveita o número; às vezes é outro prédio) — todas as seções deles entram em mudancas
+   Seção ausente de `mudancas` = mesmo local, com os mesmos dados, nos dois turnos.
 
 Orçamento: o pedido era ≤ 14 MB somados (SP ≤ 3 MB). Com 94.299 locais, só os campos OBRIGATÓRIOS do contrato
 (nr, cod, zona, nome, endereco, secoes, aptos) já passam de ~15 MB; o script avisa (não falha) e o relatório mostra o
@@ -312,25 +314,40 @@ def construir_uf(uf: str, rel: dict) -> tuple[int, int]:
     if set(t2_local) != ativas:
         raise SystemExit(f'[{uf}] seções principais do 2º turno ≠ do 1º turno')
     pos = {lk: j for j, lk in enumerate(chaves)}
+    # Local do 2º turno que já existia no 1º, mas com outro nome/endereço/bairro (o TSE reaproveita o NR_LOCAL_VOTACAO:
+    # em 2026 há casos de prédio diferente com o mesmo número, ex.: Nova Iguaçu, zona 156, local 1279 "CIEP 351" →
+    # "Colégio Estadual Barão de Tinguá"). Para o 2º turno vale o cadastro do 2º turno: o local entra de novo em
+    # segundoTurno.locais (com os dados do 2º turno) e todas as suas seções vão para `mudancas`. Diferença só de
+    # espaços/caixa não conta (compara a saída já formatada).
+    def visivel(lk: tuple[str, int, int], info: tuple, c: tuple[float, float] | None) -> tuple:
+        antes = bairros_omitidos[0]
+        it = montar(lk, info, c)
+        bairros_omitidos[0] = antes  # só compara; não conta no relatório
+        return tuple(it.get(f) for f in ('nome', 'endereco', 'bairro', 'lat', 'lon'))
+
+    alterados: set[tuple[str, int, int]] = set()
+    for lk2 in set(t2_local.values()):
+        if lk2 in locais and visivel(lk2, t2_info[lk2], coord_ok(lk2, t2_info[lk2])) != visivel(
+                lk2, locais[lk2]['info'], coords[lk2]):
+            alterados.add(lk2)
+    renomeados = sum(1 for k in ordem if t2_local[k] in alterados and t2_local[k] == secao_local[k])
     novos: dict[tuple[str, int, int], list[int]] = {}
     mudancas: dict[str, int] = {}
-    renomeados = 0
     for k in ordem:
         lk1, lk2 = secao_local[k], t2_local[k]
-        if lk2 in locais and t2_info[lk2] != locais[lk2]['info'] and lk2 == lk1:
-            renomeados += 1
-        if lk2 == lk1:
+        if lk2 == lk1 and lk2 not in alterados:
             continue
-        if lk2 not in pos:
+        if lk2 not in pos or lk2 in alterados:
             novos.setdefault(lk2, []).append(k[2])
         mudancas[f'{k[0]}:{k[1]}:{k[2]}'] = -1  # preenchido abaixo
     chaves_novas = sorted(novos, key=lambda k: (ordem_mun[k[0]], k[1], k[2]))
+    pos2 = dict(pos)
     for j, lk in enumerate(chaves_novas):
-        pos[lk] = len(chaves) + j
+        pos2[lk] = len(chaves) + j
     for k in ordem:
         ck = f'{k[0]}:{k[1]}:{k[2]}'
         if ck in mudancas:
-            mudancas[ck] = pos[t2_local[k]]
+            mudancas[ck] = pos2[t2_local[k]]
     locais_t2 = []
     for lk in chaves_novas:
         item = montar(lk, t2_info[lk], coord_ok(lk, t2_info[lk]))
@@ -346,7 +363,7 @@ def construir_uf(uf: str, rel: dict) -> tuple[int, int]:
                'agregadasSemPrincipal': agr_sem_principal, 'semCoord': sem_coord, 'foraBR': fora_br,
                'foraDoMunicipio': fora_mun, 'conflitosInfo': conflitos, 'bytes': tam,
                'bairrosOmitidos': bairros_omitidos[0], 't2Mudancas': len(mudancas), 't2LocaisNovos': len(locais_t2),
-               't2MesmoLocalOutroNomeOuEndereco': renomeados,
+               't2MesmoLocalOutroNomeOuEndereco': renomeados, 't2LocaisAlterados': len(alterados),
                'aptos': sum(l['aptos'] for l in saida)}
     log(f'{uf}: {len(saida):6d} locais · {len(secao_local):6d} seções · {len(agregadas):5d} agregadas · '
         f'sem coord {sem_coord} · fora do BR {fora_br} · fora do município {fora_mun} · {tam / 1e6:.2f} MB')
@@ -366,7 +383,7 @@ def main() -> None:
     soma = Counter()
     for v in rel.values():
         for c in ('semCoord', 'foraBR', 'foraDoMunicipio', 'bairrosOmitidos', 'agregadas', 'agregadasSemPrincipal',
-                  'conflitosInfo', 't2Mudancas', 't2LocaisNovos', 't2MesmoLocalOutroNomeOuEndereco'):
+                  'conflitosInfo', 't2Mudancas', 't2LocaisNovos', 't2MesmoLocalOutroNomeOuEndereco', 't2LocaisAlterados'):
             soma[c] += v[c]
     log(f'TOTAL: {n} locais · {total / 1e6:.2f} MB · {dict(soma)}')
     sp = rel['SP']['bytes']

@@ -231,6 +231,62 @@ as coordenadas dos locais por município, de `data-raw/ibge/mun/{uf}.topo.json` 
 (finalistas a/b, "outros", nulos técnicos, `gov.aptos`, agregadas, capitalização) estão no topo de cada script. Os
 scripts param com erro se qualquer seção ou município não fechar com o dataset da fase 1.
 
+### Candidatos, fotos oficiais e 1º turno de todos os cargos
+
+```bash
+npx tsx scripts/data/py/cargos_build.ts        # feed → public/data/cargos/{governador-t1,senado,camara,assembleia}.json (~1 s)
+npx tsx scripts/data/py/candidatos_build.ts    # feed + consulta_cand + bem_candidato → public/data/candidatos/*.json (~5 s)
+python3 -I scripts/data/py/fotos_build.py      # fotos do TSE → public/data/fotos/{grupo}.json (~2 min na 1ª vez; depois cache)
+npx tsx scripts/data/build-data.ts && npx tsx scripts/data/validate.ts   # meta.json com sqcand/fotoGrupo dos finalistas
+```
+
+Todos aceitam `--offline` (só cache); `cargos_build.ts --refresh` rebaixa os arquivos do feed (use quando o TSE
+retotalizar — em 09/10/2026 os deputados do AM estavam em "Aguarde reprocessamento da eleição": votos completos, sem
+eleitos; as listas do AM saem com `aviso` e `camara-am`/`assembleia-am` sem fichas até o TSE concluir). Fontes, com
+cache: feed `ele2026/6259/dados/{uf}/{uf}-c000{3,5,6,7|8}-e006259-u.json` (Governador, Senador, Dep. Federal,
+Dep. Estadual; 8 = Distrital, só no DF) e `ele2026/6257`/`6258` (Presidente) em `data-raw/tse/` (~6 MB);
+`consulta_cand_2026.zip` e `bem_candidato_2026.zip` em `data-raw/tse-abertos/` (~7 MB); fotos
+`ele2026/{6258|6259}/fotos/{br|uf}/{sqcand}.jpeg` em `data-raw/fotos/` (~15 MB, concorrência 8).
+
+- **Cargos** (`CargoDataset`): Senado e Governador com todos os candidatos; Câmara e Assembleias com eleitos + 20 mais
+  votados não eleitos por UF, partidos (votos válidos nominais + legenda, eleitos, federação) e `composicao` nacional.
+  `validos` = válidos computados do TSE (com os anulados sub judice) e `pct` = `pvap` publicado (conferido; voto > 0
+  que arredondaria a 0,00% aparece como 0,01%, igual ao TSE). No Senado (2 vagas) cada eleitor vota 2 vezes:
+  validos + brancos + nulos = 2 × comparecimento. Os cargos estaduais têm ~182 mil eleitores a menos que Presidente
+  (eleitores em trânsito de outras UFs só votam para Presidente); seções e eleitorado conferem com a fase 1.
+- **Fichas** (`{ grupo, candidatos: CandidatoFicha[], aviso? }`): `segundo-turno` (Presidente e 7 Governadores, cada um
+  seguido do vice), `governadores` (eleitos no 1º turno), `senado` (todos), `camara-{uf}` e `assembleia-{uf}` (eleitos).
+  `index.json` = `{ colunas, linhas }` com sqcand, nome de urna, número, partido, cargo, UF e grupo (busca e rota
+  `/candidato/:sqcand`). Nome = `nm` do feed (já traz o nome social); CPF, título e e-mail nunca entram. O arquivo de
+  2026 só traz a UF de nascimento (`naturalidade` = nome da UF). Patrimônio = soma exata (centavos) dos bens
+  declarados, conferida contra os arquivos por UF.
+- **Fotos** (`FotoPacote`): os mesmos grupos; retrato 120×160 (cobre e recorta o mínimo no centro, Lanczos), sem
+  nenhum outro ajuste; WebP q70 (~2,4 KB/foto), exceto `segundo-turno` em JPEG q85, que o servidor usa nas imagens de
+  compartilhamento (satori/resvg não leem WebP). Orçamento: ≤ 10 MB no total (hoje ~4,4 MB).
+
+### Perfil do eleitorado ("quem vota aqui")
+
+```bash
+python3 -I scripts/data/py/perfil_build.py      # baixa perfil_eleitorado_2026.zip (408 MB, cache) → public/data/perfil/{uf}.json (~20 s)
+npx tsx scripts/data/py/perfil_validate.ts      # conferência independente em TS (contrato, somas, fase 1)
+```
+
+Fonte: `perfil_eleitorado/perfil_eleitorado_2026.zip` (um CSV por UF + ZZ, lido em streaming; recorte único, cadastro
+de 14/07/2026). Saída `PerfilUfDataset` (28 arquivos, ~2,7 MB), por município (código TSE) e total da UF: 22 faixas
+etárias × gênero (`idade = [fem[], masc[]]`; gênero não informado e idade "Inválida" em `naoInformado`), escolaridade
+(Analfabeto → Superior completo + "Não informado"), deficiência e nome social. Extras opcionais além do contrato:
+`dataReferencia`, `estadoCivil`, `racaCor`, `identidadeGenero` (rótulos no topo; somam `eleitores`), `biometria`,
+`quilombola` e `interpreteLibras` (quem declarou SIM). Raça/cor, identidade de gênero, quilombola e Libras são
+autodeclarações recentes: ~79% do eleitorado ainda aparece como "Não informado".
+
+O perfil conta o eleitor no **domicílio eleitoral**; o eleitorado da fase 1 (aptos do 1º turno) conta onde ele
+**vota**, com o voto em trânsito. Por isso os municípios diferem um pouco (capitais e cidades grandes recebem
+eleitores em trânsito: São Paulo −9.717, Brasília −5.188), e o total nacional fecha em 158.745.463 × 158.745.502
+(−39). Se `eleitorado_local_votacao_2026.zip` estiver no cache (`secao_download.py`), o script confere que perfil ==
+Σ `QT_ELEITOR_SECAO` e fase 1 == Σ `QT_ELEITOR_ELEICAO_FEDERAL` em todos os 5.757 municípios (para com erro se não).
+Também para com erro se surgir código/rótulo do TSE não previsto, mais de uma data de geração, ou se os municípios
+não forem os de `public/data/uf/*.json`.
+
 ## Fontes de dados
 
 - **TSE** — [resultados.tse.jus.br](https://resultados.tse.jus.br/oficial): estrutura real de municípios, zonas e

@@ -1,11 +1,23 @@
 /**
  * /metodologia — de onde vêm os dados (TSE, IBGE), como funciona a apuração e o "matematicamente eleito",
  * a simulação e como ela é sinalizada, as cores neutras por ordem do número e a metodologia do Teste Cego
- * (documentos-fonte, cálculo, aviso de revisão editorial).
+ * (afirmações únicas com escala de concordância: redação, posições documentadas, fórmula, documentos-fonte e
+ * aviso de revisão editorial).
  */
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { DOCUMENTOS, PROPOSTAS, TEMAS, type Proposta } from '@/app/content/propostas';
+import {
+  ACESSO,
+  afinidadeItem,
+  AFIRMACOES,
+  CANDIDATOS,
+  DOCUMENTOS,
+  TEMA_POR_ID,
+  TEMAS,
+  type Candidato,
+  type Posicao,
+  type ValorLikert,
+} from '@/app/content/afirmacoes';
 import { fmtInt, fmtPct } from '@/shared/format';
 import { useMeta } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
@@ -23,6 +35,7 @@ import {
   Subtitulo,
 } from '@/app/components/pages/home/Institucional';
 import { EM_REVISAO } from '@/app/components/pages/teste/IntroTeste';
+import { OPCOES_ESCALA } from '@/app/components/pages/teste/sintonia';
 
 const SUMARIO = [
   { id: 'dados', titulo: 'De onde vêm os dados' },
@@ -58,7 +71,7 @@ export default function MetodologiaPage() {
       icone="lista"
       titulo="Como o Sintonia funciona"
       lead="De onde vêm os números, como calculamos cada percentual, como a simulação é sinalizada e como o Teste Cego foi feito. Tudo aberto, para você conferir."
-      atualizado="9 de outubro de 2026"
+      atualizado="10 de outubro de 2026"
       sumario={SUMARIO}
     >
       <Secao id="dados" titulo="De onde vêm os dados">
@@ -198,43 +211,79 @@ export default function MetodologiaPage() {
 
       <Secao id="teste-cego" titulo="Teste Cego">
         <p>
-          O Teste Cego apresenta <strong>{fmtInt(PROPOSTAS.length)} propostas reais</strong>, uma de cada candidato à Presidência em cada um de{' '}
-          <strong>{fmtInt(TEMAS.length)} temas</strong>, sem nome, partido, número ou slogan. A pessoa escolhe a que prefere (ou “nenhuma das
-          duas”, ou “tanto faz”) e, no fim, vê de quem era cada uma.
+          O Teste Cego apresenta <strong>{fmtInt(AFIRMACOES.length)} afirmações sobre políticas públicas</strong>, duas em cada um de{' '}
+          <strong>{fmtInt(TEMAS.length)} temas</strong>, uma por vez e em ordem sorteada. Para cada uma, a pessoa diz o quanto concorda —{' '}
+          <em>concordo totalmente, concordo, neutro, discordo ou discordo totalmente</em> — ou pula. No fim, comparamos as respostas com a{' '}
+          <strong>posição documentada</strong> de cada candidato à Presidência no programa de governo registrado no TSE.
         </p>
-        <Subtitulo>Como as propostas foram escolhidas e escritas</Subtitulo>
+        <p>
+          Até 9 de outubro o teste mostrava pares de propostas, uma de cada candidato, lado a lado. Trocamos pelo formato de afirmações únicas
+          (como o Wahl-O-Mat alemão e o Vote Compass) porque o estilo e o contraste entre as duas frases acabavam entregando a autoria.
+        </p>
+
+        <Subtitulo>Como as afirmações foram escritas</Subtitulo>
         <Lista
           itens={[
-            <>Todas saem dos programas de governo registrados no TSE, lidos na íntegra. Nenhuma foi tirada de reportagem, discurso ou rede social.</>,
             <>
-              Cada uma foi reescrita numa frase curta e concreta (até 140 caracteres, começando por um verbo), sem marcas de programas, nomes
-              próprios ou termos que denunciem o autor. Uma verificação automática barra pistas de autoria.
+              São frases da redação, não citações: curtas (até 110 caracteres), afirmativas, concretas e em linguagem simples. Não trazem nome,
+              partido, número, marca de programa, slogan nem palavras de enquadramento de campanha. Uma verificação automática barra essas pistas.
             </>,
-            <>Escolhemos pontos centrais e comparáveis em cada tema, um de cada candidato, para que a escolha seja entre ideias.</>,
-            <>Depois da escolha, mostramos o trecho original entre aspas e o link para a página exata do documento.</>,
+            <>Cada uma precisa permitir que alguém de qualquer campo concorde ou discorde com dignidade; quando a resposta parecia óbvia, a frase passou a dizer o custo da escolha.</>,
+            <>Nenhuma usa “não deve”, para que “discordo” nunca vire uma negação dupla.</>,
+            <>
+              A direção é equilibrada: em metade das afirmações com posição, concordar aproxima de um candidato; na outra metade, do outro. Duas
+              são de controle (os dois planos concordam). Assim, responder sempre a mesma coisa não favorece ninguém.
+            </>,
+            <>Algumas trazem uma linha de contexto factual (por exemplo, a regra em vigor hoje), que pode ser lida antes de responder.</>,
           ]}
         />
-        <Subtitulo>Como calculamos a sintonia</Subtitulo>
+
+        <Subtitulo>Como identificamos a posição de cada candidato</Subtitulo>
         <Lista
           itens={[
-            <>Cada tema vale 1 ponto.</>,
-            <>Escolher uma proposta dá o ponto inteiro ao autor dela; “tanto faz” divide meio a meio; “nenhuma das duas” não pontua ninguém.</>,
-            <>Sintonia = pontos ÷ {fmtInt(TEMAS.length)}. Os dois números são independentes e não precisam somar 100%.</>,
-            <>A ordem dos temas e o lado de cada proposta são sorteados por uma semente aleatória, para que a posição não influencie.</>,
+            <>Só pelo texto do programa de governo, lido na íntegra. Nada de entrevista, debate, histórico ou declaração de aliados.</>,
+            <>
+              <strong>Concorda</strong> ou <strong>discorda</strong> só quando o plano é explícito; <strong>posição intermediária</strong> quando o
+              plano assume um meio-termo; <strong>sem posição</strong> quando o plano não trata do assunto — e aí o item não conta para aquele
+              candidato.
+            </>,
+            <>Toda posição traz o trecho literal entre aspas, a página e o link direto para ela no PDF. Quando a leitura exigiu contexto, a nota explica por quê.</>,
+          ]}
+        />
+
+        <Subtitulo>Como calculamos a sintonia</Subtitulo>
+        <Formula />
+        <Lista
+          itens={[
+            <>
+              Em cada afirmação, a resposta (de +2 a −2) é comparada com a posição do candidato (+2 concorda, 0 intermediária, −2 discorda):
+              igual vale 100% e cada passo de distância na escala tira 25%.
+            </>,
+            <>As afirmações marcadas como “isso pesa mais para mim” contam em dobro.</>,
+            <>
+              Ficam fora da conta de um candidato as afirmações puladas e aquelas que o plano dele não trata. Por isso o resultado diz “com base
+              em N afirmações” para cada um, e os dois números são independentes: <strong>não somam 100%</strong>.
+            </>,
+            <>A quebra por tema usa a mesma conta, restrita às duas afirmações de cada tema.</>,
+            <>
+              No <strong>Duelo</strong>, a afinidade entre duas pessoas usa a mesma régua entre as respostas delas. “Concordaram” significa ficar
+              do mesmo lado da escala (as duas concordam, as duas discordam ou as duas neutras).
+            </>,
+            <>A ordem das afirmações é sorteada por uma semente aleatória (que vai no link e não é dado pessoal) e nunca põe duas do mesmo tema seguidas.</>,
           ]}
         />
         <Destaque icone="olho-fechado" titulo="Suas respostas não saem do seu aparelho">
-          O cálculo é feito no seu navegador. Não há envio, registro nem analytics das escolhas. O resultado e o Duelo carregam as respostas
+          O cálculo é feito no seu navegador. Não há envio, registro nem analytics das respostas. O resultado e o Duelo carregam as respostas
           codificadas no próprio link, depois do “#”, parte que o navegador não envia a servidor. <LinkInterno to="/privacidade">Privacidade</LinkInterno>
         </Destaque>
         <Destaque icone="info" titulo="Não é pesquisa nem recomendação de voto">
-          O teste compara {fmtInt(PROPOSTAS.length)} propostas escritas, não pessoas, trajetórias ou partidos. Programas de governo têm centenas
-          de pontos: leia os documentos completos.
+          O teste mede a distância entre as respostas da pessoa e o que está escrito nos programas — não avalia pessoas, trajetórias ou partidos.
+          Programas de governo têm centenas de pontos: leia os documentos completos. Nunca somamos respostas de pessoas diferentes.
         </Destaque>
 
         <Subtitulo>Documentos-fonte</Subtitulo>
         <ul className="grid grid-cols-1 gap-3">
-          {([13, 22] as const).map((n) => {
+          {CANDIDATOS.map((n) => {
             const d = DOCUMENTOS[n];
             return (
               <li key={n} className="rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
@@ -267,14 +316,15 @@ export default function MetodologiaPage() {
           Os planos também estão reunidos na{' '}
           <LinkExterno href={DOCUMENTOS.paginaOficialTse}>página oficial do TSE com as propostas de governo</LinkExterno>. Lemos as cópias integrais
           publicadas pela imprensa porque o servidor do TSE estava inacessível no momento da pesquisa; o número de páginas confere com o registrado.
+          Acesso aos documentos: <span className="num">{ACESSO.split('-').reverse().join('/')}</span>.
         </p>
 
-        <ListaPropostas />
+        <ListaAfirmacoesFontes />
 
         {EM_REVISAO ? (
           <Destaque icone="alerta" tom="alerta" titulo="Revisão editorial">
-            As propostas foram extraídas e reescritas a partir dos documentos oficiais e estão em revisão humana editorial e jurídica final. Cada
-            frase será conferida contra o documento registrado no TSE antes da publicação definitiva. Viu algum problema? Escreva para{' '}
+            As afirmações e as posições foram preparadas a partir dos documentos oficiais e estão em revisão humana editorial e jurídica final.
+            Cada posição será conferida contra o documento registrado no TSE antes da publicação definitiva. Viu algum problema? Escreva para{' '}
             <Email endereco={CONTATO.correcoes} />.
           </Destaque>
         ) : null}
@@ -344,19 +394,86 @@ function Amostra({ cor, titulo, texto }: { cor: 'a' | 'b'; titulo: string; texto
   );
 }
 
-/** As 24 propostas com a fonte — fechadas por padrão, porque revelam a autoria (spoiler do teste). */
-function ListaPropostas() {
-  const [aberto, setAberto] = useState(false);
-  const porTema = useMemo(
-    () => TEMAS.map((t) => ({ tema: t, itens: PROPOSTAS.filter((p) => p.tema === t.id).sort((a, b) => a.autor - b.autor) })),
-    [],
+
+/** Fórmula da sintonia e a tabela de afinidade por afirmação (resposta × posição documentada). */
+function Formula() {
+  const posicoes: { rotulo: string; c: ValorLikert }[] = [
+    { rotulo: 'Concorda', c: 2 },
+    { rotulo: 'Intermediária', c: 0 },
+    { rotulo: 'Discorda', c: -2 },
+  ];
+  return (
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface-2/60 p-4 sm:p-5">
+        <p className="text-[11.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Fórmula</p>
+        <div className="mt-3 space-y-2 font-mono text-[12.5px] leading-relaxed text-fg sm:text-[14px]">
+          <p>
+            <span className="whitespace-nowrap">afinidade = 1 − |resposta − posição|</span> <span className="whitespace-nowrap">÷ 4</span>
+          </p>
+          <p>
+            <span className="whitespace-nowrap">sintonia = 100 × Σ (peso × afinidade)</span> <span className="whitespace-nowrap">÷ Σ peso</span>
+          </p>
+        </div>
+        <p className="mt-3 text-[13px] leading-snug text-fg-muted">
+          Resposta: +2 concordo totalmente · +1 concordo · 0 neutro · −1 discordo · −2 discordo totalmente. Posição: +2 concorda · 0
+          intermediária · −2 discorda. Peso: 2 nas afirmações que pesam mais para a pessoa, 1 nas demais.
+        </p>
+      </div>
+      <figure className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        <figcaption className="border-b border-line bg-surface-2/60 px-4 py-3 text-[12.5px] leading-snug text-fg-muted">
+          Afinidade em uma afirmação, conforme a sua resposta e a posição documentada no plano
+        </figcaption>
+        <table className="w-full table-fixed text-[13px] sm:text-[14px]">
+          <thead>
+            <tr className="text-[10.5px] uppercase tracking-[0.04em] text-fg-muted sm:text-[11.5px] sm:tracking-[0.08em]">
+              <th scope="col" className="w-[36%] px-4 py-2.5 text-left font-semibold">
+                Resposta
+              </th>
+              {posicoes.map((p) => (
+                <th key={p.c} scope="col" className="px-1 py-2.5 text-right font-semibold last:pr-4 sm:px-3">
+                  <span className="sm:hidden">{p.rotulo === 'Intermediária' ? 'Interm.' : p.rotulo}</span>
+                  <span className="hidden sm:inline">Plano {p.rotulo.toLowerCase()}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line border-t border-line">
+            {OPCOES_ESCALA.map((o) => (
+              <tr key={o.valor}>
+                <th scope="row" className="px-4 py-2.5 text-left font-medium text-fg">
+                  {o.rotulo}
+                </th>
+                {posicoes.map((p) => (
+                  <td key={p.c} className="num px-1 py-2.5 text-right font-semibold text-fg last:pr-4 sm:px-3">
+                    {fmtPct(afinidadeItem(o.valor, p.c) * 100, 0)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </figure>
+    </div>
   );
+}
+
+const ROTULO_CURTO: Record<Posicao['valor'], string> = {
+  concorda: 'Concorda',
+  discorda: 'Discorda',
+  neutro: 'Intermediária',
+  'sem-posicao': 'Sem posição no plano',
+};
+
+/** As 24 afirmações com as posições e fontes — fechadas por padrão, porque revelam as posições (spoiler). */
+function ListaAfirmacoesFontes() {
+  const [aberto, setAberto] = useState(false);
+  const porTema = useMemo(() => TEMAS.map((t) => ({ tema: t, itens: AFIRMACOES.filter((a) => a.tema === t.id) })), []);
   return (
     <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
       <button
         type="button"
         aria-expanded={aberto}
-        aria-controls="lista-propostas"
+        aria-controls="lista-afirmacoes"
         onClick={() => setAberto((v) => !v)}
         className="flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand sm:p-5"
       >
@@ -365,16 +482,16 @@ function ListaPropostas() {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold text-fg">
-            As <span className="num">{fmtInt(PROPOSTAS.length)}</span> propostas e suas fontes
+            As <span className="num">{fmtInt(AFIRMACOES.length)}</span> afirmações, as posições e as fontes
           </span>
-          <span className="block text-[13px] text-fg-muted">Revela de quem é cada proposta. Se ainda vai fazer o teste, deixe para depois.</span>
+          <span className="block text-[13px] text-fg-muted">Revela a posição de cada candidato. Se ainda vai fazer o teste, deixe para depois.</span>
         </span>
         <Icon name="chevron" size={18} className={cn('shrink-0 text-fg-subtle transition-transform', aberto && 'rotate-180')} />
       </button>
       <AnimatePresence initial={false}>
         {aberto ? (
           <motion.div
-            id="lista-propostas"
+            id="lista-afirmacoes"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -386,13 +503,20 @@ function ListaPropostas() {
                 <li key={tema.id} className="p-4 sm:p-5">
                   <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
                     <span aria-hidden className="mr-1.5">
-                      {tema.emoji}
+                      {TEMA_POR_ID[tema.id].emoji}
                     </span>
                     {tema.rotulo}
                   </p>
-                  <ul className="mt-2.5 space-y-3">
-                    {itens.map((p) => (
-                      <ItemProposta key={p.id} p={p} />
+                  <ul className="mt-2.5 space-y-4">
+                    {itens.map((a) => (
+                      <li key={a.id} className="text-[14px] leading-snug">
+                        <p className="text-fg">{a.texto}</p>
+                        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                          {CANDIDATOS.map((n) => (
+                            <PosicaoCurta key={n} n={n} p={a.posicoes[n]} />
+                          ))}
+                        </ul>
+                      </li>
                     ))}
                   </ul>
                 </li>
@@ -405,25 +529,23 @@ function ListaPropostas() {
   );
 }
 
-function ItemProposta({ p }: { p: Proposta }) {
+function PosicaoCurta({ n, p }: { n: Candidato; p: Posicao }) {
   return (
-    <li className="flex gap-3">
+    <li className="inline-flex items-center gap-2 text-[12.5px] text-fg-muted">
       <span
         className={cn(
-          'num mt-0.5 inline-flex h-6 min-w-[2rem] shrink-0 items-center justify-center rounded-md px-1.5 text-[12px] font-bold',
-          p.autor === 13 ? 'bg-cand-a/15 text-cand-a-fg' : 'bg-cand-b/15 text-cand-b-fg',
+          'num inline-flex h-6 min-w-[2rem] shrink-0 items-center justify-center rounded-md px-1.5 text-[12px] font-bold',
+          n === 13 ? 'bg-cand-a/15 text-cand-a-fg' : 'bg-cand-b/15 text-cand-b-fg',
         )}
       >
-        {p.autor}
+        {n}
       </span>
-      <div className="min-w-0 text-[14px] leading-snug">
-        <p className="text-fg">{p.texto}</p>
-        <p className="mt-1 text-[12.5px] text-fg-muted">
-          <a href={p.fonte.url} target="_blank" rel="noopener noreferrer" className="underline decoration-line/[3] underline-offset-2 hover:text-fg">
-            {p.fonte.pagina}
-          </a>
-        </p>
-      </div>
+      <span className={p.valor === 'sem-posicao' ? 'text-fg-subtle' : 'text-fg'}>{ROTULO_CURTO[p.valor]}</span>
+      {p.fonte ? (
+        <a href={p.fonte.url} target="_blank" rel="noopener noreferrer" className="num underline decoration-line/[3] underline-offset-2 hover:text-fg">
+          p. {p.fonte.pagina}
+        </a>
+      ) : null}
     </li>
   );
 }

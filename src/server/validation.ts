@@ -114,7 +114,7 @@ const tse = z
   .partial()
   .strict();
 
-/** Logo do patrocínio: data URI de imagem (≤ 150 KB decodificados) ou URL https. */
+/** Logo do patrocínio: data URI de imagem estática (≤ 150 KB decodificados; GIF não — slot discreto, sem animação) ou URL https. */
 const IMAGEM_MAX_BYTES = 150 * 1024;
 const imagemPatrocinio = z
   .string()
@@ -123,15 +123,18 @@ const imagemPatrocinio = z
   .refine((v) => {
     const m = /^data:image\/(png|jpeg|webp|svg\+xml);base64,([A-Za-z0-9+/]+={0,2})$/.exec(v);
     if (m) return Math.floor((m[2].length * 3) / 4) - (m[2].endsWith('==') ? 2 : m[2].endsWith('=') ? 1 : 0) <= IMAGEM_MAX_BYTES;
-    return urlHttps(v, 2048);
+    return urlHttps(v, 500);
   }, 'imagem: use data:image/(png|jpeg|webp|svg+xml);base64 até 150 KB, ou uma URL https');
 
-/** URL https absoluta, sem credenciais, até `max` caracteres. */
+/**
+ * URL https absoluta, sem credenciais, com domínio (tem ponto), até `max` caracteres — a mesma regra do motor
+ * (validaPatrocinio em src/engine/state.ts), para o comando nunca passar aqui e ser recusado lá.
+ */
 function urlHttps(v: string, max: number): boolean {
-  if (v.length > max) return false;
+  if (v.length > max || /\s/.test(v)) return false;
   try {
     const u = new URL(v);
-    return u.protocol === 'https:' && !!u.hostname && !u.username && !u.password;
+    return u.protocol === 'https:' && u.hostname.includes('.') && !u.username && !u.password;
   } catch {
     return false;
   }

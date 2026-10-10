@@ -296,7 +296,7 @@ describe('patrocínio', () => {
     ['sem domínio', { ...valido, url: 'https://localhost/x' }, /https/],
     ['imagem html', { ...valido, imagem: 'data:text/html;base64,PGgxPg==' }, /imagem/],
     ['imagem http', { ...valido, imagem: 'http://exemplo.com/logo.png' }, /imagem/],
-    ['imagem gigante', { ...valido, imagem: 'data:image/png;base64,' + 'A'.repeat(70_000) }, /data URI/],
+    ['imagem gigante', { ...valido, imagem: 'data:image/png;base64,' + 'A'.repeat(210_000) }, /data URI/],
     ['não objeto', 'Acme' as never, /Patrocínio inválido/],
   ])('inválido: %s → CommandError sem alterar o estado', (_n, patrocinio, re) => {
     const { c, onStateChange } = compartilhado;

@@ -69,16 +69,23 @@ export function parseAviso(v: unknown): Aviso | null {
   return { nivel: v.nivel === 'alerta' ? 'alerta' : 'info', texto };
 }
 
-/** Limites do patrocínio (o status, com o patrocínio, é consultado a cada poucos segundos por todos). */
+/**
+ * Limites do patrocínio — os MESMOS da validação zod do servidor (src/server/validation.ts), que é a porta de
+ * entrada do comando em produção: um valor aceito lá nunca pode ser recusado aqui (e vice-versa).
+ */
 export const PATROCINIO_LIMITES = {
   marca: 60,
-  texto: 160,
+  texto: 140,
   url: 500,
-  /** data URI da logo: ~45 KB de imagem. Prefira uma URL https (não pesa no status). */
-  imagemDataUri: 60_000,
+  /**
+   * data URI da logo: até 150 KB de imagem (base64 ≈ 4/3 + cabeçalho). No servidor, o /api/status troca o data URI
+   * por uma URL com hash (não pesa no status); no demo ele vai no status. Prefira uma URL https.
+   */
+  imagemDataUri: Math.ceil((150 * 1024 * 4) / 3) + 64,
 };
 
-const RE_DATA_URI = /^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
+/** Imagem estática (GIF não: o slot é discreto, sem animação — mesma regra do servidor). */
+const RE_DATA_URI = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 function urlHttps(v: string): boolean {
   if (v.length > PATROCINIO_LIMITES.url || /\s/.test(v)) return false;
@@ -92,9 +99,9 @@ function urlHttps(v: string): boolean {
 
 /**
  * Valida um patrocínio (comando 'patrocinio' e estado restaurado). Retorna o objeto normalizado (só os campos do
- * contrato, textos aparados) ou a mensagem de erro. Regras: `marca` (1–60) e `texto` (1–160) obrigatórios; `url`
- * https válida (sem usuário/senha); `imagem` opcional: data URI de imagem (png, jpeg, webp, gif ou svg, base64,
- * até 60 mil caracteres) ou URL https.
+ * contrato, textos aparados) ou a mensagem de erro. Regras: `marca` (1–60) e `texto` (1–140) obrigatórios; `url`
+ * https válida (sem usuário/senha); `imagem` opcional: data URI de imagem (png, jpeg, webp ou svg, base64,
+ * até ~150 KB de imagem) ou URL https.
  */
 export function validaPatrocinio(v: unknown): { ok: Patrocinio } | { erro: string } {
   if (!isObj(v)) return { erro: 'Patrocínio inválido: informe { marca, texto, url, imagem? } ou null para remover.' };
@@ -110,8 +117,8 @@ export function validaPatrocinio(v: unknown): { ok: Patrocinio } | { erro: strin
     const img = typeof v.imagem === 'string' ? v.imagem.trim() : '';
     if (img.startsWith('data:')) {
       if (img.length > L.imagemDataUri)
-        return { erro: `Patrocínio: a imagem em data URI passa de ${L.imagemDataUri} caracteres (use uma URL https).` };
-      if (!RE_DATA_URI.test(img)) return { erro: 'Patrocínio: "imagem" deve ser data:image/(png|jpeg|webp|gif|svg+xml);base64,…' };
+        return { erro: 'Patrocínio: a imagem em data URI passa de 150 KB (use uma imagem menor ou uma URL https).' };
+      if (!RE_DATA_URI.test(img)) return { erro: 'Patrocínio: "imagem" deve ser data:image/(png|jpeg|webp|svg+xml);base64,…' };
     } else if (!urlHttps(img)) return { erro: 'Patrocínio: "imagem" deve ser uma URL https:// ou um data URI de imagem.' };
     out.imagem = img;
   }

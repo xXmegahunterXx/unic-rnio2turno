@@ -34,7 +34,8 @@ export const PUBLIC_DATA = path.join(ROOT, 'public', 'data');
 export const RAW_ABERTOS = path.join(ROOT, 'data-raw', 'tse-abertos');
 export const ABERTOS_BASE = 'https://cdn.tse.jus.br/estatistica/sead/odsele/';
 
-export const fail = (msg: string): never => {
+/** Para o build com uma mensagem clara (tipo explícito: o TS estreita os tipos depois de `fail(...)`). */
+export const fail: (msg: string) => never = (msg) => {
   console.error(`\n✗ ${msg}`);
   process.exit(1);
 };

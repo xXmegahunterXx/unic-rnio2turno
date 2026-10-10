@@ -6,7 +6,9 @@
  *  - Clientes ativos estimados (30 s) SEM guardar IP: cada cliente vira 1 bit num mapa de bits
  *    (hash SHA-256 do IP com sal aleatório do processo, trocado a cada hora). A contagem usa "linear
  *    counting" (n ≈ −m·ln(zeros/m)), que estima milhões de clientes distintos com 128 KB por janela e
- *    não permite recuperar quem acessou. Janela deslizante = 3 baldes de 10 s.
+ *    não permite recuperar quem acessou. Janela deslizante = 3 baldes de 10 s. O sal só troca na virada de
+ *    um balde, e a estimativa nunca une baldes de sais diferentes (o mesmo cliente ocuparia 2 bits): vale a
+ *    maior união entre as "eras" de sal presentes na janela — sem o salto de ~2× por 30 s a cada hora.
  *    Atrás de CDN, só as requisições que chegam à origem entram na conta.
  *  - "Pessoas agora" (LiveStatus.pessoasAgora): a mesma estimativa, recalculada no máximo a cada 5 s e
  *    ARREDONDADA (< 10 exato; < 1.000 em dezenas; depois em centenas) — a contagem é estimada, e exibir
@@ -18,10 +20,15 @@ const BITS = 1 << 20; // 1.048.576 bits = 128 KB por balde
 const BALDE_MS = 10_000;
 const N_BALDES = 3;
 
+/** Intervalo de troca do sal (privacidade: um bit de hoje não se liga ao mesmo cliente amanhã). */
+export const SAL_TROCA_MS = 3600_000;
+
 export class ClientesAtivos {
-  private baldes: { inicio: number; bits: Uint8Array }[] = [];
+  private baldes: { inicio: number; era: number; bits: Uint8Array }[] = [];
   private sal = randomBytes(16);
   private salEm: number;
+  /** "era" do sal atual (incrementa a cada troca) */
+  private era = 0;
 
   constructor(private readonly now: () => number = Date.now) {
     this.salEm = now();
@@ -30,14 +37,16 @@ export class ClientesAtivos {
   /** Registra um cliente (IP ou outro identificador). Nada além de 1 bit é guardado. */
   registrar(id: string): void {
     const t = this.now();
-    if (t - this.salEm > 3600_000) {
-      this.sal = randomBytes(16);
-      this.salEm = t;
-    }
     const inicio = Math.floor(t / BALDE_MS) * BALDE_MS;
     let b = this.baldes[this.baldes.length - 1];
     if (!b || b.inicio !== inicio) {
-      b = { inicio, bits: new Uint8Array(BITS / 8) };
+      // troca o sal só na virada do balde: um balde nunca mistura bits de dois sais
+      if (t - this.salEm > SAL_TROCA_MS) {
+        this.sal = randomBytes(16);
+        this.salEm = t;
+        this.era++;
+      }
+      b = { inicio, era: this.era, bits: new Uint8Array(BITS / 8) };
       this.baldes.push(b);
       while (this.baldes.length > N_BALDES) this.baldes.shift();
     }
@@ -46,18 +55,22 @@ export class ClientesAtivos {
     b.bits[pos >>> 3] |= 1 << (pos & 7);
   }
 
-  /** Estimativa de clientes distintos nos últimos ~30 s. */
+  /** Estimativa de clientes distintos nos últimos ~30 s (maior união entre as eras de sal da janela). */
   estimar(): number {
     const t = this.now();
     const vivos = this.baldes.filter((b) => b.inicio > t - N_BALDES * BALDE_MS);
     if (!vivos.length) return 0;
-    const uniao = new Uint8Array(BITS / 8);
-    for (const b of vivos) for (let i = 0; i < uniao.length; i++) uniao[i] |= b.bits[i];
-    let um = 0;
-    for (let i = 0; i < uniao.length; i++) um += POPCOUNT[uniao[i]];
-    const zeros = BITS - um;
-    if (zeros === 0) return BITS; // saturado (> ~10 milhões)
-    return Math.round(-BITS * Math.log(zeros / BITS));
+    let melhor = 0;
+    for (const era of new Set(vivos.map((b) => b.era))) {
+      const uniao = new Uint8Array(BITS / 8);
+      for (const b of vivos) if (b.era === era) for (let i = 0; i < uniao.length; i++) uniao[i] |= b.bits[i];
+      let um = 0;
+      for (let i = 0; i < uniao.length; i++) um += POPCOUNT[uniao[i]];
+      const zeros = BITS - um;
+      const n = zeros === 0 ? BITS : Math.round(-BITS * Math.log(zeros / BITS)); // BITS = saturado (> ~10 milhões)
+      if (n > melhor) melhor = n;
+    }
+    return melhor;
   }
 }
 

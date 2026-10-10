@@ -32,9 +32,9 @@
  *  - AM, deputados: a totalização foi reaberta pelo TSE ("Aguarde reprocessamento da eleição"); sem eleitos
  *    definidos, camara-am e assembleia-am saem vazios com `aviso`. Rode de novo quando o TSE concluir.
  */
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { CandidatoFicha } from '../../../src/shared/dataset';
+import type { CandidatoFicha, DatasetMeta } from '../../../src/shared/dataset';
 import { UFS, type UFBr } from '../../../src/shared/types';
 import { UF_NOMES, UFS_GOV_2T } from '../../../src/shared/constants';
 import { composicao as composicaoNomes, nomeColigacao, nomePessoa } from '../lib/nomes';
@@ -358,8 +358,8 @@ async function main() {
     centArquivo += bens.get(f.sqcand)?.centavos ?? 0;
   }
   if (centFichas !== centArquivo) fail(`patrimônio: Σ fichas ${centFichas} ≠ Σ arquivo ${centArquivo} (centavos)`);
-  // Conferência com meta.json (finalistas): mesmos nomes, partido e vice.
-  const meta = JSON.parse(await (await import('node:fs/promises')).readFile(path.join(PUBLIC_DATA, 'meta.json'), 'utf8')) as import('../../../src/shared/dataset').DatasetMeta;
+  // Conferência com meta.json (finalistas): mesmo sqcand, nomes, partido, coligação e vice.
+  const meta = JSON.parse(await readFile(path.join(PUBLIC_DATA, 'meta.json'), 'utf8')) as DatasetMeta;
   for (const race of meta.races.filter((x) => x.turno === 2)) {
     for (const c of race.candidatos) {
       const f = st.find((x) => x.uf === race.abrangencia && x.numero === c.numero && !x.cargo.startsWith('Vice'));
@@ -367,7 +367,7 @@ async function main() {
         (f.coligacao ?? '') !== (c.coligacao ?? '') || (f.composicao ?? '') !== (c.composicao ?? '')) {
         fail(`ficha de ${race.id} ${c.numero} diverge de meta.json: ${JSON.stringify({ f: f && [f.nomeUrna, f.nome, f.partido, f.vice?.nome, f.coligacao], c: [c.nomeUrna, c.nome, c.partido, c.vice, c.coligacao] })}`);
       }
-      if (c.sqcand !== undefined && c.sqcand !== f.sqcand) fail(`sqcand de ${race.id} ${c.numero}: meta ${c.sqcand} ≠ ficha ${f.sqcand}`);
+      if (c.sqcand !== f.sqcand || c.fotoGrupo !== 'segundo-turno') fail(`sqcand de ${race.id} ${c.numero}: meta ${c.sqcand} ≠ ficha ${f.sqcand}`);
     }
   }
 
@@ -400,7 +400,7 @@ async function main() {
   const campos = ['genero', 'corRaca', 'idade', 'ocupacao', 'escolaridade', 'estadoCivil', 'naturalidade', 'federacao'] as const;
   console.log(`Campos preenchidos: ${campos.map((k) => `${k} ${todas.filter((f) => f[k] !== undefined).length}`).join(' · ')}`);
   console.log(
-    `Patrimônio: arquivo com ${fmt(linhasBens)} bens (Σ R$ ${fmt(centBens / 100)}); fichas: Σ = Σ do arquivo para os mesmos ` +
+    `Patrimônio: arquivo com ${fmt(linhasBens)} bens (checksum ${centBens} centavos); fichas: Σ = Σ do arquivo para os mesmos ` +
       `${todas.length} sqcands (centavos exatos); ${ctx.semBens} ficha(s) sem bem declarado → { total: 0, itens: 0 }`,
   );
   for (const [g, { aviso }] of grupos) if (aviso) console.log(`⚠ ${g}: vazio — ${aviso}`);

@@ -1,6 +1,10 @@
 /**
  * Hooks de dados do app (React Query). Toda tela usa estes hooks — nunca fetch direto.
  * O intervalo de atualização acompanha a fase da apuração (LiveStatus).
+ *
+ * "Reveja a noite" (contrato `Instante`): os hooks de apuração aceitam `t` (epoch ms, opcional) no fim. Ausente =
+ * agora (com polling). Com `t`: o instante truncado ao segundo entra na chave e NÃO há polling — o passado não
+ * muda; uma mudança de `versao` no admin invalida tudo (useStatus). Instante futuro é limitado ao agora pela fonte.
  */
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -12,6 +16,16 @@ export { anonimizarRace, anonimizarTexto };
 import { getClient } from './client';
 
 const STATUS_MS = 2000;
+
+/** Instante pedido, truncado ao segundo (chave estável, igual ao `?t=` do cliente HTTP), ou undefined (agora). */
+export function instanteChave(t?: number | null): number | undefined {
+  return typeof t === 'number' && Number.isFinite(t) && t > 0 ? Math.floor(t / 1000) * 1000 : undefined;
+}
+
+/** Chave de consulta: sem `t`, a mesma de sempre; com `t`, o instante no fim. */
+const chave = (base: unknown[], t: number | undefined) => (t === undefined ? base : [...base, t]);
+/** Com instante passado, sem polling. */
+const pollOu = (t: number | undefined, ms: number | false) => (t === undefined ? ms : false);
 
 /** Estado ao vivo (fonte, fase, relógio, aviso, versão). Invalida todo o cache quando `versao` muda. */
 export function useStatus() {
@@ -96,59 +110,77 @@ function useSelectEventos<T extends { eventos: FeedEvent[] }>() {
   );
 }
 
-export function useNacional(race: RaceId) {
+export function useNacional(race: RaceId, t?: number) {
   const { data: status } = useStatus();
   const select = useSelectEventos<Awaited<ReturnType<Awaited<ReturnType<typeof getClient>>['nacional']>>>();
+  const tk = instanteChave(t);
   return useQuery({
-    queryKey: ['nacional', race],
-    queryFn: async () => (await getClient()).nacional(race),
-    refetchInterval: pollMs(status, 'br'),
+    queryKey: chave(['nacional', race], tk),
+    queryFn: async () => (await getClient()).nacional(race, tk === undefined ? undefined : { t: tk }),
+    refetchInterval: pollOu(tk, pollMs(status, 'br')),
     placeholderData: keepPreviousData,
     select,
   });
 }
 
-export function useUf(race: RaceId, uf: UF | undefined) {
+/** Mapa nacional por município (5.571 posições, ordem de public/data/municipios-br.json). Sem nomes: não anonimiza. */
+export function useMunicipiosBr(race: RaceId, t?: number, enabled = true) {
+  const { data: status } = useStatus();
+  const tk = instanteChave(t);
+  return useQuery({
+    queryKey: chave(['brmun', race], tk),
+    queryFn: async () => (await getClient()).municipiosBr(race, tk === undefined ? undefined : { t: tk }),
+    enabled,
+    refetchInterval: pollOu(tk, pollMs(status, 'uf')),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useUf(race: RaceId, uf: UF | undefined, t?: number) {
   const { data: status } = useStatus();
   const select = useSelectEventos<Awaited<ReturnType<Awaited<ReturnType<typeof getClient>>['uf']>>>();
+  const tk = instanteChave(t);
   return useQuery({
-    queryKey: ['uf', race, uf],
-    queryFn: async () => (await getClient()).uf(race, uf!),
+    queryKey: chave(['uf', race, uf], tk),
+    queryFn: async () => (await getClient()).uf(race, uf!, tk === undefined ? undefined : { t: tk }),
     enabled: !!uf,
-    refetchInterval: pollMs(status, 'uf'),
+    refetchInterval: pollOu(tk, pollMs(status, 'uf')),
     placeholderData: keepPreviousData,
     select,
   });
 }
 
-export function useMunicipio(race: RaceId, uf: UF | undefined, cod: string | undefined) {
+export function useMunicipio(race: RaceId, uf: UF | undefined, cod: string | undefined, t?: number) {
   const { data: status } = useStatus();
+  const tk = instanteChave(t);
   return useQuery({
-    queryKey: ['mun', race, uf, cod],
-    queryFn: async () => (await getClient()).municipio(race, uf!, cod!),
+    queryKey: chave(['mun', race, uf, cod], tk),
+    queryFn: async () => (await getClient()).municipio(race, uf!, cod!, tk === undefined ? undefined : { t: tk }),
     enabled: !!uf && !!cod,
-    refetchInterval: pollMs(status, 'mun'),
+    refetchInterval: pollOu(tk, pollMs(status, 'mun')),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useZona(race: RaceId, uf: UF | undefined, cod: string | undefined, zona: number | undefined) {
+export function useZona(race: RaceId, uf: UF | undefined, cod: string | undefined, zona: number | undefined, t?: number) {
   const { data: status } = useStatus();
+  const tk = instanteChave(t);
   return useQuery({
-    queryKey: ['zona', race, uf, cod, zona],
-    queryFn: async () => (await getClient()).zona(race, uf!, cod!, zona!),
+    queryKey: chave(['zona', race, uf, cod, zona], tk),
+    queryFn: async () => (await getClient()).zona(race, uf!, cod!, zona!, tk === undefined ? undefined : { t: tk }),
     enabled: !!uf && !!cod && zona !== undefined,
-    refetchInterval: pollMs(status, 'zona'),
+    refetchInterval: pollOu(tk, pollMs(status, 'zona')),
     placeholderData: keepPreviousData,
   });
 }
 
-export function useSecao(race: RaceId, uf?: UF, cod?: string, zona?: number, secao?: number) {
+export function useSecao(race: RaceId, uf?: UF, cod?: string, zona?: number, secao?: number, t?: number) {
   const { data: status } = useStatus();
+  const tk = instanteChave(t);
   return useQuery({
-    queryKey: ['secao', race, uf, cod, zona, secao],
-    queryFn: async () => (await getClient()).secao(race, uf!, cod!, zona!, secao!),
+    queryKey: chave(['secao', race, uf, cod, zona, secao], tk),
+    queryFn: async () => (await getClient()).secao(race, uf!, cod!, zona!, secao!, tk === undefined ? undefined : { t: tk }),
     enabled: !!uf && !!cod && zona !== undefined && secao !== undefined,
-    refetchInterval: pollMs(status, 'zona'),
+    refetchInterval: pollOu(tk, pollMs(status, 'zona')),
   });
 }

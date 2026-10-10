@@ -1,13 +1,13 @@
 /**
  * Ações de compartilhamento do Teste Cego. Tudo acontece no navegador (LGPD):
- *  - Cartão Stories: PNG gerado localmente; o texto NUNCA diz em quem a pessoa vota ("Fiz o Teste Cego…")
- *    e o link é o convite para /teste — nunca o resultado da pessoa.
- *  - Desafio (Duelo): link /duelo/<desafio>#<respostas>. As escolhas vão depois do "#", que o navegador não
- *    envia a servidor; quem abrir o link verá as escolhas na comparação — a pessoa é avisada antes.
+ *  - Cartão Stories: PNG gerado localmente; o texto NUNCA diz em quem a pessoa vota ("Fiz o Teste Cego do
+ *    2º turno…") e o link é o convite para /teste — nunca o resultado da pessoa.
+ *  - Desafio (Duelo): link /duelo/<desafio>#<respostas>. As respostas vão depois do "#", que o navegador não
+ *    envia a servidor; quem abrir o link verá as respostas na comparação — a pessoa é avisada antes.
  */
 import { useRef, useState } from 'react';
+import { AFIRMACOES, type ResultadoSintonia } from '@/app/content/afirmacoes';
 import type { Candidate } from '@/shared/types';
-import { cn } from '@/app/lib/cn';
 import { abrirWhatsapp, compartilhar, compartilharNodeComoImagem, copiarTexto, downloadNodeAsPng, urlAbsoluta } from '@/app/lib/share';
 import { Button, type ButtonSize, type ButtonVariant } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
@@ -15,14 +15,15 @@ import { Sheet } from '@/app/ui/Sheet';
 import { toast } from '@/app/ui/Toast';
 import { Toggle } from '@/app/ui/Toggle';
 import { ShareCardPreview } from '@/app/components/apuracao/ShareCard';
-import { caminhoDuelo, type Escolha } from './codigo';
+import { caminhoDuelo } from './codigo';
 import { CARTAO_H, CARTAO_W, CartaoTeste } from './CartaoTeste';
-import type { Autor, Sintonia } from './sintonia';
+import type { MapaRespostas } from './sessao';
+import type { Autor } from './sintonia';
 
-export const TEXTO_CONVITE =
-  'Fiz o Teste Cego do Sintonia: escolhi entre propostas reais dos candidatos à Presidência sem saber de quem eram. Faça o seu:';
-export const TEXTO_DESAFIO =
-  'Te desafio no Teste Cego do Sintonia: 12 escolhas entre propostas reais, sem saber de quem são. No fim, a gente vê em quantos temas concorda.';
+const N = AFIRMACOES.length;
+
+export const TEXTO_CONVITE = `Fiz o Teste Cego do 2º turno: ${N} afirmações sobre temas do país, sem saber o que cada candidato defende. No fim, dá para comparar com os programas de governo. Faça o seu:`;
+export const TEXTO_DESAFIO = `Te desafio no Teste Cego do 2º turno: ${N} afirmações, sem saber de quem são as propostas. No fim, a gente vê em quantas ficou do mesmo lado.`;
 
 interface BotaoProps {
   variant?: ButtonVariant;
@@ -32,14 +33,14 @@ interface BotaoProps {
 }
 
 export function CompartilharCartao({
-  sintonia,
+  resultado,
   candidatos,
-  porNumero,
+  fotos,
   variant = 'primary',
   size = 'lg',
   className,
   label = 'Compartilhar cartão',
-}: BotaoProps & { sintonia: Sintonia; candidatos: Candidate[]; porNumero: Record<Autor, Candidate> }) {
+}: BotaoProps & { resultado: ResultadoSintonia; candidatos: Candidate[]; fotos: Partial<Record<Autor, string>> }) {
   const [aberto, setAberto] = useState(false);
   const [comResultado, setComResultado] = useState(true);
   const [ocupado, setOcupado] = useState<null | 'img' | 'png'>(null);
@@ -113,7 +114,7 @@ export function CompartilharCartao({
         />
         <div className="mx-auto mt-4 max-w-[230px]">
           <ShareCardPreview formato="story">
-            <CartaoTeste ref={card} sintonia={sintonia} candidatos={candidatos} porNumero={porNumero} comResultado={comResultado} />
+            <CartaoTeste ref={card} resultado={resultado} candidatos={candidatos} fotos={fotos} comResultado={comResultado} />
           </ShareCardPreview>
         </div>
         <p className="mt-4 rounded-xl bg-surface-2 px-3 py-2.5 text-[13px] leading-snug text-fg-muted">
@@ -121,7 +122,7 @@ export function CompartilharCartao({
         </p>
         <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-snug text-fg-subtle">
           <Icon name="olho-fechado" size={14} className="mt-px shrink-0" />
-          O texto e o link não revelam suas escolhas. A imagem só mostra o resultado se você quiser.
+          O texto e o link não revelam suas respostas. A imagem só mostra o resultado se você quiser.
         </p>
       </Sheet>
     </>
@@ -131,13 +132,14 @@ export function CompartilharCartao({
 export function DesafiarAmigo({
   seed,
   respostas,
+  importantes,
   variant = 'secondary',
   size = 'lg',
   className,
   label = 'Desafiar um amigo',
-}: BotaoProps & { seed: number; respostas: Escolha[] }) {
+}: BotaoProps & { seed: number; respostas: MapaRespostas; importantes: string[] }) {
   const [aberto, setAberto] = useState(false);
-  const url = urlAbsoluta(caminhoDuelo(seed, respostas));
+  const url = urlAbsoluta(caminhoDuelo(seed, respostas, importantes));
 
   async function enviar() {
     const r = await compartilhar({ titulo: 'Sintonia · Teste Cego', texto: TEXTO_DESAFIO, url });
@@ -157,7 +159,7 @@ export function DesafiarAmigo({
         open={aberto}
         onClose={() => setAberto(false)}
         title="Desafiar um amigo"
-        description="Quem abrir o link responde às mesmas 12 escolhas, na mesma ordem."
+        description={`Quem abrir o link responde às mesmas ${N} afirmações, na mesma ordem.`}
         width="sm"
         footer={
           <div className="grid grid-cols-1 gap-2 pb-1">
@@ -173,7 +175,7 @@ export function DesafiarAmigo({
         <ol className="space-y-3">
           {[
             ['1', 'Seu amigo faz o teste sem ver as suas respostas.'],
-            ['2', 'No fim, vocês veem em quantos temas concordaram e a sintonia de cada um, lado a lado.'],
+            ['2', 'No fim, vocês veem em quantas afirmações ficaram do mesmo lado, a afinidade entre os dois e a sintonia de cada um com os candidatos.'],
           ].map(([n, t]) => (
             <li key={n} className="flex gap-3 text-[14px] leading-snug text-fg">
               <span className="num inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[12px] font-bold text-brand-fg">{n}</span>
@@ -183,13 +185,13 @@ export function DesafiarAmigo({
         </ol>
         <div className="mt-5 rounded-xl border border-line bg-surface-2 px-3 py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Link do desafio</div>
-          <div className={cn('mt-1 break-all font-mono text-[12.5px] leading-snug text-fg')}>{url}</div>
+          <div className="mt-1 break-all font-mono text-[12.5px] leading-snug text-fg">{url}</div>
         </div>
         <p className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-[12.5px] leading-snug text-fg-muted">
           <Icon name="olho-fechado" size={16} className="mt-px shrink-0 text-brand-fg" />
           <span>
-            Suas escolhas viajam <strong className="font-semibold text-fg">só dentro do link</strong>, depois do “#” — essa parte não é
-            enviada a nenhum servidor. Mas quem abrir o link verá suas escolhas na comparação: envie só para quem você quiser.
+            Suas respostas viajam <strong className="font-semibold text-fg">só dentro do link</strong>, depois do “#” — essa parte não é
+            enviada a nenhum servidor. Mas quem abrir o link verá suas respostas na comparação: envie só para quem você quiser.
           </span>
         </p>
       </Sheet>

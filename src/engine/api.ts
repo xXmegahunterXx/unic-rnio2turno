@@ -8,6 +8,7 @@ import type {
   AdminMetrics,
   AdminState,
   LiveStatus,
+  LocalResumo,
   MunicipioSnapshot,
   MunicipiosNacionalSnapshot,
   NationalSnapshot,
@@ -92,6 +93,12 @@ export interface Controller {
    * respostas seguintes já vêm com `local`). Nunca rejeita (arquivo ausente/inválido → false).
    */
   carregaLocais?(uf: UF | string): Promise<boolean>;
+  /**
+   * Locais de votação JÁ carregados (ver `carregaLocais`) das seções de uma zona: nº da seção → local. null se a UF
+   * não tem locais carregados ou o município/zona não existe. Usado pelo servidor para pôr `local` nas respostas
+   * da fonte 'tse' (o feed oficial não traz o local). Não serializável (Map): não passa pelo RPC do demo.
+   */
+  locaisDaZona?(uf: UF | string, cod: string, zona: number): Map<number, LocalResumo> | null;
 
   // `t` (opcional, epoch ms) = "reveja a noite": estado da apuração num instante PASSADO; limitado ao simNow atual
   // (nunca futuro). Ausente = agora.

@@ -1,112 +1,124 @@
 import { describe, expect, it } from 'vitest';
-import { rodadas } from '@/app/content/propostas';
+import { AFIRMACOES, calcularSintonia, ordemDoTeste, type Resposta } from '@/app/content/afirmacoes';
 import {
   caminhoDuelo,
   caminhoResultado,
+  caminhoTeste,
   codificar,
-  codificarRespostas,
   codigoDesafio,
   decodificar,
-  decodificarRespostas,
+  decodificarDesafio,
+  ehCodigoV1,
+  ehDueloV1,
   lerDuelo,
-  novaSemente,
   sementeParaTexto,
-  textoParaSemente,
-  type Escolha,
 } from './codigo';
-import { calcularSintonia, comparar } from './sintonia';
+import { compararDuelo, frasesConcordancia, ladoDe, notaPublica, rotuloResposta } from './sintonia';
 
-const R = (s: string) => s.split('').map(Number) as Escolha[];
+const ESCALA: Resposta[] = [2, 1, 0, -1, -2, 'pular'];
+/** Respostas determinísticas (todas as 24), variando pela posição. */
+const respostas = (desloc = 0) => Object.fromEntries(AFIRMACOES.map((a, i) => [a.id, ESCALA[(i + desloc) % ESCALA.length]]));
 
-describe('código do Teste Cego', () => {
-  it('ida e volta da semente', () => {
-    for (const s of [0, 1, 35, 36, 1234567, 60_466_175]) {
-      const t = sementeParaTexto(s);
-      expect(t).toHaveLength(5);
-      expect(textoParaSemente(t)).toBe(s);
-    }
-    expect(textoParaSemente('ABCDE')).toBe(textoParaSemente('abcde'));
-    expect(textoParaSemente('abc')).toBeNull();
-    expect(textoParaSemente('ab-de')).toBeNull();
+describe('rotas do Teste Cego (v2)', () => {
+  it('resultado: ida e volta pelo hash, com as marcadas como importantes', () => {
+    const r = respostas();
+    const imp = [AFIRMACOES[0].id, AFIRMACOES[3].id];
+    const caminho = caminhoResultado(12345, r, imp);
+    expect(caminho.startsWith('/teste/resultado#2')).toBe(true);
+    const hash = caminho.slice(caminho.indexOf('#'));
+    const d = decodificar(hash)!;
+    expect(d.seed).toBe(12345);
+    expect(d.respostas).toEqual(r);
+    expect(d.importantes.sort()).toEqual([...imp].sort());
   });
 
-  it('ida e volta das respostas (todas as combinações de borda)', () => {
-    for (const r of ['000000000000', '333333333333', '012301230123', '321032103210', '000000000003', '300000000000']) {
-      const c = codificarRespostas(R(r));
-      expect(c).toHaveLength(5);
-      expect(decodificarRespostas(c)).toEqual(R(r));
-    }
-    expect(() => codificarRespostas(R('0123'))).toThrow();
-    expect(decodificarRespostas('zzzzz')).toBeNull(); // acima de 4^12
+  it('teste: a semente vai na query (só a ordem, nunca respostas)', () => {
+    expect(caminhoTeste(12345)).toBe(`/teste?s=${sementeParaTexto(12345)}`);
   });
 
-  it('código completo tem 11 caracteres e volta igual', () => {
-    for (let k = 0; k < 50; k++) {
-      const seed = novaSemente();
-      const resp = Array.from({ length: 12 }, (_, i) => ((seed + i * 7) % 4) as Escolha);
-      const c = codificar(seed, resp);
-      expect(c).toMatch(/^1[0-9a-z]{10}$/);
-      expect(decodificar(c)).toEqual({ seed, respostas: resp });
-      expect(decodificar(`#${c.toUpperCase()}`)).toEqual({ seed, respostas: resp });
-    }
-    expect(decodificar('2abcde00000')).toBeNull();
-    expect(decodificar('')).toBeNull();
+  it('duelo: desafio no caminho e respostas depois do "#"', () => {
+    const r = respostas(2);
+    const caminho = caminhoDuelo(777, r, [AFIRMACOES[5].id]);
+    const [path, hash] = caminho.split('#');
+    expect(path).toBe(`/duelo/${codigoDesafio(777)}`);
+    expect(hash).toHaveLength(AFIRMACOES.length);
+    const d = lerDuelo(path.split('/').pop(), `#${hash}`)!;
+    expect(d.seed).toBe(777);
+    expect(d.respostas).toEqual(r);
+    expect(d.importantes).toEqual([AFIRMACOES[5].id]);
+    expect(decodificarDesafio(codigoDesafio(777))).toBe(777);
   });
 
-  it('caminhos: respostas sempre depois do "#" (nunca chegam ao servidor)', () => {
-    const resp = R('012301230123');
-    const r = caminhoResultado(777, resp);
-    expect(r.startsWith('/teste/resultado#')).toBe(true);
-    const d = caminhoDuelo(777, resp);
-    const [caminho, hash] = d.split('#');
-    expect(caminho).toBe(`/duelo/${codigoDesafio(777)}`);
-    expect(caminho).not.toContain(codificarRespostas(resp));
-    expect(lerDuelo(caminho.split('/').pop(), `#${hash}`)).toEqual({ seed: 777, respostas: resp });
-    // também aceita o código inteiro no caminho
-    expect(lerDuelo(codificar(777, resp), '')).toEqual({ seed: 777, respostas: resp });
-    expect(lerDuelo(codigoDesafio(777), '')).toBeNull();
+  it('duelo: aceita o código inteiro no caminho ou no hash', () => {
+    const r = respostas(1);
+    const codigo = codificar(42, r);
+    expect(lerDuelo(codigo, '')?.respostas).toEqual(r);
+    expect(lerDuelo(codigoDesafio(42), `#${codigo}`)?.respostas).toEqual(r);
     expect(lerDuelo('xyz', '#abc')).toBeNull();
+    expect(lerDuelo(codigoDesafio(42), '')).toBeNull();
+  });
+
+  it('reconhece links do formato antigo (pares) para a tela "versão anterior"', () => {
+    expect(ehCodigoV1('#1abcde00001')).toBe(true);
+    expect(ehCodigoV1(codificar(1, respostas()))).toBe(false);
+    expect(decodificar('#1abcde00001')).toBeNull();
+    expect(ehDueloV1('1abcde', '#00a1b')).toBe(true);
+    expect(ehDueloV1('1abcde00a1b', '')).toBe(true);
+    expect(ehDueloV1(codigoDesafio(5), '#00a1b')).toBe(false);
+    expect(lerDuelo('1abcde', '#00a1b')).toBeNull();
   });
 });
 
-describe('sintonia', () => {
-  const seed = 4242;
-  const rs = rodadas(seed);
-  /** Respostas que escolhem sempre o autor dado. */
-  const sempre = (autor: 13 | 22) => rs.map((r) => (r.opcoes[0].autor === autor ? 0 : 1) as Escolha);
-
-  it('escolher sempre o mesmo autor dá 100% × 0%', () => {
-    const s = calcularSintonia(seed, sempre(13));
-    expect(s.pct[13]).toBe(100);
-    expect(s.pct[22]).toBe(0);
-    expect(s.escolhas).toEqual({ 13: 12, 22: 0 });
+describe('apoio de UI', () => {
+  it('rótulos e lado das respostas', () => {
+    expect(rotuloResposta(2)).toBe('Concordo totalmente');
+    expect(rotuloResposta(-1)).toBe('Discordo');
+    expect(rotuloResposta('pular')).toBe('Pulou');
+    expect(rotuloResposta(null)).toBe('Sem resposta');
+    expect([ladoDe(2), ladoDe(1), ladoDe(0), ladoDe(-1), ladoDe('pular')]).toEqual(['concorda', 'concorda', 'neutro', 'discorda', null]);
   });
 
-  it('tanto faz divide o ponto; nenhuma não pontua', () => {
-    const resp = sempre(22);
-    resp[0] = 3; // tanto faz
-    resp[1] = 2; // nenhuma
-    const s = calcularSintonia(seed, resp);
-    expect(s.tantoFaz).toBe(1);
-    expect(s.nenhuma).toBe(1);
-    expect(s.pontos[22]).toBe(10.5);
-    expect(s.pontos[13]).toBe(0.5);
-    expect(s.pct[22]).toBeCloseTo(87.5);
+  it('nota pública tira instruções internas de revisão', () => {
+    expect(notaPublica('O plano rejeita X. O trecho contém uma alegação: mostrar como citação.')).toBe('O plano rejeita X.');
+    expect(notaPublica('Explicação simples.')).toBe('Explicação simples.');
+    expect(notaPublica(undefined)).toBeNull();
   });
 
-  it('a ordem dos temas segue a semente e cada tema aparece uma vez', () => {
-    const s = calcularSintonia(seed, sempre(13));
-    expect(s.temas.map((t) => t.rodada.tema.id)).toEqual(rs.map((r) => r.tema.id));
-    expect(s.temas.every((t) => t.escolhida?.autor === 13)).toBe(true);
+  it('duelo: respostas iguais = mesmo lado em tudo e afinidade 100%', () => {
+    const r = Object.fromEntries(AFIRMACOES.map((a, i) => [a.id, ([2, 1, -1, -2, 0] as const)[i % 5]]));
+    const c = compararDuelo(r, r, ordemDoTeste(9));
+    expect(c.emComum).toBe(24);
+    expect(c.iguais).toBe(24);
+    expect(c.afinidade).toBe(100);
+    expect(c.itens.map((i) => i.afirmacao.id)).toEqual(ordemDoTeste(9).map((a) => a.id));
+    expect(frasesConcordancia(c.iguais, c.emComum)).toMatch(/todas/);
   });
 
-  it('comparação conta temas iguais, mesmo com sementes diferentes', () => {
-    const a = calcularSintonia(seed, sempre(13));
-    const b = calcularSintonia(seed, sempre(13));
-    expect(comparar(a, b).iguais).toBe(12);
-    const c = calcularSintonia(99, rodadas(99).map((r) => (r.opcoes[0].autor === 22 ? 0 : 1) as Escolha));
-    expect(comparar(a, c).iguais).toBe(0);
-    const d = calcularSintonia(99, rodadas(99).map((r) => (r.opcoes[0].autor === 13 ? 0 : 1) as Escolha));
-    expect(comparar(a, d).iguais).toBe(12);
+  it('duelo: extremos opostos = 0%, "concordo" × "concordo totalmente" = mesmo lado (75%)', () => {
+    const a = Object.fromEntries(AFIRMACOES.map((x) => [x.id, 2 as const]));
+    const b = Object.fromEntries(AFIRMACOES.map((x) => [x.id, -2 as const]));
+    const c = Object.fromEntries(AFIRMACOES.map((x) => [x.id, 1 as const]));
+    expect(compararDuelo(a, b).afinidade).toBe(0);
+    expect(compararDuelo(a, b).iguais).toBe(0);
+    expect(compararDuelo(a, c).iguais).toBe(24);
+    expect(compararDuelo(a, c).afinidade).toBe(75);
+  });
+
+  it('duelo: pulada por qualquer um fica fora da comparação', () => {
+    const a = { [AFIRMACOES[0].id]: 2, [AFIRMACOES[1].id]: 'pular', [AFIRMACOES[2].id]: -1 } as const;
+    const b = { [AFIRMACOES[0].id]: 1, [AFIRMACOES[1].id]: 2 } as const;
+    const c = compararDuelo(a, b);
+    expect(c.emComum).toBe(1);
+    expect(c.iguais).toBe(1);
+    expect(c.itens.filter((i) => i.comparavel)).toHaveLength(1);
+  });
+
+  it('o resultado decodificado reproduz a mesma sintonia', () => {
+    const r = respostas(3);
+    const d = decodificar(codificar(5, r, [AFIRMACOES[1].id]))!;
+    const s1 = calcularSintonia(r, [AFIRMACOES[1].id]);
+    const s2 = calcularSintonia(d.respostas, d.importantes);
+    expect(s2[13]).toBeCloseTo(s1[13]!, 10);
+    expect(s2[22]).toBeCloseTo(s1[22]!, 10);
   });
 });

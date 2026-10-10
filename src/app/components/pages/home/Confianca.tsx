@@ -26,7 +26,7 @@ const PILARES: { icone: IconName; titulo: string; texto: string; link: { to: str
     icone: 'olho-fechado',
     titulo: 'Suas respostas nunca saem do seu celular',
     texto:
-      'O Teste Cego roda inteiro no seu navegador: sem cadastro, sem envio e sem analytics das suas escolhas. O resultado vive só no link.',
+      'O Teste Cego roda inteiro no seu navegador: sem cadastro, sem envio e sem analytics das suas respostas. O resultado vive só no link.',
     link: { to: '/privacidade', label: 'Privacidade' },
   },
 ];

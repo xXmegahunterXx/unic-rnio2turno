@@ -1,54 +1,36 @@
 /**
- * /teste/resultado#<código> — resultado do Teste Cego. O estado vem SÓ do hash da URL (nunca enviado a
- * servidor, nunca analytics). Revelação animada da sintonia com cada candidato (ordem da urna, cores por
- * slot), fita das escolhas, revelação tema a tema com trecho e fonte, compartilhar e desafiar.
+ * /teste/resultado#<código> — resultado do Teste Cego (formato v2). O estado vem SÓ do hash da URL (nunca
+ * enviado a servidor, nunca analytics). Revelação animada da sintonia com cada candidato (ordem da urna, cores
+ * por slot), quebra por tema, afirmação a afirmação com o trecho do plano e a página do PDF, compartilhar,
+ * desafiar e refazer. Links do formato antigo (pares) caem numa tela amigável.
  */
 import { useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
-import { DOCUMENTOS } from '@/app/content/propostas';
+import { AFIRMACOES, calcularSintonia, DOCUMENTOS, type Resposta } from '@/app/content/afirmacoes';
 import { fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Container } from '@/app/components/layout/Container';
-import { EmptyState } from '@/app/components/apuracao/States';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { ListaAfirmacoes, TituloSecao, type LinhaAfirmacao } from '@/app/components/pages/teste/AfirmacaoAAfirmacao';
 import { useCandidatosTeste } from '@/app/components/pages/teste/candidatos';
-import { caminhoTeste, decodificar, novaSemente } from '@/app/components/pages/teste/codigo';
+import { caminhoTeste, decodificar, ehCodigoV1, novaSemente } from '@/app/components/pages/teste/codigo';
 import { CompartilharCartao, DesafiarAmigo } from '@/app/components/pages/teste/Compartilhar';
-import { Fita, LegendaFita } from '@/app/components/pages/teste/Fita';
+import { SemResultado, VersaoAnterior } from '@/app/components/pages/teste/Estados';
 import { Aviso, EM_REVISAO } from '@/app/components/pages/teste/IntroTeste';
-import { MedidorSintonia, resumoEscolhas, useRevelado } from '@/app/components/pages/teste/Revelacao';
-import { apagarProgresso } from '@/app/components/pages/teste/sessao';
-import { calcularSintonia, type Autor } from '@/app/components/pages/teste/sintonia';
-import { TemaATema } from '@/app/components/pages/teste/TemaATema';
+import { PorTema } from '@/app/components/pages/teste/PorTema';
+import { MedidorSintonia, resumoRespostas, useRevelado } from '@/app/components/pages/teste/Revelacao';
+import { apagarProgresso, type MapaRespostas } from '@/app/components/pages/teste/sessao';
+import type { Autor } from '@/app/components/pages/teste/sintonia';
 import { Badge, Button, ButtonLink, Icon } from '@/app/ui';
 
 export default function ResultadoPage() {
   const { hash } = useLocation();
   const dados = useMemo(() => decodificar(hash), [hash]);
   useTitulo('Seu resultado · Teste Cego');
-  if (!dados) return <SemResultado />;
-  return <Resultado key={hash} seed={dados.seed} respostas={dados.respostas} />;
-}
-
-function SemResultado() {
-  return (
-    <Container className="py-10 sm:py-16">
-      <div className="mx-auto max-w-lg rounded-3xl border border-line bg-surface shadow-card">
-        <EmptyState
-          icon="olho-fechado"
-          title="Nenhum resultado neste link"
-          description="O resultado do Teste Cego fica só no próprio link. Este parece incompleto — faça o teste em 2 minutos."
-          action={
-            <ButtonLink to="/teste" variant="primary" iconRight="seta">
-              Fazer o Teste Cego
-            </ButtonLink>
-          }
-        />
-      </div>
-    </Container>
-  );
+  if (!dados) return ehCodigoV1(hash) ? <VersaoAnterior /> : <SemResultado />;
+  return <Resultado key={hash} seed={dados.seed} respostas={dados.respostas} importantes={dados.importantes} />;
 }
 
 export function useRefazer() {
@@ -59,13 +41,41 @@ export function useRefazer() {
   };
 }
 
-function Resultado({ seed, respostas }: { seed: number; respostas: import('@/app/components/pages/teste/codigo').Escolha[] }) {
-  const { lista, porNumero } = useCandidatosTeste();
-  const s = useMemo(() => calcularSintonia(seed, respostas), [seed, respostas]);
+function Resultado({ seed, respostas, importantes }: { seed: number; respostas: MapaRespostas; importantes: string[] }) {
+  const { lista, porNumero, fotos } = useCandidatosTeste();
+  const s = useMemo(() => calcularSintonia(respostas, importantes), [respostas, importantes]);
   const revelado = useRevelado();
   const refazer = useRefazer();
   const reduzir = useReducedMotion();
   const [a, b] = lista;
+  const total = AFIRMACOES.length;
+  const imp = useMemo(() => new Set(importantes), [importantes]);
+  const linhas = useMemo<LinhaAfirmacao[]>(
+    () =>
+      AFIRMACOES.map((af) => ({
+        afirmacao: af,
+        minha: (respostas[af.id] ?? null) as Resposta | null,
+        importante: imp.has(af.id),
+        pct: s.porAfirmacao[af.id]?.pct,
+      })),
+    [respostas, imp, s],
+  );
+
+  if (s.respondidas === 0) {
+    return (
+      <Container className="py-10 sm:py-16">
+        <div className="mx-auto max-w-lg rounded-3xl border border-line bg-surface p-8 text-center shadow-card">
+          <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-fg">Você pulou todas as afirmações</h1>
+          <p className="mt-2 text-pretty text-[14.5px] leading-relaxed text-fg-muted">
+            Sem nenhuma resposta na escala não há o que comparar com os programas. Que tal tentar de novo? Dá para pular só as que preferir.
+          </p>
+          <Button variant="primary" size="lg" icon="reset" onClick={refazer} className="mt-6">
+            Refazer o teste
+          </Button>
+        </div>
+      </Container>
+    );
+  }
 
   return (
     <Container className="pb-4 pt-4 sm:pt-8">
@@ -88,18 +98,26 @@ function Resultado({ seed, respostas }: { seed: number; respostas: import('@/app
         </div>
 
         <div className="relative">
-          <div className="flex flex-wrap items-center justify-center gap-2">
+          <div className="flex justify-center">
             <Badge tone="brand" size="sm" icon="olho-fechado" caps>
               Teste Cego · resultado
             </Badge>
           </div>
           <h1 id="titulo-resultado" className="mx-auto mt-4 max-w-[22ch] text-balance text-center font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.035em] text-fg sm:text-[44px]">
-            {revelado ? 'Com quem suas escolhas estão em sintonia' : 'Revelando de quem eram as propostas…'}
+            {revelado ? 'Com quem suas respostas estão em sintonia' : 'Comparando com os programas de governo…'}
           </h1>
 
           <div className="mx-auto mt-7 grid max-w-[720px] grid-cols-2 gap-3 sm:mt-10 sm:gap-10">
             {lista.map((c, i) => (
-              <MedidorSintonia key={c.numero} candidato={c} pct={s.pct[c.numero as Autor] ?? 0} revelado={revelado} ordem={i} />
+              <MedidorSintonia
+                key={c.numero}
+                candidato={c}
+                foto={fotos[c.numero as Autor]}
+                pct={s[c.numero as Autor]}
+                consideradas={s.consideradas[c.numero as Autor]}
+                revelado={revelado}
+                ordem={i}
+              />
             ))}
           </div>
 
@@ -109,17 +127,12 @@ function Resultado({ seed, respostas }: { seed: number; respostas: import('@/app
             transition={{ duration: 0.4, delay: reduzir ? 0 : 0.9 }}
             className="mx-auto mt-6 max-w-[40rem] text-balance text-center text-[14.5px] leading-relaxed text-fg-muted sm:mt-8 sm:text-[16px]"
           >
-            {resumoEscolhas(s, lista)}
+            {resumoRespostas(s, importantes.length, total)} Os dois números são independentes e não somam 100%.
           </motion.p>
 
-          <div className="mx-auto mt-6 max-w-[720px] sm:mt-8">
-            <Fita sintonia={s} porNumero={porNumero} revelado={revelado} />
-            <LegendaFita sintonia={s} candidatos={lista} porNumero={porNumero} className="mt-3 justify-center" />
-          </div>
-
-          <div className="mx-auto mt-7 flex max-w-[720px] flex-col gap-2.5 sm:mt-9 sm:flex-row sm:justify-center">
-            <CompartilharCartao sintonia={s} candidatos={lista} porNumero={porNumero} className="w-full sm:w-auto" />
-            <DesafiarAmigo seed={seed} respostas={respostas} className="w-full sm:w-auto" />
+          <div className="mx-auto mt-6 flex max-w-[720px] flex-col gap-2.5 sm:mt-8 sm:flex-row sm:justify-center">
+            <CompartilharCartao resultado={s} candidatos={lista} fotos={fotos} className="w-full sm:w-auto" />
+            <DesafiarAmigo seed={seed} respostas={respostas} importantes={importantes} className="w-full sm:w-auto" />
             <Button variant="ghost" size="lg" icon="reset" onClick={refazer} className="w-full sm:w-auto">
               Refazer
             </Button>
@@ -129,33 +142,38 @@ function Resultado({ seed, respostas }: { seed: number; respostas: import('@/app
 
       <div className="mt-4 grid grid-cols-1 gap-3 md:mt-6 md:grid-cols-2 md:gap-4">
         <Aviso icone="info" titulo="Não é recomendação de voto">
-          O teste mede sintonia com {fmtInt(s.temas.length * 2)} propostas escritas — não com pessoas, partidos ou trajetórias. Programas de
-          governo têm centenas de pontos: leia os documentos completos antes de decidir.
+          O teste mede a distância entre suas respostas e o que está escrito nos programas de governo — não avalia pessoas, partidos ou
+          trajetórias. Programas têm centenas de pontos: leia os documentos completos antes de decidir.
         </Aviso>
         <Aviso icone="grafico" titulo="Como calculamos">
-          Cada tema vale 1 ponto. A proposta escolhida dá o ponto ao autor; “tanto faz” divide meio a meio; “nenhuma das duas” não
-          pontua. Por isso os dois números não precisam somar 100%.
+          Em cada afirmação, sua resposta é comparada com a posição documentada do candidato: igual vale 100%, cada passo de distância na
+          escala tira 25%. Afirmações que pesam mais para você contam em dobro; puladas e temas que o plano não trata ficam fora da conta.{' '}
+          <Link to="/metodologia#teste-cego" className="font-medium text-fg underline decoration-line underline-offset-4 hover:decoration-fg">
+            Metodologia
+          </Link>
         </Aviso>
       </div>
 
-      <section aria-labelledby="tema-a-tema" className="mt-10 sm:mt-14">
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <div>
-            <h2 id="tema-a-tema" className="font-display text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">
-              Tema a tema
-            </h2>
-            <p className="mt-1 text-[14px] text-fg-muted">De quem era cada proposta, com o trecho original e a página do documento.</p>
-          </div>
+      <section aria-labelledby="por-tema" className="mt-10 sm:mt-14">
+        <TituloSecao id="por-tema" titulo="Tema a tema">
+          A mesma conta, separada pelos 12 temas do teste (duas afirmações em cada).
+        </TituloSecao>
+        <div className="mt-4">
+          <PorTema resultado={s} candidatos={lista} fotos={fotos} revelado={revelado} />
         </div>
-        <div className="mt-2">
-          <TemaATema temas={s.temas} porNumero={porNumero} abertosInicial={[0]} />
+      </section>
+
+      <section aria-labelledby="afirmacao-a-afirmacao" className="mt-10 sm:mt-14">
+        <TituloSecao id="afirmacao-a-afirmacao" titulo="Afirmação a afirmação">
+          Sua resposta e a posição de cada candidato, com o trecho original do programa de governo e o link para a página do documento.
+        </TituloSecao>
+        <div className="mt-4">
+          <ListaAfirmacoes linhas={linhas} porNumero={porNumero} lista={lista} fotos={fotos} abertosInicial={[AFIRMACOES[0].id]} />
         </div>
       </section>
 
       <section aria-labelledby="documentos" className="mt-10 sm:mt-14">
-        <h2 id="documentos" className="font-display text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">
-          Leia os programas completos
-        </h2>
+        <TituloSecao id="documentos" titulo="Leia os programas completos" />
         <ul className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4">
           {lista.map((c) => {
             const d = DOCUMENTOS[c.numero as Autor];
@@ -187,7 +205,7 @@ function Resultado({ seed, respostas }: { seed: number; respostas: import('@/app
         <p className="mt-3 text-[12.5px] leading-snug text-fg-subtle">
           Documentos registrados no TSE.{' '}
           <Link to="/metodologia#teste-cego" className="underline decoration-line underline-offset-2 hover:text-fg">
-            Como escolhemos e reescrevemos as propostas
+            Como escrevemos as afirmações e identificamos as posições
           </Link>
           {EM_REVISAO ? ' · textos em revisão editorial final.' : '.'}
         </p>

@@ -1,16 +1,17 @@
 /**
- * /teste — Teste Cego. Sem `?s=`: abertura. Com `?s=<semente>`: as 12 rodadas, na ordem determinada pela
- * semente (a mesma URL reproduz a mesma ordem). O progresso fica só nesta aba (sessionStorage).
+ * /teste — Teste Cego (formato v2: afirmações únicas com escala de concordância).
+ * Sem `?s=`: abertura. Com `?s=<semente>`: as 24 afirmações, uma por tela, na ordem determinada pela semente
+ * (a mesma URL reproduz a mesma ordem). O progresso fica só nesta aba (sessionStorage).
  * Ao terminar, vai para /teste/resultado#<código> — as respostas nunca saem do navegador.
  */
 import { useCallback, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Container } from '@/app/components/layout/Container';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
-import { caminhoResultado, caminhoTeste, novaSemente, textoParaSemente, type Escolha } from '@/app/components/pages/teste/codigo';
-import { IntroTeste } from '@/app/components/pages/teste/IntroTeste';
-import { Quiz } from '@/app/components/pages/teste/Quiz';
-import { apagarProgresso, gravarProgresso, lerProgresso, respondidas, type Parcial } from '@/app/components/pages/teste/sessao';
+import { caminhoResultado, caminhoTeste, novaSemente, textoParaSemente } from '@/app/components/pages/teste/codigo';
+import { IntroTeste, N_AFIRMACOES } from '@/app/components/pages/teste/IntroTeste';
+import { Quiz, type EstadoQuiz } from '@/app/components/pages/teste/Quiz';
+import { apagarProgresso, completo, concluidas, gravarProgresso, lerProgresso, type MapaRespostas } from '@/app/components/pages/teste/sessao';
 import { Badge } from '@/app/ui/Badge';
 import { Button } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
@@ -25,8 +26,8 @@ export default function TestePage() {
 function Abertura() {
   const navigate = useNavigate();
   const salvo = useMemo(() => lerProgresso(), []);
-  const feitas = salvo ? respondidas(salvo.respostas) : 0;
-  const completo = salvo && feitas === salvo.respostas.length;
+  const feitas = salvo ? concluidas(salvo.respostas) : 0;
+  const terminado = !!salvo && completo(salvo.respostas);
 
   function comecar() {
     apagarProgresso();
@@ -43,27 +44,27 @@ function Abertura() {
         }
         titulo={
           <>
-            Escolha propostas,
-            <br className="hidden sm:block" /> <span className="text-grad">não candidatos.</span>
+            Ideias primeiro,
+            <br className="hidden sm:block" /> <span className="text-grad">candidatos depois.</span>
           </>
         }
-        subtitulo="Em cada tema, duas propostas reais dos programas de governo dos dois candidatos à Presidência, sem nenhuma pista de quem é quem. No fim, você descobre com quem está mais em sintonia."
+        subtitulo={`${N_AFIRMACOES} afirmações sobre temas do país, uma por vez. Diga o quanto concorda com cada uma — no fim, comparamos suas respostas com o que os dois candidatos à Presidência defendem nos programas registrados no TSE.`}
         acoes={
           <>
             <Button variant="primary" size="lg" iconRight="seta" onClick={comecar} className="w-full sm:w-auto">
               {salvo && feitas > 0 ? 'Começar de novo' : 'Começar o teste'}
             </Button>
-            {salvo && feitas > 0 && !completo ? (
+            {salvo && feitas > 0 && !terminado ? (
               <Button variant="secondary" size="lg" onClick={() => navigate(caminhoTeste(salvo.seed))} className="w-full sm:w-auto">
-                Continuar · <span className="num">{feitas}</span>/<span className="num">{salvo.respostas.length}</span>
+                Continuar · <span className="num">{feitas}</span>/<span className="num">{N_AFIRMACOES}</span>
               </Button>
             ) : null}
-            {salvo && completo ? (
+            {salvo && terminado ? (
               <Button
                 variant="secondary"
                 size="lg"
                 icon="selo"
-                onClick={() => navigate(caminhoResultado(salvo.seed, salvo.respostas as Escolha[]))}
+                onClick={() => navigate(caminhoResultado(salvo.seed, salvo.respostas, salvo.importantes))}
                 className="w-full sm:w-auto"
               >
                 Ver meu resultado
@@ -73,8 +74,8 @@ function Abertura() {
         }
         extra={
           <p className="flex items-center gap-2 text-[13px] text-fg-subtle">
-            <Icon name="info" size={15} />
-            Sem cadastro e sem login. As propostas aparecem em ordem sorteada.
+            <Icon name="info" size={15} className="shrink-0" />
+            Sem cadastro e sem login. As afirmações aparecem em ordem sorteada.
           </p>
         }
       />
@@ -85,17 +86,17 @@ function Abertura() {
 function Rodadas({ seed }: { seed: number }) {
   const navigate = useNavigate();
   const salvo = useMemo(() => lerProgresso(seed), [seed]);
-  const onProgresso = useCallback((respostas: Parcial, idx: number) => gravarProgresso({ seed, respostas, idx }), [seed]);
+  const onProgresso = useCallback((e: EstadoQuiz) => gravarProgresso({ seed, ...e }), [seed]);
   const onConcluir = useCallback(
-    (respostas: Escolha[]) => {
-      gravarProgresso({ seed, respostas, idx: respostas.length - 1 });
-      navigate(caminhoResultado(seed, respostas));
+    (respostas: MapaRespostas, importantes: string[]) => {
+      gravarProgresso({ seed, respostas, importantes, idx: N_AFIRMACOES - 1 });
+      navigate(caminhoResultado(seed, respostas, importantes));
     },
     [seed, navigate],
   );
   return (
-    <Container className="pb-4 pt-4 sm:pt-8">
-      <Quiz seed={seed} inicial={salvo?.respostas} inicialIdx={salvo?.idx} onProgresso={onProgresso} onConcluir={onConcluir} onSair={() => navigate('/teste')} />
+    <Container className="pb-2 pt-3 sm:pt-6">
+      <Quiz seed={seed} inicial={salvo} onProgresso={onProgresso} onConcluir={onConcluir} onSair={() => navigate('/teste')} />
     </Container>
   );
 }

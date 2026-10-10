@@ -1,6 +1,6 @@
 /** Utilitários dos testes do motor (Node): dataset real de public/data e verificação de invariantes. */
 import { fileURLToPath } from 'node:url';
-import { expect } from 'vitest';
+import { afterEach, expect } from 'vitest';
 import type { LoadedDataset } from '../api';
 import { loadDataset } from '../controller';
 import { fsJsonLoader } from '../node';
@@ -8,6 +8,15 @@ import type { Summary } from '../../shared/types';
 import { pctValidos } from '../../shared/calc';
 
 export const PUBLIC_DIR = fileURLToPath(new URL('../../../public', import.meta.url));
+
+/**
+ * Cede o laço de eventos (fase "check", depois do poll) entre um teste e outro. Os testes do motor são síncronos e
+ * longos: sem isso, o processo do teste só lê as respostas do RPC com o orquestrador do vitest no fim do arquivo, e
+ * acima de 60 s o RPC "onTaskUpdate" estoura o tempo — `vitest run` sai com código 1 ("Unhandled Errors") mesmo com
+ * todos os testes verdes (acontecia com probe.test.ts, ~85 s). Registrado em todo arquivo que importa este módulo.
+ */
+export const cedeLaco = () => new Promise<void>((r) => setImmediate(r));
+afterEach(cedeLaco);
 
 let ds: Promise<LoadedDataset> | null = null;
 /** Dataset real (cacheado por arquivo de teste). */

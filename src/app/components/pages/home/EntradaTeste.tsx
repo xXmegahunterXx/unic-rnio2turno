@@ -1,20 +1,20 @@
 /**
- * Cartão de entrada do Teste Cego na Home: convite, ilustração "sem rosto" e o atalho para continuar um
- * teste em andamento nesta aba (sessionStorage; nada sai do navegador).
+ * Cartão de entrada do Teste Cego na Home: convite, ilustração "sem rosto" (afirmação + escala de concordância)
+ * e o atalho para continuar um teste em andamento nesta aba (sessionStorage; nada sai do navegador).
  */
 import { useMemo } from 'react';
-import { TEMAS } from '@/app/content/propostas';
+import { AFIRMACOES } from '@/app/content/afirmacoes';
 import { cn } from '@/app/lib/cn';
 import { ButtonLink } from '@/app/ui/Button';
 import { Icon, type IconName } from '@/app/ui/Icon';
-import { CartasIlustracao } from '@/app/components/pages/teste/CartasIlustracao';
+import { IlustracaoAfirmacao } from '@/app/components/pages/teste/IlustracaoAfirmacao';
 import { caminhoTeste } from '@/app/components/pages/teste/codigo';
-import { lerProgresso, respondidas } from '@/app/components/pages/teste/sessao';
+import { concluidas, lerProgresso, TOTAL } from '@/app/components/pages/teste/sessao';
 
 export function EntradaTeste({ className }: { className?: string }) {
   const salvo = useMemo(() => lerProgresso(), []);
-  const feitas = salvo ? respondidas(salvo.respostas) : 0;
-  const emAndamento = !!salvo && feitas > 0 && feitas < salvo.respostas.length;
+  const feitas = salvo ? concluidas(salvo.respostas) : 0;
+  const emAndamento = !!salvo && feitas > 0 && feitas < TOTAL;
 
   return (
     <article className={cn('relative isolate flex flex-col overflow-hidden rounded-[28px] border border-line bg-surface shadow-card', className)}>
@@ -32,22 +32,23 @@ export function EntradaTeste({ className }: { className?: string }) {
             <span className="whitespace-nowrap font-display text-[17px] font-semibold tracking-[-0.02em] text-fg sm:text-[19px]">Teste Cego</span>
           </span>
           <span className="num inline-flex h-7 items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 text-[12px] font-medium text-fg-muted">
-            <Icon name="relogio" size={13} />≈ 2 min
+            <Icon name="relogio" size={13} />≈ 3 min
           </span>
         </div>
 
         <h3 className="mt-5 text-balance font-display text-[26px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg sm:text-[30px]">
-          Escolha propostas sem saber de quem são
+          Concorde ou discorde, sem saber de quem é cada ideia
         </h3>
         <p className="mt-2 text-pretty text-[14.5px] leading-relaxed text-fg-muted">
-          Em cada tema, duas propostas reais dos programas de governo, sem nome, partido ou número. No fim, você descobre com quem está mais em sintonia.
+          {AFIRMACOES.length} afirmações neutras sobre temas do país, uma por vez. No fim, comparamos suas respostas com o que os dois candidatos
+          defendem nos programas de governo.
         </p>
 
-        <CartasIlustracao compacta className="mx-auto mt-4 w-full max-w-[400px] sm:mt-2" />
+        <IlustracaoAfirmacao compacta className="mx-auto mt-4 w-full max-w-[400px] sm:mt-3" />
 
         <ul className="mt-4 flex flex-wrap gap-2">
-          <Fato icone="grade">
-            <span className="num">{TEMAS.length}</span> temas
+          <Fato icone="lista">
+            <span className="num">{AFIRMACOES.length}</span> afirmações
           </Fato>
           <Fato icone="selo">Fontes oficiais</Fato>
           <Fato icone="olho-fechado">Nada sai do seu aparelho</Fato>
@@ -57,7 +58,7 @@ export function EntradaTeste({ className }: { className?: string }) {
           {emAndamento ? (
             <>
               <ButtonLink to={caminhoTeste(salvo!.seed)} variant="primary" size="lg" iconRight="seta" className="w-full sm:w-auto">
-                Continuar · <span className="num">{feitas}</span>/<span className="num">{salvo!.respostas.length}</span>
+                Continuar · <span className="num">{feitas}</span>/<span className="num">{TOTAL}</span>
               </ButtonLink>
               <ButtonLink to="/teste" variant="ghost" size="lg" className="w-full sm:w-auto">
                 Começar de novo
