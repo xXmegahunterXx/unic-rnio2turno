@@ -101,7 +101,11 @@ export function GovernadoresEleitosT1({
         faixas: [],
         especial: (
           <span className="flex h-full w-full items-end justify-center bg-brand/10 pb-[9%] ring-2 ring-inset ring-brand/50">
-            <span className="text-[9px] font-bold uppercase tracking-[0.08em] text-brand-fg min-[400px]:text-[10px]">2º turno</span>
+            <span className="whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.08em] text-brand-fg min-[400px]:text-[10px]">
+              {/* Bloco estreito no celular: "2º T" (o "2º turno" inteiro quebrava e escondia o "2º"). */}
+              <span className="sm:hidden">2º T</span>
+              <span className="hidden sm:inline">2º turno</span>
+            </span>
           </span>
         ),
         rotulo: `${UF_NOMES[uf]}: 2º turno em 25 de outubro${verFinalistas ? ` entre ${fin.map((c) => c.nomeUrna).join(' e ')}` : ''}`,

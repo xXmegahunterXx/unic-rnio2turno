@@ -527,7 +527,7 @@ function GradeUf({ onEscolher }: { onEscolher: (u: UF) => void }) {
             className="group flex h-full min-h-[3.75rem] w-full flex-col items-center justify-center rounded-xl border border-line bg-surface-2 px-1 py-2 transition-colors hover:border-brand/50 hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <span className="font-mono text-[15px] font-semibold leading-none text-fg">{u === 'ZZ' ? 'EX' : u}</span>
-            <span className="mt-1 line-clamp-2 max-w-full text-balance px-0.5 text-center text-[10.5px] leading-[1.2] text-fg-muted">
+            <span className="mt-1 line-clamp-3 max-w-full text-balance px-0.5 text-center text-[10.5px] leading-[1.2] text-fg-muted">
               {UF_NOMES[u]}
             </span>
           </button>

@@ -21,7 +21,7 @@ import { PageHeader } from '@/app/components/layout/PageHeader';
 import { Section } from '@/app/components/layout/Section';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
 import { NaoEncontrado } from '@/app/components/pages/detalhe/NaoEncontrado';
-import { emUf } from '@/app/components/pages/detalhe/fmt';
+import { deUf } from '@/app/components/pages/detalhe/fmt';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { NavCargos } from '@/app/components/pages/cargos/NavCargos';
 import { EleitosUf, VisaoComposicao, useComposicao } from '@/app/components/pages/cargos/CargoProporcional';
@@ -30,15 +30,9 @@ import { BancadasGrade, BarraComposicao } from '@/app/components/pages/cargos/Ba
 import { useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
 import { AvisoTse, FonteTse, textoReprocessamento } from '@/app/components/pages/cargos/ui';
 
-/** "de São Paulo" · "do Rio de Janeiro" · "da Bahia". */
-function deUf(uf: UFBr): string {
-  const em = emUf(uf, UF_NOMES[uf]);
-  return em.replace(/^em /, 'de ').replace(/^no /, 'do ').replace(/^na /, 'da ');
-}
-
 /** Nome da casa legislativa da UF. */
 function nomeCasa(uf: UFBr): string {
-  return uf === 'DF' ? 'Câmara Legislativa do Distrito Federal' : `Assembleia Legislativa ${deUf(uf)}`;
+  return uf === 'DF' ? 'Câmara Legislativa do Distrito Federal' : `Assembleia Legislativa ${deUf(uf, UF_NOMES[uf])}`;
 }
 
 export default function AssembleiaPage() {
@@ -129,10 +123,18 @@ export default function AssembleiaPage() {
           eyebrow={eyebrow}
           title={nomeCasa(uf)}
           subtitle={
-            <>
-              <span className="num">{fmtInt(comp.total)}</span> {distrital ? 'deputados distritais' : 'deputados estaduais'} eleitos em 4 de
-              outubro pelo sistema proporcional, para mandatos de 4 anos.
-            </>
+            comp.eleitos.length === 0 ? (
+              // Totalização em reprocessamento no TSE (ex.: AM): ainda não há eleitos divulgados.
+              <>
+                <span className="num">{fmtInt(comp.total)}</span> {distrital ? 'deputados distritais' : 'deputados estaduais'}, eleitos pelo
+                sistema proporcional para mandatos de 4 anos. O TSE ainda não divulgou os eleitos de 4 de outubro.
+              </>
+            ) : (
+              <>
+                <span className="num">{fmtInt(comp.total)}</span> {distrital ? 'deputados distritais' : 'deputados estaduais'} eleitos em 4 de
+                outubro pelo sistema proporcional, para mandatos de 4 anos.
+              </>
+            )
           }
           actions={seletor}
         >

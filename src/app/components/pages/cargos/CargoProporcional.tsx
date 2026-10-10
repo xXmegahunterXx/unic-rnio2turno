@@ -11,6 +11,7 @@ import { fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { useNaTela } from '@/app/lib/useNaTela';
+import { emUf } from '@/app/components/pages/detalhe/fmt';
 import { Icon } from '@/app/ui/Icon';
 import { SearchBox } from '@/app/ui/SearchBox';
 import { Segmented } from '@/app/ui/Segmented';
@@ -179,7 +180,7 @@ export function EleitosUf({
         <AvisoTse>
           {comp.avisos.length
             ? textoReprocessamento(uf, comp.avisos[0].aviso)
-            : `Os ${rotuloCargo} eleitos ${UF_NOMES[uf] ? `em ${UF_NOMES[uf]}` : ''} ainda não foram divulgados.`}
+            : `Os ${rotuloCargo} eleitos ${emUf(uf, UF_NOMES[uf])} ainda não foram divulgados.`}
         </AvisoTse>
       </div>
     );

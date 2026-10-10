@@ -287,3 +287,17 @@ Placar gigante com fotos, mapa grande (estados ou municípios), ticker de evento
 
 Meta de < 120 ms por desenho: cumprida em todos os casos no desktop e nas atualizações ao vivo no celular; o redesenho completo no celular emulado (4× + sem GPU) passa da meta só na rasterização, que nos aparelhos reais é feita pela GPU.
 <!-- fase2a:end -->
+
+<!-- integracao:start -->
+## Fase 2 · integração (revisão integrada)
+
+| O quê | Onde / como |
+|---|---|
+| `useNaTela(margem?)` | `src/app/lib/useNaTela.ts` — `[ref, visto]`: libera o download de dados pesados só quando o bloco chega perto da tela. Usado por `LocaisVotacao`, `PerfilEleitorado` (prop `adiar`, padrão sim) e `EleitosUf`/fotos dos cargos. |
+| Perfil do eleitorado na UF | `UfPage` → seção "Quem vota aqui" com `<PerfilEleitorado uf nome />` (sem `cod` = total da UF; exterior incluído). |
+| Governadores eleitos no 1º turno | `/governadores` termina com `<GovernadoresEleitosT1 mostrarSegundoTurno={false} onSelectUf2t=… />` (as 7 disputas já aparecem acima). Nova prop `mostrarSegundoTurno` (padrão `true`). No celular os blocos de 2º turno do cartograma dizem "2º T". |
+| Nome → ficha | `Placar` (hero/default) liga o nome a `/candidato/:sqcand` quando a corrida tem `sqcand` — nunca na simulação anonimizada (`anonimizarRace` remove a chave) nem no `compact` (já é link). `CandidateName linkFicha` faz o mesmo. |
+| Cores dos partidos | Tokens `--partido-1..10` agora em `src/app/styles.css` (escuro, claro e `prefers-color-scheme`), na ordem de `PARTIDOS_COM_COR`. `partidos.ts` não injeta mais `<style>` (`garantirPaletaPartidos` virou no-op por compatibilidade). |
+| Textos com artigo | `deUf(uf, nome)` em `components/pages/detalhe/fmt.ts` ("do Amazonas", "da Bahia") — use com `emUf` em vez de "de/em" + nome. |
+| `NomeLink quebra` / `PartidoChip` | `quebra` = até 2 linhas em vez de reticências (cartões estreitos do Senado); a sigla do `PartidoChip` cede espaço e o número nunca é cortado. |
+<!-- integracao:end -->

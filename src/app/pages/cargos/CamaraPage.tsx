@@ -20,6 +20,7 @@ import { PageHeader } from '@/app/components/layout/PageHeader';
 import { Section } from '@/app/components/layout/Section';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { deUf } from '@/app/components/pages/detalhe/fmt';
 import { NavCargos } from '@/app/components/pages/cargos/NavCargos';
 import { EleitosUf, MaisVotadosPais, VisaoComposicao, useComposicao } from '@/app/components/pages/cargos/CargoProporcional';
 import { UfsComposicao } from '@/app/components/pages/cargos/UfsComposicao';
@@ -91,10 +92,18 @@ export default function CamaraPage() {
         title={uf ? UF_NOMES[uf] : 'Câmara dos Deputados'}
         subtitle={
           uf ? (
-            <>
-              {UF_NOMES[uf]} elegeu <span className="num">{fmtInt(comp.total)}</span> dos <span className="num">513</span> deputados
-              federais, pelo sistema proporcional (quociente eleitoral e partidário).
-            </>
+            comp.eleitos.length === 0 ? (
+              // Totalização em reprocessamento no TSE (ex.: AM): ainda não há eleitos divulgados.
+              <>
+                {UF_NOMES[uf]} tem <span className="num">{fmtInt(comp.total)}</span> das <span className="num">513</span> cadeiras da Câmara,
+                preenchidas pelo sistema proporcional. O TSE ainda não divulgou os eleitos de 4 de outubro.
+              </>
+            ) : (
+              <>
+                {UF_NOMES[uf]} elegeu <span className="num">{fmtInt(comp.total)}</span> dos <span className="num">513</span> deputados
+                federais, pelo sistema proporcional (quociente eleitoral e partidário).
+              </>
+            )
           ) : (
             <>
               Os <span className="num">513</span> deputados federais eleitos em 4 de outubro. Cada estado tem de{' '}
@@ -111,7 +120,7 @@ export default function CamaraPage() {
         comp={comp}
         titulo={
           <>
-            <span className="num">{fmtInt(comp.total)}</span> cadeiras{uf ? ` de ${UF_NOMES[uf]}` : ''}
+            <span className="num">{fmtInt(comp.total)}</span> cadeiras{uf ? ` ${deUf(uf, UF_NOMES[uf])}` : ''}
           </>
         }
         rotuloCentro={uf ? 'deputados federais' : 'deputados'}

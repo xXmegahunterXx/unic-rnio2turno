@@ -44,6 +44,8 @@ export function Bancadas({
 }) {
   const [todos, setTodos] = useState(false);
   const lista = bancadas.filter((b) => b.eleitos > 0);
+  // Sem nenhuma bancada definida (ex.: AM em reprocessamento), a coluna de votos ficaria vazia.
+  const votosValidosCol = lista.length > 0 ? votosValidos : undefined;
   const maior = Math.max(1, ...lista.map((b) => b.eleitos));
   const cortar = !!max && !todos && lista.length > max + 1;
   const visiveis = cortar ? lista.slice(0, max) : lista;
@@ -60,7 +62,7 @@ export function Bancadas({
             <th scope="col" className="w-[4.75rem] pb-2 text-right font-semibold">
               Cadeiras
             </th>
-            {votosValidos ? (
+            {votosValidosCol ? (
               <th scope="col" className="hidden w-[6.5rem] pb-2 pr-1 text-right font-semibold min-[440px]:table-cell">
                 Votos
               </th>
@@ -104,9 +106,9 @@ export function Bancadas({
                   <span className="num font-display text-[16px] font-semibold leading-none text-fg">{fmtInt(b.eleitos)}</span>
                   <span className="num block pt-0.5 text-[11px] text-fg-muted">{fmtPct((b.eleitos / Math.max(1, total)) * 100, 1)}</span>
                 </td>
-                {votosValidos ? (
+                {votosValidosCol ? (
                   <td className="hidden py-1.5 pr-1 text-right align-top min-[440px]:table-cell">
-                    <span className="num text-[13px] leading-none text-fg">{b.votos !== undefined ? fmtPct((b.votos / votosValidos) * 100, 1) : '—'}</span>
+                    <span className="num text-[13px] leading-none text-fg">{b.votos !== undefined ? fmtPct((b.votos / votosValidosCol) * 100, 1) : '—'}</span>
                     <span className="num block pt-0.5 text-[11px] text-fg-muted">{b.votos !== undefined ? fmtInt(b.votos) : ''}</span>
                   </td>
                 ) : null}
@@ -128,7 +130,7 @@ export function Bancadas({
                 <span className="mt-0.5 block text-pretty text-[11.5px] leading-snug">{resto.map((b) => b.sigla).join(' · ')}</span>
               </th>
               <td className="num py-2 text-right text-[14px] font-semibold text-fg">{fmtInt(resto.reduce((a, b) => a + b.eleitos, 0))}</td>
-              {votosValidos ? <td className="hidden min-[440px]:table-cell" /> : null}
+              {votosValidosCol ? <td className="hidden min-[440px]:table-cell" /> : null}
             </tr>
           ) : null}
           {pendentes > 0 ? (
@@ -140,7 +142,7 @@ export function Bancadas({
                 </div>
               </th>
               <td className="num py-2 text-right text-[15px] font-semibold text-fg-muted">{fmtInt(pendentes)}</td>
-              {votosValidos ? <td className="hidden min-[440px]:table-cell" /> : null}
+              {votosValidosCol ? <td className="hidden min-[440px]:table-cell" /> : null}
             </tr>
           ) : null}
         </tbody>
@@ -229,12 +231,12 @@ export function BancadasGrade({
         );
       })}
       {pendentes > 0 ? (
-        <li className="px-1 py-1.5 [container-type:inline-size]">
+        // Linha inteira: o rótulo ("Aguardando o TSE (AM)") não cabe numa coluna estreita.
+        <li className="col-span-full px-1 py-1.5 [container-type:inline-size]">
           <span className="flex min-w-0 items-center gap-2">
             <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-line" style={hachuraStyle()} />
-            <span className="min-w-0 flex-1 truncate text-[13px] text-fg-muted">{rotuloPendentes}</span>
+            <span className="min-w-0 truncate text-[13px] text-fg-muted">{rotuloPendentes}</span>
             <span className="num shrink-0 text-[13.5px] font-semibold text-fg-muted">{fmtInt(pendentes)}</span>
-            <span className="hidden w-11 shrink-0 [@container(min-width:12.5rem)]:inline" />
           </span>
         </li>
       ) : null}

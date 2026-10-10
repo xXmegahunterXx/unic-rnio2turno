@@ -124,7 +124,7 @@ function Header() {
             rolou ? 'border-line shadow-[0_10px_30px_-20px_rgb(0_0_0/0.6)]' : 'border-transparent',
           )}
         >
-          <Container wide className="flex h-14 items-center gap-3 md:h-16">
+          <Container wide className="flex h-14 items-center gap-2 sm:gap-3 md:h-16">
             <Link to="/" aria-label="Sintonia — página inicial" className="-ml-1 rounded-xl px-1 py-1">
               <Logo size={28} />
             </Link>

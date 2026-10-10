@@ -16,6 +16,11 @@ export const fmt4 = (n: number) => String(n).padStart(4, '0');
 /** "em São Paulo" · "no Rio de Janeiro" · "na Bahia" · "no exterior" (mesma regra dos textos do feed). */
 export { emUf };
 
+/** "de São Paulo" · "do Amazonas" · "da Bahia" (mesma regra de artigo de `emUf`). */
+export function deUf(uf: UF, nome: string): string {
+  return emUf(uf, nome).replace(/^em /, 'de ').replace(/^no /, 'do ').replace(/^na /, 'da ');
+}
+
 /** Municípios: quase sempre "em"; o Rio de Janeiro (cidade) pede artigo. */
 export function emMun(nome: string): string {
   return nome === 'Rio de Janeiro' ? `no ${nome}` : `em ${nome}`;

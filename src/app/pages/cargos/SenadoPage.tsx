@@ -32,6 +32,7 @@ import { corPartido, porTamanho } from '@/app/components/pages/cargos/partidos';
 import { useFichasGrupo, ehEleito } from '@/app/components/pages/cargos/dados';
 import { FotoOficial } from '@/app/components/pages/cargos/FotoOficial';
 import { CandidatoLinha, FonteTse, NomeLink, PartidoChip } from '@/app/components/pages/cargos/ui';
+import { emUf } from '@/app/components/pages/detalhe/fmt';
 import { NavCargos } from '@/app/components/pages/cargos/NavCargos';
 
 const GRUPO = 'senado';
@@ -175,7 +176,7 @@ export default function SenadoPage() {
         </section>
 
         <section
-          className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-7"
+          className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-7"
           aria-labelledby="composicao-senado"
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -184,23 +185,26 @@ export default function SenadoPage() {
             </h2>
             <span className="text-[12.5px] text-fg-muted">Eleitos em 2026 · maior bancada primeiro</span>
           </div>
-          <div className="mx-auto mt-4 max-w-[600px]">
-            <Hemiciclo
-              assentos={assentos}
-              destaque={destaque}
-              onDestaque={setDestaque}
-              ariaLabel={`Hemiciclo com os ${totalVagas} senadores eleitos em 2026, por partido: ${bancadas.map((b) => `${b.sigla} ${b.eleitos}`).join(', ')}`}
-              centro={
-                <>
-                  <span className="num font-display text-[34px] font-semibold leading-none tracking-[-0.03em] text-fg sm:text-[40px]">
-                    {fmtInt(totalVagas)}
-                  </span>
-                  <span className="mt-1 text-[12px] text-fg-muted">vagas em 2026</span>
-                </>
-              }
-            />
+          {/* No desktop o cartão acompanha a altura do cartograma: hemiciclo e legenda ficam centrados, sem vazio embaixo. */}
+          <div className="flex flex-1 flex-col justify-center">
+            <div className="mx-auto mt-4 w-full max-w-[600px]">
+              <Hemiciclo
+                assentos={assentos}
+                destaque={destaque}
+                onDestaque={setDestaque}
+                ariaLabel={`Hemiciclo com os ${totalVagas} senadores eleitos em 2026, por partido: ${bancadas.map((b) => `${b.sigla} ${b.eleitos}`).join(', ')}`}
+                centro={
+                  <>
+                    <span className="num font-display text-[34px] font-semibold leading-none tracking-[-0.03em] text-fg sm:text-[40px]">
+                      {fmtInt(totalVagas)}
+                    </span>
+                    <span className="mt-1 text-[12px] text-fg-muted">vagas em 2026</span>
+                  </>
+                }
+              />
+            </div>
+            <BancadasGrade bancadas={bancadas} total={totalVagas} destaque={destaque} onDestaque={setDestaque} className="mt-5 border-t border-line pt-4" />
           </div>
-          <BancadasGrade bancadas={bancadas} total={totalVagas} destaque={destaque} onDestaque={setDestaque} className="mt-5 border-t border-line pt-4" />
           <p className="mt-4 text-[12.5px] leading-snug text-fg-muted">
             As outras <span className="num">27</span> cadeiras são dos senadores eleitos em 2022, com mandato até 2031.
           </p>
@@ -287,7 +291,7 @@ function CartaoUf({
           type="button"
           onClick={onAbrir}
           className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 text-[12.5px] font-medium text-brand-fg transition-colors after:absolute after:inset-0 after:rounded-2xl after:content-[''] hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          aria-label={`Ver os ${u.candidatos.length} candidatos ao Senado em ${UF_NOMES[uf]}`}
+          aria-label={`Ver os ${u.candidatos.length} candidatos ao Senado ${emUf(uf, UF_NOMES[uf])}`}
         >
           <span className="num">{u.candidatos.length}</span> candidatos
           <Icon name="chevron-direita" size={14} />

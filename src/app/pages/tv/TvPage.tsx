@@ -506,7 +506,8 @@ function PainelMapa({
             {foco === 'BR' ? (mapaMun ? 'Brasil · por município' : 'Brasil · por estado') : gov ? 'Por município' : 'Em foco · disputa mais apertada'}
           </div>
           <div className="mt-[calc(var(--u)*0.3)] truncate font-display text-[length:calc(var(--u)*3.4)] font-semibold leading-tight tracking-[-0.02em]">
-            {foco === 'BR' ? 'Quem está à frente' : UF_NOMES[foco]}
+            {/* 1º turno (fase 'pre') é resultado final: "mais votado", não "à frente". */}
+            {foco === 'BR' ? (race.turno === 1 ? `Mais votado em cada ${mapaMun ? 'município' : 'estado'}` : 'Quem está à frente') : UF_NOMES[foco]}
           </div>
         </div>
         {resumoUf && !gov ? <MiniPlacarUf race={race} resumo={resumoUf} /> : null}

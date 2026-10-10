@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { comArtigo, emMun, emUf, fmt4, fmtEleitores } from './fmt';
+import { comArtigo, deUf, emMun, emUf, fmt4, fmtEleitores } from './fmt';
 
 describe('formatadores das páginas de detalhe', () => {
   it('preposição + artigo da UF', () => {
@@ -8,6 +8,13 @@ describe('formatadores das páginas de detalhe', () => {
     expect(emUf('BA', 'Bahia')).toBe('na Bahia');
     expect(emUf('DF', 'Distrito Federal')).toBe('no Distrito Federal');
     expect(emUf('ZZ', 'Exterior')).toBe('no exterior');
+  });
+
+  it('"de" + artigo da UF (casas legislativas, cadeiras)', () => {
+    expect(deUf('SP', 'São Paulo')).toBe('de São Paulo');
+    expect(deUf('AM', 'Amazonas')).toBe('do Amazonas');
+    expect(deUf('BA', 'Bahia')).toBe('da Bahia');
+    expect(deUf('RJ', 'Rio de Janeiro')).toBe('do Rio de Janeiro');
   });
 
   it('artigo no início de frase', () => {
