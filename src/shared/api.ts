@@ -106,7 +106,8 @@ export interface ApuracaoClient {
 /**
  * "Reveja a noite": pedir o estado da apuração num instante PASSADO (epoch ms, ≤ simNow atual).
  * Ausente = agora. Instantes futuros são limitados ao agora (nunca adiantar resultado).
- * HTTP: query `?t=<epoch>`. Na fonte TSE, só nacional/UF têm histórico; demais níveis respondem o agora.
+ * HTTP: query `?t=<epoch>`. Na fonte TSE, só nacional, UF e o mapa nacional por município têm histórico; município,
+ * zona e seção respondem o agora.
  */
 export interface Instante {
   t?: number;
