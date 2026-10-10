@@ -155,9 +155,10 @@ export function segundosRestantes(restantes: number, intervalosMs: readonly numb
 }
 
 /** "menos de 1 min" · "≈ 2 min" (sem número quando não falta nada). */
-export function textoRestante(segundos: number): string {
+export function textoRestante(segundos: number, curto = false): string {
   if (segundos <= 0) return '';
-  if (segundos < 45) return 'menos de 1 min';
+  // `curto`: barra de progresso do quiz no celular, onde "menos de 1 min" era cortado ("menos de …").
+  if (segundos < 45) return curto ? '< 1 min' : 'menos de 1 min';
   return `≈ ${Math.max(1, Math.round(segundos / 60))} min`;
 }
 

@@ -11,6 +11,7 @@ import type { PresidenteT1Dataset } from '../shared/cenarios';
 import { MARCA_CENARIO, calcularCenario, cenarioDoPreset, codificarCenario, premissasCenario } from '../shared/cenarios';
 import { anonimizarRace } from '../shared/anon';
 import { CC } from './app';
+import { comPrimeiroTurnoLocal } from './og-rotas';
 import { layoutCenario, layoutComposicao, layoutCuriosidade, layoutGovernadores, layoutSecao } from './og-cartoes';
 import { svgHemiciclo } from './og-hemiciclo';
 import { RAIZ, comando, login, montar, type Montado } from './test-helpers';
@@ -195,5 +196,29 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     expect(disputas).toHaveLength(7);
     expect(JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: false, simulacao: true, aoVivo: true, anonimizado: true }))).toContain('SIMULAÇÃO');
     expect(JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: true, simulacao: false, aoVivo: false }))).not.toContain('SIMULAÇÃO');
+  });
+});
+
+describe('cartão de UF antes da apuração (revisão de QA)', () => {
+  it('usa o 1º turno DA UF, não o nacional, no "NO 1º TURNO" de cada finalista', () => {
+    const meta = json<{ races: import('../shared/types').Race[] }>('meta.json');
+    const pres = meta.races.find((r) => r.id === 'pres')!;
+    const t1 = meta.races.find((r) => r.id === 'pres-t1')!;
+    const ds = json<PresidenteT1Dataset>('presidente-t1.json');
+    const sp = ds.ufs.find((u) => u.uf === 'SP')!;
+    const porNumero = (n: number) => sp.votos[ds.candidatos.findIndex((c) => c.numero === n)];
+    // resumo do 1º turno em SP na ordem de pres-t1 (finalistas + Outros)
+    const votos = t1.candidatos.map((c) => (c.agregado ? sp.votos.reduce((a, b) => a + b, 0) - porNumero(13) - porNumero(22) : porNumero(c.numero)));
+    const r = comPrimeiroTurnoLocal(pres, t1, { votos });
+    const lula = r.candidatos.find((c) => c.numero === 13)!;
+    const flavio = r.candidatos.find((c) => c.numero === 22)!;
+    expect(lula.primeiroTurno?.votos).toBe(9505413);
+    expect(flavio.primeiroTurno?.votos).toBe(12922023);
+    expect(lula.primeiroTurno!.pct).toBeCloseTo(38.2, 1);
+    expect(flavio.primeiroTurno!.pct).toBeCloseTo(51.93, 1);
+    // e não é o nacional
+    expect(lula.primeiroTurno?.votos).not.toBe(pres.candidatos.find((c) => c.numero === 13)!.primeiroTurno?.votos);
+    // sem dado local: sem número (nunca o nacional)
+    expect(comPrimeiroTurnoLocal(pres, undefined, null).candidatos.every((c) => c.primeiroTurno === undefined)).toBe(true);
   });
 });

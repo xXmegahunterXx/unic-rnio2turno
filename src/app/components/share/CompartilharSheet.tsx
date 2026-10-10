@@ -311,9 +311,10 @@ export function CompartilharSheet({
         {app ? (
           <div role="note" className="mb-3 flex items-start gap-2.5 rounded-xl border border-brand/30 bg-brand/[0.08] px-3 py-2.5 text-[13px] leading-snug text-fg">
             <Icon name="info" size={17} className="mt-px shrink-0 text-brand-fg" />
+            {/* curto: em telas baixas (navegador embutido) o aviso empurrava a prévia para fora da tela */}
             <p>
-              Você está no navegador do {app}. Para guardar a imagem, toque em <strong className="font-semibold">Salvar imagem</strong> e depois
-              toque e segure nela. O texto e o link podem ser copiados aqui embaixo.
+              No navegador do {app}, toque em <strong className="font-semibold">Salvar imagem</strong> e depois toque e segure nela para
+              guardar.
             </p>
           </div>
         ) : null}

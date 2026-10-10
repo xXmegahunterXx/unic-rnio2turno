@@ -117,15 +117,25 @@ export default function GovernadoresPage() {
     .sort((a, b) => UF_NOMES[a.uf].localeCompare(UF_NOMES[b.uf], 'pt-BR'))
     .filter((x) => x.race && x.snap)
     .map((x) => ({ uf: x.uf, race: x.race!, resumo: x.snap!.resumo }));
-  const compartilharPagina = (
+  // Com rótulo a partir de 380 px (abaixo disso só o ícone, para caber ao lado de "Governadores").
+  const botaoCompartilhar = (soIcone: boolean, className?: string) => (
     <BotaoCompartilharGovernadores
       itens={disputas}
       simulado={!!status?.simulacao}
       t1={pre}
       carregando={disputas.length < itens.length}
-      soIcone={!desktop}
+      soIcone={soIcone}
       size={desktop ? 'md' : 'sm'}
+      className={className}
     />
+  );
+  const compartilharPagina = desktop ? (
+    botaoCompartilhar(false)
+  ) : (
+    <>
+      {botaoCompartilhar(true, 'min-[380px]:hidden')}
+      {botaoCompartilhar(false, 'max-[379px]:hidden')}
+    </>
   );
 
   return (
@@ -133,7 +143,8 @@ export default function GovernadoresPage() {
       <Topo
         eyebrow={
           <>
-            Apuração · {pre ? '4' : '25'} de outubro<span className="hidden sm:inline"> de 2026</span>
+            <span className="hidden sm:inline">Apuração · </span>
+            {pre ? '4' : '25'} de outubro<span className="hidden sm:inline"> de 2026</span>
           </>
         }
         titulo="Governadores"

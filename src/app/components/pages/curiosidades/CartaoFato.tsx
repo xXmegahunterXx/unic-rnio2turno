@@ -110,7 +110,7 @@ export const CartaoFato = forwardRef<HTMLElement, CartaoFatoProps>(function Cart
       ) : null}
 
       <details className="group/det mt-3 text-[12.5px] text-fg-subtle">
-        <summary className="inline-flex cursor-pointer list-none items-center gap-1 rounded hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-details-marker]:hidden">
+        <summary className="relative inline-flex cursor-pointer list-none items-center gap-1 rounded after:absolute after:-inset-x-2 after:-inset-y-2.5 after:content-[''] hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand [&::-webkit-details-marker]:hidden">
           <Icon name="info" size={13} />
           Fonte e critério
           <Icon name="chevron" size={13} className="transition-transform group-open/det:rotate-180" />

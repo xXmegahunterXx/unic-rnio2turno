@@ -263,7 +263,9 @@ function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar:
         { fontFamily: 'Bricolage', fontWeight: 700, fontSize: tamNome(c.nomeUrna), color: C.fg, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 420 },
         c.nomeUrna,
       ),
-      h('div', { fontSize: 22, color: C.muted, marginTop: 4 }, `${c.partido} · ${c.numero}`),
+      // 1º turno é resultado OFICIAL: com os nomes ocultos (simulação anônima) não mostra "Simulação · 1" (partido e
+      // número fictícios da anonimização) num cartão de dado real
+      h('div', { fontSize: 22, color: C.muted, marginTop: 4 }, inp.race.turno === 1 && c.partido === 'Simulação' ? 'nome oculto' : `${c.partido} · ${c.numero}`),
     ),
   ];
   if (alinhar === 'right') cabecalho.reverse();
@@ -374,7 +376,7 @@ export function layoutPlacar(inp: OgPlacarInput): No {
     'div',
     { flexDirection: 'column', alignItems: 'flex-end' },
     inp.pre
-      ? h('div', { fontSize: 22, color: C.muted }, 'Placar ao vivo, estado por estado')
+      ? h('div', { fontSize: 22, color: C.muted }, inp.uf || race.abrangencia !== 'BR' ? 'Placar ao vivo, cidade por cidade' : 'Placar ao vivo, estado por estado')
       : race.turno === 1
         ? h('div', { fontSize: 22, color: C.muted }, 'Resultado oficial · fonte: TSE')
         : h('div', { fontSize: 22, color: C.muted }, `${inp.simulacao ? 'Horário simulado' : 'Atualizado às'} ${fmtHora(inp.horario)} (Brasília)`),
@@ -444,11 +446,11 @@ export function layoutTeste(): No {
       h(
         'div',
         { fontSize: 30, color: C.muted, marginTop: 24, lineHeight: 1.35, maxWidth: 540 },
-        'Escolha entre propostas sem saber de quem são. Suas respostas ficam só no seu aparelho.',
+        'Concorde ou discorde de ideias sem saber de quem são. Suas respostas ficam só no seu aparelho.',
       ),
     ),
-    cartao(-8, 690, 150, C.brand, 'PROPOSTA 1'),
-    cartao(7, 900, 170, C.brand2, 'PROPOSTA 2'),
+    cartao(-8, 690, 150, C.brand, 'IDEIA 1'),
+    cartao(7, 900, 170, C.brand2, 'IDEIA 2'),
   );
 }
 

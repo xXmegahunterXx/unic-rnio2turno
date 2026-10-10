@@ -98,7 +98,8 @@ export default function CuriosidadesPage() {
         {q.data ? (
           <>
             <FiltroTemas temas={temasComContagem(q.data.fatos)} total={q.data.fatos.length} atual={tema} onEscolher={escolher} />
-            <div ref={listaRef} className="scroll-mt-[calc(var(--app-header-h,56px)+8px)]">
+            {/* margem = header + o filtro grudado (~57 px) + respiro: sem isso o título do tema ficava atrás do filtro */}
+            <div ref={listaRef} className="scroll-mt-[calc(var(--app-header-h,56px)+72px)]">
               <ListaFatos ds={q.data} tema={tema} foco={foco} />
             </div>
             <ComoCalculamos ds={q.data} />

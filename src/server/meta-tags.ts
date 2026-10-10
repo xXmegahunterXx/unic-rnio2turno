@@ -74,7 +74,7 @@ export interface ContextoMeta {
 }
 
 const DESCRICAO_PADRAO =
-  'Apuração do 2º turno de 2026 ao vivo, estado por estado, cidade por cidade, seção por seção. E o Teste Cego: escolha propostas sem saber de quem são.';
+  'Apuração do 2º turno de 2026 ao vivo, estado por estado, cidade por cidade, seção por seção. E o Teste Cego: concorde ou discorde de ideias sem saber de quem são.';
 const UF_SET = new Set<string>([...UFS, 'ZZ']);
 
 const ufDe = (s: string | null | undefined): UF | null => (s && UF_SET.has(s.toUpperCase()) ? (s.toUpperCase() as UF) : null);
@@ -241,8 +241,8 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
   }
   if (s0 === 'teste' && (seg.length === 1 || (seg.length === 2 && s1 === 'resultado'))) {
     return pagina({
-      titulo: `Teste Cego · escolha propostas sem saber de quem são · ${APP_NAME}`,
-      descricao: 'Compare propostas dos candidatos do 2º turno sem saber de quem são. Suas respostas ficam só no seu aparelho.',
+      titulo: `Teste Cego · concorde ou discorde sem saber de quem é cada ideia · ${APP_NAME}`,
+      descricao: 'Afirmações dos programas do 2º turno, sem nomes nem partidos: concorde ou discorde e descubra no fim com qual programa tem mais sintonia. Suas respostas ficam só no seu aparelho.',
       imagem: ogTeste,
       imagemAlt: 'Teste Cego · Sintonia',
       canonico: path,

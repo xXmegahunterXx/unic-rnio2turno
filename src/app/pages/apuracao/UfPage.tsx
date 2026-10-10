@@ -280,6 +280,9 @@ export default function UfPage() {
         <PrimeiroTurnoAviso onVoltar={() => ctx.setRace(ctx.idT2)} className="mb-4" />
       ) : null}
 
+      {/* "Reveja a noite": no celular, ao vivo, vem DEPOIS do placar (números primeiro para quem chega por um link);
+          revendo um instante (?t=), fica no topo, dando o contexto. */}
+      <div className="flex flex-col">
       {!t1 && ctx.fase !== 'pre' && statusQ.data && vivo ? (
         <LinhaDoTempo
           status={statusQ.data}
@@ -291,7 +294,7 @@ export default function UfPage() {
           onChange={setT}
           carregando={q.isPlaceholderData}
           compartilhar={{ race, uf, simulado }}
-          className="mb-3 sm:mb-4"
+          className={cn('mb-3 sm:mb-4', !t && 'max-md:order-2 max-md:mb-0 max-md:mt-3')}
         />
       ) : null}
 
@@ -304,6 +307,7 @@ export default function UfPage() {
         </div>
         {lg && !t1 ? <StatsGrid t={r} className="mt-4" /> : null}
         {exterior ? <PanoramaMunicipios race={race} municipios={snap.municipios} unidade={unidade} className="mt-3 sm:mt-4" /> : null}
+      </div>
       </div>
 
       {/* ------------------------------------------------------------ mapa (ou as seções, no DF) */}

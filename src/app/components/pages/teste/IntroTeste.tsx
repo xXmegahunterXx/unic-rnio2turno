@@ -60,17 +60,20 @@ export function IntroTeste({ eyebrow, titulo, subtitulo, acoes, extra, semPassos
     reduzir ? {} : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d, ease: [0.22, 0.9, 0.24, 1] as const } };
   return (
     <div>
-      {/* Celular: título → vitrine → ações. Desktop (lg): texto + ações à esquerda, vitrine à direita. */}
-      <section className="grid grid-cols-1 items-center gap-x-12 gap-y-5 pt-5 sm:gap-y-7 sm:pt-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-y-0 lg:pt-14">
+      {/* Celular: título → vitrine → ações. Desktop (lg): texto + ações à esquerda, vitrine à direita.
+          Celular de tela baixa (≤ 740 px úteis — o navegador embutido do app do X tira ~180 px da tela): tipografia e
+          respiros menores, para a escala da 1ª afirmação (com os rótulos) caber acima da tab bar; em ≤ 640 px o subtítulo
+          sai (os mesmos fatos vêm nas pílulas logo abaixo: nº de afirmações, tempo e privacidade). */}
+      <section className="grid grid-cols-1 items-center gap-x-12 gap-y-5 pt-5 max-sm:[@media(max-height:740px)]:gap-y-3.5 max-sm:[@media(max-height:740px)]:pt-3 sm:gap-y-7 sm:pt-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-y-0 lg:pt-14">
         <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-end">
           <motion.div {...entrar(0)}>{eyebrow}</motion.div>
           <motion.h1
             {...entrar(0.06)}
-            className="mt-3.5 text-balance font-display text-[40px] font-semibold leading-[0.98] tracking-[-0.04em] text-fg sm:mt-4 sm:text-[60px] lg:text-[60px] xl:text-[66px]"
+            className="mt-3.5 text-balance font-display text-[40px] font-semibold leading-[0.98] tracking-[-0.04em] text-fg max-sm:[@media(max-height:740px)]:mt-2.5 max-sm:[@media(max-height:740px)]:text-[34px] sm:mt-4 sm:text-[60px] lg:text-[60px] xl:text-[66px]"
           >
             {titulo}
           </motion.h1>
-          <motion.p {...entrar(0.12)} className="mt-3 max-w-[36rem] text-pretty text-[15.5px] leading-relaxed text-fg-muted sm:mt-5 sm:text-[18px]">
+          <motion.p {...entrar(0.12)} className="mt-3 max-w-[36rem] text-pretty text-[15.5px] leading-relaxed text-fg-muted max-sm:[@media(max-height:740px)]:mt-2 max-sm:[@media(max-height:740px)]:text-[14px] max-sm:[@media(max-height:740px)]:leading-snug max-sm:[@media(max-height:640px)]:hidden sm:mt-5 sm:text-[18px]">
             {subtitulo}
           </motion.p>
         </div>

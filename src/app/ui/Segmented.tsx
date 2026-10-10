@@ -139,6 +139,9 @@ function SegmentedImpl<V extends string>({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-0',
               'disabled:cursor-not-allowed disabled:opacity-40',
               size === 'sm' ? 'h-7 rounded-[9px] px-2.5 text-xs' : 'h-8 rounded-[10px] px-3.5 text-[13px]',
+              // alvo de toque de ~42 px de altura sem mudar o desenho (o ::after invisível estende a área do botão)
+              "after:absolute after:inset-x-0 after:content-['']",
+              size === 'sm' ? 'after:-inset-y-[7px]' : 'after:-inset-y-1',
               block && 'flex-1',
               sel ? 'text-fg' : 'text-fg-muted hover:text-fg',
               // sem medição (ex.: SSR/primeiro frame) o selecionado ainda se destaca

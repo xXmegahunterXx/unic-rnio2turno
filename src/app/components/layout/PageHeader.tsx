@@ -21,7 +21,7 @@ export function PageHeader({ title, subtitle, eyebrow, breadcrumbs, actions, chi
     <header className={cn('pb-5 pt-5 sm:pb-8 sm:pt-8', className)}>
       {breadcrumbs?.length ? <Breadcrumbs items={breadcrumbs} className="mb-3 sm:mb-4" /> : null}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0 sm:flex-1">
           {eyebrow ? (
             <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg-muted">{eyebrow}</div>
           ) : null}
@@ -30,7 +30,9 @@ export function PageHeader({ title, subtitle, eyebrow, breadcrumbs, actions, chi
           </h1>
           {subtitle ? <p className="mt-2 max-w-2xl text-pretty text-[15px] leading-relaxed text-fg-muted sm:text-base">{subtitle}</p> : null}
         </div>
-        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+        {/* Ações limitadas a ~55% da largura (quebram em linhas, alinhadas à direita): no tablet, três ações espremiam o
+            título ("Seção / 0001" em duas linhas). */}
+        {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:max-w-[55%] sm:justify-end">{actions}</div> : null}
       </div>
       {children ? <div className="mt-5">{children}</div> : null}
     </header>

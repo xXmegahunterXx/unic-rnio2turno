@@ -212,9 +212,15 @@ export default function MetodologiaPage() {
       <Secao id="teste-cego" titulo="Teste Cego">
         <p>
           O Teste Cego apresenta <strong>{fmtInt(AFIRMACOES.length)} afirmações sobre políticas públicas</strong>, duas em cada um de{' '}
-          <strong>{fmtInt(TEMAS.length)} temas</strong>, uma por vez e em ordem sorteada. Para cada uma, a pessoa diz o quanto concorda —{' '}
-          <em>concordo totalmente, concordo, neutro, discordo ou discordo totalmente</em> — ou pula. No fim, comparamos as respostas com a{' '}
+          <strong>{fmtInt(TEMAS.length)} temas</strong>, uma por vez e em ordem sorteada. Para cada uma, a pessoa diz o quanto concorda, numa
+          escala que vai da esquerda para a direita —{' '}
+          <em>discordo totalmente, discordo, neutro, concordo ou concordo totalmente</em> — ou pula. No fim, comparamos as respostas com a{' '}
           <strong>posição documentada</strong> de cada candidato à Presidência no programa de governo registrado no TSE.
+        </p>
+        <p>
+          Há também um <strong>modo rápido</strong>, com {fmtInt(TEMAS.length)} afirmações (uma por tema). Elas são sorteadas só entre as
+          combinações equilibradas: concordar aproxima dos dois candidatos na mesma medida e os dois percentuais têm a mesma base de cálculo.
+          A conta é a mesma do teste completo, com menos itens; dá para completar as demais depois, aproveitando as respostas.
         </p>
         <p>
           Até 9 de outubro o teste mostrava pares de propostas, uma de cada candidato, lado a lado. Trocamos pelo formato de afirmações únicas
@@ -420,8 +426,8 @@ function Formula() {
           </p>
         </div>
         <p className="mt-3 text-[13px] leading-snug text-fg-muted">
-          Resposta: +2 concordo totalmente · +1 concordo · 0 neutro · −1 discordo · −2 discordo totalmente. Posição: +2 concorda · 0
-          intermediária · −2 discorda. Peso: 2 nas afirmações que pesam mais para a pessoa, 1 nas demais.
+          Resposta: −2 discordo totalmente · −1 discordo · 0 neutro · +1 concordo · +2 concordo totalmente. Posição: −2 discorda · 0
+          intermediária · +2 concorda. Peso: 2 nas afirmações que pesam mais para a pessoa, 1 nas demais.
         </p>
       </div>
       <figure className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">

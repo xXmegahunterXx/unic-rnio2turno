@@ -471,9 +471,12 @@ export function calcular(e: Entrada): Curiosidade[] {
         a: { valor: { valor: md.a, formato: 'int', unidade: 'votos' }, rotulo: `${fmtPct(pctA(md))} dos válidos`, lugar: lugarMun(md) },
         b: { valor: { valor: md.b, formato: 'int', unidade: 'votos' }, rotulo: `${fmtPct(pctB(md))} dos válidos`, lugar: lugarMun(md) },
       },
-      contexto: `Em ${nomeMun(md)}, com ${fmtInt(md.eleitorado)} eleitores, os dois finalistas ficaram a ${votosTxt} de distância: ${placar(md)}. É a menor diferença proporcional entre os municípios com pelo menos ${pisoTxt}.${
-        mesmos.length ? ` Também por ${votosTxt}: ${listaMesmos.join('; ')}.` : ''
-      }`,
+      // curto: o cartão de imagem corta o contexto longo (o placar de md já está no par)
+      contexto: mesmos.length
+        ? `${nomeMun(md)}, com ${fmtInt(md.eleitorado)} eleitores, tem a menor diferença proporcional entre os municípios com ${pisoTxt} ou mais. ${
+            mesmos.length === 1 ? `Em ${nomeMun(mesmos[0])}, também ${votosTxt}: ${placar(mesmos[0])}.` : `Também por ${votosTxt}: ${listaMesmos.join('; ')}.`
+          }`
+        : `Em ${nomeMun(md)}, com ${fmtInt(md.eleitorado)} eleitores, os dois finalistas ficaram a ${votosTxt} de distância: ${placar(md)}. É a menor diferença entre os municípios com pelo menos ${pisoTxt}.`,
       texto: mesmos.length ? textoMesmos : `Em ${nomeMun(md)}, os dois finalistas à Presidência ficaram separados por ${votosTxt} no 1º turno: ${placar(md)}.`,
       lugares: [lugarMun(md), ...mesmos.map(lugarMun)],
       rota: rota.municipio(md.uf, md.cod),

@@ -78,7 +78,7 @@ export function Quiz({ seed, ids, inicial, onProgresso, onConcluir, onSair, selo
   const importante = importantes.includes(atual.id);
   const feitas = ordem.reduce((n, a) => n + (respostas[a.id] !== undefined ? 1 : 0), 0);
   const completo = feitas === total;
-  const restante = textoRestante(segundosRestantes(total - feitas, intervalos.current));
+  const restante = textoRestante(segundosRestantes(total - feitas, intervalos.current), true);
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
   useEffect(() => {

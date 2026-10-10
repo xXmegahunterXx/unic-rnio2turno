@@ -1,6 +1,6 @@
 {
  "versao": 1,
- "geradoEm": "2026-10-10T14:46:15.153Z",
+ "geradoEm": "2026-10-10T14:56:04.276Z",
  "fonte": "Calculado pelo Sintonia a partir dos dados oficiais do TSE do 1º turno de 04/10/2026 (resultado por município e por seção, locais de votação, perfil do eleitorado, candidaturas e resultados de Câmara, Senado e Governador). Script: scripts/data/curiosidades.ts.",
  "finalistas": {
   "a": {
@@ -260,7 +260,7 @@
      }
     }
    },
-   "contexto": "Em São Joaquim de Bicas (MG), com 25.074 eleitores, os dois finalistas ficaram a 1 voto de distância: 8.138 a 8.139. É a menor diferença proporcional entre os municípios com pelo menos 5.000 eleitores. Também por 1 voto: Vila Pavão (ES), 2.976 a 2.975.",
+   "contexto": "São Joaquim de Bicas (MG), com 25.074 eleitores, tem a menor diferença proporcional entre os municípios com 5.000 eleitores ou mais. Em Vila Pavão (ES), também 1 voto: 2.976 a 2.975.",
    "texto": "Em São Joaquim de Bicas (MG) e em Vila Pavão (ES), os dois finalistas à Presidência ficaram separados por 1 voto no 1º turno: 8.138 a 8.139 e 2.976 a 2.975.",
    "lugares": [
     {

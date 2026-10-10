@@ -128,7 +128,9 @@ export default function NacionalPage() {
       <Topo
         eyebrow={
           <>
-            Apuração · {t1 ? '4' : '25'} de outubro<span className="hidden sm:inline"> de 2026</span>
+            {/* no celular, sem "Apuração ·": a sobrancelha cabe numa linha ao lado do botão de compartilhar */}
+            <span className="hidden sm:inline">Apuração · </span>
+            {t1 ? '4' : '25'} de outubro<span className="hidden sm:inline"> de 2026</span>
           </>
         }
         titulo="Presidente"
@@ -146,24 +148,18 @@ export default function NacionalPage() {
         acoes={
           <>
             {!pre ? <LinkModoTv compacto={!desktop} raceQs={tvQs} /> : null}
-            <ShareButton race={race} resumo={resumo} simulado={simulado} caminho={caminhoShare} iconOnly={!desktop} size={desktop ? 'md' : 'sm'} />
+            {/* Com rótulo também no celular (é o placar que mais circula); abaixo de 380 px, só o ícone. */}
+            {desktop ? (
+              <ShareButton race={race} resumo={resumo} simulado={simulado} caminho={caminhoShare} size="md" />
+            ) : (
+              <>
+                <ShareButton race={race} resumo={resumo} simulado={simulado} caminho={caminhoShare} size="sm" iconOnly className="min-[380px]:hidden" />
+                <ShareButton race={race} resumo={resumo} simulado={simulado} caminho={caminhoShare} size="sm" className="max-[379px]:hidden" />
+              </>
+            )}
           </>
         }
       />
-
-      {!pre && !t1 && status && vivo ? (
-        <LinhaDoTempo
-          status={status}
-          recebidoEm={statusQ.dataUpdatedAt}
-          serie={vivo.serie}
-          eventos={vivo.eventos}
-          cores={race.candidatos.map((c) => c.cor)}
-          t={t}
-          onChange={setT}
-          carregando={q.isPlaceholderData}
-          className="mb-4 sm:mb-6"
-        />
-      ) : null}
 
       {pre ? (
         <>
@@ -214,6 +210,21 @@ export default function NacionalPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 min-[1360px]:grid-cols-12 min-[1360px]:gap-6">
+          {/* "Reveja a noite": no celular, ao vivo, vem logo DEPOIS do placar (os números são o que importa nos
+              primeiros segundos de quem chega por um link); revendo um instante (?t=), fica no topo, dando o contexto. */}
+          {!pre && status && vivo ? (
+            <LinhaDoTempo
+              status={status}
+              recebidoEm={statusQ.dataUpdatedAt}
+              serie={vivo.serie}
+              eventos={vivo.eventos}
+              cores={race.candidatos.map((c) => c.cor)}
+              t={t}
+              onChange={setT}
+              carregando={q.isPlaceholderData}
+              className={cn('min-[1360px]:col-span-12', t ? 'order-first' : 'order-2 md:order-first')}
+            />
+          ) : null}
           <div className={cn(COLUNA, 'min-[1360px]:col-span-7')}>
             <Placar race={race} resumo={resumo} variant="hero" simulado={simulado} className="order-1 min-[1360px]:order-none" />
             <CorridaPanel className="order-4 min-[1360px]:order-none min-[1360px]:flex-1" serie={data.serie} race={race} />

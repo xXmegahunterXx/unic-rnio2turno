@@ -29,6 +29,7 @@ import { UF_NOMES, UFS_GOV_2T } from '../shared/constants';
 import { anonimizarRace } from '../shared/anon';
 import { MAX_CODIGO, calcularCenario, codificarCenario, decodificarCenario, premissasCenario } from '../shared/cenarios';
 import { fmtInt } from '../shared/format';
+import { pctValidos } from '../shared/calc';
 import type { Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
 import type { Dados } from './dados';
@@ -87,6 +88,20 @@ export interface DepsOg {
   servico: ServicoOg;
   /** Versão do dataset carregado na subida (1º turno do motor). */
   versaoDataset: string;
+}
+
+/**
+ * `race` com o `primeiroTurno` de cada finalista trocado pelo resultado LOCAL do 1º turno (`resumoT1`, na ordem de
+ * `raceT1.candidatos`). Sem dado local, sem número (nunca o nacional num cartão de UF). Puro: testado em og-rotas.test.
+ */
+export function comPrimeiroTurnoLocal(race: Race, raceT1: Race | undefined, resumoT1: { votos: number[] } | null): Race {
+  return {
+    ...race,
+    candidatos: race.candidatos.map((c) => {
+      const i = raceT1 && resumoT1 ? raceT1.candidatos.findIndex((x) => !x.agregado && x.numero === c.numero) : -1;
+      return { ...c, primeiroTurno: i >= 0 && resumoT1 ? { votos: resumoT1.votos[i] ?? 0, pct: pctValidos(resumoT1, i) } : undefined };
+    }),
+  };
 }
 
 /** "fonte[-anon]": troca de modo sempre espera a imagem nova. */
@@ -184,6 +199,13 @@ export function registrarOg(app: App, d: DepsOg): void {
   const t2De = (r: Race): Race | undefined => (r.turno === 2 ? r : races.get(r.id.replace(/-t1$/, '')));
   const onde = (nome: string, uf: UF) => `${nome} (${uf === 'ZZ' ? 'Exterior' : uf})`;
 
+  /** Corrida com `primeiroTurno` de cada finalista NA UF (corrida -t1 da mesma disputa). */
+  const comPrimeiroTurnoDaUf = async (race: Race, uf: UF): Promise<Race> => {
+    const r1 = races.get(`${race.id}-t1`);
+    const s1 = r1 ? await dados.uf(r1.id, uf).catch(() => null) : null;
+    return comPrimeiroTurnoLocal(race, r1, s1?.resumo ?? null);
+  };
+
   // ---- placar (Brasil/UF) -------------------------------------------------------------------------
   app.get('/api/og/apuracao.png', async (c) => {
     const race = parseRace(c.req.query('race') || 'pres');
@@ -199,7 +221,10 @@ export function registrarOg(app: App, d: DepsOg): void {
       const simulacao = st.simulacao && r.turno === 2;
       const anon = !!st.anonimizado;
       const fonteTse = dados.fonteDe(r.id) === 'tse';
-      const raceOg = races.get(snap.race) ?? r;
+      const pre = r.turno === 2 && resumo.secoesTotalizadas === 0;
+      // Antes da apuração o cartão mostra "NO 1º TURNO" com `candidato.primeiroTurno`, que é o resultado NACIONAL:
+      // no recorte de uma UF troca pelo 1º turno daquela UF (senão o cartão "Presidente · São Paulo" saía com 45,16%).
+      const raceOg = pre && uf ? await comPrimeiroTurnoDaUf(races.get(snap.race) ?? r, uf) : (races.get(snap.race) ?? r);
       // foto oficial só com número real: nunca na simulação (nem com os nomes reais ligados no admin)
       const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
       const png = await renderPng(
@@ -210,7 +235,7 @@ export function registrarOg(app: App, d: DepsOg): void {
           resumo,
           simulacao,
           horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
-          pre: r.turno === 2 && resumo.secoesTotalizadas === 0,
+          pre,
           fotos: fotosPlacar,
         }),
       );

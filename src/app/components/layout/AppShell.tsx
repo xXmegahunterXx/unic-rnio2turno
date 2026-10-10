@@ -93,8 +93,10 @@ function FundoNoite() {
 function Header() {
   const ref = useRef<HTMLDivElement>(null);
   const status = useStatus();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const simulacao = status.data?.simulacao === true;
+  // Página do 1º turno (?race=…-t1) durante a simulação: os números da página são OFICIAIS (a simulação é do 2º turno)
+  const paginaT1 = /[?&]race=[a-z-]*-t1(?:&|$)/.test(search);
   const [rolou, setRolou] = useState(false);
 
   // Expõe a altura do header para elementos "sticky" (ex.: cabeçalho de DataTable).
@@ -179,7 +181,9 @@ function Header() {
             </div>
           </Container>
         </header>
-        {simulacao && comNumeros(pathname) ? <SimulationRibbon /> : null}
+        {simulacao && comNumeros(pathname) ? (
+          <SimulationRibbon detalhe={paginaT1 ? 'a simulação é do 2º turno; esta página mostra o resultado oficial do 1º turno, com os nomes ocultos.' : undefined} />
+        ) : null}
       </div>
       <AvisoBanner aviso={status.data?.aviso ?? null} />
     </>
@@ -266,9 +270,11 @@ function TabBar() {
   const maisAtivo = ativoNoMais(pathname);
   return (
     <>
+      {/* Sem backdrop-blur: com o fundo 97% opaco ele não aparece, mas custava um recálculo a cada quadro de rolagem
+          (pesado em Android de entrada e no navegador embutido do app do X). */}
       <nav
         aria-label="Principal"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <ul className="mx-auto grid h-[60px] max-w-md grid-cols-5">
           {NAV_TAB.slice(0, meio).map(item)}

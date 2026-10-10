@@ -2,7 +2,7 @@
  * Slider com marcas. Input range nativo (acessível, teclado, leitores de tela) sobreposto a uma
  * trilha desenhada com tokens.
  */
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, type PointerEvent, type ReactNode } from 'react';
 import { cn } from '@/app/lib/cn';
 
 export interface SliderMark {
@@ -47,6 +47,31 @@ export function Slider({
   const o = pct(origin ?? min);
   const ini = Math.min(p, o);
   const fim = Math.max(p, o);
+  // Toque: o valor segue o dedo em qualquer ponto da trilha (no iOS/WebKit, inclusive no navegador embutido do app do
+  // X, o range nativo só obedece a quem arrasta o próprio polegar). Mouse e teclado ficam com o input nativo.
+  const trilho = useRef<HTMLDivElement>(null);
+  const dedo = useRef<number | null>(null);
+  const valorNoPonto = (x: number) => {
+    const r = trilho.current?.getBoundingClientRect();
+    if (!r || r.width === 0) return value;
+    const f = Math.min(1, Math.max(0, (x - r.left) / r.width));
+    const passos = Math.round((f * (max - min)) / (step || 1));
+    return Math.min(max, Math.max(min, min + passos * (step || 1)));
+  };
+  const aoTocar = (e: PointerEvent<HTMLDivElement>) => {
+    if (disabled || e.pointerType === 'mouse') return;
+    dedo.current = e.pointerId;
+    const n = valorNoPonto(e.clientX);
+    if (n !== value) onChange(n);
+  };
+  const aoArrastar = (e: PointerEvent<HTMLDivElement>) => {
+    if (disabled || dedo.current !== e.pointerId) return;
+    const n = valorNoPonto(e.clientX);
+    if (n !== value) onChange(n);
+  };
+  const aoSoltar = () => {
+    dedo.current = null;
+  };
   return (
     <div className={cn('w-full', disabled && 'opacity-50', className)}>
       {label ? (
@@ -57,7 +82,14 @@ export function Slider({
           <span className="num text-sm font-semibold text-fg">{format(value)}</span>
         </div>
       ) : null}
-      <div className="relative h-6">
+      <div
+        ref={trilho}
+        className="relative h-6 touch-pan-y"
+        onPointerDown={aoTocar}
+        onPointerMove={aoArrastar}
+        onPointerUp={aoSoltar}
+        onPointerCancel={aoSoltar}
+      >
         <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-surface-3" />
         <div className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-brand-grad" style={{ left: `${ini}%`, width: `${fim - ini}%` }} />
         {marks?.map((m) => (
@@ -79,7 +111,8 @@ export function Slider({
           aria-label={label ? undefined : ariaLabel}
           aria-valuetext={format(value)}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="peer absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
+          // área de toque de 44 px de altura (a trilha desenhada tem 24 px)
+          className="peer absolute inset-x-0 -bottom-2.5 -top-2.5 z-10 w-full cursor-pointer appearance-none opacity-0 disabled:cursor-not-allowed"
         />
         <span
           aria-hidden

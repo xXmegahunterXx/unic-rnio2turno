@@ -41,6 +41,8 @@ describe('tempo estimado', () => {
   it('texto honesto', () => {
     expect(textoRestante(0)).toBe('');
     expect(textoRestante(30)).toBe('menos de 1 min');
+    expect(textoRestante(30, true)).toBe('< 1 min');
+    expect(textoRestante(170, true)).toBe('≈ 3 min');
     expect(textoRestante(75)).toBe('≈ 1 min');
     expect(textoRestante(170)).toBe('≈ 3 min');
   });

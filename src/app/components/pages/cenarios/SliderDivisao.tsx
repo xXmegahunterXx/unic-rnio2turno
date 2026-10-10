@@ -6,7 +6,7 @@
  * com aria-valuetext completo) sobre uma trilha desenhada com tokens. O lado esquerdo cresce quando o divisor vai
  * para a direita: arrastar em direção a um lado DIMINUI esse lado, como empurrar a fronteira.
  */
-import { useId, type ReactNode } from 'react';
+import { useId, useRef, type PointerEvent, type ReactNode } from 'react';
 import type { PartesDivisao } from '@/shared/cenarios';
 import { partesPct } from '@/shared/cenarios';
 import { fmtPct } from '@/shared/format';
@@ -58,6 +58,30 @@ export function SliderDivisao({
 }: SliderDivisaoProps) {
   const id = useId();
   const v = Math.min(100, Math.max(0, Math.round(valor)));
+  // Toque: o valor segue o dedo em qualquer ponto da trilha. O <input range> nativo do iOS (Safari e o navegador
+  // embutido do app do X, ambos WebKit) só responde a quem arrasta o próprio polegar — que aqui tem 1 px —, então o
+  // toque é tratado à mão. Mouse e teclado continuam com o input nativo. `touch-pan-y` deixa a página rolar na vertical.
+  const trilho = useRef<HTMLDivElement>(null);
+  const dedo = useRef<number | null>(null);
+  const valorNoPonto = (x: number) => {
+    const r = trilho.current?.getBoundingClientRect();
+    if (!r || r.width === 0) return v;
+    return Math.round(Math.min(1, Math.max(0, (x - r.left) / r.width)) * 100);
+  };
+  const aoTocar = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse') return;
+    dedo.current = e.pointerId;
+    const n = valorNoPonto(e.clientX);
+    if (n !== v) onChange(n);
+  };
+  const aoArrastar = (e: PointerEvent<HTMLDivElement>) => {
+    if (dedo.current !== e.pointerId) return;
+    const n = valorNoPonto(e.clientX);
+    if (n !== v) onChange(n);
+  };
+  const aoSoltar = () => {
+    dedo.current = null;
+  };
   const texto = `${fmtPct(v, 0)} ${esquerda.rotulo} e ${fmtPct(100 - v, 0)} ${direita.rotulo}`;
   return (
     <div className={cn('w-full', className)}>
@@ -92,7 +116,14 @@ export function SliderDivisao({
           ) : null}
         </div>
       ) : (
-        <div className="relative mt-1.5 h-11">
+        <div
+          ref={trilho}
+          className="relative mt-1.5 h-11 touch-pan-y"
+          onPointerDown={aoTocar}
+          onPointerMove={aoArrastar}
+          onPointerUp={aoSoltar}
+          onPointerCancel={aoSoltar}
+        >
           <div className="absolute inset-x-0 top-1/2 flex h-3 -translate-y-1/2 overflow-hidden rounded-full">
             <div className={cn('h-full transition-[width] duration-150 ease-out', TRILHA[esquerda.cor])} style={{ width: `${v}%` }} />
             <div className={cn('h-full flex-1', TRILHA[direita.cor])} />

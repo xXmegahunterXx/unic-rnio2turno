@@ -10,11 +10,15 @@ import { Icon, type IconName } from '@/app/ui/Icon';
 import { IlustracaoAfirmacao } from '@/app/components/pages/teste/IlustracaoAfirmacao';
 import { caminhoTeste } from '@/app/components/pages/teste/codigo';
 import { concluidas, lerProgresso, TOTAL } from '@/app/components/pages/teste/sessao';
+import { selecaoRapida } from '@/app/components/pages/teste/sintonia';
 
 export function EntradaTeste({ className }: { className?: string }) {
   const salvo = useMemo(() => lerProgresso(), []);
-  const feitas = salvo ? concluidas(salvo.respostas) : 0;
-  const emAndamento = !!salvo && feitas > 0 && feitas < TOTAL;
+  // Modo rápido salvo: conta só as 12 afirmações dele (antes mostrava "x/24").
+  const idsRapido = useMemo(() => (salvo?.rapido ? selecaoRapida(salvo.seed) : undefined), [salvo]);
+  const total = idsRapido ? idsRapido.length : TOTAL;
+  const feitas = salvo ? concluidas(salvo.respostas, idsRapido) : 0;
+  const emAndamento = !!salvo && feitas > 0 && feitas < total;
 
   return (
     <article className={cn('relative isolate flex flex-col overflow-hidden rounded-[28px] border border-line bg-surface shadow-card', className)}>
@@ -58,7 +62,7 @@ export function EntradaTeste({ className }: { className?: string }) {
           {emAndamento ? (
             <>
               <ButtonLink to={caminhoTeste(salvo!.seed)} variant="primary" size="lg" iconRight="seta" className="w-full sm:w-auto">
-                Continuar · <span className="num">{feitas}</span>/<span className="num">{TOTAL}</span>
+                Continuar · <span className="num">{feitas}</span>/<span className="num">{total}</span>
               </ButtonLink>
               <ButtonLink to="/teste" variant="ghost" size="lg" className="w-full sm:w-auto">
                 Começar de novo
