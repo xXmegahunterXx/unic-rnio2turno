@@ -32,7 +32,7 @@ import { fmtInt } from '../shared/format';
 import type { Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
 import type { Dados } from './dados';
-import { DadosEstaticos, cargoExibicao, ehEleito, situacaoCurta } from './dados-estaticos';
+import { cargoExibicao, ehEleito, situacaoCurta, type DadosEstaticos } from './dados-estaticos';
 import type { PacotesFotos } from './fotos';
 import { casaEtag, etagFraco, hashCurto } from './http-cache';
 import type { Logger } from './log';
@@ -51,7 +51,7 @@ import {
   type OgEleitoInput,
 } from './og-cartoes';
 import type { Bancada } from './og-hemiciclo';
-import { ServicoOg, type OgPronta, type OgServida } from './og-servico';
+import type { OgPronta, OgServida, ServicoOg } from './og-servico';
 import { deUf } from './meta-tags';
 import { ErroValidacao, parseCodMunicipio, parseNumero, parseRace, parseUf } from './validation';
 

@@ -212,6 +212,21 @@ describe('calcularCenario', () => {
     expect(r.fluxo.eliminados.total).toBe(outros);
   });
 
+  it('neutralidade do arredondamento: com divisão meio a meio, cada finalista ganha EXATAMENTE os mesmos votos em cada UF', () => {
+    const r = calcularCenario(ds, cenarioDoPreset('metade', ds));
+    for (const u of r.ufs) expect(u.votos[0] - u.votosT1[0], u.uf).toBe(u.votos[1] - u.votosT1[1]);
+    // e espelhar a hipótese (paraA ↔ 100 − paraA) espelha o ganho, UF a UF
+    const c1 = definirTodos(cenarioDoPreset('metade', ds), ds, { paraA: 37 });
+    const c2 = definirTodos(cenarioDoPreset('metade', ds), ds, { paraA: 63 });
+    const r1 = calcularCenario(ds, c1);
+    const r2 = calcularCenario(ds, c2);
+    r1.ufs.forEach((u, i) => {
+      const v = r2.ufs[i];
+      expect(u.votos[0] - u.votosT1[0], u.uf).toBe(v.votos[1] - v.votosT1[1]);
+      expect(u.votos[1] - u.votosT1[1], u.uf).toBe(v.votos[0] - v.votosT1[0]);
+    });
+  });
+
   it('todos os eliminados se abstêm: o comparecimento cai exatamente pelos votos deles', () => {
     const c = definirTodos(cenarioDoPreset('branco', ds), ds, { escolhe: 0, brancoNulo: 0 });
     const r = calcularCenario(ds, c);

@@ -1,6 +1,6 @@
 {
  "versao": 1,
- "geradoEm": "2026-10-10T12:04:42.868Z",
+ "geradoEm": "2026-10-10T14:46:15.153Z",
  "fonte": "Calculado pelo Sintonia a partir dos dados oficiais do TSE do 1º turno de 04/10/2026 (resultado por município e por seção, locais de votação, perfil do eleitorado, candidaturas e resultados de Câmara, Senado e Governador). Script: scripts/data/curiosidades.ts.",
  "finalistas": {
   "a": {
@@ -153,8 +153,8 @@
     "formato": "int",
     "unidade": "eleitores aptos"
    },
-   "contexto": "Borá (SP) é o município com menos eleitores do país; 78,79% deles votaram no 1º turno. São Paulo, o maior, tem 8.359 vezes mais.",
-   "texto": "Borá (SP) é o menor colégio eleitoral do Brasil: 1.094 eleitores aptos. São Paulo, o maior, tem 8.359 vezes mais.",
+   "contexto": "Borá (SP) é o município com menos eleitores do país; 78,79% deles votaram no 1º turno. O eleitorado de São Paulo, o maior, é 8.359 vezes o de Borá.",
+   "texto": "Borá (SP) é o menor colégio eleitoral do Brasil: 1.094 eleitores aptos. O eleitorado de São Paulo, o maior, é 8.359 vezes o de Borá.",
    "lugares": [
     {
      "nome": "Borá (SP)",
@@ -260,20 +260,26 @@
      }
     }
    },
-   "contexto": "Em São Joaquim de Bicas (MG), com 25.074 eleitores, os dois finalistas ficaram a 1 voto de distância: 8.138 a 8.139. É a menor diferença entre os municípios com pelo menos 5.000 eleitores.",
-   "texto": "Em São Joaquim de Bicas (MG), os dois finalistas à Presidência ficaram separados por 1 voto no 1º turno: 8.138 a 8.139.",
+   "contexto": "Em São Joaquim de Bicas (MG), com 25.074 eleitores, os dois finalistas ficaram a 1 voto de distância: 8.138 a 8.139. É a menor diferença proporcional entre os municípios com pelo menos 5.000 eleitores. Também por 1 voto: Vila Pavão (ES), 2.976 a 2.975.",
+   "texto": "Em São Joaquim de Bicas (MG) e em Vila Pavão (ES), os dois finalistas à Presidência ficaram separados por 1 voto no 1º turno: 8.138 a 8.139 e 2.976 a 2.975.",
    "lugares": [
     {
      "nome": "São Joaquim de Bicas (MG)",
      "uf": "MG",
      "cod": "41629",
      "rota": "/apuracao/mg/41629?race=pres-t1"
+    },
+    {
+     "nome": "Vila Pavão (ES)",
+     "uf": "ES",
+     "cod": "56081",
+     "rota": "/apuracao/es/56081?race=pres-t1"
     }
    ],
    "rota": "/apuracao/mg/41629?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
-   "criterio": "Menor diferença em pontos percentuais dos votos válidos entre os dois finalistas, sem contar empates exatos. Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "criterio": "Menor diferença em pontos percentuais dos votos válidos entre os dois finalistas, sem contar empates exatos; os municípios com a mesma diferença em votos são citados juntos. Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
    "dados": {
     "uf": "MG",
     "cod": "41629",
@@ -282,7 +288,10 @@
     "votosA": 8138,
     "votosB": 8139,
     "validos": 17953,
-    "piso": 5000
+    "piso": 5000,
+    "mesmaDiferenca": [
+     "ES:56081:Vila Pavão:2976:2975"
+    ]
    }
   },
   {
@@ -563,76 +572,6 @@
    }
   },
   {
-   "id": "finalistas-secoes-100",
-   "tema": "finalistas",
-   "titulo": "Seções com 100% dos válidos",
-   "par": {
-    "a": {
-     "valor": {
-      "valor": 34,
-      "formato": "int",
-      "unidade": "seções"
-     },
-     "rotulo": "maior: Montes Altos (MA)",
-     "lugar": {
-      "nome": "Montes Altos (MA) · zona 103, seção 28",
-      "uf": "MA",
-      "cod": "08397",
-      "zona": 103,
-      "secao": 28,
-      "rota": "/apuracao/ma/08397/103/28?race=pres-t1"
-     }
-    },
-    "b": {
-     "valor": {
-      "valor": 2,
-      "formato": "int",
-      "unidade": "seções"
-     },
-     "rotulo": "maior: Cândido Godói (RS)",
-     "lugar": {
-      "nome": "Cândido Godói (RS) · zona 166, seção 81",
-      "uf": "RS",
-      "cod": "85839",
-      "zona": 166,
-      "secao": 81,
-      "rota": "/apuracao/rs/85839/166/81?race=pres-t1"
-     }
-    }
-   },
-   "contexto": "Seções em que todos os votos válidos foram para um só finalista: 34 para Lula e 2 para Flávio Bolsonaro. As maiores: a seção 28 da zona 103 de Montes Altos (MA), com 281 votos válidos, e a seção 81 da zona 166 de Cândido Godói (RS), com 81 votos válidos.",
-   "texto": "No 1º turno, 34 seções deram 100% dos votos válidos a Lula e 2 a Flávio Bolsonaro (seções com pelo menos 20 votos válidos).",
-   "lugares": [
-    {
-     "nome": "Montes Altos (MA) · zona 103, seção 28",
-     "uf": "MA",
-     "cod": "08397",
-     "zona": 103,
-     "secao": 28,
-     "rota": "/apuracao/ma/08397/103/28?race=pres-t1"
-    },
-    {
-     "nome": "Cândido Godói (RS) · zona 166, seção 81",
-     "uf": "RS",
-     "cod": "85839",
-     "zona": 166,
-     "secao": 81,
-     "rota": "/apuracao/rs/85839/166/81?race=pres-t1"
-    }
-   ],
-   "rota": "/apuracao/ma/08397/103/28?race=pres-t1",
-   "rotuloRota": "Ver o boletim",
-   "fonte": "TSE · votação por seção eleitoral do 1º turno (dados abertos)",
-   "criterio": "Seções com pelo menos 20 votos válidos (brancos e nulos não contam), para não destacar seções minúsculas nem expor o voto de quem vota em seções com pouquíssimos eleitores.",
-   "dados": {
-    "secoesA": 34,
-    "secoesB": 2,
-    "exemploA": "MA:08397:103:28:281",
-    "exemploB": "RS:85839:166:81:81",
-    "pisoValidos": 20
-   }
-  },
-  {
    "id": "comparecimento-maior",
    "tema": "comparecimento",
    "titulo": "Onde mais se votou",
@@ -839,7 +778,7 @@
    "rota": "/apuracao/zz/30341?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · eleitorado por local de votação 2026 (dados abertos)",
-   "criterio": "Seções por local de votação, como o TSE cadastra (um local por zona eleitoral).",
+   "criterio": "Seções em funcionamento por local de votação, como o TSE cadastra (um local por zona eleitoral). Seções agregadas a outra contam uma vez, junto com a principal.",
    "dados": {
     "local": "Isep - R. Dr. Antonio Bernardino / R. de São Tomé (Entradas Separadas)",
     "municipio": "ZZ:30341",
@@ -944,7 +883,7 @@
      "rotulo": "à frente em 59 cidades"
     }
    },
-   "contexto": "Percentual dos votos válidos nas 186 cidades do exterior: 157.387 votos para Lula e 143.900 para Flávio Bolsonaro. Nas outras 42 cidades houve empate ou nenhum voto nos dois.",
+   "contexto": "Percentual dos votos válidos nas 186 cidades do exterior: 157.387 votos para Lula e 143.900 para Flávio Bolsonaro. Das outras 42 cidades, houve empate em 1 (Bissau, 17 a 17) e em 41 nenhum eleitor compareceu.",
    "texto": "No exterior, no 1º turno, Lula teve 47,57% dos votos válidos e Flávio Bolsonaro, 43,49%. Cidades à frente: 85 e 59.",
    "lugares": [
     {
@@ -962,7 +901,10 @@
     "validos": 330882,
     "cidadesA": 85,
     "cidadesB": 59,
-    "cidadesOutras": 42
+    "cidadesOutras": 42,
+    "cidadesEmpate": 1,
+    "cidadesSemComparecimento": 41,
+    "cidadesSemVotoNosDois": 0
    }
   },
   {
@@ -970,12 +912,13 @@
    "tema": "eleitorado",
    "titulo": "Elas são a maioria",
    "destaque": {
-    "valor": 52.84,
+    "valor": 53,
     "formato": "pct",
+    "casas": 0,
     "unidade": "do eleitorado são mulheres"
    },
-   "contexto": "São 83.876.462 eleitoras, 9.032.008 a mais que os homens. A maior proporção feminina está no Distrito Federal: 54,13%.",
-   "texto": "As mulheres são 52,84% do eleitorado brasileiro em 2026: 83.876.462 eleitoras, 9.032.008 a mais que os homens.",
+   "contexto": "São mais de 83,8 milhões de eleitoras, cerca de 9 milhões a mais que os homens. A maior proporção feminina está no Distrito Federal: 54,13%.",
+   "texto": "As mulheres são 53% do eleitorado brasileiro em 2026: mais de 83,8 milhões de eleitoras, cerca de 9 milhões a mais que os homens.",
    "lugares": [
     {
      "nome": "Distrito Federal",
@@ -986,11 +929,13 @@
    "rota": "/apuracao/df?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
-   "criterio": "Gênero declarado no cadastro eleitoral; sem informação fica fora das duas contagens. Inclui o exterior.",
+   "criterio": "Gênero declarado no cadastro eleitoral; inclui o exterior. 24.547 eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados (\"mais de\", \"cerca de\").",
    "dados": {
     "eleitores": 158745463,
     "mulheres": 83876462,
     "homens": 74844454,
+    "naoInformado": 24547,
+    "pct": 53,
     "ufMaior": "DF",
     "pctUfMaior": 54.13
    }
@@ -1031,12 +976,13 @@
    "tema": "eleitorado",
    "titulo": "Com 70 anos ou mais",
    "destaque": {
-    "valor": 17237195,
-    "formato": "int",
-    "unidade": "eleitores com 70 anos ou mais"
+    "valor": 10.9,
+    "formato": "pct",
+    "casas": 1,
+    "unidade": "do eleitorado tem 70 anos ou mais"
    },
-   "contexto": "São 10,86% do eleitorado, e o voto também é facultativo para eles. A maior proporção está no Rio Grande do Sul (14,52%); a menor, no Amazonas (6,10%).",
-   "texto": "O Brasil tem 17.237.195 eleitores com 70 anos ou mais (10,86%), para quem o voto é facultativo. A maior proporção está no Rio Grande do Sul: 14,52%.",
+   "contexto": "São mais de 17,2 milhões de eleitores, e o voto também é facultativo para eles. A maior proporção está no Rio Grande do Sul (14,52%); a menor, no Amazonas (6,10%).",
+   "texto": "10,9% do eleitorado brasileiro tem 70 anos ou mais: mais de 17,2 milhões de pessoas, para quem o voto é facultativo. A maior proporção está no Rio Grande do Sul: 14,52%.",
    "lugares": [
     {
      "nome": "Rio Grande do Sul",
@@ -1047,10 +993,12 @@
    "rota": "/apuracao/rs?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
-   "criterio": "Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE. Inclui o exterior no total.",
+   "criterio": "Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE; inclui o exterior. 24.547 eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados (\"mais de\").",
    "dados": {
-    "idosos": 17237195,
+    "idososContados": 17237195,
+    "idososMax": 17261742,
     "eleitores": 158745463,
+    "pct": 10.9,
     "ufMaior": "RS",
     "pctUfMaior": 14.52,
     "ufMenor": "AM",
@@ -1200,7 +1148,7 @@
     {
      "nome": "Rio Grande do Norte",
      "uf": "RN",
-     "rota": "/apuracao/rn?race=pres-t1"
+     "rota": "/apuracao/rn?race=gov-rn-t1"
     }
    ],
    "rota": "/apuracao/rn?race=gov-rn-t1",
@@ -1226,7 +1174,7 @@
     "formato": "int",
     "unidade": "deputadas federais eleitas"
    },
-   "contexto": "São 21,39% dos 505 deputados federais eleitos já divulgados (falta o Amazonas, com 8 vagas). No Senado, 12 das 54 vagas; entre os 20 governadores eleitos no 1º turno, 1 mulher: Raquel Lyra (PE). As mulheres são 52,84% do eleitorado.",
+   "contexto": "São 21,39% dos 505 deputados federais eleitos já divulgados (falta o Amazonas, com 8 vagas). No Senado, 12 das 54 vagas; entre os 20 governadores eleitos no 1º turno, 1 mulher: Raquel Lyra (PE). As mulheres são 53% do eleitorado.",
    "texto": "108 mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (21,39% dos eleitos já divulgados). No Senado, 12 das 54 vagas.",
    "lugares": [
     {
@@ -1237,7 +1185,7 @@
    "rota": "/camara",
    "rotuloRota": "Ver a Câmara",
    "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) · gênero: TSE, candidaturas 2026",
-   "criterio": "Eleitos já divulgados pelo TSE. AM: totalização ainda não divulgada (8 vagas).",
+   "criterio": "Eleitos já divulgados pelo TSE. AM: eleitos ainda não divulgados (8 vagas).",
    "dados": {
     "deputadasEleitas": 108,
     "deputadosEleitos": 505,

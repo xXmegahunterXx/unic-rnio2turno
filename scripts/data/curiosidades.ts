@@ -39,7 +39,7 @@ import type { UF, UFBr } from '../../src/shared/types';
 import { UFS } from '../../src/shared/types';
 import { UF_NOMES } from '../../src/shared/constants';
 import { decodeFaixas, pctAbstencao, pctBrancos, pctComparecimento, pctNulos, pctValidos } from '../../src/shared/calc';
-import { fmtInt, fmtPct } from '../../src/shared/format';
+import { fmtCompact, fmtInt, fmtPct } from '../../src/shared/format';
 import { decodeU16 } from '../../src/shared/u16';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
@@ -134,6 +134,39 @@ const maior = <T extends { eleitorado?: number; cod?: string }>(arr: T[], f: (x:
 const menor = <T extends { eleitorado?: number; cod?: string }>(arr: T[], f: (x: T) => number) => maiores(arr, (x) => -f(x))[0];
 
 const plural = (n: number, um: string, varios: string) => (n === 1 ? um : varios);
+
+/**
+ * Percentual de uma contagem conhecida só por um intervalo [lo, hi] (perfil do eleitorado: quem não tem gênero
+ * informado ou tem idade inválida no cadastro fica em `naoInformado`, fora das faixas de gênero × idade).
+ * Usa 2 casas quando os dois extremos dão o mesmo número exibido; senão 1 casa; senão 0; senão falha (nunca
+ * exibe um número que pode estar errado).
+ */
+function pctSeguro(lo: number, hi: number, todo: number, id: string): { valor: number; casas: 0 | 1 | 2; txt: string } {
+  for (const casas of [2, 1, 0] as const) {
+    const a = fmtPct(proporcao(lo, todo), casas);
+    if (a === fmtPct(proporcao(hi, todo), casas)) {
+      const f = 10 ** casas;
+      const valor = Math.round(proporcao(lo, todo) * f) / f;
+      exigir(fmtPct(valor, casas) === a, `${id}: arredondamento divergente (${a})`);
+      return { valor, casas, txt: a };
+    }
+  }
+  throw new Error(`curiosidades: ${id}: percentual ambíguo entre ${proporcao(lo, todo)} e ${proporcao(hi, todo)}`);
+}
+
+/** "mais de 17,2 milhões" — piso em décimos de milhão (verdadeiro para qualquer valor ≥ lo). */
+function maisDeMilhoes(lo: number, id: string): string {
+  const piso = Math.floor(lo / 1e5) * 1e5;
+  exigir(lo > piso && piso >= 1e6, `${id}: valor fora da faixa para "mais de … milhões" (${lo})`);
+  return `mais de ${fmtCompact(piso).replace(/\s?mi$/, piso < 2e6 ? ' milhão' : ' milhões')}`;
+}
+
+/** "cerca de 9 milhões" — só quando os dois extremos do intervalo arredondam para o mesmo milhão. */
+function cercaDeMilhoes(lo: number, hi: number, id: string): string {
+  const a = Math.round(lo / 1e6);
+  exigir(a === Math.round(hi / 1e6) && a >= 2, `${id}: "cerca de … milhões" ambíguo (${lo} a ${hi})`);
+  return `cerca de ${fmtInt(a)} milhões`;
+}
 
 function exigir(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(`curiosidades: ${msg}`);
@@ -359,8 +392,8 @@ export function calcular(e: Entrada): Curiosidade[] {
       tema: 'brasil',
       titulo: 'O menor colégio eleitoral',
       destaque: { valor: menorMun.eleitorado, formato: 'int', unidade: 'eleitores aptos' },
-      contexto: `${nomeMun(menorMun)} é o município com menos eleitores do país; ${fmtPct(pctComp(menorMun))} deles votaram no 1º turno. ${maiorMun.nome}, o maior, tem ${fmtInt(vezes)} vezes mais.`,
-      texto: `${nomeMun(menorMun)} é o menor colégio eleitoral do Brasil: ${fmtInt(menorMun.eleitorado)} eleitores aptos. ${maiorMun.nome}, o maior, tem ${fmtInt(vezes)} vezes mais.`,
+      contexto: `${nomeMun(menorMun)} é o município com menos eleitores do país; ${fmtPct(pctComp(menorMun))} deles votaram no 1º turno. O eleitorado de ${maiorMun.nome}, o maior, é ${fmtInt(vezes)} vezes o de ${menorMun.nome}.`,
+      texto: `${nomeMun(menorMun)} é o menor colégio eleitoral do Brasil: ${fmtInt(menorMun.eleitorado)} eleitores aptos. O eleitorado de ${maiorMun.nome}, o maior, é ${fmtInt(vezes)} vezes o de ${menorMun.nome}.`,
       lugares: [lugarMun(menorMun)],
       rota: rota.municipio(menorMun.uf, menorMun.cod),
       rotuloRota: 'Ver no mapa',
@@ -416,23 +449,41 @@ export function calcular(e: Entrada): Curiosidade[] {
     const dif = (m: Mun) => Math.abs(pctA(m) - pctB(m));
     const md = [...cands].sort((x, y) => dif(x) - dif(y) || Math.abs(x.a - x.b) - Math.abs(y.a - y.b) || y.eleitorado - x.eleitorado)[0];
     const dv = Math.abs(md.a - md.b);
+    const votosTxt = `${fmtInt(dv)} ${plural(dv, 'voto', 'votos')}`;
+    // Outros municípios (acima do piso) com a MESMA diferença em votos: citados juntos, para não destacar só o
+    // caso em que um dos finalistas fica à frente (em 2026: um com cada finalista à frente por 1 voto).
+    const mesmos = maiores(
+      cands.filter((m) => m !== md && Math.abs(m.a - m.b) === dv),
+      (m) => m.eleitorado,
+    );
+    const placar = (m: Mun) => `${fmtInt(m.a)} a ${fmtInt(m.b)}`;
+    const listaMesmos = mesmos.map((m) => `${nomeMun(m)}, ${placar(m)}`);
+    const textoMesmos =
+      mesmos.length === 1
+        ? `Em ${nomeMun(md)} e em ${nomeMun(mesmos[0])}, os dois finalistas à Presidência ficaram separados por ${votosTxt} no 1º turno: ${placar(md)} e ${placar(mesmos[0])}.`
+        : `Em ${fmtInt(mesmos.length + 1)} municípios, os dois finalistas à Presidência ficaram separados por ${votosTxt} no 1º turno. Em ${nomeMun(md)}: ${placar(md)}.`;
     add({
       id: 'finalistas-menor-diferenca',
       tema: 'finalistas',
-      titulo: `Separados por ${fmtInt(dv)} ${plural(dv, 'voto', 'votos')}`,
+      titulo: `Separados por ${votosTxt}`,
       destaque: { valor: dv, formato: 'int', unidade: plural(dv, 'voto de diferença', 'votos de diferença') },
       par: {
         a: { valor: { valor: md.a, formato: 'int', unidade: 'votos' }, rotulo: `${fmtPct(pctA(md))} dos válidos`, lugar: lugarMun(md) },
         b: { valor: { valor: md.b, formato: 'int', unidade: 'votos' }, rotulo: `${fmtPct(pctB(md))} dos válidos`, lugar: lugarMun(md) },
       },
-      contexto: `Em ${nomeMun(md)}, com ${fmtInt(md.eleitorado)} eleitores, os dois finalistas ficaram a ${fmtInt(dv)} ${plural(dv, 'voto', 'votos')} de distância: ${fmtInt(md.a)} a ${fmtInt(md.b)}. É a menor diferença entre os municípios com pelo menos ${pisoTxt}.`,
-      texto: `Em ${nomeMun(md)}, os dois finalistas à Presidência ficaram separados por ${fmtInt(dv)} ${plural(dv, 'voto', 'votos')} no 1º turno: ${fmtInt(md.a)} a ${fmtInt(md.b)}.`,
-      lugares: [lugarMun(md)],
+      contexto: `Em ${nomeMun(md)}, com ${fmtInt(md.eleitorado)} eleitores, os dois finalistas ficaram a ${votosTxt} de distância: ${placar(md)}. É a menor diferença proporcional entre os municípios com pelo menos ${pisoTxt}.${
+        mesmos.length ? ` Também por ${votosTxt}: ${listaMesmos.join('; ')}.` : ''
+      }`,
+      texto: mesmos.length ? textoMesmos : `Em ${nomeMun(md)}, os dois finalistas à Presidência ficaram separados por ${votosTxt} no 1º turno: ${placar(md)}.`,
+      lugares: [lugarMun(md), ...mesmos.map(lugarMun)],
       rota: rota.municipio(md.uf, md.cod),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_RESULTADO,
-      criterio: `Menor diferença em pontos percentuais dos votos válidos entre os dois finalistas, sem contar empates exatos. ${criterioPiso}`,
-      dados: { uf: md.uf, cod: md.cod, municipio: md.nome, eleitorado: md.eleitorado, votosA: md.a, votosB: md.b, validos: md.validos, piso: PISO_MUNICIPIO },
+      criterio: `Menor diferença em pontos percentuais dos votos válidos entre os dois finalistas, sem contar empates exatos; os municípios com a mesma diferença em votos são citados juntos. ${criterioPiso}`,
+      dados: {
+        uf: md.uf, cod: md.cod, municipio: md.nome, eleitorado: md.eleitorado, votosA: md.a, votosB: md.b, validos: md.validos, piso: PISO_MUNICIPIO,
+        mesmaDiferenca: mesmos.map((m) => `${m.uf}:${m.cod}:${m.nome}:${m.a}:${m.b}`),
+      },
     });
   }
 
@@ -584,61 +635,9 @@ export function calcular(e: Entrada): Curiosidade[] {
     });
   }
 
-  {
-    // seções com 100% dos válidos para um finalista
-    type Cem = { s: Secoes; i: number; v: number };
-    const cem: { a: Cem[]; b: Cem[] } = { a: [], b: [] };
-    for (const s of e.secoes)
-      for (let i = 0; i < s.n; i++) {
-        const v = s.a[i] + s.b[i] + s.outros[i];
-        if (v < PISO_SECAO_VALIDOS) continue;
-        if (s.a[i] === v) cem.a.push({ s, i, v });
-        else if (s.b[i] === v) cem.b.push({ s, i, v });
-      }
-    const ex1 = (k: 'a' | 'b') => [...cem[k]].sort((x, y) => y.v - x.v)[0];
-    const lugarSec = (c: Cem | undefined): LugarCuriosidade | undefined => {
-      if (!c) return undefined;
-      const m = e.muns.find((x) => x.uf === c.s.uf && x.cod === c.s.cod[c.i])!;
-      return {
-        nome: `${nomeMun(m)} · zona ${c.s.zona[c.i]}, seção ${c.s.secao[c.i]}`,
-        uf: c.s.uf,
-        cod: c.s.cod[c.i],
-        zona: c.s.zona[c.i],
-        secao: c.s.secao[c.i],
-        rota: rota.secao(c.s.uf, c.s.cod[c.i], c.s.zona[c.i], c.s.secao[c.i]),
-      };
-    };
-    const ea = ex1('a');
-    const eb = ex1('b');
-    const la = lugarSec(ea);
-    const lb = lugarSec(eb);
-    const munDe = (l?: LugarCuriosidade) => (l ? l.nome.split(' · ')[0] : '');
-    const exemplo = (c: Cem | undefined, l: LugarCuriosidade | undefined) =>
-      c && l ? `a seção ${c.s.secao[c.i]} da zona ${c.s.zona[c.i]} de ${munDe(l)}, com ${fmtInt(c.v)} votos válidos` : 'nenhuma';
-    add({
-      id: 'finalistas-secoes-100',
-      tema: 'finalistas',
-      titulo: 'Seções com 100% dos válidos',
-      par: {
-        a: { valor: { valor: cem.a.length, formato: 'int', unidade: plural(cem.a.length, 'seção', 'seções') }, rotulo: la ? `maior: ${munDe(la)}` : 'nenhuma', lugar: la },
-        b: { valor: { valor: cem.b.length, formato: 'int', unidade: plural(cem.b.length, 'seção', 'seções') }, rotulo: lb ? `maior: ${munDe(lb)}` : 'nenhuma', lugar: lb },
-      },
-      contexto: `Seções em que todos os votos válidos foram para um só finalista: ${fmtInt(cem.a.length)} para ${nomeA} e ${fmtInt(cem.b.length)} para ${nomeB}. As maiores: ${exemplo(ea, la)}, e ${exemplo(eb, lb)}.`,
-      texto: `No 1º turno, ${fmtInt(cem.a.length)} seções deram 100% dos votos válidos a ${nomeA} e ${fmtInt(cem.b.length)} a ${nomeB} (seções com pelo menos ${PISO_SECAO_VALIDOS} votos válidos).`,
-      lugares: [la, lb].filter((x): x is LugarCuriosidade => !!x),
-      rota: (la ?? lb)?.rota ?? rota.brasil(),
-      rotuloRota: 'Ver o boletim',
-      fonte: FONTE_SECAO,
-      criterio: `Seções com pelo menos ${PISO_SECAO_VALIDOS} votos válidos (brancos e nulos não contam), para não destacar seções minúsculas nem expor o voto de quem vota em seções com pouquíssimos eleitores.`,
-      dados: {
-        secoesA: cem.a.length,
-        secoesB: cem.b.length,
-        exemploA: ea ? `${ea.s.uf}:${ea.s.cod[ea.i]}:${ea.s.zona[ea.i]}:${ea.s.secao[ea.i]}:${ea.v}` : null,
-        exemploB: eb ? `${eb.s.uf}:${eb.s.cod[eb.i]}:${eb.s.zona[eb.i]}:${eb.s.secao[eb.i]}:${eb.v}` : null,
-        pisoValidos: PISO_SECAO_VALIDOS,
-      },
-    });
-  }
+  // Sem o fato "seções com 100% dos válidos para um finalista" (revisão de QA da fase 3): numa seção unânime, o voto
+  // de cada eleitor que votou num candidato fica conhecido (sigilo do voto), e a contagem por finalista
+  // (34 × 2 no 1º turno de 2026) é um gatilho conhecido de desinformação sobre as urnas. Não volte a incluir.
 
   // ── Comparecimento ─────────────────────────────────────────────────────────────────────────
   {
@@ -787,7 +786,7 @@ export function calcular(e: Entrada): Curiosidade[] {
       rota: rota.municipio(mg.uf, mg.cod),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_LOCAIS,
-      criterio: 'Seções por local de votação, como o TSE cadastra (um local por zona eleitoral).',
+      criterio: 'Seções em funcionamento por local de votação, como o TSE cadastra (um local por zona eleitoral). Seções agregadas a outra contam uma vez, junto com a principal.',
       dados: {
         local: lgeral.nome, municipio: `${lgeral.uf}:${lgeral.cod}`, zona: lgeral.zona, secoes: lgeral.n, aptos: lgeral.aptos,
         localBrasil: lbr.nome, municipioBrasil: `${lbr.uf}:${lbr.cod}`, zonaBrasil: lbr.zona, secoesBrasil: lbr.n, aptosBrasil: lbr.aptos,
@@ -843,6 +842,18 @@ export function calcular(e: Entrada): Curiosidade[] {
     const xa = ex.filter((m) => m.a > m.b).length;
     const xb = ex.filter((m) => m.b > m.a).length;
     const xe = ex.length - xa - xb;
+    const xEmp = ex.filter((m) => m.a === m.b && m.a > 0);
+    const xSemComp = ex.filter((m) => m.comparecimento === 0).length;
+    const xSemVoto = xe - xEmp.length - xSemComp; // compareceu alguém, mas nenhum voto nos dois finalistas
+    exigir(xSemVoto >= 0, 'exterior: contagem de cidades inconsistente');
+    const partesOutras = [
+      xEmp.length ? `houve empate em ${xEmp.length === 1 ? `1 (${xEmp[0].nome}, ${fmtInt(xEmp[0].a)} a ${fmtInt(xEmp[0].b)})` : fmtInt(xEmp.length)}` : '',
+      xSemComp ? `em ${fmtInt(xSemComp)} nenhum eleitor compareceu` : '',
+      xSemVoto ? `em ${fmtInt(xSemVoto)} nenhum voto foi para os dois` : '',
+    ].filter(Boolean);
+    const outrasTxt = partesOutras.length
+      ? ` Das outras ${fmtInt(xe)} cidades, ${partesOutras.length > 1 ? `${partesOutras.slice(0, -1).join(', ')} e ${partesOutras[partesOutras.length - 1]}` : partesOutras[0]}.`
+      : '';
     add({
       id: 'exterior-finalistas',
       tema: 'exterior',
@@ -851,13 +862,16 @@ export function calcular(e: Entrada): Curiosidade[] {
         a: { valor: { valor: r2(pctA(nacEx)), formato: 'pct', unidade: 'dos válidos' }, rotulo: `à frente em ${xa} cidades` },
         b: { valor: { valor: r2(pctB(nacEx)), formato: 'pct', unidade: 'dos válidos' }, rotulo: `à frente em ${xb} cidades` },
       },
-      contexto: `Percentual dos votos válidos nas ${fmtInt(ex.length)} cidades do exterior: ${fmtInt(nacEx.a)} votos para ${nomeA} e ${fmtInt(nacEx.b)} para ${nomeB}. Nas outras ${xe} cidades houve empate ou nenhum voto nos dois.`,
+      contexto: `Percentual dos votos válidos nas ${fmtInt(ex.length)} cidades do exterior: ${fmtInt(nacEx.a)} votos para ${nomeA} e ${fmtInt(nacEx.b)} para ${nomeB}.${outrasTxt}`,
       texto: `No exterior, no 1º turno, ${nomeA} teve ${fmtPct(pctA(nacEx))} dos votos válidos e ${nomeB}, ${fmtPct(pctB(nacEx))}. Cidades à frente: ${xa} e ${xb}.`,
       lugares: [{ nome: 'Exterior', uf: 'ZZ', rota: rota.uf('ZZ') }],
       rota: rota.uf('ZZ'),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_RESULTADO,
-      dados: { votosA: nacEx.a, votosB: nacEx.b, validos: nacEx.validos, cidadesA: xa, cidadesB: xb, cidadesOutras: xe },
+      dados: {
+        votosA: nacEx.a, votosB: nacEx.b, validos: nacEx.validos, cidadesA: xa, cidadesB: xb, cidadesOutras: xe,
+        cidadesEmpate: xEmp.length, cidadesSemComparecimento: xSemComp, cidadesSemVotoNosDois: xSemVoto,
+      },
     });
   }
 
@@ -865,6 +879,8 @@ export function calcular(e: Entrada): Curiosidade[] {
   {
     const faixas = e.perfil.SP.faixas;
     const escol = e.perfil.SP.escolaridade;
+    // 16 e 17 anos: contagem EXATA — no perfil bruto do TSE não há eleitor de 16/17 anos sem gênero informado, e a
+    // faixa "Inválida" não cai em 16/17 (conferido em 10/10/2026: 1.634.244 nos dois). Já mulheres e 70+ usam intervalo.
     const iJovem = faixas.map((f, i) => [f, i] as const).filter(([f]) => /^1[67] anos$/.test(f)).map(([, i]) => i);
     const i70 = faixas.map((f, i) => [f, i] as const).filter(([f]) => /^(7\d|8\d|9\d|1\d\d)/.test(f)).map(([, i]) => i);
     exigir(iJovem.length === 2 && i70.length >= 6, `faixas etárias inesperadas: ${faixas.join(', ')}`);
@@ -884,8 +900,20 @@ export function calcular(e: Entrada): Curiosidade[] {
         idosos: proporcao(somaIdx(p, i70), p.eleitores),
         fem: proporcao(fem(p), p.eleitores),
         sup: proporcao(p.escolaridade[iSup], p.eleitores),
+        // limites superiores: quem está em `naoInformado` (sem gênero ou com idade inválida) pode pertencer ao grupo
+        idososMax: proporcao(somaIdx(p, i70) + p.naoInformado, p.eleitores),
+        femMax: proporcao(fem(p) + p.naoInformado, p.eleitores),
+        v: somaIdx(p, i70),
+        f: fem(p),
+        ni: p.naoInformado,
       };
     });
+    /** O recorde por UF só vale se o mínimo do primeiro superar o máximo de todos os outros (e vice-versa). */
+    const recordeSeguro = (l: (typeof linhas)[number], lo: (x: (typeof linhas)[number]) => number, hi: (x: (typeof linhas)[number]) => number, maiorQue: boolean, id: string) =>
+      exigir(
+        linhas.every((o) => o === l || (maiorQue ? lo(l) > hi(o) : hi(l) < lo(o))),
+        `${id}: recorde por UF ambíguo por causa de eleitores sem gênero/idade no perfil`,
+      );
     const tot = TODAS.reduce(
       (s, uf) => {
         const p = e.perfil[uf].total;
@@ -894,28 +922,40 @@ export function calcular(e: Entrada): Curiosidade[] {
         s.v += somaIdx(p, i70);
         s.f += fem(p);
         s.m += masc(p);
+        s.ni += p.naoInformado;
         p.escolaridade.forEach((x, i) => (s.esc[i] = (s.esc[i] ?? 0) + x));
         return s;
       },
-      { el: 0, j: 0, v: 0, f: 0, m: 0, esc: [] as number[] },
+      { el: 0, j: 0, v: 0, f: 0, m: 0, ni: 0, esc: [] as number[] },
     );
     const iModa = tot.esc.indexOf(Math.max(...tot.esc));
     const rotUf = (uf: UF) => lugarUf(uf);
 
+    // Perfil agregado: eleitores sem gênero informado ou com idade inválida ficam em `naoInformado` (fora de
+    // gênero × idade). Mulheres e 70+ são conhecidos só por intervalo [contado, contado + naoInformado]:
+    // os números saem com a precisão que o intervalo garante (pctSeguro, "mais de", "cerca de").
     const fMax = maior(linhas, (l) => l.fem);
+    recordeSeguro(fMax, (l) => l.fem, (l) => l.femMax, true, 'eleitorado-mulheres');
+    const pctMulheres = pctSeguro(tot.f, tot.f + tot.ni, tot.el, 'eleitorado-mulheres');
+    const pctFMax = pctSeguro(fMax.f, fMax.f + fMax.ni, fMax.eleitorado, 'eleitorado-mulheres/UF');
+    const eleitoras = maisDeMilhoes(tot.f, 'eleitorado-mulheres');
+    const aMais = cercaDeMilhoes(tot.f - (tot.m + tot.ni), tot.f + tot.ni - tot.m, 'eleitorado-mulheres/diferença');
     add({
       id: 'eleitorado-mulheres',
       tema: 'eleitorado',
       titulo: 'Elas são a maioria',
-      destaque: { valor: r2(proporcao(tot.f, tot.el)), formato: 'pct', unidade: 'do eleitorado são mulheres' },
-      contexto: `São ${fmtInt(tot.f)} eleitoras, ${fmtInt(tot.f - tot.m)} a mais que os homens. A maior proporção feminina está ${emUf(fMax.uf)}: ${fmtPct(fMax.fem)}.`,
-      texto: `As mulheres são ${fmtPct(proporcao(tot.f, tot.el))} do eleitorado brasileiro em 2026: ${fmtInt(tot.f)} eleitoras, ${fmtInt(tot.f - tot.m)} a mais que os homens.`,
+      destaque: { valor: pctMulheres.valor, formato: 'pct', casas: pctMulheres.casas, unidade: 'do eleitorado são mulheres' },
+      contexto: `São ${eleitoras} de eleitoras, ${aMais} a mais que os homens. A maior proporção feminina está ${emUf(fMax.uf)}: ${pctFMax.txt}.`,
+      texto: `As mulheres são ${pctMulheres.txt} do eleitorado brasileiro em 2026: ${eleitoras} de eleitoras, ${aMais} a mais que os homens.`,
       lugares: [rotUf(fMax.uf)],
       rota: rota.uf(fMax.uf),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_PERFIL,
-      criterio: 'Gênero declarado no cadastro eleitoral; sem informação fica fora das duas contagens. Inclui o exterior.',
-      dados: { eleitores: tot.el, mulheres: tot.f, homens: tot.m, ufMaior: fMax.uf, pctUfMaior: r2(fMax.fem) },
+      criterio: `Gênero declarado no cadastro eleitoral; inclui o exterior. ${fmtInt(tot.ni)} eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados ("mais de", "cerca de").`,
+      dados: {
+        eleitores: tot.el, mulheres: tot.f, homens: tot.m, naoInformado: tot.ni,
+        pct: pctMulheres.valor, ufMaior: fMax.uf, pctUfMaior: pctFMax.valor,
+      },
     });
 
     const jMax = maior(linhas, (l) => l.jovens);
@@ -937,19 +977,28 @@ export function calcular(e: Entrada): Curiosidade[] {
 
     const vMax = maior(linhas, (l) => l.idosos);
     const vMin = menor(linhas, (l) => l.idosos);
+    recordeSeguro(vMax, (l) => l.idosos, (l) => l.idososMax, true, 'eleitorado-70-mais');
+    recordeSeguro(vMin, (l) => l.idosos, (l) => l.idososMax, false, 'eleitorado-70-mais');
+    const pctV = pctSeguro(tot.v, tot.v + tot.ni, tot.el, 'eleitorado-70-mais');
+    const pctVMax = pctSeguro(vMax.v, vMax.v + vMax.ni, vMax.eleitorado, 'eleitorado-70-mais/max');
+    const pctVMin = pctSeguro(vMin.v, vMin.v + vMin.ni, vMin.eleitorado, 'eleitorado-70-mais/min');
+    const idosos = maisDeMilhoes(tot.v, 'eleitorado-70-mais');
     add({
       id: 'eleitorado-70-mais',
       tema: 'eleitorado',
       titulo: 'Com 70 anos ou mais',
-      destaque: { valor: tot.v, formato: 'int', unidade: 'eleitores com 70 anos ou mais' },
-      contexto: `São ${fmtPct(proporcao(tot.v, tot.el))} do eleitorado, e o voto também é facultativo para eles. A maior proporção está ${emUf(vMax.uf)} (${fmtPct(vMax.idosos)}); a menor, ${emUf(vMin.uf)} (${fmtPct(vMin.idosos)}).`,
-      texto: `O Brasil tem ${fmtInt(tot.v)} eleitores com 70 anos ou mais (${fmtPct(proporcao(tot.v, tot.el))}), para quem o voto é facultativo. A maior proporção está ${emUf(vMax.uf)}: ${fmtPct(vMax.idosos)}.`,
+      destaque: { valor: pctV.valor, formato: 'pct', casas: pctV.casas, unidade: 'do eleitorado tem 70 anos ou mais' },
+      contexto: `São ${idosos} de eleitores, e o voto também é facultativo para eles. A maior proporção está ${emUf(vMax.uf)} (${pctVMax.txt}); a menor, ${emUf(vMin.uf)} (${pctVMin.txt}).`,
+      texto: `${pctV.txt} do eleitorado brasileiro tem 70 anos ou mais: ${idosos} de pessoas, para quem o voto é facultativo. A maior proporção está ${emUf(vMax.uf)}: ${pctVMax.txt}.`,
       lugares: [rotUf(vMax.uf)],
       rota: rota.uf(vMax.uf),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_PERFIL,
-      criterio: 'Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE. Inclui o exterior no total.',
-      dados: { idosos: tot.v, eleitores: tot.el, ufMaior: vMax.uf, pctUfMaior: r2(vMax.idosos), ufMenor: vMin.uf, pctUfMenor: r2(vMin.idosos) },
+      criterio: `Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE; inclui o exterior. ${fmtInt(tot.ni)} eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados ("mais de").`,
+      dados: {
+        idososContados: tot.v, idososMax: tot.v + tot.ni, eleitores: tot.el, pct: pctV.valor,
+        ufMaior: vMax.uf, pctUfMaior: pctVMax.valor, ufMenor: vMin.uf, pctUfMenor: pctVMin.valor,
+      },
     });
 
     const sMax = maior(linhas, (l) => l.sup);
@@ -1035,6 +1084,7 @@ export function calcular(e: Entrada): Curiosidade[] {
     const [p1, p2] = [ap.c1, ap.c2].sort((x, y) => x.numero - y.numero);
     const pp = Math.abs(ap.c1.pct - ap.c2.pct);
     const segundoTurno = ap.c1.situacao === 'segundo-turno';
+    const rotaGovAp = segundoTurno ? `/apuracao/${ap.uf.toLowerCase()}?race=gov-${ap.uf.toLowerCase()}-t1` : '/governadores';
     add({
       id: 'cargos-governador-apertada',
       tema: 'cargos',
@@ -1042,8 +1092,9 @@ export function calcular(e: Entrada): Curiosidade[] {
       destaque: { valor: r2(pp), formato: 'pp', unidade: 'de diferença' },
       contexto: `${emUf(ap.uf).replace(/^./, (c) => c.toUpperCase())}, ${p1.nomeUrna} (${p1.partido}) teve ${fmtPct(p1.pct)} e ${p2.nomeUrna} (${p2.partido}), ${fmtPct(p2.pct)}: ${fmtInt(Math.abs(p1.votos - p2.votos))} votos de diferença.${segundoTurno ? ' Os dois disputam o 2º turno em 25 de outubro.' : ''}`,
       texto: `A disputa de governador mais apertada do 1º turno foi ${emUf(ap.uf)}: ${p1.nomeUrna} (${p1.partido}), ${fmtPct(p1.pct)}, e ${p2.nomeUrna} (${p2.partido}), ${fmtPct(p2.pct)}.`,
-      lugares: [lugarUf(ap.uf)],
-      rota: segundoTurno ? `/apuracao/${ap.uf.toLowerCase()}?race=gov-${ap.uf.toLowerCase()}-t1` : '/governadores',
+      // o lugar leva à disputa de governador (não ao mapa de Presidente da UF)
+      lugares: [{ ...lugarUf(ap.uf), rota: rotaGovAp }],
+      rota: rotaGovAp,
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_CARGOS,
       criterio: 'Menor diferença, em pontos percentuais dos votos válidos, entre o 1º e o 2º colocados nas 27 disputas.',
@@ -1061,7 +1112,11 @@ export function calcular(e: Entrada): Curiosidade[] {
     const senMulheres = senEleitos.filter((c) => e.fichas.get(c.sqcand)?.genero === 'Feminino');
     const govMulheres = eleitos.filter((g) => e.fichas.get(g.c1.sqcand)?.genero === 'Feminino');
     const pctDep = proporcao(depMulheres.length, depEleitos.length);
-    const perfilTot = TODAS.reduce((s, uf) => ({ el: s.el + e.perfil[uf].total.eleitores, f: s.f + e.perfil[uf].total.idade[0].reduce((a, b) => a + b, 0) }), { el: 0, f: 0 });
+    const perfilTot = TODAS.reduce(
+      (s, uf) => ({ el: s.el + e.perfil[uf].total.eleitores, f: s.f + e.perfil[uf].total.idade[0].reduce((a, b) => a + b, 0), ni: s.ni + e.perfil[uf].total.naoInformado }),
+      { el: 0, f: 0, ni: 0 },
+    );
+    const pctEleitoras = pctSeguro(perfilTot.f, perfilTot.f + perfilTot.ni, perfilTot.el, 'cargos-mulheres-eleitas');
     const govTxt =
       govMulheres.length === 0
         ? `nenhum dos ${eleitos.length} governadores eleitos no 1º turno é mulher`
@@ -1073,14 +1128,14 @@ export function calcular(e: Entrada): Curiosidade[] {
       tema: 'cargos',
       titulo: 'Mulheres eleitas',
       destaque: { valor: depMulheres.length, formato: 'int', unidade: 'deputadas federais eleitas' },
-      contexto: `São ${fmtPct(pctDep)} dos ${fmtInt(depEleitos.length)} deputados federais eleitos${pendentes.length ? ` já divulgados (${pendentes.length === 1 ? `falta ${artigoUf(pendentes[0].uf as UF)}` : `faltam ${pendentes.map((u) => u.uf).join(', ')}`}, com ${vagasPend} vagas)` : ''}. No Senado, ${senMulheres.length} das ${senEleitos.length} vagas; ${govTxt}. As mulheres são ${fmtPct(proporcao(perfilTot.f, perfilTot.el))} do eleitorado.`,
+      contexto: `São ${fmtPct(pctDep)} dos ${fmtInt(depEleitos.length)} deputados federais eleitos${pendentes.length ? ` já divulgados (${pendentes.length === 1 ? `falta ${artigoUf(pendentes[0].uf as UF)}` : `faltam ${pendentes.map((u) => u.uf).join(', ')}`}, com ${vagasPend} vagas)` : ''}. No Senado, ${senMulheres.length} das ${senEleitos.length} vagas; ${govTxt}. As mulheres são ${pctEleitoras.txt} do eleitorado.`,
       texto: `${depMulheres.length} mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (${fmtPct(pctDep)} dos eleitos já divulgados). No Senado, ${senMulheres.length} das ${senEleitos.length} vagas.`,
       lugares: [{ nome: 'Câmara dos Deputados', rota: rota.camara() }],
       rota: rota.camara(),
       rotuloRota: 'Ver a Câmara',
       fonte: `${FONTE_CARGOS} · gênero: TSE, candidaturas 2026`,
       criterio: pendentes.length
-        ? `Eleitos já divulgados pelo TSE. ${pendentes.map((u) => u.uf).join(', ')}: totalização ainda não divulgada (${vagasPend} vagas).`
+        ? `Eleitos já divulgados pelo TSE. ${pendentes.map((u) => u.uf).join(', ')}: eleitos ainda não divulgados (${vagasPend} vagas).`
         : 'Eleitos divulgados pelo TSE.',
       dados: {
         deputadasEleitas: depMulheres.length,

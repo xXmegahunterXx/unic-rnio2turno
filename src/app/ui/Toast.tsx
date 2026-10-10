@@ -46,11 +46,17 @@ const icones: Record<ToastTone, IconName> = { neutral: 'info', ok: 'check-circul
 export function Toaster() {
   const lista = useSyncExternalStore(sub, () => itens, () => itens);
   if (typeof document === 'undefined') return null;
+  // Com um Sheet/Dialog aberto, o celular mostra o aviso no TOPO: na base ele cobria (e bloqueava o toque em)
+  // "Postar no X" / "Baixar imagem" do sheet de compartilhar. Lido a cada aviso novo (a lista muda e re-renderiza).
+  const modalAberto = lista.length > 0 && document.querySelector('[aria-modal="true"]') !== null;
   return createPortal(
     <div
       aria-live="polite"
       aria-atomic="false"
-      className="pointer-events-none fixed inset-x-0 bottom-[calc(76px+env(safe-area-inset-bottom))] z-[90] flex flex-col items-center gap-2 px-4 md:bottom-6"
+      className={cn(
+        'pointer-events-none fixed inset-x-0 z-[90] flex flex-col items-center gap-2 px-4 md:bottom-6 md:top-auto',
+        modalAberto ? 'top-[calc(12px+env(safe-area-inset-top))]' : 'bottom-[calc(76px+env(safe-area-inset-bottom))]',
+      )}
     >
       <AnimatePresence initial={false}>
         {lista.map((t) => (

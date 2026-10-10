@@ -144,7 +144,8 @@ export function createApp(deps: AppDeps) {
   const nomeMunicipio = (uf: UF, cod: string) => nomes.get(`${uf}|${cod}`);
   const dadosEstaticos = new DadosEstaticos(config.dataDir, now);
   // imagens OG: LRU de 256 PNGs / 64 MB, uma renderização por vez e no máximo 16 na fila
-  const servicoOg = new ServicoOg({ now, aoFalhar: (chave, err) => log.erro(`Falha ao gerar a imagem OG ${chave}`, err) });
+  // (o código de um cenário não vai para o log: é a hipótese de quem compartilhou)
+  const servicoOg = new ServicoOg({ now, aoFalhar: (chave, err) => log.erro(`Falha ao gerar a imagem OG ${chave.startsWith('cen|') ? 'cen|…' : chave}`, err) });
 
   // ---- utilidades --------------------------------------------------------------------------------
   const ipDe = (c: Ctx): string => {

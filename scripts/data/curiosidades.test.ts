@@ -234,3 +234,76 @@ describe('curiosidades.json · recálculo independente', () => {
     expect(f.dados.deputadosEleitos).toBe(eleitos);
   });
 });
+
+describe('curiosidades.json · revisão adversarial (QA de dados, fase 3)', () => {
+  it('não destaca seções unânimes (sigilo do voto e gatilho de desinformação)', () => {
+    expect(ds.fatos.some((f) => f.id === 'finalistas-secoes-100')).toBe(false);
+    for (const f of ds.fatos) expect(`${f.titulo} ${f.contexto} ${f.texto}`, f.id).not.toMatch(/100\s?% dos (votos )?válidos/);
+  });
+
+  it('"separados por N votos" cita TODOS os municípios (acima do piso) com a mesma diferença em votos', () => {
+    const f = fato('finalistas-menor-diferenca');
+    const piso = ds.pisos.eleitoradoMunicipio;
+    const dv = f.destaque!.valor;
+    const iguais: string[] = [];
+    for (const uf of UFS)
+      for (const m of ufs.get(uf)!) {
+        const a = m.t1.votos[na] ?? 0;
+        const b = m.t1.votos[nb] ?? 0;
+        if (m.eleitorado >= piso && a !== b && Math.abs(a - b) === dv && m.cod !== f.dados.cod) iguais.push(`${uf}:${m.cod}:${m.nome}:${a}:${b}`);
+      }
+    expect([...(f.dados.mesmaDiferenca as string[])].sort()).toEqual(iguais.sort());
+    for (const s of iguais) expect(f.lugares.some((l) => l.cod === s.split(':')[1]), s).toBe(true);
+  });
+
+  it('exterior: as cidades sem ninguém à frente são explicadas (empate × ninguém compareceu)', () => {
+    const f = fato('exterior-finalistas');
+    const zz = ufs.get('ZZ')!;
+    const emp = zz.filter((m) => (m.t1.votos[na] ?? 0) === (m.t1.votos[nb] ?? 0) && (m.t1.votos[na] ?? 0) > 0).length;
+    const semComp = zz.filter((m) => m.t1.comparecimento === 0).length;
+    expect(f.dados.cidadesEmpate).toBe(emp);
+    expect(f.dados.cidadesSemComparecimento).toBe(semComp);
+    expect(Number(f.dados.cidadesA) + Number(f.dados.cidadesB) + emp + semComp + Number(f.dados.cidadesSemVotoNosDois)).toBe(zz.length);
+  });
+
+  it('perfil: mulheres e 70+ só afirmam o que vale para qualquer valor do intervalo [contado, contado + não informado]', () => {
+    let el = 0;
+    let f = 0;
+    let m = 0;
+    let v = 0;
+    let ni = 0;
+    for (const uf of TODAS) {
+      const p = ler<{ faixas: string[]; total: { eleitores: number; idade: [number[], number[]]; naoInformado: number } }>(`perfil/${uf.toLowerCase()}.json`);
+      const t = p.total;
+      el += t.eleitores;
+      ni += t.naoInformado;
+      f += t.idade[0].reduce((x, y) => x + y, 0);
+      m += t.idade[1].reduce((x, y) => x + y, 0);
+      p.faixas.forEach((rot, i) => {
+        if (/^(7\d|8\d|9\d|1\d\d)/.test(rot)) v += t.idade[0][i] + t.idade[1][i];
+      });
+    }
+    const mul = fato('eleitorado-mulheres');
+    const casasM = mul.destaque!.casas ?? 2;
+    for (const x of [f, f + ni]) expect((x / el) * 100, 'pct mulheres').toBeCloseTo(mul.destaque!.valor, casasM === 0 ? 0 : casasM);
+    const milhoes = (s: string) => Number(/mais de ([\d,]+) milh/.exec(s)![1].replace(',', '.')) * 1e6;
+    expect(f).toBeGreaterThan(milhoes(mul.texto));
+    const id = fato('eleitorado-70-mais');
+    for (const x of [v, v + ni]) expect(Math.round((x / el) * 1000) / 10).toBe(id.destaque!.valor);
+    expect(v).toBeGreaterThan(milhoes(id.texto));
+  });
+
+  it('o lugar da disputa de governador leva ao mapa de governador, não ao de Presidente', () => {
+    const f = fato('cargos-governador-apertada');
+    for (const l of f.lugares) expect(l.rota, f.id).toBe(f.rota);
+    expect(f.rota).toMatch(/race=gov-[a-z]{2}-t1|^\/governadores$/);
+  });
+
+  it('textos sem "vezes mais" (ambíguo) e sem afirmar nada sobre o 2º turno', () => {
+    for (const f of ds.fatos) {
+      const t = `${f.contexto} ${f.texto}`;
+      expect(t, f.id).not.toMatch(/vezes mais/);
+      expect(t, f.id).not.toMatch(/\b(vai|vão) (ganhar|vencer|perder)\b|\bfavorit/i);
+    }
+  });
+});

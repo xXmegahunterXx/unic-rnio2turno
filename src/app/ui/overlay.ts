@@ -6,6 +6,12 @@ const FOCAVEIS =
 
 let travas = 0;
 
+/**
+ * Pilha de modais abertos: só o do topo responde a Esc/Tab. Sem isso, um Dialog aberto por cima de um Sheet (ex.: o
+ * "toque e segure para salvar" do compartilhar) fechava os dois no mesmo Esc, e o Tab podia cair no Sheet de baixo.
+ */
+const pilha: object[] = [];
+
 export function useModal(aberto: boolean, painel: RefObject<HTMLElement | null>, onClose: () => void) {
   const fechar = useRef(onClose);
   fechar.current = onClose;
@@ -13,6 +19,8 @@ export function useModal(aberto: boolean, painel: RefObject<HTMLElement | null>,
   useEffect(() => {
     if (!aberto) return;
     const anterior = document.activeElement as HTMLElement | null;
+    const eu = {};
+    pilha.push(eu);
     const html = document.documentElement;
     const sbw = window.innerWidth - html.clientWidth;
     if (travas++ === 0) {
@@ -27,6 +35,7 @@ export function useModal(aberto: boolean, painel: RefObject<HTMLElement | null>,
     }, 30);
 
     const onKey = (e: KeyboardEvent) => {
+      if (pilha[pilha.length - 1] !== eu) return;
       if (e.key === 'Escape') {
         e.stopPropagation();
         fechar.current();
@@ -52,6 +61,8 @@ export function useModal(aberto: boolean, painel: RefObject<HTMLElement | null>,
     return () => {
       window.clearTimeout(foco);
       document.removeEventListener('keydown', onKey);
+      const i = pilha.indexOf(eu);
+      if (i >= 0) pilha.splice(i, 1);
       if (--travas === 0) {
         html.style.overflow = '';
         html.style.paddingRight = '';

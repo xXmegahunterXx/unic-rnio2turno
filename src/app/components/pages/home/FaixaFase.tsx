@@ -62,11 +62,14 @@ function Contagem({ status, recebidoEm, race, className }: { status: LiveStatus;
       </div>
       <Countdown target={alvo} now={relogio} size="md" hideZeroDays doneLabel="Começando…" className="mt-2.5 w-full [&>div]:min-w-0" />
       {finalistas.length === 2 ? (
-        <div className="mt-2.5 flex min-w-0 items-center justify-center gap-2 text-[13px] text-fg-muted">
-          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em]">Presidente</span>
-          <Nome c={finalistas[0]} />
-          <span aria-hidden className="text-fg-subtle">×</span>
-          <Nome c={finalistas[1]} />
+        // Dois lados de largura IGUAL (mesmo tratamento para os dois nomes, inclusive se precisar cortar).
+        <div className="mt-2.5 flex min-w-0 items-center gap-2 text-[13px] text-fg-muted">
+          <span className="hidden shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] min-[420px]:inline">Presidente</span>
+          <div className="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+            <Nome c={finalistas[0]} />
+            <span aria-hidden className="text-fg-subtle">×</span>
+            <Nome c={finalistas[1]} />
+          </div>
         </div>
       ) : null}
     </div>
@@ -75,10 +78,10 @@ function Contagem({ status, recebidoEm, race, className }: { status: LiveStatus;
 
 function Nome({ c }: { c: Candidate }) {
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
+    <span className="inline-flex min-w-0 items-center justify-center gap-1.5">
       <span aria-hidden className={cn('h-2 w-2 shrink-0 rounded-full', corSlot(c.cor).bg)} />
       <span className="truncate font-medium text-fg">{c.nomeUrna}</span>
-      <span className="num shrink-0 text-fg-subtle">{c.numero}</span>
+      <span className="num shrink-0 text-fg-subtle max-[379px]:hidden">{c.numero}</span>
     </span>
   );
 }

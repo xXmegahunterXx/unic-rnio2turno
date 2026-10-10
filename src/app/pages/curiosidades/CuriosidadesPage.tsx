@@ -215,7 +215,8 @@ function ComoCalculamos({ ds }: { ds: CuriosidadesDataset }) {
   const itens = [
     'Fonte: dados oficiais do TSE do 1º turno de 4 de outubro de 2026: resultado por município e por seção, locais de votação, perfil do eleitorado, candidaturas e resultados de Câmara, Senado e Governador.',
     'Percentuais como os do TSE: votos válidos não incluem brancos e nulos; brancos e nulos são calculados sobre o comparecimento; comparecimento e abstenção, sobre o eleitorado apto.',
-    `Recordes por município consideram só cidades com pelo menos ${fmtInt(ds.pisos.eleitoradoMunicipio)} eleitores aptos, para não destacar oscilações de cidades muito pequenas. Seções com 100% dos válidos: pelo menos ${fmtInt(ds.pisos.secaoValidos)} votos válidos.`,
+    `Recordes por município consideram só cidades com pelo menos ${fmtInt(ds.pisos.eleitoradoMunicipio)} eleitores aptos, para não destacar oscilações de cidades muito pequenas. Não destacamos seções unânimes, para preservar o sigilo do voto.`,
+    'Perfil do eleitorado: quando parte do cadastro não informa gênero ou idade, mostramos o número com menos casas ou arredondado para baixo ("mais de…"), para nunca exibir um valor que possa estar errado.',
     'Todo fato sobre os dois finalistas aparece em par, com o mesmo critério para cada um. Nenhum número vem da simulação do 2º turno.',
   ];
   return (

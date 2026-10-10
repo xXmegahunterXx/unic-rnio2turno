@@ -418,6 +418,27 @@ export function arredondarComSoma(xs: readonly number[], total: number): number[
   return base;
 }
 
+/**
+ * [A, B, brancos/nulos] arredondados preservando o total, SEM que o arredondamento desempate os finalistas: se A e B
+ * têm o mesmo resto (ex.: "metade para cada" com número ímpar de votos na UF) e só um levaria a unidade extra, ela vai
+ * para brancos/nulos. Assim o resultado não depende da ordem dos candidatos nem de ruído de ponto flutuante.
+ */
+function arredondarSemDesempatar(a: number, b: number, bn: number, total: number): [number, number, number] {
+  const r = arredondarComSoma([a, b, bn], total) as [number, number, number];
+  const s = a + b + bn;
+  if (!(s > 0) || total <= 0) return r;
+  const ra = (Math.max(0, a) / s) * total;
+  const rb = (Math.max(0, b) / s) * total;
+  const ganhoA = r[0] - Math.floor(ra);
+  const ganhoB = r[1] - Math.floor(rb);
+  if (ganhoA !== ganhoB && Math.abs(ra - Math.floor(ra) - (rb - Math.floor(rb))) < 1e-6) {
+    if (ganhoA > ganhoB) r[0]--;
+    else r[1]--;
+    r[2]++;
+  }
+  return r;
+}
+
 export function calcularCenario(ds: PresidenteT1Dataset, cenarioBruto: Cenario): ResultadoCenario {
   const cenario = normalizarCenario(cenarioBruto, ds);
   const { ia, ib } = finalistasDe(ds);
@@ -488,7 +509,7 @@ export function calcularCenario(ds: PresidenteT1Dataset, cenarioBruto: Cenario):
 
     // Arredonda preservando o total (sem abstenção nem variação, o comparecimento do 1º turno fica exato).
     const comp = Math.min(u.eleitorado, Math.round(a + b + bn));
-    const [A, B, BN] = arredondarComSoma([a, b, bn], comp);
+    const [A, B, BN] = arredondarSemDesempatar(a, b, bn, comp);
     const vA = u.votos[ia] ?? 0;
     const vB = u.votos[ib] ?? 0;
     return {
