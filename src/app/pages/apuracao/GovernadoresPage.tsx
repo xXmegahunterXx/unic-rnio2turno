@@ -237,7 +237,6 @@ export default function GovernadoresPage() {
               ufs={presData.ufs}
               sub={pre ? '1º turno · resultado oficial' : 'Também neste domingo · Brasil'}
               to="/apuracao"
-              simulado={!pre && status?.simulacao}
             />
           ) : (
             <GovernadorCartaoSk />

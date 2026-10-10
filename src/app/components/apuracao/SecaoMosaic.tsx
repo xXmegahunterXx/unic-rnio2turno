@@ -136,7 +136,8 @@ export function SecaoMosaic({
     });
     return layoutMosaico(tamanhos, size.w, {
       alturaAlvo: alvo,
-      labelH: 18,
+      // 20 px: o rótulo fica no alto da faixa e sobra respiro para o anel da seção selecionada.
+      labelH: 20,
       gapX: estreito ? 10 : 16,
       gapY: estreito ? 10 : 14,
       minBlockW: estreito ? 76 : 110,
@@ -241,7 +242,8 @@ export function SecaoMosaic({
       bctx.font = '600 11px "JetBrains Mono", ui-monospace, monospace';
       bctx.fillStyle = paleta.label;
       bctx.textAlign = 'left';
-      bctx.fillText(`Zona ${z.zona}`, b.x, b.y + labelH / 2 - 1);
+      const yTxt = b.y + Math.min(labelH / 2 - 1, 8);
+      bctx.fillText(`Zona ${z.zona}`, b.x, yTxt);
       if (b.w >= 104) {
         let tot = 0;
         for (let i = 0; i < z.estado.length; i++) if (z.estado.charCodeAt(i) !== 48) tot++;
@@ -251,7 +253,7 @@ export function SecaoMosaic({
         bctx.fillText(
           `${fmtInt(tot)}/${fmtInt(z.secoes.length)}`,
           b.x + b.cols * pitch - (pitch - cell),
-          b.y + labelH / 2 - 1,
+          yTxt,
         );
       }
       bctx.globalAlpha = 1;
@@ -482,7 +484,8 @@ export function SecaoMosaic({
   const ativoZona = ativo && layout ? zonas[layout.blocks[ativo.bi]?.idx] : null;
   const pitch = layout?.pitch ?? 0;
   const cell = layout?.cell ?? 0;
-  const anel = Math.max(2, Math.round(cell * 0.18));
+  // Anel limitado a 3 px: em células grandes (zonas pequenas) não invade o rótulo da zona.
+  const anel = Math.max(2, Math.min(3, Math.round(cell * 0.18)));
 
   return (
     <div className={cn('w-full', className)}>

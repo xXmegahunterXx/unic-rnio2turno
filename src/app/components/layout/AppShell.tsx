@@ -49,7 +49,7 @@ function AtalhoPainelDemo() {
       to="/admin"
       aria-label="Painel de simulação"
       title="Painel de simulação"
-      className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-line text-[13px] font-semibold text-fg-muted transition-colors hover:border-line/[2] hover:text-fg lg:w-auto lg:px-3.5"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-line text-[13px] font-semibold text-fg-muted transition-colors hover:border-line/[2] hover:text-fg max-[359px]:hidden lg:w-auto lg:px-3.5"
     >
       <Icon name="ajustes" size={16} />
       <span className="hidden lg:inline">Painel</span>

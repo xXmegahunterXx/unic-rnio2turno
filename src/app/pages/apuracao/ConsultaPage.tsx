@@ -168,6 +168,21 @@ export default function ConsultaPage() {
 
   const passo = !uf ? 1 : !cod ? 2 : zona === null ? 3 : 4;
   const secaoInput = useRef<HTMLInputElement>(null);
+  // Ao avançar, o passo anterior recolhe e a página encolhe: sem isto o passo ativo pode ficar escondido
+  // sob o header (celular). Só rola quando o topo do passo ativo está fora da vista.
+  const passoAnterior = useRef(passo);
+  useEffect(() => {
+    if (passoAnterior.current === passo) return;
+    passoAnterior.current = passo;
+    const el = document.getElementById(`passo-${passo}`);
+    if (!el) return;
+    const topo = el.getBoundingClientRect().top;
+    const header = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 64;
+    if (topo < header + 8 || topo > window.innerHeight * 0.6) {
+      const reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      el.scrollIntoView({ behavior: reduzir ? 'auto' : 'smooth', block: 'start' });
+    }
+  }, [passo]);
   useEffect(() => {
     if (passo === 4 && zonas.length > 1) secaoInput.current?.focus({ preventScroll: true });
   }, [passo, zonas.length]);
@@ -175,7 +190,7 @@ export default function ConsultaPage() {
   const munErro = (qMun.error ?? qMun.failureReason) && !munSnap;
 
   return (
-    <Container>
+    <Container wide>
       <PageHeader
         eyebrow="Boletim de urna · 2º turno"
         title="Consulte sua seção"
@@ -430,9 +445,10 @@ function Passo({
   const mostrarConteudo = ativo;
   return (
     <li
+      id={`passo-${n}`}
       aria-current={ativo ? 'step' : undefined}
       className={cn(
-        'rounded-2xl border bg-surface transition-[border-color,box-shadow]',
+        'scroll-mt-[calc(var(--app-header-h,64px)+12px)] rounded-2xl border bg-surface transition-[border-color,box-shadow]',
         ativo ? 'border-brand/40 p-4 shadow-glow sm:p-6' : 'border-line px-4 py-3 shadow-card sm:px-6',
         bloqueado && !ativo && 'opacity-55',
       )}

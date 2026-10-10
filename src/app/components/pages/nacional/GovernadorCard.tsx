@@ -114,16 +114,17 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
                 <CandidateAvatar candidato={c} size="sm" eleito={eleito === c} className="hidden min-[420px]:inline-flex" />
                 <div className="min-w-0 flex-1">
                   <div className={cn('line-clamp-2 text-[14.5px] leading-tight text-fg', lider ? 'font-semibold' : 'font-medium')}>{c.nomeUrna}</div>
-                  <div className="num mt-0.5 truncate text-[12px] text-fg-muted">
-                    {c.partido} · {fmtInt(resumo.votos[i] ?? 0)}
+                  <div className="num mt-0.5 flex min-w-0 text-[12px] text-fg-muted">
+                    <span className="min-w-0 truncate">{c.partido}</span>
+                    <span className="shrink-0 whitespace-pre"> · {fmtInt(resumo.votos[i] ?? 0)}</span>
                   </div>
                 </div>
                 <NumberRoll
                   value={pctValidos(resumo, i)}
-                  format={(n) => fmtPct(n, 1)}
+                  format={(n) => fmtPct(n)}
                   smallChars="%"
                   className={cn(
-                    'shrink-0 font-display text-[24px] font-semibold leading-none tracking-[-0.03em] xl:text-[28px]',
+                    'shrink-0 font-display text-[22px] font-semibold leading-none tracking-[-0.03em] xl:text-[26px]',
                     tem ? s.textDisplay : 'text-fg-subtle',
                   )}
                 />

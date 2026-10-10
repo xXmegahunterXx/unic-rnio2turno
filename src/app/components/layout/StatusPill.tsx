@@ -50,7 +50,20 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
     return (
       <span className={cn(base, className)}>
         <Icon name="check-circulo" size={15} className="text-ok-fg" />
-        <span className="font-semibold">{v.simulacao ? 'Simulação encerrada' : 'Encerrada'}</span>
+        {/* No celular, só "Encerrada": a faixa de SIMULAÇÃO já sinaliza a fonte (e o header não estoura). */}
+        <span className="font-semibold">
+          {v.simulacao ? (
+            compact ? (
+              <>
+                <span className="sr-only">Simulação </span>Encerrada
+              </>
+            ) : (
+              'Simulação encerrada'
+            )
+          ) : (
+            'Encerrada'
+          )}
+        </span>
       </span>
     );
   }

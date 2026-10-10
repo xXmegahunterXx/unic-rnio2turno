@@ -28,7 +28,7 @@ export function Section({ id, title, description, actions, children, card, class
             ) : null}
             {description ? <p className="mt-1 text-[13.5px] leading-snug text-fg-muted sm:text-sm">{description}</p> : null}
           </div>
-          {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+          {actions ? <div className="flex min-w-0 max-w-full items-center gap-2">{actions}</div> : null}
         </div>
       ) : null}
       <div className={cn(card && 'rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6', contentClassName)}>{children}</div>

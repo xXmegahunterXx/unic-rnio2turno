@@ -30,7 +30,7 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
       className={cn('-mx-1 overflow-x-auto scrollbar-none', className)}
       style={cortado ? { maskImage: fade, WebkitMaskImage: fade } : undefined}
     >
-      <ol className="flex w-max items-center gap-0.5 px-1 text-[13px]">
+      <ol className="flex w-max items-center px-1 text-[13px] sm:gap-0.5">
         {items.map((c, i) => {
           const ultimo = i === items.length - 1;
           return (
@@ -51,7 +51,7 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
               </li>
               {!ultimo ? (
                 <li aria-hidden className="text-fg-subtle">
-                  <Icon name="chevron-direita" size={14} />
+                  <Icon name="chevron-direita" size={13} />
                 </li>
               ) : null}
             </Fragment>

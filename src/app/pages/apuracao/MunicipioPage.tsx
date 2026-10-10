@@ -74,7 +74,7 @@ export default function MunicipioPage() {
 
   if (!uf || (ehNaoEncontrado(erro) && !snap)) {
     return (
-      <Container className="py-8 sm:py-12">
+      <Container wide className="py-8 sm:py-12">
         <NaoEncontrado
           icon="pin"
           titulo={uf ? 'Município não encontrado' : 'Endereço não encontrado'}
@@ -104,14 +104,14 @@ export default function MunicipioPage() {
   }
   if (q.isError && !snap) {
     return (
-      <Container className="py-8">
+      <Container wide className="py-8">
         <ErrorState onRetry={() => q.refetch()} />
       </Container>
     );
   }
   if (!snap || !raceShown) {
     return (
-      <Container>
+      <Container wide>
         <EsqueletoMunicipio />
       </Container>
     );
@@ -160,7 +160,7 @@ export default function MunicipioPage() {
   );
 
   return (
-    <Container>
+    <Container wide>
       <PageHeader
         breadcrumbs={[
           { label: 'Brasil', to: rotaBrasil(ctx.pedida) },

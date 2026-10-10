@@ -108,7 +108,7 @@ export default function UfPage() {
   // ---------------------------------------------------------------- estados de erro/carregamento
   if (!uf) {
     return (
-      <Container className="py-8 sm:py-12">
+      <Container wide className="py-8 sm:py-12">
         <NaoEncontrado
           icon="mapa"
           titulo="Estado não encontrado"
@@ -133,7 +133,7 @@ export default function UfPage() {
   const erro = q.error ?? q.failureReason;
   if (ehNaoEncontrado(erro) && !snap) {
     return (
-      <Container className="py-8 sm:py-12">
+      <Container wide className="py-8 sm:py-12">
         <NaoEncontrado
           icon="mapa"
           titulo={`Sem dados para ${nomeUf}`}
@@ -154,14 +154,14 @@ export default function UfPage() {
   }
   if (q.isError && !snap) {
     return (
-      <Container className="py-8">
+      <Container wide className="py-8">
         <ErrorState onRetry={() => q.refetch()} />
       </Container>
     );
   }
   if (!snap || !raceShown) {
     return (
-      <Container>
+      <Container wide>
         <EsqueletoUf />
       </Container>
     );
@@ -241,7 +241,7 @@ export default function UfPage() {
   );
 
   return (
-    <Container>
+    <Container wide>
       <PageHeader
         breadcrumbs={[{ label: 'Brasil', to: rotaBrasil(ctx.pedida) }, { label: exterior ? 'Exterior' : nomeUf }]}
         eyebrow={t1 ? 'Resultado oficial · 1º turno' : '2º turno · 25 de outubro'}

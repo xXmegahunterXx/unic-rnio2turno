@@ -134,7 +134,7 @@ function LinhaGov({ c, pct, apagado }: { c: Candidate; pct: number | null; apaga
       <CandidateAvatar candidato={c} size="xs" />
       <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg">{c.nomeUrna}</span>
       <span className={cn('num shrink-0 font-display text-[16px] font-semibold tracking-[-0.02em]', apagado || pct === null ? 'text-fg-subtle' : s.text)}>
-        {pct === null ? '—' : fmtPct(pct, 1)}
+        {pct === null ? '—' : fmtPct(pct)}
       </span>
     </li>
   );

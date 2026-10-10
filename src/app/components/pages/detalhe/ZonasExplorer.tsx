@@ -71,7 +71,6 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
           <span className="flex min-w-0 items-baseline gap-2">
             <span className="font-mono text-[13px] font-semibold">{fmtZona(z.zona)}</span>
             <span className="num truncate text-[11.5px] text-fg-muted">{fmtInt(z.secoes)} seções</span>
-            {z.zona === zonaValida ? <Icon name="check" size={14} className="shrink-0 self-center text-brand-fg" /> : null}
           </span>
           <span className={cn('mt-1 block', soAbaixoDe[LARGURA.apurado])}>
             <ApuradoCell t={z} compact />
@@ -134,7 +133,7 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
           rowKey={(z) => z.zona}
           onRowClick={(z) => escolher(z.zona)}
           rowLabel={(z) => `Ver as seções da zona ${z.zona}`}
-          rowClassName={(z) => cn(z.zona === zonaValida && 'bg-brand/[0.09]')}
+          rowClassName={(z) => cn(z.zona === zonaValida && 'bg-brand/[0.09] [&>td:first-child]:shadow-[inset_3px_0_0_rgb(var(--brand))]')}
           initialSort={{ key: 'zona', dir: 'asc' }}
           maxHeight={lg ? 'calc(100dvh - var(--app-header-h, 64px) - 120px)' : undefined}
           pageSize={lg ? undefined : 8}

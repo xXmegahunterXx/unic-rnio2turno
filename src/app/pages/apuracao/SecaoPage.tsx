@@ -116,7 +116,7 @@ export default function SecaoPage() {
     const consulta = `/apuracao/consulta${uf ? `?uf=${uf.toLowerCase()}${munExiste ? `&mun=${cod}` : ''}${munExiste && zona !== undefined && mSnap?.zonas.some((z) => z.zona === zona) ? `&zona=${zona}` : ''}` : ''}`;
     const zonaExiste = !!mSnap && zona !== undefined && mSnap.zonas.some((z) => z.zona === zona);
     return (
-      <Container className="py-8 sm:py-12">
+      <Container wide className="py-8 sm:py-12">
         <NaoEncontrado
           icon="urna"
           titulo={!munExiste ? 'Município não encontrado' : !zonaExiste ? 'Zona não encontrada' : 'Seção não encontrada'}
@@ -163,14 +163,14 @@ export default function SecaoPage() {
 
   if (qSec.isError && !sec && !ehNaoEncontrado(erroSec)) {
     return (
-      <Container className="py-8">
+      <Container wide className="py-8">
         <ErrorState onRetry={() => qSec.refetch()} />
       </Container>
     );
   }
   if (!sec || !race) {
     return (
-      <Container>
+      <Container wide>
         <EsqueletoSecao />
       </Container>
     );
@@ -230,7 +230,7 @@ export default function SecaoPage() {
     mSnap && sec.totalizada ? fraseDiferenca(race, tSec, mSnap.resumo, exterior ? 'conjunto da cidade' : 'conjunto do município') : null;
 
   return (
-    <Container>
+    <Container wide>
       <PageHeader
         breadcrumbs={[
           { label: 'Brasil', to: rotaBrasil(ctx.pedida) },

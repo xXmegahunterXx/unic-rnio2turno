@@ -23,7 +23,7 @@ export function NaoEncontrado({ icon = 'pin', titulo, descricao, acoes, children
     <section
       role="alert"
       className={cn(
-        'relative overflow-hidden rounded-3xl border border-line bg-surface px-5 py-10 text-center shadow-card sm:px-10 sm:py-14',
+        'relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-line bg-surface px-5 py-10 text-center shadow-card sm:px-10 sm:py-14',
         className,
       )}
     >

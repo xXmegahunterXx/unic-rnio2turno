@@ -200,7 +200,7 @@ function PlacarEstados({ race, ufs }: { race: Race; ufs: Partial<Record<UF, Summ
         })}
       </ul>
       <p className="num mt-2.5 text-[12.5px] text-fg-muted">
-        {aguardando > 0 ? `${fmtInt(aguardando)} ${aguardando === 1 ? 'estado aguarda' : 'estados aguardam'} a 1ª seção` : 'Todos os estados com seções totalizadas'}
+        {aguardando > 0 ? `${fmtInt(aguardando)} ${aguardando === 1 ? 'estado aguarda' : 'estados aguardam'} a 1ª seção` : 'Todos os estados já têm seções totalizadas'}
         {empate > 0 ? ` · ${fmtInt(empate)} empatado${empate === 1 ? '' : 's'}` : ''}
       </p>
     </div>
