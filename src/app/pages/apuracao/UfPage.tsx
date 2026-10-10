@@ -182,7 +182,7 @@ export default function UfPage() {
   const modoAtual = modos.includes(modo) ? modo : 'vencedor';
   const paraMun = (m: MunicipioResumo) => rotaMun(uf, m.cod, ctx.pedida);
   // "Eleito" só faz sentido onde a disputa se decide (governador na própria UF). Presidente num estado:
-  // o selo fica "À frente" (o kit não tem rótulo "venceu aqui" — anotado no relatório).
+  // o selo fica "À frente" e, com a apuração local encerrada, "Mais votado" (Placar).
   const resumoPlacar = race.abrangencia === uf ? r : { ...r, eleito: null };
   const temSerie = snap.serie.length > 1;
   // O feed da UF traz também eventos nacionais (início, "matematicamente eleito"): deixamos claro que são do país.

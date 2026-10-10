@@ -8,7 +8,7 @@ import { useNow, estimarSimNow } from '@/app/lib/useNow';
 import { INICIO_APURACAO } from '@/shared/constants';
 import { fmtHora, fmtHoraSeg } from '@/shared/format';
 import type { LiveStatus } from '@/shared/types';
-import { fmtFaltam } from '@/app/ui/Countdown';
+import { fmtFaltam, partesTempo } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
 
@@ -32,6 +32,13 @@ export function statusVisual(status: LiveStatus | undefined, recebidoEm: number,
   return { tipo: 'apurando', simulacao: status.simulacao, simNow: sim, parado: status.pausado || status.congelado };
 }
 
+/** Versão curta para o header do celular: "15d 18h", "2h 05min", "45min", "30s" (o aria-label leva a completa). */
+function fmtFaltamCurto(ms: number): string {
+  const p = partesTempo(ms);
+  if (p.dias > 0 || p.horas > 0) return fmtFaltam(ms);
+  return p.min > 0 ? `${p.min}min` : `${p.seg}s`;
+}
+
 export function StatusPillView({ v, compact, className }: { v: StatusVisual; compact?: boolean; className?: string }) {
   const base =
     'inline-flex h-8 items-center gap-2 whitespace-nowrap rounded-full border border-line bg-surface-2/80 pl-2.5 pr-3 text-[12.5px] font-medium text-fg';
@@ -41,8 +48,8 @@ export function StatusPillView({ v, compact, className }: { v: StatusVisual; com
       // role="timer" (aria-live implícito "off"): o relógio não é anunciado a cada segundo.
       <span className={cn(base, className)} role="timer" aria-label={`Apuração começa em ${fmtFaltam(v.faltaMs)}`}>
         <Icon name="relogio" size={15} className="text-brand-fg" />
-        <span className="text-fg-muted">{compact ? 'Em' : 'Começa em'}</span>
-        <span className="num font-semibold">{fmtFaltam(v.faltaMs)}</span>
+        <span className={cn('text-fg-muted', compact && 'max-[359px]:hidden')}>{compact ? 'Em' : 'Começa em'}</span>
+        <span className="num font-semibold">{compact ? fmtFaltamCurto(v.faltaMs) : fmtFaltam(v.faltaMs)}</span>
       </span>
     );
   }

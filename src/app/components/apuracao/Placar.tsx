@@ -280,8 +280,9 @@ function LadoDuelo({
 
       <div className={cn('mt-3 flex h-6 items-center sm:mt-4', dir && 'justify-end')}>
         {l.lider && !semVotos && !l.eleito ? (
-          <Badge tone={toneFromCor(l.c.cor)} size="xs" caps icon="seta-cima">
-            À frente
+          // Apuração encerrada sem "eleito" (Presidente num estado/município, ou 1º turno): "Mais votado".
+          <Badge tone={toneFromCor(l.c.cor)} size="xs" caps icon={resumo.status === 'encerrada' ? 'check' : 'seta-cima'}>
+            {resumo.status === 'encerrada' ? 'Mais votado' : 'À frente'}
           </Badge>
         ) : l.eleito ? (
           // No desktop o selo "Eleito / Matematicamente eleito" já aparece no cabeçalho do placar.

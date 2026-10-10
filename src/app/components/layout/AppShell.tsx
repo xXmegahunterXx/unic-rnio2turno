@@ -50,10 +50,11 @@ function AtalhoPainelDemo() {
       to="/admin"
       aria-label="Painel de simulação"
       title="Painel de simulação"
-      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-2.5 text-[13px] font-semibold text-fg transition-colors hover:bg-brand/20 max-[359px]:hidden sm:px-3.5"
+      className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-brand/40 bg-brand/10 px-2.5 text-[13px] font-semibold text-fg transition-colors hover:bg-brand/20 max-[379px]:w-9 max-[379px]:px-0 max-[339px]:hidden sm:px-3.5 md:max-lg:w-9 md:max-lg:px-0"
     >
       <Icon name="ajustes" size={16} />
-      <span>Painel</span>
+      {/* Entre 768 e 1023 px a navegação ocupa o header: só o ícone (o nome segue no aria-label). */}
+      <span className="max-[379px]:hidden md:max-lg:hidden">Painel</span>
     </Link>
   );
 }
@@ -125,7 +126,7 @@ function Header() {
             <Link to="/" aria-label="Sintonia — página inicial" className="-ml-1 rounded-xl px-1 py-1">
               <Logo size={28} />
             </Link>
-            <nav aria-label="Principal" className="ml-4 hidden items-center gap-0.5 md:flex">
+            <nav aria-label="Principal" className="ml-1 hidden items-center gap-0.5 md:flex lg:ml-4">
               {NAV.map((n) => {
                 const ativo = n.match(pathname);
                 return (
@@ -134,7 +135,7 @@ function Header() {
                     to={n.to}
                     aria-current={ativo ? 'page' : undefined}
                     className={cn(
-                      'relative rounded-[10px] px-3 py-2 text-[14px] font-medium transition-colors',
+                      'relative whitespace-nowrap rounded-[10px] px-2.5 py-2 text-[14px] font-medium transition-colors lg:px-3',
                       ativo ? 'text-fg' : 'text-fg-muted hover:text-fg',
                     )}
                   >
@@ -145,14 +146,17 @@ function Header() {
                         transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                       />
                     ) : null}
-                    {n.label}
+                    {/* Entre 768 e 1023 px, rótulos curtos (os mesmos da tab bar) para caber com a pílula de status. */}
+                    <span className="lg:hidden">{n.short}</span>
+                    <span className="hidden lg:inline">{n.label}</span>
                   </Link>
                 );
               })}
             </nav>
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-              <StatusPill className="hidden sm:inline-flex" />
-              <StatusPill compact className="sm:hidden" />
+              {/* Pílula completa só a partir de 1024 px: entre 768 e 1023 a navegação do header já ocupa a linha. */}
+              <StatusPill className="hidden lg:inline-flex" />
+              <StatusPill compact className="lg:hidden" />
               {__DEMO__ ? <AtalhoPainelDemo /> : null}
               <ThemeToggle size="sm" />
             </div>

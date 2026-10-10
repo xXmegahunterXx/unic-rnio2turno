@@ -8,6 +8,11 @@ import { cn } from '@/app/lib/cn';
 import { Segmented } from '@/app/ui/Segmented';
 import { TimelineChart } from '@/app/components/apuracao/TimelineChart';
 import { Icon } from '@/app/ui/Icon';
+import { useMediaQuery } from '@/app/lib/useMediaQuery';
+import { useElementSize } from '@/app/components/apuracao/MapHooks';
+
+/** Altura da legenda do TimelineChart (uma linha + margem) somada ao gráfico. */
+const LEGENDA_H = 32;
 
 export interface CorridaPanelProps {
   serie: SeriePoint[];
@@ -20,6 +25,8 @@ type Eixo = 'secoes' | 'horario';
 export const CorridaPanel = memo(function CorridaPanel({ serie, race, className }: CorridaPanelProps) {
   const [eixo, setEixo] = useState<Eixo>('secoes');
   const tem = serie.length >= 2;
+  const largo = useMediaQuery('(min-width: 1360px)');
+  const [areaRef, area] = useElementSize<HTMLDivElement>();
   return (
     <section aria-labelledby="corrida-titulo" className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
@@ -43,9 +50,23 @@ export const CorridaPanel = memo(function CorridaPanel({ serie, race, className 
         ) : null}
       </div>
       {tem ? (
-        <div className="flex flex-1 flex-col justify-center">
+        largo ? (
+          // Desktop largo: o cartão estica até a altura da coluna do mapa; o gráfico ocupa essa altura toda
+          // (absoluto dentro da área medida, para a medida não depender do próprio gráfico).
+          <div ref={areaRef} className="relative min-h-[332px] flex-1">
+            <div className="absolute inset-x-0 top-0">
+              <TimelineChart
+                serie={serie}
+                race={race}
+                eixoX={eixo}
+                altura={Math.max(300, Math.floor(area.h) - LEGENDA_H)}
+                ariaLabel={`Evolução do placar · ${race.titulo}`}
+              />
+            </div>
+          </div>
+        ) : (
           <TimelineChart serie={serie} race={race} eixoX={eixo} ariaLabel={`Evolução do placar · ${race.titulo}`} />
-        </div>
+        )
       ) : (
         <GraficoVazio />
       )}
