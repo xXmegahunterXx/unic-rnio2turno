@@ -29,10 +29,29 @@ export function AppShell({ children }: { children?: ReactNode }) {
       </main>
       <Footer />
       <TabBar />
+      {__DEMO__ ? <AtalhoPainelDemo /> : null}
       <Toaster />
       <ScrollRestoration />
     </div>
     </MotionConfig>
+  );
+}
+
+/**
+ * Só no build demo (preview estático): atalho fixo para o painel de simulação, já que no preview não dá para
+ * digitar /admin na barra de endereço. Fica acima da tab bar do celular.
+ */
+function AtalhoPainelDemo() {
+  const { pathname } = useLocation();
+  if (pathname.startsWith('/admin')) return null;
+  return (
+    <Link
+      to="/admin"
+      className="glass fixed right-4 z-40 inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-[13px] font-semibold text-fg shadow-glow transition-transform hover:-translate-y-0.5 bottom-[calc(84px+env(safe-area-inset-bottom,0px))] md:bottom-6"
+    >
+      <Icon name="ajustes" size={16} />
+      Painel de simulação
+    </Link>
   );
 }
 
