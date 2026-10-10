@@ -11,7 +11,9 @@ import { buildModel, type Model } from '../model';
 import { cenarioDoPreset, PRESET_IDS } from '../presets';
 import { alvosNeutros, cenarioPadrao, mesclaCenario } from '../scenario';
 import { buildStructure, type Structure } from '../structure';
+import { hashStr } from '../rng';
 import { checaSoma, checaTally, dataset, relogio, semGeradoEm } from './helpers';
+import { semSecao } from './secao-sintetica';
 
 const INI = INICIO_APURACAO;
 const GOVS = ['gov-ac', 'gov-am', 'gov-df', 'gov-es', 'gov-rj', 'gov-rn', 'gov-to'];
@@ -21,6 +23,9 @@ const pct0 = (s: Summary) => (100 * s.votos[0]) / (s.votos[0] + s.votos[1]);
 const ds: LoadedDataset = await dataset();
 const st: Structure = buildStructure(ds);
 const modelo: Model = buildModel(st, cenarioPadrao(st));
+/** Mesmo dataset SEM os arquivos de seção (modelo por município + ruído, comportamento da fase 1). */
+const dsFallback: LoadedDataset = semSecao(ds);
+const temSecaoReal = !!st.real && st.real.nUfs > 0;
 
 /** Controller demo pausado, com relógio controlável, posicionado em `pct`% via comando. */
 function ctrlEm(preset?: string) {
@@ -59,13 +64,35 @@ describe('determinismo', () => {
     expect(m3.aptos.reduce((a, b) => a + b, 0)).toBe(modelo.aptos.reduce((a, b) => a + b, 0));
   });
 
-  it('impressão digital estável do cenário padrão (muda só se o modelo mudar de propósito)', () => {
+  const digital = (m: Model, n: number) => {
     // Soma ponderada simples de todas as seções — qualquer alteração de algoritmo/constante muda isto.
     let h = 0;
-    for (let i = 0; i < st.nSec; i += 1) {
-      h = (h * 31 + modelo.pv0[i] * 7 + modelo.pv1[i] * 3 + modelo.comp[i] + (modelo.chegada[i] % 9973)) % 2147483647;
+    for (let i = 0; i < n; i += 1) {
+      h = (h * 31 + m.pv0[i] * 7 + m.pv1[i] * 3 + m.comp[i] + (m.chegada[i] % 9973)) % 2147483647;
     }
-    expect(h).toBe(FINGERPRINT);
+    return h;
+  };
+
+  it('impressão digital estável do cenário padrão SEM seção real (muda só se o modelo mudar de propósito)', () => {
+    const stFb = buildStructure(dsFallback);
+    expect(stFb.real).toBeNull();
+    expect(digital(buildModel(stFb, cenarioPadrao(stFb)), stFb.nSec)).toBe(FINGERPRINT);
+  });
+
+  it.runIf(temSecaoReal)('impressão digital com o 1º turno real por seção (por versão dos arquivos de seção)', () => {
+    // a impressão digital depende dos arquivos de public/data/secao: registrada por resumo (hash) dos arquivos
+    let resumo = 0;
+    for (const u of ds.meta.ufs) {
+      const d = ds.secao?.[u.uf];
+      if (d) resumo = hashStr(`${resumo}|${u.uf}|${d.n}|${d.aptos}|${d.pres.a}|${d.pres.b}|${d.pres.comp}`);
+    }
+    const h = digital(modelo, st.nSec);
+    const esperado = FINGERPRINT_SECAO[resumo];
+    if (esperado === undefined) {
+      console.warn(`[impressão digital] arquivos de seção sem registro (resumo ${resumo}): impressão digital ${h}`);
+      return;
+    }
+    expect(h).toBe(esperado);
   });
 
   it('dois controllers com o mesmo estado e relógio produzem snapshots idênticos', () => {
@@ -467,7 +494,9 @@ describe('1º turno (dataset oficial)', () => {
     }
   });
 
-  it('município no 1º turno: uma linha "todas as zonas" (zona 0), mosaico das zonas reais; zona/seção → 404', () => {
+  it('município no 1º turno SEM seção real: uma linha "todas as zonas" (zona 0), mosaico das zonas reais; zona/seção → 404', () => {
+    const r = relogio(Date.UTC(2026, 9, 25, 19, 0));
+    const c = createController(dsFallback, { modo: 'demo', now: r.now });
     const m = c.municipio('pres-t1', 'SP', '71072');
     expect(m.zonas.length).toBe(1);
     expect(m.zonas[0].zona).toBe(0);
@@ -571,4 +600,9 @@ describe('desempenho', () => {
   });
 });
 
-const FINGERPRINT = 1307193522;
+/** Fase 2: ruído por seção padrão 0,08 + ruído estrutural 0,24 em quadratura no fallback (antes: 1307193522). */
+const FINGERPRINT = 261226385;
+/** Impressão digital do cenário padrão com os arquivos REAIS de seção, por resumo (hash) dos arquivos. */
+const FINGERPRINT_SECAO: Record<number, number> = {
+  1918870254: 485363866, // public/data/secao de 10/10/2026 (28 UFs, 7 governadores)
+};

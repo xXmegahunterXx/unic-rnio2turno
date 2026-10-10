@@ -2,7 +2,7 @@
  * AdminState: padrão por modo, relógio, (de)serialização e validação de estados persistidos/recebidos.
  */
 import { INICIO_APURACAO } from '../shared/constants';
-import type { AdminState, Aviso, ClockState, FonteDados, ScenarioConfig, TseConfig } from '../shared/types';
+import type { AdminState, Aviso, ClockState, FonteDados, Patrocinio, ScenarioConfig, TseConfig } from '../shared/types';
 import { normalizaCenario } from './scenario';
 import type { Structure } from './structure';
 
@@ -51,6 +51,7 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     versao: 1,
     tse: tsePadrao(st),
     nomesReais: false,
+    patrocinio: null,
   };
 }
 
@@ -66,6 +67,55 @@ export function parseAviso(v: unknown): Aviso | null {
   const texto = typeof v.texto === 'string' ? v.texto.trim().slice(0, 280) : '';
   if (!texto) return null;
   return { nivel: v.nivel === 'alerta' ? 'alerta' : 'info', texto };
+}
+
+/** Limites do patrocínio (o status, com o patrocínio, é consultado a cada poucos segundos por todos). */
+export const PATROCINIO_LIMITES = {
+  marca: 60,
+  texto: 160,
+  url: 500,
+  /** data URI da logo: ~45 KB de imagem. Prefira uma URL https (não pesa no status). */
+  imagemDataUri: 60_000,
+};
+
+const RE_DATA_URI = /^data:image\/(png|jpeg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/]+={0,2}$/;
+
+function urlHttps(v: string): boolean {
+  if (v.length > PATROCINIO_LIMITES.url || /\s/.test(v)) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' && !u.username && !u.password && u.hostname.includes('.');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Valida um patrocínio (comando 'patrocinio' e estado restaurado). Retorna o objeto normalizado (só os campos do
+ * contrato, textos aparados) ou a mensagem de erro. Regras: `marca` (1–60) e `texto` (1–160) obrigatórios; `url`
+ * https válida (sem usuário/senha); `imagem` opcional: data URI de imagem (png, jpeg, webp, gif ou svg, base64,
+ * até 60 mil caracteres) ou URL https.
+ */
+export function validaPatrocinio(v: unknown): { ok: Patrocinio } | { erro: string } {
+  if (!isObj(v)) return { erro: 'Patrocínio inválido: informe { marca, texto, url, imagem? } ou null para remover.' };
+  const L = PATROCINIO_LIMITES;
+  const marca = typeof v.marca === 'string' ? v.marca.trim() : '';
+  const texto = typeof v.texto === 'string' ? v.texto.trim() : '';
+  const url = typeof v.url === 'string' ? v.url.trim() : '';
+  if (!marca || marca.length > L.marca) return { erro: `Patrocínio: "marca" é obrigatória (até ${L.marca} caracteres).` };
+  if (!texto || texto.length > L.texto) return { erro: `Patrocínio: "texto" é obrigatório (até ${L.texto} caracteres).` };
+  if (!urlHttps(url)) return { erro: 'Patrocínio: "url" precisa ser um endereço https:// válido.' };
+  const out: Patrocinio = { marca, texto, url };
+  if (v.imagem !== undefined && v.imagem !== null && v.imagem !== '') {
+    const img = typeof v.imagem === 'string' ? v.imagem.trim() : '';
+    if (img.startsWith('data:')) {
+      if (img.length > L.imagemDataUri)
+        return { erro: `Patrocínio: a imagem em data URI passa de ${L.imagemDataUri} caracteres (use uma URL https).` };
+      if (!RE_DATA_URI.test(img)) return { erro: 'Patrocínio: "imagem" deve ser data:image/(png|jpeg|webp|gif|svg+xml);base64,…' };
+    } else if (!urlHttps(img)) return { erro: 'Patrocínio: "imagem" deve ser uma URL https:// ou um data URI de imagem.' };
+    out.imagem = img;
+  }
+  return { ok: out };
 }
 
 /**
@@ -120,5 +170,14 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     versao: Math.max(0, Math.floor(finito(v.versao, fallback.versao))),
     tse,
     nomesReais: typeof v.nomesReais === 'boolean' ? v.nomesReais : (fallback.nomesReais ?? false),
+    patrocinio: parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null),
   };
+}
+
+/** Patrocínio de um estado restaurado: null remove; ausente → fallback; inválido → null (nunca lança). */
+function parsePatrocinioSalvo(v: unknown, fallback: Patrocinio | null): Patrocinio | null {
+  if (v === undefined) return fallback;
+  if (v === null) return null;
+  const r = validaPatrocinio(v);
+  return 'ok' in r ? r.ok : null;
 }

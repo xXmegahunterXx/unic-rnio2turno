@@ -1,6 +1,6 @@
 {
  "versao": 1,
- "geradoEm": "2026-10-09T20:59:54.596Z",
+ "geradoEm": "2026-10-10T03:35:59.591Z",
  "fonte": "TSE — resultados oficiais do 1º turno das Eleições Gerais de 04/10/2026 (pleito 3220): Presidente (eleição 6257) e Governador (eleição 6259) por município; estrutura de zonas e seções do arquivo de urnas (3220); candidatos do 2º turno de 25/10/2026 (eleições 6258 e 6260). URLs: https://resultados.tse.jus.br/oficial/ele2026/6257/config/mun-e006257-cm.json · https://resultados.tse.jus.br/oficial/ele2026/arquivo-urna/3220/config/{uf}/{uf}-p003220-cs.json · https://resultados.tse.jus.br/oficial/ele2026/6257/dados/{uf}/{uf}{mun}-c0001-e006257-u.json · https://resultados.tse.jus.br/oficial/ele2026/6259/dados/{uf}/{uf}{mun}-c0003-e006259-u.json · https://resultados.tse.jus.br/oficial/ele2026/6258/dados/br/br-c0001-e006258-u.json. Malhas municipais e grafia oficial dos nomes dos municípios: IBGE (servicodados.ibge.gov.br/api/v4/malhas e api/v1/localidades/municipios).",
  "races": [
   {
@@ -15,6 +15,7 @@
      "nomeUrna": "Lula",
      "nome": "Luiz Inácio Lula da Silva",
      "partido": "PT",
+     "sqcand": "280002542548",
      "coligacao": "Brasil Pronto pra Mais",
      "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
      "vice": "Geraldo Alckmin",
@@ -22,19 +23,22 @@
      "primeiroTurno": {
       "votos": 53879538,
       "pct": 45.16
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 22,
      "nomeUrna": "Flávio Bolsonaro",
      "nome": "Flávio Nantes Bolsonaro",
      "partido": "PL",
+     "sqcand": "280002551544",
      "vice": "Alfredo Gaspar",
      "cor": "b",
      "primeiroTurno": {
       "votos": 56104503,
       "pct": 47.03
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -86,6 +90,7 @@
      "nomeUrna": "Alan Rick",
      "nome": "Alan Rick Miranda",
      "partido": "REPUBLICANOS",
+     "sqcand": "10002532492",
      "coligacao": "Trabalho da Esperança",
      "composicao": "REPUBLICANOS / NOVO / PSD / AVANTE",
      "vice": "Ricardo Leite",
@@ -93,13 +98,15 @@
      "primeiroTurno": {
       "votos": 141859,
       "pct": 32.27
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 11,
      "nomeUrna": "Mailza Assis",
      "nome": "Mailza Assis Cameli",
      "partido": "PP",
+     "sqcand": "10002544107",
      "coligacao": "Avança Acre",
      "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
      "vice": "Jéssica Sales",
@@ -107,7 +114,8 @@
      "primeiroTurno": {
       "votos": 218760,
       "pct": 49.76
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -132,6 +140,7 @@
      "nomeUrna": "Professora Maria do Carmo",
      "nome": "Maria do Carmo Seffair Lins de Albuquerque",
      "partido": "PL",
+     "sqcand": "40002541626",
      "coligacao": "Mudar é Urgente",
      "composicao": "PL / NOVO",
      "vice": "Coronel Aníbal",
@@ -139,13 +148,15 @@
      "primeiroTurno": {
       "votos": 507335,
       "pct": 24.49
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 55,
      "nomeUrna": "Omar Aziz",
      "nome": "Omar José Abdelaziz",
      "partido": "PSD",
+     "sqcand": "40002532272",
      "coligacao": "Força Amazonas",
      "composicao": "REPUBLICANOS / MDB / PSD / PCdoB / PT / PV",
      "vice": "Alessandra Campelo",
@@ -153,7 +164,8 @@
      "primeiroTurno": {
       "votos": 841846,
       "pct": 40.63
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -178,6 +190,7 @@
      "nomeUrna": "Celina Leão",
      "nome": "Celina Leão Hizim Ferreira",
      "partido": "PP",
+     "sqcand": "70002553055",
      "coligacao": "Propósito e Ação",
      "composicao": "REPUBLICANOS / MDB / PODE / PL / DC / MOBILIZA / DEMOCRATA / PRD / SOLIDARIEDADE / PP / UNIÃO",
      "vice": "Gustavo Rocha",
@@ -185,13 +198,15 @@
      "primeiroTurno": {
       "votos": 825530,
       "pct": 49.93
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 13,
      "nomeUrna": "Leandro Grass",
      "nome": "Leandro Antônio Grass Peixoto",
      "partido": "PT",
+     "sqcand": "70002552496",
      "coligacao": "DF do Povo",
      "composicao": "PDT / PCdoB / PT / PV / PSOL / REDE",
      "vice": "Dora Gomes",
@@ -199,7 +214,8 @@
      "primeiroTurno": {
       "votos": 569930,
       "pct": 34.47
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -224,6 +240,7 @@
      "nomeUrna": "Lorenzo Pazolini",
      "nome": "Lorenzo Silva de Pazolini",
      "partido": "REPUBLICANOS",
+     "sqcand": "80002552682",
      "coligacao": "Paz pra Viver um Novo Tempo",
      "composicao": "REPUBLICANOS / PL / DEMOCRATA",
      "vice": "Eliane Leal",
@@ -231,13 +248,15 @@
      "primeiroTurno": {
       "votos": 1048633,
       "pct": 49.65
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 15,
      "nomeUrna": "Ricardo Ferraço",
      "nome": "Ricardo de Rezende Ferraço",
      "partido": "MDB",
+     "sqcand": "80002552172",
      "coligacao": "Agora é o Futuro",
      "composicao": "PODE / MDB / AGIR / PSB / PDT / CIDADANIA / PSDB / PP / UNIÃO",
      "vice": "Camillo Neves",
@@ -245,7 +264,8 @@
      "primeiroTurno": {
       "votos": 719397,
       "pct": 34.06
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -270,6 +290,7 @@
      "nomeUrna": "Douglas Ruas",
      "nome": "Douglas Ruas dos Santos",
      "partido": "PL",
+     "sqcand": "190002542887",
      "coligacao": "Rio Real",
      "composicao": "PL / MOBILIZA / AGIR / AVANTE",
      "vice": "Fernanda Louback",
@@ -277,13 +298,15 @@
      "primeiroTurno": {
       "votos": 4271199,
       "pct": 49.27
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 55,
      "nomeUrna": "Eduardo Paes",
      "nome": "Eduardo da Costa Paes",
      "partido": "PSD",
+     "sqcand": "190002543380",
      "coligacao": "Juntos para Mudar Coragem para Reconstruir",
      "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
      "vice": "Jane Reis",
@@ -291,7 +314,8 @@
      "primeiroTurno": {
       "votos": 3706984,
       "pct": 42.76
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -316,6 +340,7 @@
      "nomeUrna": "Cadu de Lula",
      "nome": "Carlos Eduardo Xavier",
      "partido": "PT",
+     "sqcand": "200002534001",
      "coligacao": "Time que Cuida",
      "composicao": "PDT / PSB / PCdoB / PT / PV",
      "vice": "Larissa",
@@ -323,13 +348,15 @@
      "primeiroTurno": {
       "votos": 718300,
       "pct": 36.16
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 44,
      "nomeUrna": "Allyson",
      "nome": "Allyson Leandro Bezerra Silva",
      "partido": "UNIÃO",
+     "sqcand": "200002535255",
      "coligacao": "Esperança e Trabalho",
      "composicao": "REPUBLICANOS / MDB / PSD / AVANTE / PRD / SOLIDARIEDADE / PP / UNIÃO",
      "vice": "Hermano",
@@ -337,7 +364,8 @@
      "primeiroTurno": {
       "votos": 733809,
       "pct": 36.94
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -362,6 +390,7 @@
      "nomeUrna": "Professora Dorinha",
      "nome": "Maria Auxiliadora Seabra Rezende",
      "partido": "UNIÃO",
+     "sqcand": "270002544599",
      "coligacao": "União pelo Tocantins",
      "composicao": "REPUBLICANOS / PODE / AVANTE / PL / PRD / SOLIDARIEDADE / PP / UNIÃO",
      "vice": "Atos Gomes",
@@ -369,13 +398,15 @@
      "primeiroTurno": {
       "votos": 386260,
       "pct": 45.52
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 45,
      "nomeUrna": "Vicentinho Júnior",
      "nome": "Vicente Alves de Oliveira Júnior",
      "partido": "PSDB",
+     "sqcand": "270002544544",
      "coligacao": "Pra Cima Tocantins",
      "composicao": "MDB / CIDADANIA / PSDB",
      "vice": "Amélio Cayres",
@@ -383,7 +414,8 @@
      "primeiroTurno": {
       "votos": 372848,
       "pct": 43.94
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     }
    ],
    "ufs": [
@@ -408,6 +440,7 @@
      "nomeUrna": "Lula",
      "nome": "Luiz Inácio Lula da Silva",
      "partido": "PT",
+     "sqcand": "280002542548",
      "coligacao": "Brasil Pronto pra Mais",
      "composicao": "PSB / PDT / PCdoB / PT / PV / PSOL / REDE",
      "vice": "Geraldo Alckmin",
@@ -415,19 +448,22 @@
      "primeiroTurno": {
       "votos": 53879538,
       "pct": 45.16
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 22,
      "nomeUrna": "Flávio Bolsonaro",
      "nome": "Flávio Nantes Bolsonaro",
      "partido": "PL",
+     "sqcand": "280002551544",
      "vice": "Alfredo Gaspar",
      "cor": "b",
      "primeiroTurno": {
       "votos": 56104503,
       "pct": 47.03
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -491,6 +527,7 @@
      "nomeUrna": "Alan Rick",
      "nome": "Alan Rick Miranda",
      "partido": "REPUBLICANOS",
+     "sqcand": "10002532492",
      "coligacao": "Trabalho da Esperança",
      "composicao": "REPUBLICANOS / NOVO / PSD / AVANTE",
      "vice": "Ricardo Leite",
@@ -498,13 +535,15 @@
      "primeiroTurno": {
       "votos": 141859,
       "pct": 32.27
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 11,
      "nomeUrna": "Mailza Assis",
      "nome": "Mailza Assis Cameli",
      "partido": "PP",
+     "sqcand": "10002544107",
      "coligacao": "Avança Acre",
      "composicao": "PDT / MDB / PL / DEMOCRATA / PP / UNIÃO",
      "vice": "Jéssica Sales",
@@ -512,7 +551,8 @@
      "primeiroTurno": {
       "votos": 218760,
       "pct": 49.76
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -549,6 +589,7 @@
      "nomeUrna": "Professora Maria do Carmo",
      "nome": "Maria do Carmo Seffair Lins de Albuquerque",
      "partido": "PL",
+     "sqcand": "40002541626",
      "coligacao": "Mudar é Urgente",
      "composicao": "PL / NOVO",
      "vice": "Coronel Aníbal",
@@ -556,13 +597,15 @@
      "primeiroTurno": {
       "votos": 507335,
       "pct": 24.49
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 55,
      "nomeUrna": "Omar Aziz",
      "nome": "Omar José Abdelaziz",
      "partido": "PSD",
+     "sqcand": "40002532272",
      "coligacao": "Força Amazonas",
      "composicao": "REPUBLICANOS / MDB / PSD / PCdoB / PT / PV",
      "vice": "Alessandra Campelo",
@@ -570,7 +613,8 @@
      "primeiroTurno": {
       "votos": 841846,
       "pct": 40.63
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -607,6 +651,7 @@
      "nomeUrna": "Celina Leão",
      "nome": "Celina Leão Hizim Ferreira",
      "partido": "PP",
+     "sqcand": "70002553055",
      "coligacao": "Propósito e Ação",
      "composicao": "REPUBLICANOS / MDB / PODE / PL / DC / MOBILIZA / DEMOCRATA / PRD / SOLIDARIEDADE / PP / UNIÃO",
      "vice": "Gustavo Rocha",
@@ -614,13 +659,15 @@
      "primeiroTurno": {
       "votos": 825530,
       "pct": 49.93
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 13,
      "nomeUrna": "Leandro Grass",
      "nome": "Leandro Antônio Grass Peixoto",
      "partido": "PT",
+     "sqcand": "70002552496",
      "coligacao": "DF do Povo",
      "composicao": "PDT / PCdoB / PT / PV / PSOL / REDE",
      "vice": "Dora Gomes",
@@ -628,7 +675,8 @@
      "primeiroTurno": {
       "votos": 569930,
       "pct": 34.47
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -665,6 +713,7 @@
      "nomeUrna": "Lorenzo Pazolini",
      "nome": "Lorenzo Silva de Pazolini",
      "partido": "REPUBLICANOS",
+     "sqcand": "80002552682",
      "coligacao": "Paz pra Viver um Novo Tempo",
      "composicao": "REPUBLICANOS / PL / DEMOCRATA",
      "vice": "Eliane Leal",
@@ -672,13 +721,15 @@
      "primeiroTurno": {
       "votos": 1048633,
       "pct": 49.65
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 15,
      "nomeUrna": "Ricardo Ferraço",
      "nome": "Ricardo de Rezende Ferraço",
      "partido": "MDB",
+     "sqcand": "80002552172",
      "coligacao": "Agora é o Futuro",
      "composicao": "PODE / MDB / AGIR / PSB / PDT / CIDADANIA / PSDB / PP / UNIÃO",
      "vice": "Camillo Neves",
@@ -686,7 +737,8 @@
      "primeiroTurno": {
       "votos": 719397,
       "pct": 34.06
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -723,6 +775,7 @@
      "nomeUrna": "Douglas Ruas",
      "nome": "Douglas Ruas dos Santos",
      "partido": "PL",
+     "sqcand": "190002542887",
      "coligacao": "Rio Real",
      "composicao": "PL / MOBILIZA / AGIR / AVANTE",
      "vice": "Fernanda Louback",
@@ -730,13 +783,15 @@
      "primeiroTurno": {
       "votos": 4271199,
       "pct": 49.27
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 55,
      "nomeUrna": "Eduardo Paes",
      "nome": "Eduardo da Costa Paes",
      "partido": "PSD",
+     "sqcand": "190002543380",
      "coligacao": "Juntos para Mudar Coragem para Reconstruir",
      "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
      "vice": "Jane Reis",
@@ -744,7 +799,8 @@
      "primeiroTurno": {
       "votos": 3706984,
       "pct": 42.76
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -781,6 +837,7 @@
      "nomeUrna": "Cadu de Lula",
      "nome": "Carlos Eduardo Xavier",
      "partido": "PT",
+     "sqcand": "200002534001",
      "coligacao": "Time que Cuida",
      "composicao": "PDT / PSB / PCdoB / PT / PV",
      "vice": "Larissa",
@@ -788,13 +845,15 @@
      "primeiroTurno": {
       "votos": 718300,
       "pct": 36.16
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 44,
      "nomeUrna": "Allyson",
      "nome": "Allyson Leandro Bezerra Silva",
      "partido": "UNIÃO",
+     "sqcand": "200002535255",
      "coligacao": "Esperança e Trabalho",
      "composicao": "REPUBLICANOS / MDB / PSD / AVANTE / PRD / SOLIDARIEDADE / PP / UNIÃO",
      "vice": "Hermano",
@@ -802,7 +861,8 @@
      "primeiroTurno": {
       "votos": 733809,
       "pct": 36.94
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,
@@ -839,6 +899,7 @@
      "nomeUrna": "Professora Dorinha",
      "nome": "Maria Auxiliadora Seabra Rezende",
      "partido": "UNIÃO",
+     "sqcand": "270002544599",
      "coligacao": "União pelo Tocantins",
      "composicao": "REPUBLICANOS / PODE / AVANTE / PL / PRD / SOLIDARIEDADE / PP / UNIÃO",
      "vice": "Atos Gomes",
@@ -846,13 +907,15 @@
      "primeiroTurno": {
       "votos": 386260,
       "pct": 45.52
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 45,
      "nomeUrna": "Vicentinho Júnior",
      "nome": "Vicente Alves de Oliveira Júnior",
      "partido": "PSDB",
+     "sqcand": "270002544544",
      "coligacao": "Pra Cima Tocantins",
      "composicao": "MDB / CIDADANIA / PSDB",
      "vice": "Amélio Cayres",
@@ -860,7 +923,8 @@
      "primeiroTurno": {
       "votos": 372848,
       "pct": 43.94
-     }
+     },
+     "fotoGrupo": "segundo-turno"
     },
     {
      "numero": 0,

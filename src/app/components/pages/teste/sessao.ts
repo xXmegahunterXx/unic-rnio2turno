@@ -1,19 +1,24 @@
 /**
  * Progresso do Teste Cego guardado SÓ na aba (sessionStorage): some quando a aba fecha.
  * Nada aqui é enviado a servidor (LGPD). Todo acesso é protegido (modo privado, armazenamento bloqueado).
+ * Chaves com "v2": o progresso do formato antigo (pares) é simplesmente ignorado.
  */
-import { ehEscolha, N_RODADAS, type Escolha } from './codigo';
+import { AFIRMACAO_POR_ID, AFIRMACOES, ehResposta, type Resposta } from '@/app/content/afirmacoes';
 
-export type Parcial = (Escolha | null)[];
+export type MapaRespostas = Partial<Record<string, Resposta>>;
 
 export interface Progresso {
   seed: number;
-  respostas: Parcial;
+  respostas: MapaRespostas;
+  /** Ids marcados como "Isso pesa mais para mim" (só valem para respostas na escala). */
+  importantes: string[];
+  /** Posição atual na ordem embaralhada. */
   idx: number;
 }
 
-const CHAVE_TESTE = 'sintonia:teste:progresso';
-const prefixoDuelo = 'sintonia:duelo:';
+const CHAVE_TESTE = 'sintonia:teste:v2:progresso';
+const prefixoDuelo = 'sintonia:duelo:v2:';
+export const TOTAL = AFIRMACOES.length;
 
 function ler(chave: string): unknown {
   try {
@@ -38,15 +43,17 @@ function apagar(chave: string) {
   }
 }
 
-export const vazio = (): Parcial => Array.from({ length: N_RODADAS }, () => null);
-
 function normalizar(v: unknown): Progresso | null {
   if (!v || typeof v !== 'object') return null;
   const o = v as Partial<Progresso>;
-  if (typeof o.seed !== 'number' || !Array.isArray(o.respostas) || o.respostas.length !== N_RODADAS) return null;
-  const respostas = o.respostas.map((r) => (ehEscolha(r) ? r : null));
-  const idx = typeof o.idx === 'number' ? Math.max(0, Math.min(N_RODADAS - 1, Math.floor(o.idx))) : 0;
-  return { seed: o.seed, respostas, idx };
+  if (typeof o.seed !== 'number' || !Number.isFinite(o.seed) || !o.respostas || typeof o.respostas !== 'object') return null;
+  const respostas: MapaRespostas = {};
+  for (const [id, r] of Object.entries(o.respostas)) if (AFIRMACAO_POR_ID[id] && ehResposta(r)) respostas[id] = r;
+  const importantes = Array.isArray(o.importantes)
+    ? o.importantes.filter((id): id is string => typeof id === 'string' && !!AFIRMACAO_POR_ID[id] && typeof respostas[id] === 'number')
+    : [];
+  const idx = typeof o.idx === 'number' ? Math.max(0, Math.min(TOTAL - 1, Math.floor(o.idx))) : 0;
+  return { seed: o.seed, respostas, importantes, idx };
 }
 
 /** Progresso do teste em andamento (opcionalmente só se for da semente dada). */
@@ -58,10 +65,11 @@ export function lerProgresso(seed?: number): Progresso | null {
 export const gravarProgresso = (p: Progresso) => gravar(CHAVE_TESTE, p);
 export const apagarProgresso = () => apagar(CHAVE_TESTE);
 
-/** Respondidas (quantas rodadas têm resposta). */
-export const respondidas = (r: Parcial) => r.filter((x) => x !== null).length;
+/** Quantas afirmações já têm resposta (inclui "Pular"). */
+export const concluidas = (r: MapaRespostas) => AFIRMACOES.reduce((n, a) => n + (r[a.id] !== undefined ? 1 : 0), 0);
+export const completo = (r: MapaRespostas) => concluidas(r) === TOTAL;
 
-/** Respostas de quem recebeu o desafio, por código do desafio (inclui as escolhas de quem desafiou). */
+/** Respostas de quem recebeu o desafio, por código do desafio (inclui as respostas de quem desafiou). */
 export function lerDuelo(chave: string): Progresso | null {
   return normalizar(ler(prefixoDuelo + chave));
 }

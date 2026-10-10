@@ -4,7 +4,8 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { AdminSnapshot } from '../shared/api';
-import type { LiveStatus, NationalSnapshot } from '../shared/types';
+import type { LiveStatus, MunicipiosNacionalSnapshot, NationalSnapshot } from '../shared/types';
+import { CC } from './app';
 import { criarFakeFetch, BASE, type FakeFetch } from '../tse/__fixtures__/fake-fetch';
 import { comando, login, montar, type Montado } from './test-helpers';
 
@@ -69,6 +70,35 @@ describe('fonte tse', () => {
 
   it('UF inexistente na corrida → 404 também na fonte tse', async () => {
     expect((await m.app.request('/api/apuracao/gov-rj/uf/sp')).status).toBe(404);
+  });
+
+  it('?t= na fonte tse: Brasil/UF pelo histórico; município responde o agora; mapa nacional por município', async () => {
+    const st = (await (await m.app.request('/api/status')).json()) as LiveStatus;
+    const t = m.relogio.t - 10 * 60_000;
+    const r = await m.app.request(`/api/apuracao/pres/br?t=${t}&v=${st.versao}`);
+    expect(r.status).toBe(200);
+    expect(r.headers.get('cache-control')).toBe(CC.historico);
+    expect(r.headers.get('etag')).toMatch(/-h[a-z0-9]+-/);
+    const n = (await r.json()) as NationalSnapshot;
+    expect(n.simNow).toBe(Math.floor(t / 1000) * 1000);
+    expect(n.resumo.secoesTotalizadas).toBe(0);
+    expect(n.resumo.secoes).toBe(48_964);
+    // passado recente na fonte tse: o ETag acompanha o balde do agora (dados ainda podem chegar)
+    const rec = await m.app.request(`/api/apuracao/pres/br?t=${m.relogio.t - 30_000}`);
+    expect(rec.headers.get('etag')).toMatch(/-h[a-z0-9]+-tse\d+-/);
+    expect(rec.headers.get('cache-control')).toBe(CC.snapshot);
+    // município/zona/seção não têm histórico: ?t= responde o agora (mesmo ETag)
+    const a = await m.app.request('/api/apuracao/pres/uf/ac/mun/01120');
+    const b = await m.app.request(`/api/apuracao/pres/uf/ac/mun/01120?t=${t}`);
+    expect(b.status).toBe(200);
+    expect(b.headers.get('etag')).toBe(a.headers.get('etag'));
+
+    const mb = await m.app.request('/api/apuracao/pres/br/municipios');
+    expect(mb.status).toBe(200);
+    const mbj = (await mb.json()) as MunicipiosNacionalSnapshot;
+    if (m.ds.municipiosBr) expect(mbj.lider).toHaveLength(m.ds.municipiosBr.ordem.length);
+    expect(mbj.apurado.every((x) => x === 0)).toBe(true);
+    expect(mbj.municipiosLiderados).toEqual([0, 0]);
   });
 
   it('voltar para pre desliga o polling', async () => {

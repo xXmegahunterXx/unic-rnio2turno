@@ -94,6 +94,11 @@ async function main() {
         `${config.serveStatic ? `servindo ${config.distDir}` : 'só API'}; subida em ${Math.round(performance.now() - t0)} ms)`,
     );
   });
+  // pré-comprime data/ e geo/ (JSONs grandes) em segundo plano, um arquivo por vez
+  if (sintonia.estaticos) {
+    const est = sintonia.estaticos;
+    setTimeout(() => void est.aquecer(['data', 'geo'], (m) => log.info(m)), 2_000).unref();
+  }
   server.on('error', (e: NodeJS.ErrnoException) => {
     log.erro(e.code === 'EADDRINUSE' ? `Porta ${config.port} já está em uso (defina PORT)` : 'Falha no servidor HTTP', e);
     process.exit(1);

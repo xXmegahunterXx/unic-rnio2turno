@@ -4,6 +4,9 @@
  *  - /api/og/apuracao.png?race=pres[&uf=sp]: placar atual (nomes, % válidos, % de seções, horário),
  *    faixa "SIMULAÇÃO · dados fictícios" quando simulado; antes das 17h, o 1º turno como referência.
  *  - /api/og/teste.png: cartão do Teste Cego (sem nenhum dado de preferência — LGPD/sem enquetes).
+ *  - Fotos oficiais do TSE (opcionais, `fotos`): mesmo tamanho e tratamento para os dois (retrato 3:4, sem
+ *    recorte nem filtro, com o contorno da cor do slot). Quem chama só passa fotos quando NÃO anonimizado e
+ *    quando há foto dos dois finalistas; senão, o monograma (iniciais) de sempre.
  *
  * Fontes (satori não lê woff2): TTF estáticos de Inter e Bricolage Grotesque em src/server/assets/fonts
  * (Google Fonts, SIL Open Font License 1.1 — ver OFL-*.txt). Reserva: JetBrains Mono .woff do @fontsource.
@@ -185,9 +188,34 @@ export interface OgPlacarInput {
   horario: number;
   /** true antes do início (nenhuma seção totalizada numa corrida de 2º turno). */
   pre: boolean;
+  /**
+   * Fotos oficiais (data URI JPEG/PNG) na ordem de `race.candidatos`. Só usadas se TODOS os finalistas
+   * tiverem foto (tratamento igual); ausente/incompleto → monograma.
+   */
+  fotos?: (string | null | undefined)[];
 }
 
-function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar: 'left' | 'right'): No {
+/** Índices dos finalistas (candidatos não agregados) na ordem da urna. */
+const finalistas = (race: Race) => race.candidatos.map((c, i) => (c.agregado ? -1 : i)).filter((i) => i >= 0);
+
+/** Fotos utilizáveis para o placar (todas as dos finalistas) ou null. */
+export function fotosDoPlacar(inp: Pick<OgPlacarInput, 'race' | 'fotos'>): Map<number, string> | null {
+  if (!inp.fotos) return null;
+  const idx = finalistas(inp.race).slice(0, 2);
+  if (idx.length < 2) return null;
+  const m = new Map<number, string>();
+  for (const i of idx) {
+    const f = inp.fotos[i];
+    if (typeof f !== 'string' || !/^data:image\/(jpeg|png);base64,/.test(f)) return null;
+    m.set(i, f);
+  }
+  return m;
+}
+
+const FOTO_W = 60;
+const FOTO_H = 80;
+
+function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar: 'left' | 'right', foto: string | null): No {
   const cor = c.cor === 'b' ? C.b : C.a;
   const ink = c.cor === 'b' ? C.bInk : C.aInk;
   const lado = alinhar === 'right' ? 'flex-end' : 'flex-start';
@@ -198,12 +226,19 @@ function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar:
   // significa apenas "vencedor ali"; no 1º turno ninguém foi eleito para estes cargos)
   const escopoDaDisputa = !inp.uf || inp.race.abrangencia === inp.uf;
   const eleito = r.eleito === idx && inp.race.turno === 2 && escopoDaDisputa;
+  const retrato: No = foto
+    ? h(
+        'div',
+        { width: FOTO_W + 6, height: FOTO_H + 6, borderRadius: 14, background: cor, alignItems: 'center', justifyContent: 'center' },
+        { type: 'img', props: { src: foto, width: FOTO_W, height: FOTO_H, style: { width: FOTO_W, height: FOTO_H, borderRadius: 11, objectFit: 'cover' } } },
+      )
+    : h(
+        'div',
+        { width: 64, height: 64, borderRadius: 32, background: cor, color: ink, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 800, fontSize: 26 },
+        iniciais(c.nomeUrna),
+      );
   const cabecalho = [
-    h(
-      'div',
-      { width: 64, height: 64, borderRadius: 32, background: cor, color: ink, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 800, fontSize: 26 },
-      iniciais(c.nomeUrna),
-    ),
+    retrato,
     h(
       'div',
       { flexDirection: 'column', alignItems: lado, maxWidth: 420 },
@@ -243,7 +278,7 @@ function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar:
   return h(
     'div',
     { flexDirection: 'column', alignItems: lado, width: 520 },
-    h('div', { alignItems: 'center', gap: 18, height: 76 }, ...cabecalho),
+    h('div', { alignItems: 'center', gap: 18, height: foto ? FOTO_H + 6 : 76 }, ...cabecalho),
     corpo,
   );
 }
@@ -274,8 +309,9 @@ function barra(inp: OgPlacarInput, ia: number, ib: number): No {
 export function layoutPlacar(inp: OgPlacarInput): No {
   const { race, resumo: r } = inp;
   // finalistas: candidatos não agregados ("Outros" fica fora do placar), na ordem da urna
-  const idx = race.candidatos.map((c, i) => (c.agregado ? -1 : i)).filter((i) => i >= 0);
+  const idx = finalistas(race);
   const [ia, ib] = [idx[0] ?? 0, idx[1] ?? 1];
+  const fotos = fotosDoPlacar(inp);
   const titulo =
     race.cargo === 'Presidente'
       ? inp.uf
@@ -341,9 +377,9 @@ export function layoutPlacar(inp: OgPlacarInput): No {
       h('div', { fontFamily: 'Bricolage', fontWeight: 700, fontSize: 46, color: C.fg, marginTop: 2, letterSpacing: -1 }, titulo),
       h(
         'div',
-        { justifyContent: 'space-between', marginTop: 22 },
-        colunaCandidato(race.candidatos[ia], ia, inp, 'left'),
-        colunaCandidato(race.candidatos[ib], ib, inp, 'right'),
+        { justifyContent: 'space-between', marginTop: fotos ? 14 : 22 },
+        colunaCandidato(race.candidatos[ia], ia, inp, 'left', fotos?.get(ia) ?? null),
+        colunaCandidato(race.candidatos[ib], ib, inp, 'right', fotos?.get(ib) ?? null),
       ),
       barra(inp, ia, ib),
       h('div', { flexGrow: 1 }),

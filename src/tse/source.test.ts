@@ -15,6 +15,11 @@ const races = racesJson as unknown as Race[];
 const CONFIG: TseConfig = { baseUrl: BASE, ciclo: 'ele2026', eleicaoPres: '6258', eleicaoGov: '6260', pleito: '3221', intervaloSeg: 15 };
 /** Relógio do teste: 26/10/2026 00:00 de Brasília (depois de tudo). */
 const AGORA = Date.UTC(2026, 9, 26, 3, 0, 0);
+/** "hh:mm:ss" → ms desde 17:00 (horário de Brasília). */
+const horaBrt = (h: string) => {
+  const [hh, mm, ss] = h.split(':').map(Number);
+  return ((hh - 17) * 3600 + mm * 60 + ss) * 1000;
+};
 
 function criar(f: FakeFetch, extra: Partial<ConstructorParameters<typeof TseSource>[0]> = {}) {
   const logs: string[] = [];
@@ -263,6 +268,65 @@ describe('2º turno', () => {
       const n2 = await src2.nacional('pres');
       expect(n2.serie).toEqual(n.serie);
       expect(n2.eventos).toEqual(n.eventos);
+    });
+
+    it('reveja a noite: estado mais recente ≤ t (Brasil, UF, municípios), mapa nacional e persistência', async () => {
+      const { f, avancar } = cenario();
+      // relógio acompanhando a noite (os instantes oficiais nunca ficam no futuro)
+      const relogios = [Date.UTC(2026, 9, 25, 19, 59), ...passos.slice(1).map((p) => Date.UTC(2026, 9, 25, 20, 0, 30) + horaBrt(p.ht))];
+      let agora = relogios[0];
+      const { src } = criar(f, { now: () => agora });
+      for (let k = 0; k < passos.length; k++) {
+        agora = relogios[k];
+        avancar(k);
+        await src.pollOnce();
+        await ocioso(src);
+      }
+      const T2 = Date.UTC(2026, 9, 25, 20, 50); // entre 17:40 (300 seções) e 18:20:30 (632)
+      const n2 = await src.nacional('pres', T2);
+      expect(n2.simNow).toBe(T2);
+      expect(n2.resumo).toMatchObject({ secoesTotalizadas: 300, votos: [13_000, 14_000], lider: 1, status: 'apurando' });
+      expect(n2.ufs.SP).toMatchObject({ secoesTotalizadas: 300 });
+      expect(n2.regioes.SE!.votos).toEqual([13_000, 14_000]);
+      expect(n2.serie.map((p) => p.pst)).toEqual([1.2, 30]);
+      expect(n2.eventos.length).toBeGreaterThan(0);
+      expect(n2.eventos.every((e) => e.t <= T2)).toBe(true);
+      expect(n2.eventos.some((e) => e.tipo === 'virada' || e.tipo === 'eleito')).toBe(false);
+      expect(n2.restante.eleitorado).toBe(TE - 30_000);
+      // antes da 1ª totalização: zerado, com as seções da abrangência
+      const n0 = await src.nacional('pres', Date.UTC(2026, 9, 25, 19, 0));
+      expect(n0.resumo).toMatchObject({ secoes: TS, secoesTotalizadas: 0, votos: [0, 0], status: 'aguardando' });
+      expect(n0.serie).toEqual([]);
+      expect(n0.eventos).toEqual([]);
+      // futuro / ausente = agora
+      expect((await src.nacional('pres', agora + 60_000)).resumo.status).toBe('encerrada');
+
+      const u2 = await src.uf('pres', 'SP', T2);
+      expect(u2.simNow).toBe(T2);
+      expect(u2.resumo.secoesTotalizadas).toBe(300);
+      expect(u2.municipios.find((m) => m.cod === '71072')).toMatchObject({ nome: 'São Paulo', secoesTotalizadas: 300, votos: [13_000, 14_000] });
+      expect(u2.serie.every((p) => p.t <= T2)).toBe(true);
+      const uAgora = await src.uf('pres', 'SP');
+      expect(uAgora.municipios.find((m) => m.cod === '71072')!.secoesTotalizadas).toBe(TS);
+
+      // mapa nacional por município: o que está em cache (os demais com apurado 0 e líder −1)
+      const ordem = { uf: ['SP', 'SP', 'RJ'], cod: ['71072', '99999', '60011'] };
+      const mb = await src.municipiosBr('pres', ordem);
+      expect(mb).toMatchObject({ race: 'pres', lider: [0, -1, -1], apurado: [1000, 0, 0], municipiosLiderados: [1, 0] });
+      expect(mb.pct0[0]).toBe(Math.round((52_000 / 99_000) * 10_000));
+      expect(mb.margem[0]).toBe(Math.round(((52_000 - 47_000) / 99_000) * 1000));
+      const mb2 = await src.municipiosBr('pres', ordem, T2);
+      expect(mb2).toMatchObject({ simNow: T2, lider: [1, -1, -1], apurado: [300, 0, 0], municipiosLiderados: [0, 1] });
+      const gov = await src.municipiosBr('gov-rj', ordem);
+      expect(gov.lider).toEqual([-1, -1, -1]);
+
+      // persistência: o histórico (com os estados completos) sobrevive a reinício
+      const salvo = JSON.parse(JSON.stringify(src.exportarHistorico()));
+      expect(salvo.find((h: { race: string }) => h.race === 'pres').resumos.BR.length).toBe(passos.length);
+      const { src: src2 } = criar(f, { historico: salvo, now: () => agora });
+      await src2.pollOnce();
+      expect((await src2.nacional('pres', T2)).resumo).toEqual(n2.resumo);
+      expect((await src2.municipiosBr('pres', ordem, T2)).apurado).toEqual([300, 0, 0]);
     });
 
     it('aquecimento: UF em apuração tem os municípios atualizados em segundo plano', async () => {

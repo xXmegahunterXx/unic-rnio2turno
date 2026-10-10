@@ -2,7 +2,7 @@
  * Interface pública do motor/controller. O servidor (src/server) e o worker do demo (src/app/data/worker.ts)
  * dependem SOMENTE desta interface. A implementação fica em src/engine/controller.ts.
  */
-import type { DatasetMeta, UfDataset } from '../shared/dataset';
+import type { DatasetMeta, LocaisUfDataset, MunicipiosBr, SecaoUfDataset, UfDataset } from '../shared/dataset';
 import type { AdminCommand, AdminSnapshot, PublicMeta } from '../shared/api';
 import type {
   AdminMetrics,
@@ -22,10 +22,29 @@ import type {
 export interface LoadedDataset {
   meta: DatasetMeta;
   ufs: Partial<Record<UF, UfDataset>>;
+  /**
+   * 1º turno REAL por seção (public/data/secao/{uf}.json), OPCIONAL: UFs ausentes (ou com `n` diferente do
+   * número de seções da UF) usam o modelo por município + ruído (comportamento da fase 1).
+   */
+  secao?: Partial<Record<UF, SecaoUfDataset>>;
+  /** Ordem canônica do mapa nacional (public/data/municipios-br.json), OPCIONAL (derivada se ausente). */
+  municipiosBr?: MunicipiosBr | null;
+  /** Locais de votação já carregados (opcional; normalmente carregados sob demanda por `load`). */
+  locais?: Partial<Record<UF, LocaisUfDataset | null>>;
+  /** Leitor usado no carregamento (o controller o reaproveita para arquivos sob demanda, ex.: locais). */
+  load?: JsonLoader;
 }
 
 /** Carrega o dataset a partir de um leitor de JSON (fs no servidor, fetch no navegador). Caminhos: 'data/meta.json', 'data/uf/sp.json'. */
 export type JsonLoader = (path: string) => Promise<unknown>;
+
+/** Opções de `loadDataset` (todos os arquivos opcionais são carregados por padrão; ausentes são ignorados). */
+export interface LoadOptions {
+  /** Carregar public/data/secao/{uf}.json (1º turno real por seção). Padrão true. */
+  secao?: boolean;
+  /** Carregar public/data/municipios-br.json. Padrão true. */
+  municipiosBr?: boolean;
+}
 
 export interface ControllerOptions {
   modo: 'servidor' | 'demo';
@@ -66,6 +85,13 @@ export interface Controller {
   secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number, t?: number): SecaoDetalhe | null;
   /** Mapa nacional por município (ordem de public/data/municipios-br.json). */
   municipiosBr(race: RaceId, t?: number): MunicipiosNacionalSnapshot;
+  /**
+   * Carrega (uma vez, com cache) os locais de votação da UF (public/data/locais/{uf}.json) pelo leitor do
+   * dataset. Resolve true se há locais. Depois disso, `zona`/`secao` da UF trazem `local` em cada seção.
+   * Sem esta chamada, a primeira consulta de zona/seção da UF dispara o carregamento em segundo plano (as
+   * respostas seguintes já vêm com `local`). Nunca rejeita (arquivo ausente/inválido → false).
+   */
+  carregaLocais?(uf: UF | string): Promise<boolean>;
 
   // `t` (opcional, epoch ms) = "reveja a noite": estado da apuração num instante PASSADO; limitado ao simNow atual
   // (nunca futuro). Ausente = agora.
@@ -101,5 +127,5 @@ export class CommandError extends Error {
 }
 
 // Implementado em controller.ts:
-//   export async function loadDataset(load: JsonLoader): Promise<LoadedDataset>
+//   export async function loadDataset(load: JsonLoader, opts?: LoadOptions): Promise<LoadedDataset>
 //   export function createController(ds: LoadedDataset, opts: ControllerOptions): Controller

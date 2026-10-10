@@ -7,7 +7,9 @@
 import { INICIO_APURACAO, MARGEM_BUCKETS } from '../shared/constants';
 import type {
   FeedEvent,
+  LocalResumo,
   MunicipioResumo,
+  MunicipiosNacionalSnapshot,
   MunicipioSnapshot,
   NationalSnapshot,
   PrimeiroTurnoLocal,
@@ -29,7 +31,7 @@ import { pctPar, pctSecoes } from './events';
 import type { Model } from './model';
 import { triple32 } from './rng';
 import type { SerieBuf } from './series';
-import type { RaceInfo, Structure } from './structure';
+import { temSecaoReal, type ColunasT1, type RaceInfo, type Structure } from './structure';
 
 // ---------------------------------------------------------------------------------------------
 // Regras comuns
@@ -374,15 +376,23 @@ function secaoResumo(model: Model, i: number, k: number, gov: boolean): SecaoRes
   };
 }
 
-export function zona2t(ctx: Ctx, r: RaceInfo, p: number): ZonaSnapshot {
-  const { model, agg, tq } = ctx;
+/** Local de votação de cada seção (índice global da seção → local), quando os locais da UF estão carregados. */
+export type LocalDe = (i: number) => LocalResumo | undefined;
+
+export function zona2t(ctx: Ctx, r: RaceInfo, p: number, localDe?: LocalDe): ZonaSnapshot {
+  const { model, agg } = ctx;
   const st = model.st;
   const gov = r.kind === 'gov';
   const m = st.pairMun[p];
   const s0 = st.pairSecStart[p];
   const s1 = st.pairSecEnd[p];
   const secoes: SecaoResumo[] = new Array(s1 - s0);
-  for (let i = s0; i < s1; i++) secoes[i - s0] = secaoResumo(model, i, agg.k, gov);
+  for (let i = s0; i < s1; i++) {
+    const sr = secaoResumo(model, i, agg.k, gov);
+    const loc = localDe?.(i);
+    if (loc) sr.local = loc;
+    secoes[i - s0] = sr;
+  }
   return {
     race: r.id,
     uf: st.ufs[st.munUf[m]],
@@ -396,11 +406,13 @@ export function zona2t(ctx: Ctx, r: RaceInfo, p: number): ZonaSnapshot {
   };
 }
 
-export function secao2t(ctx: Ctx, r: RaceInfo, i: number): SecaoDetalhe {
+export function secao2t(ctx: Ctx, r: RaceInfo, i: number, localDe?: LocalDe): SecaoDetalhe {
   const { model, agg } = ctx;
   const st = model.st;
   const gov = r.kind === 'gov';
   const s = secaoResumo(model, i, agg.k, gov);
+  const loc = localDe?.(i);
+  if (loc) s.local = loc;
   const m = st.secMun[i];
   return {
     ...s,
@@ -532,33 +544,57 @@ export function uf1t(st: Structure, d: T1Data, u: number, simNow: number, gerado
   };
 }
 
+/** Colunas reais do 1º turno da corrida (Presidente ou Governador), se a UF tiver o arquivo de seções. */
+function colunasReais(st: Structure, r: RaceInfo, u: number): ColunasT1 | null {
+  if (!temSecaoReal(st, r, u)) return null;
+  return r.kind === 'gov' ? st.real!.gov : st.real!.pres;
+}
+
+/** As seções reais do município somam exatamente o resultado oficial (ver SecaoReal.munConfere). */
+export function municipioConfere(st: Structure, r: RaceInfo, m: number): boolean {
+  if (!colunasReais(st, r, st.munUf[m])) return false;
+  return (r.kind === 'gov' ? st.real!.munConfereGov : st.real!.munConfere)[m] === 1;
+}
+
+/** Soma das seções reais [i0, i1) no layout T (1º turno). */
+function t1SomaSecoes(st: Structure, c: ColunasT1, i0: number, i1: number): Float64Array {
+  const out = new Float64Array(T.STRIDE);
+  const ap = c.aptos;
+  for (let i = i0; i < i1; i++) {
+    out[T.ELEIT] += ap[i];
+    out[T.COMP] += c.comp[i];
+    out[T.V0] += c.a[i];
+    out[T.V1] += c.b[i];
+    out[T.VO] += c.outros[i];
+    out[T.B] += c.brancos[i];
+    out[T.N] += c.nulos[i];
+  }
+  out[T.SEC] = i1 - i0;
+  return out;
+}
+
+/** Caractere do mosaico do 1º turno: finalista à frente e margem entre os dois em % de TODOS os válidos. */
+function estadoMosaicoT1(v0: number, v1: number, validos: number): number {
+  if (validos <= 0) return CZ;
+  if (v0 === v1) return CX;
+  const pp = (100 * Math.abs(v0 - v1)) / validos;
+  const b = pp < MARGEM_BUCKETS[0] ? 0 : pp < MARGEM_BUCKETS[1] ? 1 : pp < MARGEM_BUCKETS[2] ? 2 : 3;
+  return (v0 > v1 ? CA : CE) + b;
+}
+
 /**
- * Município no 1º turno. O dataset não tem resultado por zona/seção do 1º turno, então:
- *  - `zonas` tem UMA linha com `zona: 0` (= todas as zonas) e o total do município;
- *  - `mosaico` lista as zonas reais com todas as seções totalizadas, coloridas pelo resultado do MUNICÍPIO
- *    (finalista à frente e margem entre os dois finalistas em % dos votos válidos);
- *  - `primeiroTurno` = null (o próprio resumo já é o 1º turno).
+ * Município no 1º turno.
+ *  - Com o 1º turno REAL por seção (e as seções somando o total oficial do município): `zonas` reais (uma
+ *    linha por zona) e `mosaico` seção a seção, colorido pelo resultado REAL de cada seção;
+ *  - sem ele: `zonas` tem UMA linha com `zona: 0` (= todas as zonas) e o total do município, e o `mosaico`
+ *    lista as zonas reais com todas as seções coloridas pelo resultado do MUNICÍPIO.
+ * Em ambos: `primeiroTurno` = null (o próprio resumo já é o 1º turno).
  */
 export function municipio1t(st: Structure, d: T1Data, m: number, simNow: number, geradoEm: number): MunicipioSnapshot {
   const md = st.mun[m];
   const o = m * T.STRIDE;
   const resumo = t1Summary(d.mun, o);
-  const v0 = d.mun[o + T.V0];
-  const v1 = d.mun[o + T.V1];
-  const validos = v0 + v1 + d.mun[o + T.VO];
-  let ch = CZ;
-  if (validos > 0 && v0 === v1) ch = CX;
-  else if (validos > 0) {
-    const pp = (100 * Math.abs(v0 - v1)) / validos;
-    const b = pp < MARGEM_BUCKETS[0] ? 0 : pp < MARGEM_BUCKETS[1] ? 1 : pp < MARGEM_BUCKETS[2] ? 2 : 3;
-    ch = (v0 > v1 ? CA : CE) + b;
-  }
-  const c = String.fromCharCode(ch);
-  const mosaico: ZonaMosaico[] = [];
-  for (let p = st.munPairStart[m]; p < st.munPairEnd[m]; p++) {
-    mosaico.push({ zona: st.pairZona[p], faixas: st.pairFaixas[p], estado: c.repeat(st.pairSecEnd[p] - st.pairSecStart[p]) });
-  }
-  return {
+  const base = {
     race: d.r.id,
     uf: st.ufs[st.munUf[m]],
     cod: md.cod,
@@ -568,8 +604,172 @@ export function municipio1t(st: Structure, d: T1Data, m: number, simNow: number,
     geradoEm,
     simNow,
     resumo,
-    zonas: [{ zona: 0, ...resumo }],
-    mosaico,
     primeiroTurno: null,
   };
+  const col = municipioConfere(st, d.r, m) ? colunasReais(st, d.r, st.munUf[m]) : null;
+  if (col) {
+    const zonas: ZonaResumo[] = [];
+    const mosaico: ZonaMosaico[] = [];
+    for (let p = st.munPairStart[m]; p < st.munPairEnd[m]; p++) {
+      const s0 = st.pairSecStart[p];
+      const s1 = st.pairSecEnd[p];
+      zonas.push({ zona: st.pairZona[p], ...t1Summary(t1SomaSecoes(st, col, s0, s1), 0) });
+      const codes = new Uint8Array(s1 - s0);
+      for (let i = s0; i < s1; i++) codes[i - s0] = estadoMosaicoT1(col.a[i], col.b[i], col.a[i] + col.b[i] + col.outros[i]);
+      mosaico.push({ zona: st.pairZona[p], faixas: st.pairFaixas[p], estado: codesToString(codes) });
+    }
+    return { ...base, zonas, mosaico };
+  }
+  const v0 = d.mun[o + T.V0];
+  const v1 = d.mun[o + T.V1];
+  const c = String.fromCharCode(estadoMosaicoT1(v0, v1, v0 + v1 + d.mun[o + T.VO]));
+  const mosaico: ZonaMosaico[] = [];
+  for (let p = st.munPairStart[m]; p < st.munPairEnd[m]; p++) {
+    mosaico.push({ zona: st.pairZona[p], faixas: st.pairFaixas[p], estado: c.repeat(st.pairSecEnd[p] - st.pairSecStart[p]) });
+  }
+  return { ...base, zonas: [{ zona: 0, ...resumo }], mosaico };
+}
+
+/** A corrida de 1º turno tem resultados reais por seção nesta UF (zona/seção do 1º turno disponíveis). */
+export const t1TemSecao = (st: Structure, r: RaceInfo, u: number) => colunasReais(st, r, u) !== null;
+
+function secaoResumoT1(st: Structure, c: ColunasT1, i: number): SecaoResumo {
+  return {
+    secao: st.secNum[i],
+    totalizada: true,
+    totalizadaEm: null,
+    aptos: c.aptos[i],
+    comparecimento: c.comp[i],
+    votos: [c.a[i], c.b[i], c.outros[i]],
+    brancos: c.brancos[i],
+    nulos: c.nulos[i],
+  };
+}
+
+/** Zona no 1º turno com os números REAIS de cada seção (requer `t1TemSecao`). */
+export function zona1t(st: Structure, r: RaceInfo, p: number, simNow: number, geradoEm: number, localDe?: LocalDe): ZonaSnapshot {
+  const m = st.pairMun[p];
+  const c = colunasReais(st, r, st.munUf[m])!;
+  const s0 = st.pairSecStart[p];
+  const s1 = st.pairSecEnd[p];
+  const secoes: SecaoResumo[] = new Array(s1 - s0);
+  for (let i = s0; i < s1; i++) {
+    const sr = secaoResumoT1(st, c, i);
+    const loc = localDe?.(i);
+    if (loc) sr.local = loc;
+    secoes[i - s0] = sr;
+  }
+  return {
+    race: r.id,
+    uf: st.ufs[st.munUf[m]],
+    cod: st.mun[m].cod,
+    nomeMunicipio: st.mun[m].nome,
+    zona: st.pairZona[p],
+    geradoEm,
+    simNow,
+    resumo: t1Summary(t1SomaSecoes(st, c, s0, s1), 0),
+    secoes,
+  };
+}
+
+/**
+ * Boletim de uma seção no 1º turno com os números REAIS (dados abertos do TSE). `simulado: false` e, como o
+ * código de identificação da urna não vem nos dados abertos, `codigoIdentificacao` = '' (não inventamos).
+ */
+export function secao1t(st: Structure, r: RaceInfo, i: number, localDe?: LocalDe): SecaoDetalhe {
+  const m = st.secMun[i];
+  const c = colunasReais(st, r, st.munUf[m])!;
+  const s = secaoResumoT1(st, c, i);
+  const loc = localDe?.(i);
+  if (loc) s.local = loc;
+  return {
+    ...s,
+    race: r.id,
+    uf: st.ufs[st.secUf[i]],
+    cod: st.mun[m].cod,
+    nomeMunicipio: st.mun[m].nome,
+    zona: st.pairZona[st.secPair[i]],
+    abstencao: s.aptos - s.comparecimento,
+    codigoIdentificacao: '',
+    simulado: false,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mapa nacional por município (MunicipiosNacionalSnapshot)
+// ---------------------------------------------------------------------------------------------
+
+/** Linha do mapa nacional: −1 sem votos válidos · 0/1 à frente · 2 empate. Inteiros conforme o contrato. */
+function linhaMapa(
+  out: MunicipiosNacionalSnapshot,
+  j: number,
+  v0: number,
+  v1: number,
+  validos: number,
+  secTot: number,
+  secoes: number,
+  comp: number,
+  eleitTot: number,
+): void {
+  const lider = validos <= 0 ? -1 : v0 > v1 ? 0 : v1 > v0 ? 1 : 2;
+  out.lider[j] = lider;
+  out.margem[j] = validos > 0 ? Math.round((1000 * Math.abs(v0 - v1)) / validos) : 0;
+  // truncado: 100,0% só com todas as seções
+  out.apurado[j] = secoes > 0 ? Math.floor((1000 * secTot) / secoes) : 0;
+  out.comparecimento[j] = eleitTot > 0 ? Math.round((1000 * comp) / eleitTot) : 0;
+  out.pct0[j] = validos > 0 ? Math.round((10000 * v0) / validos) : 0;
+  if (lider === 0 || lider === 1) out.municipiosLiderados[lider]++;
+}
+
+function mapaVazio(race: string, n: number, simNow: number, geradoEm: number): MunicipiosNacionalSnapshot {
+  return {
+    race,
+    geradoEm,
+    simNow,
+    lider: new Array<number>(n).fill(-1),
+    margem: new Array<number>(n).fill(0),
+    apurado: new Array<number>(n).fill(0),
+    comparecimento: new Array<number>(n).fill(0),
+    pct0: new Array<number>(n).fill(0),
+    municipiosLiderados: [0, 0],
+  };
+}
+
+/**
+ * 2º turno: arrays alinhados com `ordem` (índice do município na estrutura por posição; −1 = sem
+ * correspondência). Fora do escopo da corrida (governador de outra UF): sem votos (−1, zeros).
+ */
+export function municipiosBr2t(ctx: Ctx, r: RaceInfo, ordem: Int32Array): MunicipiosNacionalSnapshot {
+  const { model, agg } = ctx;
+  const st = model.st;
+  const gov = r.kind === 'gov';
+  const out = mapaVazio(r.id, ordem.length, ctx.simNow, ctx.geradoEm);
+  const S = F.STRIDE;
+  const a = agg.mun;
+  for (let j = 0; j < ordem.length; j++) {
+    const m = ordem[j];
+    if (m < 0 || (gov && st.munUf[m] !== r.ufIdx)) continue;
+    const o = m * S;
+    const v0 = gov ? a[o + F.G0] : a[o + F.V0];
+    const v1 = gov ? a[o + F.G1] : a[o + F.V1];
+    linhaMapa(out, j, v0, v1, v0 + v1, a[o + F.SEC], st.munSecEnd[m] - st.munSecStart[m], a[o + F.COMP], a[o + F.APT]);
+  }
+  return out;
+}
+
+/** 1º turno (dataset oficial, 100% totalizado): margem e % do candidato 0 sobre TODOS os válidos. */
+export function municipiosBr1t(st: Structure, d: T1Data, ordem: Int32Array, simNow: number, geradoEm: number): MunicipiosNacionalSnapshot {
+  const r = d.r;
+  const out = mapaVazio(r.id, ordem.length, simNow, geradoEm);
+  const S = T.STRIDE;
+  for (let j = 0; j < ordem.length; j++) {
+    const m = ordem[j];
+    if (m < 0 || (r.kind === 'gov' && st.munUf[m] !== r.ufIdx)) continue;
+    const o = m * S;
+    const v0 = d.mun[o + T.V0];
+    const v1 = d.mun[o + T.V1];
+    const sec = d.mun[o + T.SEC];
+    linhaMapa(out, j, v0, v1, v0 + v1 + d.mun[o + T.VO], sec, sec, d.mun[o + T.COMP], d.mun[o + T.ELEIT]);
+  }
+  return out;
 }

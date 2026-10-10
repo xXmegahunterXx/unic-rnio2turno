@@ -8,6 +8,9 @@
  *    counting" (n ≈ −m·ln(zeros/m)), que estima milhões de clientes distintos com 128 KB por janela e
  *    não permite recuperar quem acessou. Janela deslizante = 3 baldes de 10 s.
  *    Atrás de CDN, só as requisições que chegam à origem entram na conta.
+ *  - "Pessoas agora" (LiveStatus.pessoasAgora): a mesma estimativa, recalculada no máximo a cada 5 s e
+ *    ARREDONDADA (< 10 exato; < 1.000 em dezenas; depois em centenas) — a contagem é estimada, e exibir
+ *    "1.237" sugeriria uma precisão que ela não tem.
  */
 import { createHash, randomBytes } from 'node:crypto';
 
@@ -64,6 +67,17 @@ const POPCOUNT = (() => {
   return t;
 })();
 
+/** Arredonda a estimativa de pessoas: < 10 exato; < 1.000 em dezenas; daí em diante, em centenas. */
+export function arredondarPessoas(n: number): number {
+  const v = Math.max(0, Math.round(Number.isFinite(n) ? n : 0));
+  if (v < 10) return v;
+  if (v < 1000) return Math.round(v / 10) * 10;
+  return Math.round(v / 100) * 100;
+}
+
+/** Intervalo mínimo entre recálculos de `pessoasAgora` (a união dos baldes percorre 384 KB). */
+const PESSOAS_TTL_MS = 5_000;
+
 export interface ResumoMinuto {
   requisicoes: number;
   p50: number;
@@ -85,6 +99,7 @@ export class Metricas {
   private misses = 0;
   private n304 = 0;
   readonly clientes: ClientesAtivos;
+  private pessoas: { em: number; v: number } | null = null;
   /** Tempo da última montagem de resposta não cacheada (snapshot + JSON + compressão), em ms. */
   ultimoCalculoMs = 0;
   readonly iniciadoEm: number;
@@ -116,6 +131,15 @@ export class Metricas {
   cache(hit: boolean): void {
     if (hit) this.hits++;
     else this.misses++;
+  }
+
+  /** Pessoas agora (clientes ativos estimados nos últimos ~30 s), arredondado e com cache de 5 s. */
+  pessoasAgora(): number {
+    const t = this.now();
+    if (!this.pessoas || t - this.pessoas.em >= PESSOAS_TTL_MS || t < this.pessoas.em) {
+      this.pessoas = { em: t, v: arredondarPessoas(this.clientes.estimar()) };
+    }
+    return this.pessoas.v;
   }
 
   requisicoesUltimoMinuto(): number {

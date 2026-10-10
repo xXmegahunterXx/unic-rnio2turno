@@ -1,5 +1,5 @@
 /** Ícone de tema do Teste Cego: o emoji neutro do conteúdo editorial num ladrilho discreto. */
-import type { TemaInfo } from '@/app/content/propostas';
+import type { TemaInfo } from '@/app/content/afirmacoes';
 import { cn } from '@/app/lib/cn';
 
 const tamanhos = {

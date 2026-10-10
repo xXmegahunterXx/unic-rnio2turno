@@ -4,8 +4,10 @@
  * somadas sob demanda a partir das seções do próprio município (`camposPar`), só nas telas de município/zona.
  *
  * Cache: LRU pequeno por k (o controller quantiza simNow em buckets de 1 s e converte em k). Um k novo é
- * calculado de forma INCREMENTAL a partir do maior k em cache que seja ≤ k (o relógio quase sempre anda
- * para frente), senão do zero.
+ * calculado de forma INCREMENTAL a partir do maior k ≤ k disponível — no LRU ou num dos PONTOS DE CONTROLE
+ * (agregados imutáveis a cada N/16 seções, guardados na primeira vez em que a soma passa por eles). O relógio
+ * quase sempre anda para frente (custo ~ seções novas); voltar no tempo ("reveja a noite") custa no máximo
+ * N/16 seções (~31 mil), em vez de recomeçar do zero. Memória dos pontos de controle: 16 × (municípios × 12 × 8 B).
  */
 import type { Model } from './model';
 
@@ -35,12 +37,20 @@ export interface Agg {
 
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
 
+/** Nº de intervalos entre pontos de controle (o custo máximo de um k qualquer é N/PONTOS seções). */
+export const PONTOS_CONTROLE = 16;
+
 export class Aggregator {
   private cache = new Map<number, Agg>();
+  /** pontos de controle: índice c → agregado imutável em k = c × passo (preenchidos sob demanda) */
+  private pontos: (Float64Array | undefined)[] = [];
+  private readonly passo: number;
   constructor(
     private readonly model: Model,
     private readonly max = 6,
-  ) {}
+  ) {
+    this.passo = Math.max(1, Math.ceil(model.st.nSec / PONTOS_CONTROLE));
+  }
 
   get(k: number): Agg {
     const hit = this.cache.get(k);
@@ -52,35 +62,55 @@ export class Aggregator {
     const t0 = now();
     const st = this.model.st;
     const S = F.STRIDE;
-    let base: Agg | null = null;
-    for (const a of this.cache.values()) if (a.k <= k && (!base || a.k > base.k)) base = a;
+    // base: o maior k' ≤ k entre o LRU e os pontos de controle
+    let baseMun: Float64Array | null = null;
+    let from = 0;
+    for (const a of this.cache.values())
+      if (a.k <= k && (baseMun === null || a.k > from)) {
+        baseMun = a.mun;
+        from = a.k;
+      }
+    for (let c = Math.min(PONTOS_CONTROLE, Math.floor(k / this.passo)); c >= 1; c--) {
+      const p = this.pontos[c];
+      if (!p) continue;
+      if (c * this.passo > from || baseMun === null) {
+        baseMun = p;
+        from = c * this.passo;
+      }
+      break;
+    }
     let mun: Float64Array;
-    let from: number;
-    if (base) {
-      mun = base.mun.slice();
-      from = base.k;
-    } else {
+    if (baseMun) mun = baseMun.slice();
+    else {
       mun = new Float64Array(st.nMun * S);
       for (let m = 0; m < st.nMun; m++) mun[m * S + F.LAST] = -1;
       from = 0;
     }
     const { ordem, aptos, comp, pv0, pv1, pb, pn, gv0, gv1, gb, gn, chegada } = this.model;
     const secMun = st.secMun;
-    for (let j = from; j < k; j++) {
-      const i = ordem[j];
-      const o = secMun[i] * S;
-      mun[o] += 1;
-      mun[o + 1] += aptos[i];
-      mun[o + 2] += comp[i];
-      mun[o + 3] += pv0[i];
-      mun[o + 4] += pv1[i];
-      mun[o + 5] += pb[i];
-      mun[o + 6] += pn[i];
-      mun[o + 7] += gv0[i];
-      mun[o + 8] += gv1[i];
-      mun[o + 9] += gb[i];
-      mun[o + 10] += gn[i];
-      mun[o + 11] = chegada[i];
+    const passo = this.passo;
+    let j = from;
+    while (j < k) {
+      // avança até o próximo ponto de controle (ou até k)
+      const prox = Math.min(k, (Math.floor(j / passo) + 1) * passo);
+      for (; j < prox; j++) {
+        const i = ordem[j];
+        const o = secMun[i] * S;
+        mun[o] += 1;
+        mun[o + 1] += aptos[i];
+        mun[o + 2] += comp[i];
+        mun[o + 3] += pv0[i];
+        mun[o + 4] += pv1[i];
+        mun[o + 5] += pb[i];
+        mun[o + 6] += pn[i];
+        mun[o + 7] += gv0[i];
+        mun[o + 8] += gv1[i];
+        mun[o + 9] += gb[i];
+        mun[o + 10] += gn[i];
+        mun[o + 11] = chegada[i];
+      }
+      const c = j / passo;
+      if (j % passo === 0 && c >= 1 && c <= PONTOS_CONTROLE && !this.pontos[c]) this.pontos[c] = mun.slice();
     }
     const agg: Agg = { k, mun, ms: now() - t0 };
     this.cache.set(k, agg);

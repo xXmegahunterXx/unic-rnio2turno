@@ -175,6 +175,9 @@ await tse.uf('pres', 'SP');
 await tse.municipio('pres', 'SP', '71072');
 await tse.zona('pres', 'SP', '71072', 1);
 await tse.secao('pres', 'SP', '71072', 1, 1);   // null ⇒ 404
+await tse.nacional('pres', t);       // "reveja a noite": estado mais recente com instante ≤ t (t passado, epoch ms)
+await tse.uf('pres', 'SP', t);
+await tse.municipiosBr('pres', municipiosBr, t?); // mapa nacional por município (ordem de municipios-br.json)
 tse.health();                         // ok, falhas, ausentes, fila, latência…
 salvarJson('.server-state/tse-historico.json', tse.exportarHistorico()); // periodicamente
 ```
@@ -195,6 +198,31 @@ salvarJson('.server-state/tse-historico.json', tse.exportarHistorico()); // peri
   `exportarHistorico()`/`historico` preservam série e eventos entre reinícios.
 - Caches: municípios/zonas 60 s, `cs` 120 s, `cm` 1 h, 1º turno local 6 h, BU 15 min (LRU 2.000).
 - `MunicipioSnapshot.primeiroTurno`: arquivo do município no 1º turno (6257/6259), na ordem da corrida `-t1`.
+
+### 5.1 "Reveja a noite" (`?t=`) e mapa nacional por município
+
+- **Histórico de estados** (`HistoricoCorrida`, em `eventos.ts`): além de série e eventos, cada poll que muda uma
+  abrangência grava o `Summary` completo do Brasil e da UF (compactado em inteiros, `ResumoCompacto`, ≤ 3.000 por
+  abrangência), e cada download de município que muda os números grava o do município (≤ 240 por município,
+  afinados uniformemente). O instante de cada estado é o **oficial** (`dt/ht` da última totalização do arquivo);
+  estado zerado sem data vale "desde sempre". Tudo vai em `exportarHistorico()` (campos opcionais `resumos` e
+  `municipios`; históricos antigos sem eles continuam importáveis) e o servidor grava em
+  `STATE_DIR/tse-historico.json` a cada 30 s e no encerramento.
+- **`nacional(race, t)` / `uf(race, uf, t)`** com `t` no passado: Brasil, UFs (e regiões, somadas) e municípios da
+  UF no estado mais recente com instante ≤ t; série e eventos cortados em t; `restante` recalculado; `simNow = t`.
+  Sem estado registrado até t: resumo zerado com as seções e o eleitorado da abrangência. `t` ausente ou ≥ agora =
+  agora. A soma dos municípios pode ficar abaixo da UF num instante (os arquivos de município chegam pela fila,
+  como no agora).
+- **Município, zona e seção com `t` respondem o agora**: não guardamos zonas nem BUs por instante (o servidor nem
+  repassa o `t` nesses níveis, e o ETag é o do agora).
+- **`municipiosBr(race, ordem, t?)`**: `MunicipiosNacionalSnapshot` na ordem de `public/data/municipios-br.json`
+  com o que **já está em cache**: município cujo `-u.json` ainda não foi baixado (ou fora da disputa) sai com
+  `lider: -1` e `apurado: 0` — nunca inventamos votos nem usamos o `-ab.json` (sem votos) para "pintar" o mapa.
+  O aquecimento baixa os municípios das UFs em apuração a cada mudança do `-ab.json` (≈ 3,5 min para o país
+  inteiro com 5 workers), então o mapa se completa ao longo da noite. Com `t`: o estado de cada município
+  registrado até t. Percentuais de `calc.ts`; `apurado` truncado (100,0 só com tudo totalizado).
+- No servidor, um `t` passado é "consolidado" (cache longo na CDN, com `&v=<versão>` na URL) só 3 min depois: o
+  arquivo do TSE chega com até ~1 min de atraso pelo CDN dele, mais o intervalo de polling e a fila.
 
 ### Medidas (feed real, 09/10/2026, deste contêiner)
 

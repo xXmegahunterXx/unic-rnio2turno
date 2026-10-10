@@ -67,13 +67,13 @@ const DEFS: PresetDef[] = [
     nome: 'Empate técnico',
     descricao: () =>
       'Presidente: A com 50,05% dos válidos e ruído por seção baixo — a definição só vem no fim da noite.',
-    cenario: () => ({ alvoPres: 50.05, ruidoSecao: 0.1 }),
+    cenario: () => ({ alvoPres: 50.05, ruidoSecao: 0.03 }),
   },
   {
     id: 'empate-b',
     nome: 'Empate técnico (espelhado)',
     descricao: () => 'Espelho do anterior: B com 50,05% dos válidos (A com 49,95%), ruído baixo.',
-    cenario: () => ({ alvoPres: 49.95, ruidoSecao: 0.1 }),
+    cenario: () => ({ alvoPres: 49.95, ruidoSecao: 0.03 }),
   },
   {
     id: 'virada-a',

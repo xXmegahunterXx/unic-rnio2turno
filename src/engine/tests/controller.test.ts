@@ -299,7 +299,7 @@ describe('hospedeiro RPC (Worker do demo)', () => {
     const r2 = out.find((m) => m.type === 'reply' && m.id === 2) as Extract<HostOut, { type: 'reply'; ok: true }>;
     expect(r2.ok).toBe(true);
     expect((r2.result as { race: string }).race).toBe('pres');
-    await handle({ type: 'call', id: 3, method: 'zona', args: ['pres-t1', 'SP', '71072', 1] });
+    await handle({ type: 'call', id: 3, method: 'zona', args: ['pres-t1', 'SP', '71072', 9999] });
     const r3 = out.at(-1) as Extract<HostOut, { type: 'reply'; ok: false }>;
     expect(r3.ok).toBe(false);
     expect(r3.error.name).toBe('NotFoundError');

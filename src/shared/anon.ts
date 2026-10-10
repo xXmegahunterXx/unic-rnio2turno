@@ -7,7 +7,7 @@ import type { Race } from './types';
 
 const ROTULO_SLOT = { a: 'A', b: 'B', outros: '' } as const;
 
-/** Versão anônima de uma corrida: "Candidato A/B", sem partido, vice ou número reais. */
+/** Versão anônima de uma corrida: "Candidato A/B", sem partido, vice, número, foto ou ficha reais. */
 export function anonimizarRace(r: Race): Race {
   return {
     ...r,
@@ -23,6 +23,9 @@ export function anonimizarRace(r: Race): Race {
             composicao: undefined,
             vice: undefined,
             numero: c.cor === 'a' ? 1 : 2,
+            // sem chave de foto/ficha: nunca foto na simulação anonimizada (ARCHITECTURE §1.1)
+            sqcand: undefined,
+            fotoGrupo: undefined,
           },
     ),
   };

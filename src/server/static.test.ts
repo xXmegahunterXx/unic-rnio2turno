@@ -5,7 +5,7 @@
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { gunzipSync } from 'node:zlib';
+import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { escapeHtml } from './meta-tags';
 import { montar, type Montado } from './test-helpers';
@@ -34,6 +34,13 @@ beforeAll(async () => {
   writeFileSync(join(dist, 'assets/index-abc123.js'), `console.log(${JSON.stringify('x'.repeat(5000))});`);
   writeFileSync(join(dist, 'favicon.svg'), '<svg xmlns="http://www.w3.org/2000/svg"/>');
   writeFileSync(join(dist, 'geo/br.json'), JSON.stringify({ viewBox: '0 0 1 1', ufs: {}, pad: 'y'.repeat(3000) }));
+  // diretórios novos da fase 2 (JSONs grandes)
+  mkdirSync(join(dist, 'data/locais'), { recursive: true });
+  mkdirSync(join(dist, 'data/secao'), { recursive: true });
+  const locais = { uf: 'SP', locais: Array.from({ length: 4000 }, (_, i) => ({ nome: `Escola Estadual ${i}`, endereco: `Rua ${i % 97}, ${i}` })) };
+  writeFileSync(join(dist, 'data/locais/sp.json'), JSON.stringify(locais));
+  writeFileSync(join(dist, 'data/secao/sp.json'), JSON.stringify({ n: 3, aptos: 'AAAA'.repeat(2000) }));
+  writeFileSync(join(dist, 'geo/br-mun.json'), JSON.stringify({ viewBox: '0 0 1 1', municipios: { '3550308': 'M0 0L1 1'.repeat(400) }, ufs: {} }));
   m = await montar({ env: { SERVE_STATIC: '1', DIST_DIR: dist, PUBLIC_URL: 'https://sintonia.exemplo.br' } });
 });
 
@@ -59,6 +66,32 @@ describe('arquivos do build', () => {
     const fav = await get('/apuracao/sp/favicon.svg');
     expect(fav.status).toBe(200);
     expect(fav.headers.get('content-type')).toBe('image/svg+xml');
+  });
+
+  it('data/** e geo/** (inclusive os diretórios novos): cache longo na CDN, ETag e br/gzip pré-computados', async () => {
+    for (const p of ['/data/locais/sp.json', '/data/secao/sp.json', '/geo/br-mun.json']) {
+      const r = await get(p, { 'accept-encoding': 'gzip, deflate, br' });
+      expect(r.status).toBe(200);
+      expect(r.headers.get('cache-control')).toBe('public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400');
+      expect(r.headers.get('content-type')).toBe('application/json; charset=utf-8');
+      expect(r.headers.get('content-encoding')).toBe('br');
+      expect(r.headers.get('vary')).toBe('Accept-Encoding');
+      const corpo = brotliDecompressSync(Buffer.from(await r.arrayBuffer()));
+      expect(() => JSON.parse(corpo.toString())).not.toThrow();
+      expect((await get(p, { 'if-none-match': r.headers.get('etag')! })).status).toBe(304);
+    }
+    const bruto = await get('/data/locais/sp.json');
+    const tamanho = Buffer.from(await bruto.arrayBuffer()).length;
+    const br = await get('/data/locais/sp.json', { 'accept-encoding': 'br' });
+    expect(Buffer.from(await br.arrayBuffer()).length).toBeLessThan(tamanho / 5);
+  });
+
+  it('aquecer(): pré-comprime data/ e geo/ sem erro', async () => {
+    const r = await m.estaticos!.aquecer(['data', 'geo']);
+    expect(r.arquivos).toBe(4);
+    expect(r.comprimidos).toBeGreaterThan(0);
+    expect(r.comprimidos).toBeLessThan(r.bytes);
+    expect(m.estaticos!.emMemoria).toBeGreaterThan(r.bytes - 1);
   });
 
   it('arquivo inexistente → 404 (não cai na SPA); path traversal bloqueado', async () => {
@@ -112,6 +145,22 @@ describe('SPA com meta tags por rota', () => {
     const dh = await d.text();
     expect(dh).toContain('noindex');
     expect(dh).toContain('Duelo no Teste Cego');
+  });
+
+  it('rotas da fase 2: TV, Senado, Câmara, Assembleias e ficha do candidato', async () => {
+    const tv = await get('/tv');
+    expect(tv.status).toBe(200);
+    expect(await tv.text()).toContain('<title>Modo TV · Apuração ao vivo · Sintonia</title>');
+    expect(await (await get('/senado')).text()).toContain('Senado · Resultado do 1º turno de 2026');
+    expect(await (await get('/camara')).text()).toContain('Câmara dos Deputados');
+    expect(await (await get('/assembleias/sp')).text()).toContain('Assembleia Legislativa · São Paulo');
+    expect(await (await get('/assembleias/df')).text()).toContain('Câmara Legislativa · Distrito Federal');
+    const cand = await get('/candidato/280001607829');
+    expect(cand.status).toBe(200);
+    expect(await cand.text()).toContain('Ficha do candidato · Sintonia');
+    expect((await get('/assembleias/zz')).status).toBe(404);
+    expect((await get('/assembleias/xx')).status).toBe(404);
+    expect((await get('/candidato/abc')).status).toBe(404);
   });
 
   it('rota desconhecida → 404 com a SPA (página "não encontrada")', async () => {

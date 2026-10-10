@@ -6,11 +6,15 @@
  *  - `secao()` devolve `null` no 404 (seção sem boletim / inexistente).
  *  - Timeouts por tipo de chamada (AbortController); `credentials: 'same-origin'` (cookie do admin).
  *  - O cache HTTP do navegador revalida com ETag (304) automaticamente.
+ *  - "Reveja a noite" (`opts.t`, contrato `Instante`): `?t=<epoch ms>` truncado ao segundo, mais `&v=<versão>`
+ *    (a última `versao` vista em `status()`): com a versão na URL, o servidor/CDN pode guardar o passado por
+ *    muito mais tempo, e uma mudança de cenário no admin troca a URL.
  */
-import type { AdminCommand, AdminSnapshot, ApuracaoClient, PublicMeta } from '@/shared/api';
+import type { AdminCommand, AdminSnapshot, ApuracaoClient, Instante, PublicMeta } from '@/shared/api';
 import type {
   LiveStatus,
   MunicipioSnapshot,
+  MunicipiosNacionalSnapshot,
   NationalSnapshot,
   PresetInfo,
   RaceId,
@@ -112,21 +116,34 @@ export function createHttpClient(opts: HttpClientOptions = {}): ApuracaoClient {
 
   const ap = (race: RaceId) => `/apuracao/${lower(race)}`;
 
+  /** Última versão do admin vista no status (chave de cache dos instantes passados). */
+  let versao: number | null = null;
+  /** Query do instante: '' (agora) ou `?t=<epoch ms>&v=<versão>`. */
+  const qt = (opts?: Instante) => {
+    const t = opts?.t;
+    if (typeof t !== 'number' || !Number.isFinite(t) || t <= 0) return '';
+    return `?t=${Math.floor(t / 1000) * 1000}${versao !== null ? `&v=${versao}` : ''}`;
+  };
+
   return {
-    status: () => req<LiveStatus>('/status', { timeout: to.status }),
+    async status() {
+      const s = await req<LiveStatus>('/status', { timeout: to.status });
+      if (typeof s?.versao === 'number') versao = s.versao;
+      return s;
+    },
     meta: () => req<PublicMeta>('/meta', { timeout: to.dados }),
-    // TODO(fase 2): implementado pelo agente do servidor (rota /br/municipios e ?t=).
-    municipiosBr: () => Promise.reject(new Error('municipiosBr ainda não implementado')),
-    nacional: (race) => req<NationalSnapshot>(`${ap(race)}/br`, { timeout: to.dados }),
-    uf: (race, uf: UF) => req<UfSnapshot>(`${ap(race)}/uf/${lower(uf)}`, { timeout: to.dados }),
-    municipio: (race, uf, cod) => req<MunicipioSnapshot>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}`, { timeout: to.dados }),
-    zona: (race, uf, cod, zona) =>
-      req<ZonaSnapshot>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}/zona/${enc(String(zona))}`, { timeout: to.dados }),
-    secao: (race, uf, cod, zona, secao) =>
-      req<SecaoDetalhe | null>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}/zona/${enc(String(zona))}/secao/${enc(String(secao))}`, {
-        timeout: to.dados,
-        nullOn404: true,
-      }),
+    municipiosBr: (race, opts) => req<MunicipiosNacionalSnapshot>(`${ap(race)}/br/municipios${qt(opts)}`, { timeout: to.dados }),
+    nacional: (race, opts) => req<NationalSnapshot>(`${ap(race)}/br${qt(opts)}`, { timeout: to.dados }),
+    uf: (race, uf: UF, opts) => req<UfSnapshot>(`${ap(race)}/uf/${lower(uf)}${qt(opts)}`, { timeout: to.dados }),
+    municipio: (race, uf, cod, opts) =>
+      req<MunicipioSnapshot>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}${qt(opts)}`, { timeout: to.dados }),
+    zona: (race, uf, cod, zona, opts) =>
+      req<ZonaSnapshot>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}/zona/${enc(String(zona))}${qt(opts)}`, { timeout: to.dados }),
+    secao: (race, uf, cod, zona, secao, opts) =>
+      req<SecaoDetalhe | null>(
+        `${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}/zona/${enc(String(zona))}/secao/${enc(String(secao))}${qt(opts)}`,
+        { timeout: to.dados, nullOn404: true },
+      ),
     admin: {
       async login(senha: string) {
         try {

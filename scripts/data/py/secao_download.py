@@ -9,6 +9,7 @@ import os
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
+sys.dont_write_bytecode = True  # não deixa __pycache__ no repositório
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from secao_comum import UFS_GOV_2T, baixar  # noqa: E402
 

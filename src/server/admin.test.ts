@@ -141,10 +141,16 @@ describe('comandos', () => {
     expect(r.status).toBe(400);
   });
 
-  it('corpo grande demais → 413', async () => {
+  it('corpo grande demais → 413 (256 KB no /command, 64 KB no resto)', async () => {
     const cookie = await login(m);
-    const r = await comando(m, cookie, { tipo: 'aviso', aviso: { nivel: 'info', texto: 'x'.repeat(70_000) } });
+    const r = await comando(m, cookie, { tipo: 'aviso', aviso: { nivel: 'info', texto: 'x'.repeat(300_000) } });
     expect(r.status).toBe(413);
+    const rLogin = await m.app.request('/api/admin/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ senha: 'x'.repeat(70_000) }),
+    });
+    expect(rLogin.status).toBe(413);
   });
 
   it('aplica comandos válidos, devolve AdminSnapshot e persiste o estado (escrita atômica)', async () => {

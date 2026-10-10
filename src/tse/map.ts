@@ -19,6 +19,7 @@ import type {
   ApuracaoStatus,
   Candidate,
   MunicipioResumo,
+  MunicipiosNacionalSnapshot,
   PrimeiroTurnoLocal,
   Race,
   Regiao,
@@ -33,7 +34,7 @@ import type {
 } from '../shared/types';
 import { UFS } from '../shared/types';
 import { BRT_OFFSET_MS, UF_REGIAO } from '../shared/constants';
-import { encodeFaixas, pctTotalizadas, pctValidos } from '../shared/calc';
+import { encodeFaixas, margem, pctComparecimento, pctTotalizadas, pctValidos, validos } from '../shared/calc';
 import { titleCasePt } from '../shared/format';
 import type {
   TseAcompanhamentoItem,
@@ -381,6 +382,47 @@ export const resumoVazio = (n: number): Summary => ({
   eleito: null,
   ultimaAtualizacao: null,
 });
+
+/** Mesma abrangência antes de qualquer totalização: mantém seções e eleitorado, zera o resto. */
+export const resumoZerado = (s: Pick<Summary, 'secoes' | 'eleitorado' | 'votos'>): Summary => ({
+  ...resumoVazio(s.votos.length),
+  secoes: s.secoes,
+  eleitorado: s.eleitorado,
+});
+
+/**
+ * Mapa nacional por município (`MunicipiosNacionalSnapshot`) a partir dos Summaries na ordem de
+ * public/data/municipios-br.json. `null` = município sem dado (fora da disputa ou arquivo ainda não
+ * baixado): líder −1 e apurado 0. Percentuais de calc.ts; `apurado` truncado (100,0 só com tudo apurado).
+ */
+export function municipiosNacionalDe(
+  race: string,
+  nCandidatos: number,
+  resumos: (Summary | null)[],
+  geradoEm: number,
+  simNow: number,
+): MunicipiosNacionalSnapshot {
+  const n = resumos.length;
+  const lider = new Array<number>(n).fill(-1);
+  const margemArr = new Array<number>(n).fill(0);
+  const apurado = new Array<number>(n).fill(0);
+  const comparecimento = new Array<number>(n).fill(0);
+  const pct0 = new Array<number>(n).fill(0);
+  const municipiosLiderados = new Array<number>(Math.max(2, nCandidatos)).fill(0);
+  for (let i = 0; i < n; i++) {
+    const s = resumos[i];
+    if (!s) continue;
+    apurado[i] = Math.floor(pctTotalizadas(s) * 10);
+    comparecimento[i] = Math.round(pctComparecimento(s) * 10);
+    if (validos(s) <= 0) continue;
+    const m = margem(s);
+    lider[i] = m.lider ?? 2;
+    margemArr[i] = Math.round(m.pp * 10);
+    pct0[i] = Math.round(pctValidos(s, 0) * 100);
+    if (m.lider !== null) municipiosLiderados[m.lider]++;
+  }
+  return { race, geradoEm, simNow, lider, margem: margemArr, apurado, comparecimento, pct0, municipiosLiderados };
+}
 
 /** Soma contagens (regiões, conferências). Status: aguardando (nada), encerrada (tudo), apurando. */
 export function somarResumos(lista: Summary[], candidatos: Pick<Candidate, 'agregado'>[]): Summary {

@@ -8,6 +8,8 @@
  *   await tse.municipio('pres', 'SP', '71072');
  *   await tse.zona('pres', 'SP', '71072', 1);
  *   await tse.secao('pres', 'SP', '71072', 1, 1);  // boletim de urna (bu.dat) decodificado
+ *   await tse.nacional('pres', t);     // "reveja a noite": snapshot mais recente com instante ≤ t (nacional/UF)
+ *   await tse.municipiosBr('pres', ordem);  // mapa nacional por município (o que já está em cache)
  *   tse.health(); tse.stop();
  *
  * Estratégia (detalhes e URLs em src/tse/README.md):
@@ -18,6 +20,10 @@
  *    prioridade (UFs consultadas nos últimos minutos primeiro), no máximo 1 vez por `municipioTtlMs`.
  *  - Zona: arquivo por município+zona (`{uf}{mun}-z{zona}-c…-u.json`). Seções: status pelo `-cs.json` da UF
  *    (`da`/`ha` = arquivos da urna publicados); votos de uma seção só sob demanda, pelo BU.
+ *  - Histórico ("reveja a noite"): a cada mudança, o Summary completo do Brasil e de cada UF e, a cada
+ *    download de município que mudou os números, o do município (eventos.ts, `HistoricoCorrida`). Com `t`
+ *    (epoch ms, passado), `nacional`/`uf`/`municipiosBr` respondem o estado mais recente com instante ≤ t;
+ *    município, zona e seção sempre respondem o agora (não guardamos zonas nem BUs por instante).
  *  - Erros do TSE nunca derrubam: o último dado bom é mantido e `health()` expõe o problema. Métodos não
  *    lançam por falha de rede; lançam `NotFoundError` só para corrida/UF/município/zona inexistentes.
  *
@@ -26,6 +32,7 @@
 import type {
   MunicipioResumo,
   MunicipioSnapshot,
+  MunicipiosNacionalSnapshot,
   NationalSnapshot,
   PrimeiroTurnoLocal,
   Race,
@@ -521,21 +528,32 @@ export class TseSource {
     return mudou;
   }
 
-  private registrarHistorico(c: Corrida, mudaram: Abr[]) {
-    const race = c.mapeada;
+  /** Histórico da corrida mapeada (criado sob demanda; restaura o salvo na 1ª vez). */
+  private histDe(c: Corrida, race: Race = c.mapeada): HistoricoCorrida {
     if (!c.hist || c.hist.race.id !== race.id) {
       c.hist = new HistoricoCorrida(race, c.chave);
       const salvo = this.historicoPendente.get(race.id);
       if (salvo && c.hist.importar(salvo)) this.log(`TSE ${race.id}: histórico restaurado`);
       this.historicoPendente.delete(race.id);
     }
+    return c.hist;
+  }
+
+  /** Histórico só se já existir para a corrida mapeada (consultas não criam histórico). */
+  private histSe(c: Corrida, race: Race): HistoricoCorrida | null {
+    return c.hist && c.hist.race.id === race.id ? c.hist : null;
+  }
+
+  private registrarHistorico(c: Corrida, mudaram: Abr[]) {
+    const race = c.mapeada;
+    const hist = this.histDe(c, race);
     // UFs antes do Brasil: o feed nacional fica na ordem natural (Brasil por último no mesmo instante)
     const ordem = [...mudaram].sort((x, y) => (x === c.principal ? 1 : 0) - (y === c.principal ? 1 : 0));
     for (const abr of ordem) {
       const e = c.resultados.get(abr);
       if (!e || e.r.race.id !== race.id) continue;
       const t = e.r.resumo.ultimaAtualizacao ?? this.now();
-      c.hist.registrar(abr, e.r.resumo, t, abr === c.principal);
+      hist.registrar(abr, e.r.resumo, t, abr === c.principal);
     }
   }
 
@@ -554,11 +572,16 @@ export class TseSource {
   // Snapshots
   // -------------------------------------------------------------------------------------------
 
-  async nacional(raceId: RaceId): Promise<NationalSnapshot> {
+  /**
+   * Snapshot nacional. `t` (epoch ms) no passado = "reveja a noite": Brasil e UFs no estado mais recente
+   * registrado com instante ≤ t; série e eventos cortados em t. `t` ausente ou ≥ agora = agora.
+   */
+  async nacional(raceId: RaceId, t?: number): Promise<NationalSnapshot> {
     const c = this.corrida(raceId);
     await this.garantir(c);
     const agora = this.now();
     const race = c.mapeada;
+    if (t !== undefined && t < agora) return this.nacionalEm(c, race, t, agora);
     const resumo = this.resumoAbr(c, c.principal, race);
     const ufs: NationalSnapshot['ufs'] = {};
     for (const abr of c.abrs) if (abr !== 'BR') ufs[abr] = this.resumoAbr(c, abr, race);
@@ -576,16 +599,31 @@ export class TseSource {
     };
   }
 
-  async uf(raceId: RaceId, ufIn: string): Promise<UfSnapshot> {
+  /** Snapshot da UF. `t` no passado: UF e municípios no estado mais recente com instante ≤ t (ver `nacional`). */
+  async uf(raceId: RaceId, ufIn: string, t?: number): Promise<UfSnapshot> {
     const c = this.corrida(raceId);
     const uf = this.ufDaCorrida(c, ufIn);
     await this.garantir(c);
     this.marcarQuente(c, uf);
     const race = c.mapeada;
     const municipios = await this.municipiosDaUf(c, uf, race);
-    const resumo = this.resumoAbr(c, uf, race);
     const hist = c.hist && c.hist.race.id === race.id ? c.hist : null;
     const agora = this.now();
+    if (t !== undefined && t < agora) {
+      const resumo = hist?.resumoEm(uf, t) ?? map.resumoZerado(this.resumoAbr(c, uf, race));
+      return {
+        race: race.id,
+        uf,
+        geradoEm: agora,
+        simNow: t,
+        resumo,
+        municipios: municipios.map((m) => map.municipioResumo(hist?.municipioEm(uf, m.cod, t) ?? map.resumoZerado(m), m)),
+        serie: hist?.serieAte(uf, t) ?? [],
+        eventos: hist?.eventosDaUfAte(uf, t) ?? [],
+        restante: map.restanteDe(resumo, race.candidatos),
+      };
+    }
+    const resumo = this.resumoAbr(c, uf, race);
     return {
       race: race.id,
       uf,
@@ -728,6 +766,56 @@ export class TseSource {
       this.log(`TSE seção ${uf}/${info.cod}/${z}/${s}: ${msgDe(err)}`);
       return cache?.det ?? pendente();
     }
+  }
+
+  /**
+   * Mapa nacional por município (ordem de public/data/municipios-br.json), com o que JÁ está em cache:
+   * municípios cujo arquivo ainda não foi baixado (ou fora da disputa) saem com apurado 0 e líder −1 —
+   * nunca inventamos votos. Durante a noite, o aquecimento (`aquecerMunicipios`) baixa os municípios das
+   * UFs em apuração a cada mudança do `-ab.json`, então o mapa se completa em poucos minutos.
+   * `t` no passado: estado de cada município registrado até t.
+   */
+  async municipiosBr(raceId: RaceId, ordem: { uf: readonly string[]; cod: readonly string[] }, t?: number): Promise<MunicipiosNacionalSnapshot> {
+    const c = this.corrida(raceId);
+    await this.garantir(c);
+    const race = c.mapeada;
+    const agora = this.now();
+    const tq = t !== undefined && t < agora ? t : undefined;
+    const hist = this.histSe(c, race);
+    const ufs = new Set<string>(race.ufs);
+    const n = Math.min(ordem.uf.length, ordem.cod.length);
+    const resumos: (Summary | null)[] = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) {
+      const uf = String(ordem.uf[i]).toUpperCase() as UF;
+      if (!ufs.has(uf)) continue;
+      const cod = String(ordem.cod[i]).padStart(5, '0');
+      if (tq !== undefined) {
+        resumos[i] = hist?.municipioEm(uf, cod, tq) ?? null;
+      } else {
+        const e = this.munUf.get(`${c.chave}|${uf}`)?.mun.get(cod);
+        resumos[i] = e && e.r.race.id === race.id ? e.r.resumo : null;
+      }
+    }
+    return map.municipiosNacionalDe(race.id, race.candidatos.length, resumos, agora, tq ?? agora);
+  }
+
+  private nacionalEm(c: Corrida, race: Race, t: number, agora: number): NationalSnapshot {
+    const hist = this.histSe(c, race);
+    const em = (abr: Abr) => hist?.resumoEm(abr, t) ?? map.resumoZerado(this.resumoAbr(c, abr, race));
+    const resumo = em(c.principal);
+    const ufs: NationalSnapshot['ufs'] = {};
+    for (const abr of c.abrs) if (abr !== 'BR') ufs[abr] = em(abr);
+    return {
+      race: race.id,
+      geradoEm: agora,
+      simNow: t,
+      resumo,
+      ufs,
+      regioes: map.regioesDe(ufs, race.candidatos),
+      serie: hist?.serieAte(c.principal, t) ?? [],
+      eventos: hist?.eventosNacionaisAte(t) ?? [],
+      restante: map.restanteDe(resumo, race.candidatos),
+    };
   }
 
   // -------------------------------------------------------------------------------------------
@@ -907,6 +995,8 @@ export class TseSource {
           this.limitarAoRelogio(res.resumo);
           mu.mun.set(cod, { r: res, validadores: r.validadores, em: this.now() });
           mu.ausentes.delete(cod);
+          // histórico do município ("reveja a noite"): instante oficial da última totalização do arquivo
+          if (res.race.id === c.mapeada.id) this.histDe(c).registrarMunicipio(uf, cod, res.resumo, res.resumo.ultimaAtualizacao ?? this.now());
         } else if (r.status === 'ausente') mu.ausentes.set(cod, this.now());
         else if (prev) prev.em = this.now();
       } catch (err) {

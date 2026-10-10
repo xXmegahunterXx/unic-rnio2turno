@@ -46,6 +46,30 @@ describe('createHttpClient', () => {
     expect(s?.secao).toBe(z.secoes[0].secao);
   });
 
+  it('municipiosBr e "reveja a noite": ?t= truncado ao segundo + &v= (versão vista no status)', async () => {
+    const c = createHttpClient({ fetch: fetchNavegador });
+    const mb = await c.municipiosBr('PRES-T1');
+    expect(chamadas.at(-1)!.url).toBe('/api/apuracao/pres-t1/br/municipios');
+    expect(mb.lider.length).toBeGreaterThan(5_000);
+    // sem status ainda: só ?t=
+    await c.nacional('pres', { t: 1_792_960_000_123 });
+    expect(chamadas.at(-1)!.url).toBe('/api/apuracao/pres/br?t=1792960000000');
+    const st = await c.status();
+    await c.uf('pres', 'SP', { t: 1_792_960_000_999 });
+    expect(chamadas.at(-1)!.url).toBe(`/api/apuracao/pres/uf/sp?t=1792960000000&v=${st.versao}`);
+    await c.municipiosBr('pres', { t: 1_792_960_000_000 });
+    expect(chamadas.at(-1)!.url).toBe(`/api/apuracao/pres/br/municipios?t=1792960000000&v=${st.versao}`);
+    const z = await c.zona('pres', 'SP', '71072', 1, { t: 1_792_960_000_000 });
+    expect(chamadas.at(-1)!.url).toBe(`/api/apuracao/pres/uf/sp/mun/71072/zona/1?t=1792960000000&v=${st.versao}`);
+    await c.secao('pres', 'SP', '71072', 1, z.secoes[0].secao, { t: 1_792_960_000_000 });
+    expect(chamadas.at(-1)!.url).toMatch(/\/secao\/\d+\?t=1792960000000&v=\d+$/);
+    // t ausente/inválido = agora (sem query)
+    await c.municipio('pres', 'SP', '71072', { t: Number.NaN });
+    expect(chamadas.at(-1)!.url).toBe('/api/apuracao/pres/uf/sp/mun/71072');
+    await c.nacional('pres', {});
+    expect(chamadas.at(-1)!.url).toBe('/api/apuracao/pres/br');
+  });
+
   it('erros tipados: 404 → NotFoundError, seção 404 → null, 400 → CommandError', async () => {
     const c = createHttpClient({ fetch: fetchNavegador });
     await expect(c.nacional('nao-existe')).rejects.toBeInstanceOf(NotFoundError);

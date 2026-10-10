@@ -9,6 +9,11 @@
  *    no máximo 1 a cada 10 min por UF);
  *  - UF encerrada; eleição matematicamente definida.
  * Textos neutros em pt-BR. Tudo serializável (`exportar`/`importar`) para sobreviver a reinícios.
+ *
+ * "Reveja a noite" (`?t=`): além da série e dos eventos, guarda o Summary COMPLETO de cada abrangência
+ * (Brasil e UFs) a cada mudança e, por município, a cada download que mudou os números — compactados em
+ * arrays de inteiros (`ResumoCompacto`). `resumoEm(abr, t)` / `municipioEm(uf, cod, t)` devolvem o estado
+ * mais recente com instante ≤ t (instante oficial da última totalização do arquivo, ou o relógio do poll).
  */
 import type { FeedEvent, Race, RaceId, SeriePoint, Summary, TipoEvento, UF } from '../shared/types';
 import { UF_NOMES } from '../shared/constants';
@@ -26,6 +31,10 @@ export const INTERVALO_LIDER_UF_MS = 10 * 60_000;
 const MAX_EVENTOS = 300;
 export const MAX_EVENTOS_SNAPSHOT = 60;
 const MAX_PONTOS = 2_000;
+/** Estados guardados por abrangência (Brasil/UF): ~1 por poll com mudança (15 s) → folga para a noite toda. */
+const MAX_RESUMOS = 3_000;
+/** Estados guardados por município (downloads que mudaram os números; ≥ 60 s entre downloads). */
+const MAX_RESUMOS_MUN = 240;
 
 /** 'BR' ou a UF. */
 export type Abr = 'BR' | UF;
@@ -52,6 +61,93 @@ export const estadoDe = (s: Summary, t: number): EstadoAbr => ({
   eleito: s.eleito,
   status: s.status,
 });
+
+// ---------------------------------------------------------------------------------------------
+// Summary compacto (histórico "reveja a noite")
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Summary + instante em inteiros: [t, secoes, secoesTotalizadas, eleitorado, eleitoradoTotalizado,
+ * comparecimento, abstencao, brancos, nulos, status (0 aguardando · 1 apurando · 2 encerrada),
+ * lider, eleito, ultimaAtualizacao (−1 = null), ...votos]. ~5× menor que o objeto em JSON.
+ */
+export type ResumoCompacto = number[];
+
+const STATUS: Summary['status'][] = ['aguardando', 'apurando', 'encerrada'];
+const CAMPOS_FIXOS = 13;
+
+export function compactarResumo(s: Summary, t: number): ResumoCompacto {
+  const nul = (v: number | null) => (v === null ? -1 : v);
+  return [
+    t,
+    s.secoes,
+    s.secoesTotalizadas,
+    s.eleitorado,
+    s.eleitoradoTotalizado,
+    s.comparecimento,
+    s.abstencao,
+    s.brancos,
+    s.nulos,
+    Math.max(0, STATUS.indexOf(s.status)),
+    nul(s.lider),
+    nul(s.eleito),
+    nul(s.ultimaAtualizacao),
+    ...s.votos,
+  ];
+}
+
+export function expandirResumo(a: ResumoCompacto): Summary {
+  const nul = (v: number) => (v < 0 ? null : v);
+  return {
+    secoes: a[1],
+    secoesTotalizadas: a[2],
+    eleitorado: a[3],
+    eleitoradoTotalizado: a[4],
+    comparecimento: a[5],
+    abstencao: a[6],
+    brancos: a[7],
+    nulos: a[8],
+    status: STATUS[a[9]] ?? 'aguardando',
+    lider: nul(a[10]),
+    eleito: nul(a[11]),
+    ultimaAtualizacao: nul(a[12]),
+    votos: a.slice(CAMPOS_FIXOS),
+  };
+}
+
+/** Índice do último item com instante (`[0]`) ≤ t, ou −1. Lista ordenada por instante. */
+function ultimoAte(lista: ResumoCompacto[], t: number): number {
+  let lo = 0;
+  let hi = lista.length - 1;
+  let r = -1;
+  while (lo <= hi) {
+    const m = (lo + hi) >> 1;
+    if (lista[m][0] <= t) {
+      r = m;
+      lo = m + 1;
+    } else hi = m - 1;
+  }
+  return r;
+}
+
+/** Acrescenta mantendo a ordem por instante (mesmo instante ou anterior ⇒ substitui o último). */
+function acrescentar(lista: ResumoCompacto[], item: ResumoCompacto, max: number): ResumoCompacto[] {
+  const ult = lista[lista.length - 1];
+  if (ult && item[0] <= ult[0]) {
+    item[0] = ult[0];
+    lista[lista.length - 1] = item;
+  } else lista.push(item);
+  return lista.length > max ? afinar(lista, Math.floor(max / 2)) : lista;
+}
+
+/**
+ * Instante do estado no histórico: o da última totalização; estado ainda zerado sem data no arquivo vale
+ * "desde sempre" (0) — senão o relógio do 1º poll (pode ser posterior à 1ª totalização oficial, pelo atraso
+ * do CDN do TSE) esconderia o começo da noite.
+ */
+const instanteResumo = (s: Summary, t: number) => (s.secoesTotalizadas === 0 && s.ultimaAtualizacao === null ? 0 : t);
+
+const mesmosNumeros = (a: ResumoCompacto | undefined, b: ResumoCompacto) => !!a && a.length === b.length && a.every((v, i) => i === 0 || v === b[i]);
 
 const nomeAbr = (abr: Abr) => (abr === 'BR' ? 'Brasil' : UF_NOMES[abr]);
 const pctSecoes = (pst: number) => fmtPct(Math.floor(pst * 10) / 10, 1);
@@ -162,6 +258,10 @@ export interface HistoricoSerializado {
   eventos: FeedEvent[];
   eventosUf: Partial<Record<Abr, FeedEvent[]>>;
   ultimoLiderUf: Partial<Record<Abr, number>>;
+  /** Summary compacto a cada mudança, por abrangência ("reveja a noite"). Opcional (históricos antigos). */
+  resumos?: Partial<Record<Abr, ResumoCompacto[]>>;
+  /** Summary compacto por município, chave `UF|cod` (ex.: "SP|71072"). Opcional. */
+  municipios?: Record<string, ResumoCompacto[]>;
 }
 
 export class HistoricoCorrida {
@@ -175,6 +275,8 @@ export class HistoricoCorrida {
   private eventosUf = new Map<Abr, FeedEvent[]>();
   private ultimoLiderUf = new Map<Abr, number>();
   private ids = new Set<string>();
+  private resumos = new Map<Abr, ResumoCompacto[]>();
+  private municipios = new Map<string, ResumoCompacto[]>();
 
   constructor(race: Race, chave: string) {
     this.race = race;
@@ -189,6 +291,7 @@ export class HistoricoCorrida {
     const curr = estadoDe(resumo, t);
     const prev = this.estados.get(abr) ?? null;
     this.estados.set(abr, curr);
+    this.resumos.set(abr, acrescentar(this.resumos.get(abr) ?? [], compactarResumo(resumo, instanteResumo(resumo, t)), MAX_RESUMOS));
 
     // série: um ponto por mudança de seções totalizadas
     if (curr.st > 0 && (!prev || prev.st !== curr.st || !this.series.get(abr)?.length)) {
@@ -229,6 +332,45 @@ export class HistoricoCorrida {
     return this.estados.get(abr) ?? null;
   }
 
+  /** Summary da abrangência no instante t (o mais recente registrado com instante ≤ t), ou null. */
+  resumoEm(abr: Abr, t: number): Summary | null {
+    const l = this.resumos.get(abr);
+    const i = l ? ultimoAte(l, t) : -1;
+    return i >= 0 ? expandirResumo(l![i]) : null;
+  }
+
+  /** Registra o estado de um município (download do arquivo do município). Ignora repetições. */
+  registrarMunicipio(uf: UF, cod: string, resumo: Summary, t: number): void {
+    const k = `${uf}|${cod}`;
+    const l = this.municipios.get(k) ?? [];
+    const item = compactarResumo(resumo, instanteResumo(resumo, t));
+    if (mesmosNumeros(l[l.length - 1], item)) return;
+    this.municipios.set(k, acrescentar(l, item, MAX_RESUMOS_MUN));
+  }
+
+  /** Summary do município no instante t, ou null (nada registrado até t). */
+  municipioEm(uf: UF, cod: string, t: number): Summary | null {
+    const l = this.municipios.get(`${uf}|${cod}`);
+    const i = l ? ultimoAte(l, t) : -1;
+    return i >= 0 ? expandirResumo(l![i]) : null;
+  }
+
+  /** Série da abrangência até o instante t (inclusive), afinada para no máximo `max` pontos. */
+  serieAte(abr: Abr, t: number, max = 480): SeriePoint[] {
+    const s = (this.series.get(abr) ?? []).filter((p) => p.t <= t);
+    return s.length > max ? afinarSerie(s, max) : s;
+  }
+
+  /** Feed nacional até o instante t (mais recentes primeiro). */
+  eventosNacionaisAte(t: number, max = MAX_EVENTOS_SNAPSHOT): FeedEvent[] {
+    return this.eventos.filter((e) => e.t <= t).slice(0, max);
+  }
+
+  /** Feed da UF até o instante t (mais recentes primeiro). */
+  eventosDaUfAte(uf: UF, t: number, max = MAX_EVENTOS_SNAPSHOT): FeedEvent[] {
+    return (this.eventosUf.get(uf) ?? []).filter((e) => e.t <= t).slice(0, max);
+  }
+
   /** Série da abrangência (afinada para no máximo `max` pontos). */
   serie(abr: Abr, max = 480): SeriePoint[] {
     const s = this.series.get(abr) ?? [];
@@ -256,6 +398,8 @@ export class HistoricoCorrida {
       eventos: this.eventos.slice(),
       eventosUf: obj(this.eventosUf),
       ultimoLiderUf: obj(this.ultimoLiderUf),
+      resumos: obj(this.resumos),
+      municipios: Object.fromEntries(this.municipios),
     };
   }
 
@@ -268,6 +412,10 @@ export class HistoricoCorrida {
     this.eventos = (h.eventos ?? []).slice(0, MAX_EVENTOS);
     this.eventosUf = mapa(h.eventosUf);
     this.ultimoLiderUf = mapa(h.ultimoLiderUf);
+    const valido = (l: unknown): l is ResumoCompacto[] =>
+      Array.isArray(l) && l.every((x) => Array.isArray(x) && x.length >= CAMPOS_FIXOS && x.every((v) => typeof v === 'number'));
+    this.resumos = new Map([...mapa(h.resumos)].filter(([, l]) => valido(l)));
+    this.municipios = new Map(Object.entries(h.municipios ?? {}).filter(([, l]) => valido(l)));
     this.ids = new Set([...this.eventos, ...[...this.eventosUf.values()].flat()].map((e) => e.id));
     return true;
   }
@@ -275,8 +423,12 @@ export class HistoricoCorrida {
 
 /** Reduz a série a ~`max` pontos mantendo o primeiro, o último e espaçamento uniforme. */
 export function afinarSerie(s: SeriePoint[], max: number): SeriePoint[] {
+  return afinar(s, max);
+}
+
+function afinar<T>(s: T[], max: number): T[] {
   if (s.length <= max || max < 2) return s.slice();
-  const out: SeriePoint[] = [];
+  const out: T[] = [];
   const passo = (s.length - 1) / (max - 1);
   for (let i = 0; i < max; i++) out.push(s[Math.round(i * passo)]);
   return out;

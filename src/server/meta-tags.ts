@@ -158,6 +158,63 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       noindex: true,
     });
   }
+  // ---- fase 2: modo TV, 1º turno de todos os cargos e ficha do candidato -------------------------
+  if (s0 === 'tv' && seg.length === 1) {
+    return pagina({
+      titulo: `Modo TV · Apuração ao vivo · ${APP_NAME}`,
+      descricao: comPlacar('Tela cheia com mapa, placar e os eventos da apuração do 2º turno, feita para transmissão.'),
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar('Brasil'),
+    });
+  }
+  if (s0 === 'senado' && seg.length === 1) {
+    return pagina({
+      titulo: `Senado · Resultado do 1º turno de 2026 · ${APP_NAME}`,
+      descricao: 'Os senadores eleitos em 2026 em cada estado (duas vagas por UF), com votação e dados públicos do TSE.',
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar(''),
+    });
+  }
+  if (s0 === 'camara' && seg.length === 1) {
+    return pagina({
+      titulo: `Câmara dos Deputados · Eleitos em 2026 · ${APP_NAME}`,
+      descricao: 'As 513 cadeiras da Câmara dos Deputados por partido e por estado, com os eleitos em 2026 (fonte: TSE).',
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar(''),
+    });
+  }
+  if (s0 === 'assembleias' && seg.length === 2) {
+    const uf = ufDe(s1);
+    if (uf && uf !== 'ZZ') {
+      const nomeUf = UF_NOMES[uf];
+      const casa = uf === 'DF' ? 'Câmara Legislativa' : 'Assembleia Legislativa';
+      return pagina({
+        titulo: `${casa} · ${nomeUf} · Eleitos em 2026 · ${APP_NAME}`,
+        descricao: `Deputados estaduais eleitos em ${nomeUf} em 2026, por partido, com votação (fonte: TSE).`,
+        imagem: ogApuracao(),
+        imagemAlt: altPlacar(nomeUf),
+      });
+    }
+    return naoEncontrada(ogApuracao());
+  }
+  if (s0 === 'candidato' && seg.length === 2) {
+    if (!/^\d{6,15}$/.test(s1)) return naoEncontrada(ogApuracao());
+    let nome: string | null = null;
+    for (const r of ctx.races.values()) {
+      const c = r.candidatos.find((x) => !x.agregado && x.sqcand === s1);
+      if (c) {
+        nome = `${c.nomeUrna} (${c.partido})`;
+        break;
+      }
+    }
+    return pagina({
+      titulo: `${nome ? `${nome} · ` : ''}Ficha do candidato · ${APP_NAME}`,
+      descricao: 'Dados públicos do TSE: cargo, partido, ocupação, escolaridade, patrimônio declarado e resultado em 2026.',
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar(''),
+    });
+  }
+
   const estaticas: Record<string, [string, string]> = {
     metodologia: ['Metodologia', 'Como calculamos e exibimos a apuração: fontes (TSE e IBGE), regras de percentuais e simulação.'],
     privacidade: ['Privacidade', 'O que coletamos (quase nada) e por que suas respostas do Teste Cego nunca saem do seu aparelho.'],

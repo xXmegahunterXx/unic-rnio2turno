@@ -93,7 +93,6 @@ describe('rotas públicas', () => {
     ['/api/apuracao/pres/uf/sp/mun/71072/zona/999', 404, /Zona 999 não existe/],
     ['/api/apuracao/pres/uf/sp/mun/71072/zona/1/secao/-3', 400, /Seção inválida/],
     ['/api/apuracao/pres/uf/sp/mun/71072/zona/1/secao/9999', 404, /Seção 9999 não existe/],
-    ['/api/apuracao/pres-t1/uf/sp/mun/71072/zona/1', 404, /1º turno/],
     ['/api/apuracao/pres/br/extra', 404, /Rota da API inexistente/],
     ['/api/qualquer', 404, /Rota da API inexistente/],
   ])('%s → %i { erro }', async (path, status, re) => {
@@ -102,6 +101,19 @@ describe('rotas públicas', () => {
     expect(r.headers.get('content-type')).toContain('application/json');
     const b = (await r.json()) as { erro: string };
     expect(b.erro).toMatch(re);
+  });
+
+  it('1º turno por zona: números reais com data/secao/{uf}.json; sem o arquivo, 404 coerente', async () => {
+    const r = await get('/api/apuracao/pres-t1/uf/sp/mun/71072/zona/1');
+    if (m.ds.secao?.SP) {
+      expect(r.status).toBe(200);
+      const z = (await r.json()) as ZonaSnapshot;
+      expect(z.secoes.length).toBeGreaterThan(100);
+      expect(z.resumo.secoesTotalizadas).toBe(z.resumo.secoes);
+    } else {
+      expect(r.status).toBe(404);
+      expect(((await r.json()) as { erro: string }).erro).toMatch(/1º turno/);
+    }
   });
 
   it('zona e seção existentes', async () => {

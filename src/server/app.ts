@@ -6,16 +6,20 @@
  * Contrato das rotas: src/shared/api.ts. Cache para CDN: ARCHITECTURE.md §6.
  */
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
-import type { AdminMetrics, Race, RaceId, UF } from '../shared/types';
+import type { AdminMetrics, LiveStatus, Race, RaceId, UF } from '../shared/types';
+import type { MunicipiosBr } from '../shared/dataset';
 import type { LoadedDataset, Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
 import { COOKIE_SESSAO, LimiteTaxa, SESSAO_MS, Sessoes, chaveCliente, senhaConfere } from './auth';
 import type { ServerConfig } from './config';
-import { Dados } from './dados';
+import { Dados, type InstanteNormalizado, type NivelApuracao } from './dados';
+import { PacotesFotos } from './fotos';
 import {
   CacheRespostas,
   type CorpoPronto,
@@ -32,7 +36,17 @@ import { layoutPlacar, layoutTeste, renderPng } from './og';
 import { anonimizarRace } from '../shared/anon';
 import { Estaticos, pareceArquivo } from './static';
 import type { TseManager } from './tse';
-import { ErroValidacao, loginSchema, parseAdminCommand, parseCodMunicipio, parseNumero, parseRace, parseUf } from './validation';
+import {
+  ErroValidacao,
+  loginSchema,
+  parseAdminCommand,
+  parseCodMunicipio,
+  parseInstante,
+  parseNumero,
+  parseRace,
+  parseUf,
+  parseVersaoUrl,
+} from './validation';
 
 export interface AppDeps {
   config: ServerConfig;
@@ -50,6 +64,15 @@ export const CC = {
   snapshot: 'public, max-age=0, s-maxage=2, stale-while-revalidate=10',
   /** 1º turno: resultado final, não muda */
   t1: 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
+  /**
+   * "Reveja a noite": instante passado consolidado COM a versão do admin na URL (`&v=`): o passado não muda,
+   * e qualquer mudança de cenário/fonte troca a versão — logo, a URL.
+   */
+  historico: 'public, max-age=600, s-maxage=3600, stale-while-revalidate=600',
+  /** instante passado consolidado sem `v` (ou com `v` antiga): a CDN guarda pouco */
+  historicoSemVersao: 'public, max-age=0, s-maxage=30, stale-while-revalidate=60',
+  /** logo do patrocínio com o hash do conteúdo na URL */
+  imutavel: 'public, max-age=86400, s-maxage=86400, immutable',
   og: 'public, max-age=30, s-maxage=30, stale-while-revalidate=60',
   ogTeste: 'public, max-age=86400, s-maxage=86400',
   html: 'no-cache',
@@ -57,12 +80,21 @@ export const CC = {
 } as const;
 
 const OG_TTL_MS = 30_000;
+/** Grupo padrão do pacote de fotos oficiais (public/data/fotos/{grupo}.json) quando o candidato não diz. */
+const GRUPO_FOTOS_PADRAO = 'segundo-turno';
 /** Imagem vencida da mesma fonte ainda serve (enquanto a nova é gerada) por até 5 min. */
 const OG_STALE_MS = 5 * 60_000;
 const OG_CACHE_MAX = 128;
 const OG_FILA_MAX = 16;
 
 type Ctx = Context<{ Bindings: HttpBindings }>;
+
+/** Imagem OG pronta: PNG, se usou fotos oficiais e o "versão|modo" do estado com que foi gerada. */
+interface OgPronta {
+  png: Buffer;
+  fotos: boolean;
+  sub: string;
+}
 
 /** Erro HTTP com corpo `{ erro }`. */
 class ErroHttp extends Error {
@@ -89,7 +121,24 @@ export function createApp(deps: AppDeps) {
   const { config, controller, log } = deps;
   const now = deps.now ?? Date.now;
   const app = new Hono<{ Bindings: HttpBindings }>();
-  const dados = new Dados(controller, deps.tse, now);
+  // ordem do mapa nacional por município (fonte 'tse'): a do dataset; senão DATA_DIR/municipios-br.json
+  let ordemBrCache: { em: number; v: MunicipiosBr | null } | null = null;
+  const ordemBr = (): MunicipiosBr | null => {
+    if (deps.dataset.municipiosBr) return deps.dataset.municipiosBr;
+    const t = now();
+    if (ordemBrCache && (ordemBrCache.v || t - ordemBrCache.em < 60_000)) return ordemBrCache.v;
+    let v: MunicipiosBr | null = null;
+    try {
+      const x = JSON.parse(readFileSync(join(config.dataDir, 'municipios-br.json'), 'utf8')) as MunicipiosBr;
+      if (x && Array.isArray(x.uf) && Array.isArray(x.cod) && x.uf.length === x.cod.length) v = x;
+    } catch {
+      v = null;
+    }
+    ordemBrCache = { em: t, v };
+    return v;
+  };
+  const dados = new Dados(controller, deps.tse, now, ordemBr);
+  const fotos = new PacotesFotos(config.dataDir, now);
   const metricas = new Metricas(now);
   const respostas = new CacheRespostas(now);
   const sessoes = new Sessoes(config.adminSecret, now);
@@ -101,7 +150,7 @@ export function createApp(deps: AppDeps) {
   const nomes = new Map<string, string>();
   for (const [uf, d] of Object.entries(deps.dataset.ufs)) for (const m of d?.municipios ?? []) nomes.set(`${uf}|${m.cod}`, m.nome);
   const nomeMunicipio = (uf: UF, cod: string) => nomes.get(`${uf}|${cod}`);
-  const ogCache = new Map<string, { png: Buffer | null; em: number; sub: string; pendente: Promise<Buffer> | null }>();
+  const ogCache = new Map<string, { png: Buffer | null; fotos: boolean; em: number; sub: string; pendente: Promise<OgPronta> | null }>();
   let ogFila: Promise<unknown> = Promise.resolve();
   let ogNaFila = 0;
   let ogTeste: Promise<Buffer> | null = null;
@@ -147,16 +196,25 @@ export function createApp(deps: AppDeps) {
   const json = (c: Ctx, v: unknown, headers: Record<string, string>, status = 200) =>
     enviar(c, { bruto: Buffer.from(JSON.stringify(v)) }, headers, status);
 
+  /** `?t=` validado (400 se malformado) e normalizado para a corrida/nível (ver Dados.instante). */
+  const instanteDe = (c: Ctx, race: RaceId, nivel: NivelApuracao): InstanteNormalizado =>
+    dados.instante(race, parseInstante(c.req.query('t')), nivel);
+
   /**
    * Snapshot com ETag fraco (versão, balde dos dados, rota), 304 e cache de resposta por segundo.
    * `rota` é a forma canônica (minúsculas, zeros à esquerda) — a mesma para URLs equivalentes.
+   * Com instante passado (`inst.t`), o balde é o próprio instante; consolidado + `&v=<versão atual>` →
+   * cache longo (CC.historico).
    */
-  const snapshot = async (c: Ctx, race: RaceId, rota: string, montar: () => Promise<unknown>) => {
+  const snapshot = async (c: Ctx, race: RaceId, rota: string, inst: InstanteNormalizado, montar: () => Promise<unknown>) => {
     const r = dados.race(race);
     const st = dados.status();
-    const etag = etagFraco(`v${st.versao}`, dados.balde(race), hashCurto(rota));
+    const passado = inst.t !== undefined;
+    const etag = etagFraco(`v${st.versao}`, passado ? dados.baldeHistorico(race, inst) : dados.balde(race), hashCurto(rota));
+    let cc: string = r.turno === 1 ? CC.t1 : CC.snapshot;
+    if (passado && inst.consolidado) cc = parseVersaoUrl(c.req.query('v')) === st.versao ? CC.historico : CC.historicoSemVersao;
     const headers = {
-      'cache-control': r.turno === 1 ? CC.t1 : CC.snapshot,
+      'cache-control': cc,
       etag,
       'access-control-allow-origin': '*',
     };
@@ -239,7 +297,49 @@ export function createApp(deps: AppDeps) {
   });
 
   // ---- API pública -------------------------------------------------------------------------------
-  app.get('/api/status', (c) => json(c, dados.status(), { 'cache-control': CC.status, 'access-control-allow-origin': '*' }));
+  // logo do patrocínio em data URI sai do status (consultado por todos a cada poucos segundos) e vira uma URL
+  // com o hash do conteúdo, servida por /api/patrocinio/logo com cache longo
+  let logoMemo: { img: string; h: string; tipo: string; corpo: Buffer } | null = null;
+  const logo = (img: string) => {
+    if (logoMemo?.img === img) return logoMemo;
+    const m = /^data:(image\/(?:png|jpeg|webp|gif|svg\+xml));base64,([A-Za-z0-9+/]+={0,2})$/.exec(img);
+    if (!m) return null;
+    logoMemo = { img, h: hashCurto(img), tipo: m[1], corpo: Buffer.from(m[2], 'base64') };
+    return logoMemo;
+  };
+
+  /** LiveStatus público: + pessoas agora (estimativa arredondada) e logo do patrocínio por URL. */
+  const statusPublico = (c: Ctx): LiveStatus => {
+    const st = dados.status();
+    const out: LiveStatus = { ...st, pessoasAgora: metricas.pessoasAgora() };
+    const p = st.patrocinio;
+    if (p?.imagem?.startsWith('data:')) {
+      const l = logo(p.imagem);
+      const { imagem: _, ...semImagem } = p;
+      out.patrocinio = l ? { ...semImagem, imagem: `${origemDe(c)}/api/patrocinio/logo?h=${l.h}` } : semImagem;
+    }
+    return out;
+  };
+
+  app.get('/api/status', (c) => json(c, statusPublico(c), { 'cache-control': CC.status, 'access-control-allow-origin': '*' }));
+
+  app.get('/api/patrocinio/logo', (c) => {
+    const img = dados.status().patrocinio?.imagem;
+    const l = img?.startsWith('data:') ? logo(img) : null;
+    if (!l) throw new NotFoundError('Nenhuma logo de patrocínio publicada.');
+    const etag = etagFraco('pat', l.h);
+    const headers: Record<string, string> = {
+      'content-type': l.tipo,
+      'cache-control': c.req.query('h') === l.h ? CC.imutavel : 'public, max-age=60, s-maxage=60',
+      etag,
+      'access-control-allow-origin': '*',
+      'cross-origin-resource-policy': 'cross-origin',
+      // SVG enviado pelo admin: aberto direto no navegador, nunca executa script nem carrega nada
+      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+    };
+    if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
+    return responder(c, c.req.method === 'HEAD' ? null : l.corpo, 200, headers);
+  });
 
   app.get('/api/meta', async (c) => {
     const etag = etagFraco('meta', deps.dataset.meta.versao, hashCurto(deps.dataset.meta.geradoEm));
@@ -250,22 +350,32 @@ export function createApp(deps: AppDeps) {
     return enviar(c, await p, headers);
   });
 
+  // Todas as rotas de apuração aceitam ?t=<epoch ms> ("reveja a noite"; ver Dados.instante e CC.historico).
   app.get('/api/apuracao/:race/br', (c) => {
     const race = parseRace(c.req.param('race'));
-    return snapshot(c, race, `${race}/br`, () => dados.nacional(race));
+    const inst = instanteDe(c, race, 'br');
+    return snapshot(c, race, `${race}/br`, inst, () => dados.nacional(race, inst.t));
+  });
+
+  app.get('/api/apuracao/:race/br/municipios', (c) => {
+    const race = parseRace(c.req.param('race'));
+    const inst = instanteDe(c, race, 'brmun');
+    return snapshot(c, race, `${race}/br/municipios`, inst, () => dados.municipiosBr(race, inst.t));
   });
 
   app.get('/api/apuracao/:race/uf/:uf', (c) => {
     const race = parseRace(c.req.param('race'));
     const uf = parseUf(c.req.param('uf'));
-    return snapshot(c, race, `${race}/uf/${uf}`, () => dados.uf(race, uf));
+    const inst = instanteDe(c, race, 'uf');
+    return snapshot(c, race, `${race}/uf/${uf}`, inst, () => dados.uf(race, uf, inst.t));
   });
 
   app.get('/api/apuracao/:race/uf/:uf/mun/:cod', (c) => {
     const race = parseRace(c.req.param('race'));
     const uf = parseUf(c.req.param('uf'));
     const cod = parseCodMunicipio(c.req.param('cod'));
-    return snapshot(c, race, `${race}/uf/${uf}/mun/${cod}`, () => dados.municipio(race, uf, cod));
+    const inst = instanteDe(c, race, 'mun');
+    return snapshot(c, race, `${race}/uf/${uf}/mun/${cod}`, inst, () => dados.municipio(race, uf, cod, inst.t));
   });
 
   app.get('/api/apuracao/:race/uf/:uf/mun/:cod/zona/:zona', (c) => {
@@ -273,7 +383,8 @@ export function createApp(deps: AppDeps) {
     const uf = parseUf(c.req.param('uf'));
     const cod = parseCodMunicipio(c.req.param('cod'));
     const zona = parseNumero(c.req.param('zona'), 'zona');
-    return snapshot(c, race, `${race}/uf/${uf}/mun/${cod}/zona/${zona}`, () => dados.zona(race, uf, cod, zona));
+    const inst = instanteDe(c, race, 'zona');
+    return snapshot(c, race, `${race}/uf/${uf}/mun/${cod}/zona/${zona}`, inst, () => dados.zona(race, uf, cod, zona, inst.t));
   });
 
   app.get('/api/apuracao/:race/uf/:uf/mun/:cod/zona/:zona/secao/:secao', (c) => {
@@ -282,8 +393,9 @@ export function createApp(deps: AppDeps) {
     const cod = parseCodMunicipio(c.req.param('cod'));
     const zona = parseNumero(c.req.param('zona'), 'zona');
     const secao = parseNumero(c.req.param('secao'), 'secao');
-    return snapshot(c, race, `${race}/uf/${uf}/mun/${cod}/zona/${zona}/secao/${secao}`, async () => {
-      const d = await dados.secao(race, uf, cod, zona, secao);
+    const inst = instanteDe(c, race, 'secao');
+    return snapshot(c, race, `${race}/uf/${uf}/mun/${cod}/zona/${zona}/secao/${secao}`, inst, async () => {
+      const d = await dados.secao(race, uf, cod, zona, secao, inst.t);
       if (!d) throw new NotFoundError(`Boletim da seção ${secao} (zona ${zona}) indisponível.`);
       return d;
     });
@@ -292,14 +404,17 @@ export function createApp(deps: AppDeps) {
   // ---- OG images ---------------------------------------------------------------------------------
   /**
    * Renderização serial (satori ocupa a thread principal ~0,2–0,3 s por imagem): uma por vez, no máximo
-   * OG_FILA_MAX na fila. Imagem vencida (> 30 s) da MESMA fonte é servida na hora enquanto a nova é gerada
-   * em segundo plano; troca de fonte (real ↔ simulação) sempre espera a imagem nova (a marca "SIMULAÇÃO"
-   * nunca pode faltar nem sobrar).
+   * OG_FILA_MAX na fila. Imagem vencida (> 30 s) do MESMO modo é servida na hora enquanto a nova é gerada
+   * em segundo plano; troca de modo (real ↔ simulação, nomes reais ↔ anonimizado) sempre espera a imagem nova
+   * (a marca "SIMULAÇÃO" nunca pode faltar nem sobrar, e nome/foto real nunca acompanha número fictício).
+   * `sub` = "versão|modo" do estado com que a imagem foi gerada.
    */
-  const renderOg = (chave: string, sub: string, montar: () => Promise<Buffer>): Promise<Buffer> => {
+  const modoOg = (st: LiveStatus) => `${st.fonte}${st.anonimizado ? '-anon' : ''}`;
+
+  const renderOg = (chave: string, montar: () => Promise<OgPronta>): Promise<OgPronta> => {
     let e = ogCache.get(chave);
     if (!e) {
-      e = { png: null, em: 0, sub: '', pendente: null };
+      e = { png: null, fotos: false, em: 0, sub: '', pendente: null };
       ogCache.set(chave, e);
       while (ogCache.size > OG_CACHE_MAX) ogCache.delete(ogCache.keys().next().value as string);
     }
@@ -307,11 +422,11 @@ export function createApp(deps: AppDeps) {
     if (ogNaFila >= OG_FILA_MAX) throw new ErroHttp(503, 'Gerando muitas imagens agora; tente de novo em instantes.', { 'retry-after': '10' });
     const ent = e;
     ogNaFila++;
-    const p: Promise<Buffer> = ogFila.catch(() => undefined).then(async () => {
+    const p: Promise<OgPronta> = ogFila.catch(() => undefined).then(async () => {
       try {
-        const png = await montar();
-        Object.assign(ent, { png, em: now(), sub });
-        return png;
+        const pronta = await montar();
+        Object.assign(ent, { png: pronta.png, fotos: pronta.fotos, em: now(), sub: pronta.sub });
+        return pronta;
       } finally {
         ogNaFila--;
         ent.pendente = null;
@@ -323,6 +438,17 @@ export function createApp(deps: AppDeps) {
     return p;
   };
 
+  /**
+   * Fotos oficiais (pacote DATA_DIR/fotos/{grupo}.json, chave = Candidate.sqcand) para o placar da imagem:
+   * nunca na simulação anonimizada; só quando há foto de TODOS os finalistas (tratamento igual).
+   */
+  const fotosOg = (race: Race, anonimizado: boolean): string[] | undefined => {
+    if (anonimizado) return undefined;
+    const lista = race.candidatos.map((cd) => (cd.agregado || !cd.sqcand ? null : fotos.foto(cd.fotoGrupo || GRUPO_FOTOS_PADRAO, cd.sqcand)));
+    const finalistas = race.candidatos.map((cd, i) => (cd.agregado ? -1 : i)).filter((i) => i >= 0);
+    return finalistas.length >= 2 && finalistas.every((i) => lista[i]) ? lista.map((f) => f ?? '') : undefined;
+  };
+
   app.get('/api/og/apuracao.png', async (c) => {
     const race = parseRace(c.req.query('race') || 'pres');
     const r = dados.race(race);
@@ -331,52 +457,66 @@ export function createApp(deps: AppDeps) {
     if (uf && !r.ufs.includes(uf)) throw new NotFoundError(`A UF ${uf} não participa da corrida ${r.id}.`);
     const st = dados.status();
     const chave = `${r.id}|${uf ?? 'br'}`;
-    const sub = `${st.versao}|${st.fonte}`;
-    const montar = async () => {
+    const sub = `${st.versao}|${modoOg(st)}`;
+    const montar = async (): Promise<OgPronta> => {
       const t0 = perf();
       const snap = uf ? await dados.uf(r.id, uf) : await dados.nacional(r.id);
       const resumo = snap.resumo;
-      const simulacao = dados.status().simulacao && r.turno === 2;
+      const agoraSt = dados.status();
+      const simulacao = agoraSt.simulacao && r.turno === 2;
+      const anon = !!agoraSt.anonimizado;
       const fonteTse = dados.fonteDe(r.id) === 'tse';
       const raceOg = races.get(snap.race) ?? r;
+      const fotosPlacar = fotosOg(raceOg, anon);
       const png = await renderPng(
         layoutPlacar({
-          // simulação anônima: nada de nome real em imagem com números fictícios
-          race: dados.status().anonimizado ? anonimizarRace(raceOg) : raceOg,
+          // simulação anônima: nada de nome nem foto real em imagem com números fictícios
+          race: anon ? anonimizarRace(raceOg) : raceOg,
           uf,
           resumo,
           simulacao,
           horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
           pre: r.turno === 2 && resumo.secoesTotalizadas === 0,
+          fotos: fotosPlacar,
         }),
       );
-      log.info(`OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB)`);
-      return png;
+      log.info(
+        `OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB` +
+          `${fotosPlacar ? ', com fotos oficiais' : ''})`,
+      );
+      return { png, fotos: !!fotosPlacar, sub: `${agoraSt.versao}|${modoOg(agoraSt)}` };
     };
 
     const e = ogCache.get(chave);
     const agora = now();
-    const mesmaFonte = !!e?.png && e.sub.split('|')[1] === st.fonte;
-    let png: Buffer;
+    const mesmoModo = !!e?.png && e.sub.split('|')[1] === modoOg(st);
+    let pronta: OgPronta;
     let em: number;
-    let deQual: string;
     if (e?.png && e.sub === sub && agora - e.em < OG_TTL_MS) {
-      [png, em, deQual] = [e.png, e.em, e.sub]; // fresca
-    } else if (e?.png && mesmaFonte && agora - e.em < OG_STALE_MS) {
-      [png, em, deQual] = [e.png, e.em, e.sub]; // vencida: serve já e renova em segundo plano
+      [pronta, em] = [{ png: e.png, fotos: e.fotos, sub: e.sub }, e.em]; // fresca
+    } else if (e?.png && mesmoModo && agora - e.em < OG_STALE_MS) {
+      [pronta, em] = [{ png: e.png, fotos: e.fotos, sub: e.sub }, e.em]; // vencida: serve já e renova em segundo plano
       try {
-        void renderOg(chave, sub, montar).catch(() => undefined);
+        void renderOg(chave, montar).catch(() => undefined);
       } catch {
         /* fila cheia: segue com a vencida */
       }
     } else {
-      png = await renderOg(chave, sub, montar);
-      [em, deQual] = [ogCache.get(chave)?.em ?? agora, sub];
+      pronta = await renderOg(chave, montar);
+      // a geração em andamento podia ser do modo anterior (ex.: nomes reais → anonimizado): gera de novo
+      if (pronta.sub.split('|')[1] !== modoOg(dados.status())) pronta = await renderOg(chave, montar);
+      em = ogCache.get(chave)?.em ?? agora;
     }
-    const etag = etagFraco('og', hashCurto(chave), hashCurto(deQual), em.toString(36));
-    const headers = { 'content-type': 'image/png', 'cache-control': CC.og, etag, 'access-control-allow-origin': '*' };
+    const etag = etagFraco('og', hashCurto(chave), hashCurto(pronta.sub), em.toString(36));
+    const headers = {
+      'content-type': 'image/png',
+      'cache-control': CC.og,
+      etag,
+      'access-control-allow-origin': '*',
+      'x-og-fotos': pronta.fotos ? '1' : '0',
+    };
     if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
-    return responder(c, png, 200, headers);
+    return responder(c, pronta.png, 200, headers);
   });
 
   app.get('/api/og/teste.png', async (c) => {
@@ -401,7 +541,11 @@ export function createApp(deps: AppDeps) {
     }
     await next();
   });
-  admin.use('*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ erro: 'Corpo grande demais.' }, 413) }));
+  // 64 KB em geral; 256 KB no /command (o patrocínio pode trazer a logo em data URI de até 150 KB)
+  const limite = (kb: number) => bodyLimit({ maxSize: kb * 1024, onError: (c) => c.json({ erro: 'Corpo grande demais.' }, 413) });
+  const limitePadrao = limite(64);
+  const limiteComando = limite(256);
+  admin.use('*', (c, next) => (c.req.path.endsWith('/command') ? limiteComando(c, next) : limitePadrao(c, next)));
 
   const autenticado = (c: Ctx) => sessoes.validar(getCookie(c, COOKIE_SESSAO));
 
@@ -445,7 +589,13 @@ export function createApp(deps: AppDeps) {
     await next();
   });
 
-  admin.get('/state', (c) => c.json(controller.adminSnapshot(extraMetricas())));
+  /** AdminSnapshot com o `pessoasAgora` do status público (o painel mostra o mesmo número do site). */
+  const snapshotAdmin = () => {
+    const snap = controller.adminSnapshot(extraMetricas());
+    return { ...snap, status: { ...snap.status, pessoasAgora: metricas.pessoasAgora() } };
+  };
+
+  admin.get('/state', (c) => c.json(snapshotAdmin()));
 
   admin.post('/command', async (c) => {
     const cmd = parseAdminCommand(await lerJson(c));
@@ -453,7 +603,7 @@ export function createApp(deps: AppDeps) {
     const s = controller.state();
     if (cmd.tipo === 'fonte' || cmd.tipo === 'tse' || cmd.tipo === 'relogio') deps.tse.sincronizar(s.fonte, s.tse);
     log.info(`Admin: comando "${cmd.tipo}" aplicado (versão ${s.versao})`);
-    return c.json(controller.adminSnapshot(extraMetricas()));
+    return c.json(snapshotAdmin());
   });
 
   admin.get('/presets', (c) => c.json(controller.presets()));
@@ -551,7 +701,7 @@ export function createApp(deps: AppDeps) {
     );
   };
 
-  return { app, dados, metricas, respostas, sessoes, resumoMinuto, msgErro };
+  return { app, dados, metricas, respostas, sessoes, estaticos, resumoMinuto, msgErro };
 }
 
 export type SintoniaApp = ReturnType<typeof createApp>;

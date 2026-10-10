@@ -13,6 +13,8 @@
  *   GET  /api/apuracao/:race/br/municipios                  → MunicipiosNacionalSnapshot (mapa nacional por município)
  *   (todas as rotas de apuração aceitam ?t=<epoch> para "reveja a noite" — ver Instante)
  *   GET  /api/og/apuracao.png?race=pres                     → imagem 1200×630 para link preview
+ *   GET  /api/patrocinio/logo?h=<hash>                      → logo do patrocínio enviada em data URI (no /api/status,
+ *                                                             `patrocinio.imagem` vem como esta URL absoluta)
  *
  *   POST /api/admin/login            { senha }                → { ok: true } + cookie httpOnly
  *   POST /api/admin/logout

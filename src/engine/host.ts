@@ -4,10 +4,13 @@
  *
  * Protocolo:
  *   → { type: 'init', base, modo?, state? }      carrega o dataset (fetch relativo a `base`) e cria o controller
- *   → { type: 'call', id, method, args }        chamadas (aguardam o init)
+ *   → { type: 'call', id, method, args }        chamadas (aguardam o init). Snapshots: o último argumento
+ *                                               opcional é o instante `t` (epoch ms, "reveja a noite");
+ *                                               zona/seção aguardam os locais de votação da UF (cache)
  *   → { type: 'setState', state }               estado vindo de outra aba: aplicado só se for MAIS NOVO que o
  *                                               atual (estadoMaisNovo); nunca gera 'state' de volta
- *   ← { type: 'ready', state, ms }
+ *   ← { type: 'ready', state, ms, cargaMs, modeloMs }  ms = boot total; cargaMs = download + JSON do dataset;
+ *                                               modeloMs = construção do modelo (o resto é a estrutura)
  *   ← { type: 'reply', id, ok, result | error }
  *   ← { type: 'state', state }                  mudança feita por comando nesta aba (persistir/propagar)
  *   ← { type: 'fatal', error }                  falha ao carregar/construir
@@ -25,6 +28,7 @@ export type HostMethod =
   | 'municipio'
   | 'zona'
   | 'secao'
+  | 'municipiosBr'
   | 'adminSnapshot'
   | 'command'
   | 'presets';
@@ -41,7 +45,7 @@ export type HostIn =
   | { type: 'setState'; state: AdminState };
 
 export type HostOut =
-  | { type: 'ready'; state: AdminState; ms: number }
+  | { type: 'ready'; state: AdminState; ms: number; cargaMs?: number; modeloMs?: number }
   | { type: 'reply'; id: number; ok: true; result: unknown }
   | { type: 'reply'; id: number; ok: false; error: HostError }
   | { type: 'state'; state: AdminState }
@@ -69,6 +73,9 @@ export function fetchJsonLoader(base: string): JsonLoader {
   };
 }
 
+/** Instante opcional ("reveja a noite"): número finito ou ausente. */
+const instante = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
 function dispatch(c: Controller, method: HostMethod, a: unknown[]): unknown {
   switch (method) {
     case 'status':
@@ -76,15 +83,17 @@ function dispatch(c: Controller, method: HostMethod, a: unknown[]): unknown {
     case 'meta':
       return c.meta();
     case 'nacional':
-      return c.nacional(a[0] as string);
+      return c.nacional(a[0] as string, instante(a[1]));
     case 'uf':
-      return c.uf(a[0] as string, a[1] as never);
+      return c.uf(a[0] as string, a[1] as never, instante(a[2]));
     case 'municipio':
-      return c.municipio(a[0] as string, a[1] as never, a[2] as string);
+      return c.municipio(a[0] as string, a[1] as never, a[2] as string, instante(a[3]));
     case 'zona':
-      return c.zona(a[0] as string, a[1] as never, a[2] as string, a[3] as number);
+      return c.zona(a[0] as string, a[1] as never, a[2] as string, a[3] as number, instante(a[4]));
     case 'secao':
-      return c.secao(a[0] as string, a[1] as never, a[2] as string, a[3] as number, a[4] as number);
+      return c.secao(a[0] as string, a[1] as never, a[2] as string, a[3] as number, a[4] as number, instante(a[5]));
+    case 'municipiosBr':
+      return c.municipiosBr(a[0] as string, instante(a[1]));
     case 'adminSnapshot':
       return c.adminSnapshot();
     case 'command':
@@ -114,6 +123,7 @@ export function createEngineHost(
       ready = (async () => {
         const t0 = perf();
         const ds = await loadDataset(makeLoader(msg.base));
+        const cargaMs = Math.round(perf() - t0);
         const c = createController(ds, {
           modo: msg.modo ?? 'demo',
           initialState: msg.state ?? undefined,
@@ -122,7 +132,7 @@ export function createEngineHost(
         if (pendente && estadoMaisNovo(pendente, c.state())) c.setState(pendente);
         pendente = null;
         ctrl = c;
-        post({ type: 'ready', state: c.state(), ms: Math.round(perf() - t0) });
+        post({ type: 'ready', state: c.state(), ms: Math.round(perf() - t0), cargaMs, modeloMs: c.metrics().modeloMs ?? undefined });
         return c;
       })();
       ready.catch((e) => post({ type: 'fatal', error: serializaErro(e) }));
@@ -139,6 +149,9 @@ export function createEngineHost(
       try {
         if (!ready) throw new Error('Motor não inicializado (falta a mensagem init).');
         const c = await ready;
+        // zona/seção: os locais de votação da UF entram na resposta (carregados uma vez, com cache)
+        if ((msg.method === 'zona' || msg.method === 'secao') && c.carregaLocais && typeof msg.args?.[1] === 'string')
+          await c.carregaLocais(msg.args[1]);
         post({ type: 'reply', id: msg.id, ok: true, result: dispatch(c, msg.method, msg.args ?? []) });
       } catch (e) {
         post({ type: 'reply', id: msg.id, ok: false, error: serializaErro(e) });

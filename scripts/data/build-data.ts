@@ -275,7 +275,12 @@ interface Finalista {
   coligacao?: string;
   composicao?: string;
   vice?: string;
+  /** Sequencial do candidato no TSE: chave da foto oficial e da ficha (fase 2). */
+  sqcand: string;
 }
+
+/** Pacote de fotos/fichas dos finalistas (public/data/fotos/segundo-turno.json, gerado por scripts/data/py/fotos_build.py). */
+const FOTO_GRUPO_FINALISTAS = 'segundo-turno';
 
 /** Finalistas a partir de um arquivo do 1º turno (st = "2º turno") ou do 2º turno (todos os candidatos). */
 function finalistas(r: TseResultado, de2oTurno: boolean, ctx: string): Finalista[] {
@@ -288,6 +293,7 @@ function finalistas(r: TseResultado, de2oTurno: boolean, ctx: string): Finalista
         nomeUrna: nomePessoa(cand.nmu),
         nome: nomePessoa(cand.nm),
         partido: sigla(par.sg),
+        sqcand: cand.sqcand,
       };
       if (agr.tp !== 'i') {
         // Coligação ('c') ou federação: nome e composição; partido isolado ('i') não tem coligação.
@@ -304,7 +310,12 @@ function finalistas(r: TseResultado, de2oTurno: boolean, ctx: string): Finalista
 function candidatosDaCorrida(fin: Finalista[], tot: Totais, comOutros: boolean): Candidate[] {
   const cands: Candidate[] = fin.map((f, i) => {
     const votos = tot.votos[String(f.numero)] ?? fail(`candidato ${f.numero} sem votos no 1º turno`);
-    return { ...f, cor: i === 0 ? 'a' : 'b', primeiroTurno: { votos, pct: pct2(votos, tot.validos) } };
+    return {
+      ...f,
+      cor: i === 0 ? 'a' : 'b',
+      primeiroTurno: { votos, pct: pct2(votos, tot.validos) },
+      fotoGrupo: FOTO_GRUPO_FINALISTAS,
+    };
   });
   if (comOutros) {
     const outros = tot.validos - cands[0].primeiroTurno!.votos - cands[1].primeiroTurno!.votos;
@@ -375,7 +386,8 @@ async function main() {
   let finPres = fin1Pres;
   if (pres2tFile) {
     finPres = finalistas(pres2tFile, true, 'Presidente 2T');
-    if (finPres.map((f) => f.numero).join() !== fin1Pres.map((f) => f.numero).join()) {
+    const chave = (l: Finalista[]) => l.map((f) => `${f.numero}:${f.sqcand}`).join();
+    if (chave(finPres) !== chave(fin1Pres)) {
       fail(`finalistas do 2º turno (${finPres.map((f) => f.numero)}) ≠ 1º turno (${fin1Pres.map((f) => f.numero)})`);
     }
   } else {
@@ -416,7 +428,7 @@ async function main() {
     let origem = '1º turno (st = "2º turno")';
     if (gov2tFile) {
       fin = finalistas(gov2tFile, true, `Governador ${uf} 2T`);
-      if (fin.map((f) => f.numero).join() !== fin1.map((f) => f.numero).join()) {
+      if (fin.map((f) => `${f.numero}:${f.sqcand}`).join() !== fin1.map((f) => `${f.numero}:${f.sqcand}`).join()) {
         fail(`[${uf}] finalistas do 2º turno ≠ 1º turno`);
       }
       origem = `arquivo do 2º turno (${ELE_GOV_T2})`;

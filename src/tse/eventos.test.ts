@@ -1,7 +1,7 @@
 /** Série e eventos por diferença entre polls (textos neutros, marcos, viradas, limites). */
 import { describe, expect, it } from 'vitest';
 import type { Race, Summary } from '../shared/types';
-import { HistoricoCorrida, afinarSerie, eventosEntre, estadoDe, placarTexto } from './eventos';
+import { HistoricoCorrida, afinarSerie, compactarResumo, eventosEntre, estadoDe, expandirResumo, placarTexto } from './eventos';
 import { resumir, tallyVazio } from './map';
 import racesJson from './__fixtures__/races.json';
 
@@ -129,5 +129,47 @@ describe('HistoricoCorrida', () => {
     expect(a).toHaveLength(100);
     expect(a[0]).toBe(s[0]);
     expect(a[99]).toBe(s[999]);
+  });
+});
+
+describe('histórico de estados ("reveja a noite")', () => {
+  it('Summary compacto ida e volta (nulls, status e votos)', () => {
+    for (const s of [S(0, 0, 0), S(300, 13_000, 14_000), S(1000, 52_000, 47_000)]) {
+      const c = compactarResumo({ ...s, ultimaAtualizacao: s.secoesTotalizadas ? T0 + 5 : null }, T0);
+      expect(c[0]).toBe(T0);
+      expect(expandirResumo(c)).toEqual({ ...s, ultimaAtualizacao: s.secoesTotalizadas ? T0 + 5 : null });
+    }
+  });
+
+  it('resumoEm/municipioEm: o mais recente ≤ t; zerado sem data vale desde sempre; limite de tamanho', () => {
+    const h = new HistoricoCorrida(PRES, 'k');
+    h.registrar('BR', S(0, 0, 0), T0 + 999_999, true); // 1º poll depois da 1ª totalização oficial
+    h.registrar('BR', S(100, 10, 5), T0 + 60_000, true);
+    h.registrar('BR', S(500, 40, 50), T0 + 120_000, true);
+    expect(h.resumoEm('BR', T0 - 1)!.secoesTotalizadas).toBe(0);
+    expect(h.resumoEm('BR', T0 + 59_999)!.secoesTotalizadas).toBe(0);
+    expect(h.resumoEm('BR', T0 + 60_000)!.secoesTotalizadas).toBe(100);
+    expect(h.resumoEm('BR', T0 + 119_000)!.votos).toEqual([10, 5]);
+    expect(h.resumoEm('BR', T0 + 10 ** 9)!.secoesTotalizadas).toBe(500);
+    expect(h.resumoEm('SP', T0)).toBeNull();
+    expect(h.serieAte('BR', T0 + 60_000).map((p) => p.pst)).toEqual([10]);
+    expect(h.eventosNacionaisAte(T0 + 60_000).every((e) => e.t <= T0 + 60_000)).toBe(true);
+
+    for (let i = 1; i <= 500; i++) h.registrarMunicipio('SP', '71072', S(i, i * 2, i), T0 + i * 1000);
+    h.registrarMunicipio('SP', '71072', S(500, 1000, 500), T0 + 999_000); // mesmos números: ignorado
+    expect(h.municipioEm('SP', '71072', T0 + 999_000)!.secoesTotalizadas).toBe(500);
+    expect(h.municipioEm('SP', '71072', T0)).toBeNull();
+    const meio = h.municipioEm('SP', '71072', T0 + 250_500)!;
+    expect(meio.secoesTotalizadas).toBeLessThanOrEqual(250);
+    expect(meio.secoesTotalizadas).toBeGreaterThan(240); // afinado (≤ 240 estados), mas perto
+    const exp = h.exportar();
+    expect(exp.municipios!['SP|71072'].length).toBeLessThanOrEqual(240);
+    const h2 = new HistoricoCorrida(PRES, 'k');
+    expect(h2.importar(JSON.parse(JSON.stringify(exp)))).toBe(true);
+    expect(h2.resumoEm('BR', T0 + 60_000)).toEqual(h.resumoEm('BR', T0 + 60_000));
+    expect(h2.municipioEm('SP', '71072', T0 + 250_500)).toEqual(meio);
+    // histórico antigo (sem estados) continua importável
+    const { resumos: _r, municipios: _m, ...antigo } = exp;
+    expect(new HistoricoCorrida(PRES, 'k').importar(antigo)).toBe(true);
   });
 });

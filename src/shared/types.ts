@@ -202,6 +202,15 @@ export interface MunicipioSnapshot {
   primeiroTurno: PrimeiroTurnoLocal | null;
 }
 
+/** Local de votação de uma seção (public/data/locais/{uf}.json — ver LocalVotacao em dataset.ts). */
+export interface LocalResumo {
+  nome: string; // "Escola Estadual Fulano de Tal"
+  endereco: string;
+  bairro?: string;
+  lat?: number;
+  lon?: number;
+}
+
 export interface SecaoResumo {
   secao: number;
   totalizada: boolean;
@@ -211,6 +220,8 @@ export interface SecaoResumo {
   votos: number[];
   brancos: number;
   nulos: number;
+  /** Local de votação (quando o arquivo de locais da UF está disponível). Opcional, retrocompatível. */
+  local?: LocalResumo;
 }
 
 export interface ZonaSnapshot {

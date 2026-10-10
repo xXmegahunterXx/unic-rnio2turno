@@ -2,8 +2,9 @@
  * Cliente local do build demo (site 100% estático): implementa `ApuracaoClient` com o motor de simulação
  * rodando num Web Worker (src/app/data/worker.ts), via RPC por postMessage. Protocolo em src/engine/host.ts.
  *
- *  - Dataset: o Worker baixa `data/meta.json` e `data/uf/*.json` relativos a `assetBase()` (funciona em
- *    qualquer subcaminho). Se o Worker não puder ser criado ou falhar antes de ficar pronto, o mesmo motor
+ *  - Dataset: o Worker baixa `data/meta.json`, `data/uf/*.json` e, opcionais, `data/secao/*.json` (1º turno
+ *    real por seção) e `data/municipios-br.json`, relativos a `assetBase()` (funciona em qualquer subcaminho);
+ *    os locais de votação (`data/locais/{uf}.json`) são baixados sob demanda na 1ª consulta de zona/seção da UF. Se o Worker não puder ser criado ou falhar antes de ficar pronto, o mesmo motor
  *    roda na thread principal (import dinâmico) — mesma interface.
  *  - Sincronização entre abas: o AdminState fica em localStorage ('sintonia:admin-state') e é propagado por
  *    BroadcastChannel('sintonia-admin') (com o evento `storage` como reserva). O relógio é ancorado no tempo
@@ -14,14 +15,16 @@
  *    descartado: quem abre o demo depois vê a simulação desde o começo.
  *  - Admin: login local com a senha 'sintonia' (sessionStorage). Sem login, os métodos do admin lançam um
  *    erro com `status = 401`.
+ *  - "Reveja a noite": todos os snapshots aceitam `opts.t` (epoch ms), repassado ao motor (limitado ao agora).
  *  - Falha ao carregar o dataset (ou o Worker cair): as chamadas pendentes são rejeitadas com mensagem clara
  *    e a próxima chamada (≥ 3 s depois — o React Query refaz sozinho) reinicia o motor.
  */
-import type { AdminCommand, AdminSnapshot, ApuracaoClient, PublicMeta } from '@/shared/api';
+import type { AdminCommand, AdminSnapshot, ApuracaoClient, Instante, PublicMeta } from '@/shared/api';
 import type {
   AdminState,
   LiveStatus,
   MunicipioSnapshot,
+  MunicipiosNacionalSnapshot,
   NationalSnapshot,
   PresetInfo,
   RaceId,
@@ -246,6 +249,11 @@ class Ponte {
     switch (m.type) {
       case 'ready':
         this.pronto = true;
+        // tempo de boot do motor (download do dataset + estrutura + modelo), para medição/diagnóstico
+        console.info(
+          `[sintonia] motor pronto em ${m.ms} ms (dados ${m.cargaMs ?? '?'} ms · modelo ${m.modeloMs ?? '?'} ms)` +
+            (this.emFallback ? ' · thread principal' : ''),
+        );
         this.adotaLocal(m.state);
         break;
       case 'state':
@@ -349,6 +357,12 @@ class Ponte {
   }
 }
 
+/** Instante opcional ("reveja a noite") para o RPC: número finito ou ausente (o motor limita ao agora). */
+function tDe(opts?: Instante): number | undefined {
+  const t = opts?.t;
+  return typeof t === 'number' && Number.isFinite(t) ? t : undefined;
+}
+
 export function createLocalClient(): ApuracaoClient {
   const ponte = new Ponte();
   let autenticado = ssGet(AUTH_KEY) === '1';
@@ -359,15 +373,17 @@ export function createLocalClient(): ApuracaoClient {
   return {
     status: () => ponte.call<LiveStatus>('status'),
     meta: () => ponte.call<PublicMeta>('meta'),
-    // TODO(fase 2): implementado pelo agente do motor (municipiosBr e instante t).
-    municipiosBr: () => Promise.reject(new Error('municipiosBr ainda não implementado')),
-    nacional: (race: RaceId) => ponte.call<NationalSnapshot>('nacional', [race]),
-    uf: (race: RaceId, uf: UF) => ponte.call<UfSnapshot>('uf', [race, uf]),
-    municipio: (race: RaceId, uf: UF, cod: string) => ponte.call<MunicipioSnapshot>('municipio', [race, uf, cod]),
-    zona: (race: RaceId, uf: UF, cod: string, zona: number) => ponte.call<ZonaSnapshot>('zona', [race, uf, cod, zona]),
-    async secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number): Promise<SecaoDetalhe | null> {
+    nacional: (race: RaceId, opts?: Instante) => ponte.call<NationalSnapshot>('nacional', [race, tDe(opts)]),
+    uf: (race: RaceId, uf: UF, opts?: Instante) => ponte.call<UfSnapshot>('uf', [race, uf, tDe(opts)]),
+    municipio: (race: RaceId, uf: UF, cod: string, opts?: Instante) =>
+      ponte.call<MunicipioSnapshot>('municipio', [race, uf, cod, tDe(opts)]),
+    zona: (race: RaceId, uf: UF, cod: string, zona: number, opts?: Instante) =>
+      ponte.call<ZonaSnapshot>('zona', [race, uf, cod, zona, tDe(opts)]),
+    municipiosBr: (race: RaceId, opts?: Instante) =>
+      ponte.call<MunicipiosNacionalSnapshot>('municipiosBr', [race, tDe(opts)]),
+    async secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number, opts?: Instante): Promise<SecaoDetalhe | null> {
       try {
-        return await ponte.call<SecaoDetalhe | null>('secao', [race, uf, cod, zona, secao]);
+        return await ponte.call<SecaoDetalhe | null>('secao', [race, uf, cod, zona, secao, tDe(opts)]);
       } catch (e) {
         if (e instanceof NotFoundError) return null;
         throw e;

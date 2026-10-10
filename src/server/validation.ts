@@ -36,6 +36,24 @@ export function parseCodMunicipio(v: string): string {
   return s.padStart(5, '0');
 }
 
+/**
+ * `?t=<epoch ms>` ("reveja a noite", contrato `Instante`): inteiro positivo de até 15 dígitos.
+ * Ausente/vazio → undefined (agora). Instantes futuros são aceitos aqui e limitados ao agora depois.
+ */
+export function parseInstante(v: string | undefined | null): number | undefined {
+  if (v === undefined || v === null || v === '') return undefined;
+  const s = String(v);
+  if (!/^\d{1,15}$/.test(s) || Number(s) <= 0) {
+    throw new ErroValidacao(`Instante inválido: "${s.slice(0, 20)}". Use ?t=<epoch em milissegundos> (inteiro positivo).`);
+  }
+  return Number(s);
+}
+
+/** `?v=<versão do admin>` (chave de cache na URL dos instantes passados). Malformado → undefined (ignorado). */
+export function parseVersaoUrl(v: string | undefined | null): number | undefined {
+  return v && /^\d{1,12}$/.test(v) ? Number(v) : undefined;
+}
+
 /** Zona/seção: inteiro positivo de até 4 dígitos. */
 export function parseNumero(v: string, campo: 'zona' | 'secao'): number {
   const s = String(v ?? '');
@@ -96,6 +114,42 @@ const tse = z
   .partial()
   .strict();
 
+/** Logo do patrocínio: data URI de imagem (≤ 150 KB decodificados) ou URL https. */
+const IMAGEM_MAX_BYTES = 150 * 1024;
+const imagemPatrocinio = z
+  .string()
+  .trim()
+  .max(Math.ceil((IMAGEM_MAX_BYTES * 4) / 3) + 64, 'imagem acima de 150 KB')
+  .refine((v) => {
+    const m = /^data:image\/(png|jpeg|webp|svg\+xml);base64,([A-Za-z0-9+/]+={0,2})$/.exec(v);
+    if (m) return Math.floor((m[2].length * 3) / 4) - (m[2].endsWith('==') ? 2 : m[2].endsWith('=') ? 1 : 0) <= IMAGEM_MAX_BYTES;
+    return urlHttps(v, 2048);
+  }, 'imagem: use data:image/(png|jpeg|webp|svg+xml);base64 até 150 KB, ou uma URL https');
+
+/** URL https absoluta, sem credenciais, até `max` caracteres. */
+function urlHttps(v: string, max: number): boolean {
+  if (v.length > max) return false;
+  try {
+    const u = new URL(v);
+    return u.protocol === 'https:' && !!u.hostname && !u.username && !u.password;
+  } catch {
+    return false;
+  }
+}
+
+/** Patrocínio (anunciante NÃO político — ARCHITECTURE §1.5): marca, texto curto, link https e logo opcional. */
+const patrocinio = z
+  .object({
+    marca: z.string().trim().min(1, 'marca vazia').max(60, 'marca: máximo de 60 caracteres'),
+    texto: z.string().trim().min(1, 'texto vazio').max(140, 'texto: máximo de 140 caracteres'),
+    url: z
+      .string()
+      .trim()
+      .refine((v) => urlHttps(v, 500), 'url: use um endereço https:// válido (até 500 caracteres)'),
+    imagem: imagemPatrocinio.optional(),
+  })
+  .strict();
+
 export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('relogio'), acao: z.enum(['iniciar', 'pausar', 'retomar', 'reiniciar']) }).strict(),
   z.object({ tipo: z.literal('velocidade'), velocidade: finito.gt(0).max(10_000) }).strict(),
@@ -108,6 +162,7 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('congelar'), congelado: z.boolean() }).strict(),
   z.object({ tipo: z.literal('nomes-reais'), ativo: z.boolean() }).strict(),
   z.object({ tipo: z.literal('tse'), tse }).strict(),
+  z.object({ tipo: z.literal('patrocinio'), patrocinio: patrocinio.nullable() }).strict(),
 ]);
 
 /** Valida um comando do admin (lança ErroValidacao com a primeira mensagem legível). */

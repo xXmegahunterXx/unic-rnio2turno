@@ -82,14 +82,18 @@ Leve para a máquina: `dist/`, `dist-server/`, `package.json`, `package-lock.jso
 ### CDN (recomendado na noite da eleição)
 
 O servidor já responde pensando em CDN; basta respeitar `Cache-Control`, `ETag` e `Vary: Accept-Encoding` e incluir
-a **query string** na chave de cache (`?race=`).
+a **query string** na chave de cache (`?race=`, `?t=`, `&v=`).
 
 | Rota | Cache-Control | Observações |
 |---|---|---|
-| `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão) |
+| `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão, `pessoasAgora` arredondado, patrocínio) |
 | `GET /api/meta` | `public, max-age=60, s-maxage=300` | ETag pela versão do dataset |
 | `GET /api/apuracao/:race/…` (2º turno) | `public, max-age=0, s-maxage=2, stale-while-revalidate=10` | ETag fraco `W/"v{versão}-{balde}-{rota}"` → 304 |
-| `GET /api/apuracao/:race-t1/…` (1º turno) | `public, max-age=60, s-maxage=300, stale-while-revalidate=600` | resultado final |
+| `GET /api/apuracao/:race-t1/…` (1º turno) | `public, max-age=60, s-maxage=300, stale-while-revalidate=600` | resultado final (ignora `?t=`) |
+| `GET /api/apuracao/:race/…?t=<passado>&v=<versão>` | `public, max-age=600, s-maxage=3600, stale-while-revalidate=600` | "reveja a noite": instante ≥ 60 s (simulação) ou 3 min (TSE) no passado, com a versão atual do admin na URL; ETag `W/"v{versão}-h{t}-{rota}"` |
+| idem sem `&v=` (ou versão antiga) | `public, max-age=0, s-maxage=30, stale-while-revalidate=60` | passado recente ou `t` futuro = cache do agora (futuro nunca é atendido: vira o agora) |
+| `GET /api/apuracao/:race/br/municipios` | como as demais de apuração | mapa nacional por município (`MunicipiosNacionalSnapshot`, ordem de `municipios-br.json`) |
+| `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | logo do patrocínio enviada em data URI (o `/api/status` leva só esta URL) |
 | 404 de `/api/apuracao/…` | `public, max-age=30, s-maxage=60` | evita martelar a origem com URLs inexistentes |
 | `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630 |
 | `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego |
@@ -102,6 +106,21 @@ O "balde" do ETag só muda quando os números podem mudar: fixo com a fonte `pre
 pausado ou os dados congelados, antes das 17h e depois do encerramento; por segundo simulado com a simulação
 rodando; a cada 5 s na fonte `tse`. Respostas comprimem com **brotli** ou **gzip** conforme `Accept-Encoding`, e a
 origem monta cada rota no máximo 1×/s (requisições simultâneas compartilham o mesmo cálculo).
+
+**Reveja a noite (`?t=<epoch ms>`)**: todas as rotas de apuração aceitam um instante PASSADO (inteiro positivo;
+malformado → 400; futuro → o agora). Na simulação, qualquer nível (Brasil, UF, município, zona, seção, mapa por
+município). Na fonte `tse`, só Brasil, UF e o mapa por município têm histórico (estados gravados a cada mudança em
+`STATE_DIR/tse-historico.json`); **município, zona e seção com `?t=` respondem o agora**. Detalhes em
+[`src/tse/README.md`](./src/tse/README.md) §5.1.
+
+**Pessoas agora** (`LiveStatus.pessoasAgora`): clientes distintos estimados nos últimos ~30 s (mapa de bits com
+hash salgado, sem guardar IP), recalculado a cada 5 s e arredondado (< 10 exato; < 1.000 em dezenas; depois
+centenas). Atrás de CDN, conta só quem chega à origem (o `status` tem `s-maxage=1`).
+
+**Estáticos de dados** (`/data/**`, `/geo/**`, inclusive `secao/`, `locais/`, `perfil/`, `fotos/`, `cargos/`,
+`candidatos/`, `municipios-br.json`, `br-mun.json`): brotli (q10) e gzip (9) calculados uma vez por arquivo e
+guardados em memória (arquivos ≤ 32 MB, orçamento de 384 MB); na subida, `data/` e `geo/` são pré-comprimidos em
+segundo plano, um arquivo por vez (ex.: `locais/sp.json` 2,4 MB → 0,5 MB em br).
 
 ### Capacidade medida (1 processo, 1 núcleo, contêiner de 4 vCPUs, sem CDN)
 
@@ -175,6 +194,42 @@ real pelo caminho ao vivo (Brasil, UF, município, zona e boletim de urna decodi
 `6258`/`6260`/`3221`.
 
 ---
+
+## Dados
+
+Pipeline em `scripts/data`: brutos em `data-raw/` (ignorado pelo git, com cache), saída commitada em `public/data` e
+`public/geo`.
+
+### Mapa nacional por município e ordem canônica dos municípios
+
+```bash
+npx tsx scripts/data/fetch-ibge.ts              # cache das malhas IBGE v4 em data-raw/ibge (~16 MB; não rebaixa)
+npx tsx scripts/data/build-geo-br-mun.ts        # → public/geo/br-mun.json + public/data/municipios-br.json (~15 s)
+npx tsx scripts/data/geo-lib/preview-br-mun.ts  # QA: screenshots, frestas, alinhamento e tempo do <canvas> (preview-out/)
+```
+
+Precisa antes de `public/geo/br.json` (mesma projeção e enquadramento, conferidos pelo script) e de
+`public/data/uf/*.json` (ordem dos municípios). O script une as 27 malhas por UF numa topologia única (divisas sem
+frestas), simplifica até caber em ~1,85 MB (`--orcamento=MB` muda o alvo; `--limiar=px²` fixa o limiar) e para com
+erro se faltar município, se a ordem divergir do cadastro do TSE ou se o viewBox não for o do `br.json`.
+
+### 1º turno real por seção e locais de votação
+
+```bash
+python3 -I scripts/data/py/secao_download.py   # ZIPs de dados abertos do TSE → data-raw/tse-abertos/ (~950 MB; cache por tamanho)
+python3 -I scripts/data/py/locais_build.py     # → public/data/locais/{uf}.json (~40 s)
+python3 -I scripts/data/py/secao_build.py      # → public/data/secao/{uf}.json (~2,5 min; lê o índice do local de locais/)
+npx tsx scripts/data/validate-secao.ts         # conferência independente em TS (+ 7 boletins de urna do feed; --sem-bu sem rede)
+python3 -I scripts/data/py/locais_nomes.py     # autotestes da capitalização dos nomes/endereços
+```
+
+Fontes (`cdn.tse.jus.br/estatistica/sead/odsele/`, lidas em streaming de dentro do ZIP, latin-1/`;`):
+`votacao_secao_2026_BR.zip` (Presidente) e `_{AC,AM,DF,ES,RJ,RN,TO}.zip` (Governador), `detalhe_votacao_secao_2026.zip`
+(aptos, comparecimento, brancos, nulos) e `eleitorado_local_votacao_2026.zip` (seção → local, 1º turno; o 2º turno
+entra no campo extra `segundoTurno`). Precisa de `public/data/uf/*.json` (ordem canônica e conferência) e, para validar
+as coordenadas dos locais por município, de `data-raw/ibge/mun/{uf}.topo.json` (`fetch-ibge.ts`). As regras
+(finalistas a/b, "outros", nulos técnicos, `gov.aptos`, agregadas, capitalização) estão no topo de cada script. Os
+scripts param com erro se qualquer seção ou município não fechar com o dataset da fase 1.
 
 ## Fontes de dados
 

@@ -61,7 +61,9 @@ export function cenarioPadrao(st: Structure, seed = SEED_PADRAO): ScenarioConfig
     alvoGov: a.gov,
     transferenciaOutros: 0.5,
     intensidadeRegional: 1,
-    ruidoSecao: 0.25,
+    // ruído EXTRA sobre o 1º turno real da seção (o real já varia); nas UFs sem seção real o motor soma um
+    // ruído estrutural (MODELO.ruidoSemSecaoReal) — equivalente ao 0,25 da fase 1
+    ruidoSecao: 0.08,
     comparecimentoDelta: 0,
     brancosFator: 1,
     nulosFator: 1,
