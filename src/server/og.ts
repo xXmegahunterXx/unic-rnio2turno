@@ -27,7 +27,7 @@ export const OG_W = 1200;
 export const OG_H = 630;
 
 /** Paleta do tema escuro (espelho dos tokens de src/app/styles.css). */
-const C = {
+export const C = {
   bg: 'rgb(9,9,15)',
   surface: 'rgb(17,17,26)',
   surface3: 'rgb(34,34,50)',
@@ -49,7 +49,7 @@ const C = {
 // Fontes
 // ---------------------------------------------------------------------------------------------
 
-type FontOpt = { name: string; data: Buffer; weight: 400 | 600 | 700 | 800; style: 'normal' };
+type FontOpt = { name: string; data: Buffer; weight: 400 | 500 | 600 | 700 | 800; style: 'normal' };
 
 let fontesCache: FontOpt[] | null = null;
 
@@ -78,18 +78,27 @@ export function carregarFontes(): FontOpt[] {
     add('Bricolage', 'BricolageGrotesque-Bold.ttf', 700);
     add('Bricolage', 'BricolageGrotesque-ExtraBold.ttf', 800);
   }
-  if (!out.length) {
-    // reserva: JetBrains Mono (woff) do @fontsource, registrada com os dois nomes
+  // JetBrains Mono (woff do @fontsource, dependência de execução): fonte 'Mono' do boletim de urna e reserva das
+  // demais quando os TTF não estão disponíveis
+  const mono: { w: 400 | 700; data: Buffer }[] = [];
+  try {
     const req = createRequire(import.meta.url);
     const base = dirname(req.resolve('@fontsource/jetbrains-mono/package.json'));
     for (const [w, arq] of [
       [400, 'jetbrains-mono-latin-400-normal.woff'],
       [700, 'jetbrains-mono-latin-700-normal.woff'],
     ] as const) {
-      const data = readFileSync(join(base, 'files', arq));
+      mono.push({ w, data: readFileSync(join(base, 'files', arq)) });
+    }
+  } catch {
+    /* sem a Mono: o boletim cai na Inter */
+  }
+  if (!out.length) {
+    for (const { w, data } of mono) {
       out.push({ name: 'Inter', data, weight: w, style: 'normal' }, { name: 'Bricolage', data, weight: w, style: 'normal' });
     }
   }
+  for (const { w, data } of mono) out.push({ name: 'Mono', data, weight: w, style: 'normal' });
   fontesCache = out;
   return out;
 }
@@ -98,13 +107,13 @@ export function carregarFontes(): FontOpt[] {
 // Mini "JSX" para o satori
 // ---------------------------------------------------------------------------------------------
 
-type Estilo = Record<string, string | number>;
-interface No {
+export type Estilo = Record<string, string | number>;
+export interface No {
   type: string;
   props: { style?: Estilo; children?: unknown; [k: string]: unknown };
 }
 
-function h(type: string, style: Estilo, ...children: (No | string | null | false | undefined)[]): No {
+export function h(type: string, style: Estilo, ...children: (No | string | null | false | undefined)[]): No {
   const filhos = children.filter((c) => c !== null && c !== false && c !== undefined) as (No | string)[];
   const s = type === 'div' ? { display: 'flex', ...style } : style;
   return { type, props: { style: s, children: filhos.length === 1 ? filhos[0] : filhos } };
@@ -115,9 +124,9 @@ const LOGO_SVG =
   '<stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#c4a8ff"/></linearGradient></defs>' +
   '<rect width="64" height="64" rx="16" fill="#222232"/><path d="M14 38c6-14 12-14 18 0s12 14 18 0" fill="none" ' +
   'stroke="url(#g)" stroke-width="6" stroke-linecap="round"/><circle cx="32" cy="22" r="4" fill="#fff"/></svg>';
-const LOGO_URI = `data:image/svg+xml;base64,${Buffer.from(LOGO_SVG).toString('base64')}`;
+export const LOGO_URI = `data:image/svg+xml;base64,${Buffer.from(LOGO_SVG).toString('base64')}`;
 
-function marca(): No {
+export function marca(): No {
   return h(
     'div',
     { alignItems: 'center', gap: 16 },
@@ -126,7 +135,7 @@ function marca(): No {
   );
 }
 
-function pill(texto: string, bg: string, fg: string, borda?: string): No {
+export function pill(texto: string, bg: string, fg: string, borda?: string): No {
   return h(
     'div',
     {
@@ -145,7 +154,7 @@ function pill(texto: string, bg: string, fg: string, borda?: string): No {
   );
 }
 
-function fundo(...filhos: (No | null)[]): No {
+export function fundo(...filhos: (No | null)[]): No {
   return h(
     'div',
     {
@@ -163,9 +172,9 @@ function fundo(...filhos: (No | null)[]): No {
 }
 
 /** Corpo do nome por comprimento (nomes de urna longos, ex.: "Professora Maria do Carmo"). */
-const tamNome = (nome: string) => (nome.length <= 16 ? 38 : nome.length <= 21 ? 34 : 30);
+export const tamNome = (nome: string) => (nome.length <= 16 ? 38 : nome.length <= 21 ? 34 : 30);
 
-const iniciais = (nome: string) => {
+export const iniciais = (nome: string) => {
   const p = nome
     .replace(/[^\p{L}\s'-]/gu, ' ')
     .split(/\s+/)
@@ -193,10 +202,16 @@ export interface OgPlacarInput {
    * tiverem foto (tratamento igual); ausente/incompleto → monograma.
    */
   fotos?: (string | null | undefined)[];
+  /** Título no lugar do da corrida (ex.: o nome do município). */
+  titulo?: string;
+  /** Linha acima do título no lugar de "APURAÇÃO · Nº TURNO 2026". */
+  kicker?: string;
+  /** Recorte local (município): nunca mostra "ELEITO" (o resumo local só diz quem venceu ali). */
+  local?: boolean;
 }
 
 /** Índices dos finalistas (candidatos não agregados) na ordem da urna. */
-const finalistas = (race: Race) => race.candidatos.map((c, i) => (c.agregado ? -1 : i)).filter((i) => i >= 0);
+export const finalistas = (race: Race) => race.candidatos.map((c, i) => (c.agregado ? -1 : i)).filter((i) => i >= 0);
 
 /** Fotos utilizáveis para o placar (todas as dos finalistas) ou null. */
 export function fotosDoPlacar(inp: Pick<OgPlacarInput, 'race' | 'fotos'>): Map<number, string> | null {
@@ -224,7 +239,7 @@ function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar:
   const pct = temVotos ? pctValidos(r, idx) : null;
   // "eleito" só no 2º turno e na abrangência da própria disputa (no recorte de uma UF, `eleito` do resumo
   // significa apenas "vencedor ali"; no 1º turno ninguém foi eleito para estes cargos)
-  const escopoDaDisputa = !inp.uf || inp.race.abrangencia === inp.uf;
+  const escopoDaDisputa = !inp.local && (!inp.uf || inp.race.abrangencia === inp.uf);
   const eleito = r.eleito === idx && inp.race.turno === 2 && escopoDaDisputa;
   const retrato: No = foto
     ? h(
@@ -313,17 +328,19 @@ export function layoutPlacar(inp: OgPlacarInput): No {
   const [ia, ib] = [idx[0] ?? 0, idx[1] ?? 1];
   const fotos = fotosDoPlacar(inp);
   const titulo =
-    race.cargo === 'Presidente'
+    inp.titulo ??
+    (race.cargo === 'Presidente'
       ? inp.uf
         ? `Presidente · ${UF_NOMES[inp.uf]}`
         : 'Presidente'
-      : race.titulo;
-  const kicker = `APURAÇÃO · ${race.turno}º TURNO 2026`;
+      : race.titulo);
+  const kicker = inp.kicker ?? `APURAÇÃO · ${race.turno}º TURNO 2026`;
   const pctSec = pctTotalizadas(r);
 
   let selo: No;
   if (inp.simulacao) selo = pill('SIMULAÇÃO · DADOS FICTÍCIOS', C.brand, '#ffffff');
   else if (inp.pre) selo = pill('25/10 · A PARTIR DAS 17H', 'rgba(255,255,255,0.06)', C.fg, C.line);
+  else if (race.turno === 1) selo = pill('RESULTADO OFICIAL · TSE', 'rgba(255,255,255,0.06)', C.fg, C.line);
   else if (r.status === 'encerrada') selo = pill('APURAÇÃO ENCERRADA', 'rgba(255,255,255,0.06)', C.fg, C.line);
   else selo = pill('AO VIVO', 'rgba(255,255,255,0.06)', C.fg, C.line);
 
@@ -374,7 +391,11 @@ export function layoutPlacar(inp: OgPlacarInput): No {
       { flexDirection: 'column', padding: '44px 64px 40px', width: OG_W, height: OG_H },
       h('div', { justifyContent: 'space-between', alignItems: 'center' }, marca(), selo),
       h('div', { fontSize: 20, fontWeight: 600, color: C.brand2, letterSpacing: 3, marginTop: 24 }, kicker),
-      h('div', { fontFamily: 'Bricolage', fontWeight: 700, fontSize: 46, color: C.fg, marginTop: 2, letterSpacing: -1 }, titulo),
+      h(
+        'div',
+        { fontFamily: 'Bricolage', fontWeight: 700, fontSize: 46, color: C.fg, marginTop: 2, letterSpacing: -1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: OG_W - 128 },
+        titulo,
+      ),
       h(
         'div',
         { justifyContent: 'space-between', marginTop: fotos ? 14 : 22 },

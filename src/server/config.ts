@@ -14,9 +14,11 @@
  *   SIM_AUTOSTART     '1' → sobe em fonte 'simulacao' a 20× (se não houver simulação/TSE já em curso);
  *                     'force' → sempre reinicia a simulação ao subir
  *   SERVE_STATIC      '1'/'0' força servir (ou não) o DIST_DIR (padrão: só em produção)
+ *   TWITTER_SITE      perfil do X (@sintonia) para a meta twitter:site dos cartões (opcional)
  */
 import { randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
+import { normalizarTwitterSite } from './meta-tags';
 
 export interface ServerConfig {
   producao: boolean;
@@ -35,6 +37,8 @@ export interface ServerConfig {
   adminSecretEfemero: boolean;
   publicUrl: string | null;
   trustProxy: boolean;
+  /** `@perfil` do X para twitter:site (TWITTER_SITE) ou null. */
+  twitterSite: string | null;
   simAutostart: 'nao' | 'auto' | 'force';
   /** Avisos de configuração (vão para o log na subida). */
   avisos: string[];
@@ -98,6 +102,9 @@ export function loadConfig(env: Env = process.env, cwd = process.cwd()): ServerC
     }
   }
 
+  const twitterSite = normalizarTwitterSite(env.TWITTER_SITE);
+  if (env.TWITTER_SITE && !twitterSite) avisos.push(`TWITTER_SITE inválido (${env.TWITTER_SITE.slice(0, 40)}): use o @perfil do X`);
+
   return {
     producao,
     port,
@@ -112,6 +119,7 @@ export function loadConfig(env: Env = process.env, cwd = process.cwd()): ServerC
     adminSecretEfemero,
     publicUrl,
     trustProxy: sim(env.TRUST_PROXY),
+    twitterSite,
     simAutostart,
     avisos,
   };

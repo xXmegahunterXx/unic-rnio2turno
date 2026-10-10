@@ -12,7 +12,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
-import type { AdminMetrics, LiveStatus, Race, RaceId, UF } from '../shared/types';
+import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, UF } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
 import type { LoadedDataset, Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
@@ -30,9 +30,12 @@ import {
   negociar,
 } from './http-cache';
 import { caminhoParaLog, msgErro, type Logger } from './log';
-import { injetarMeta, metaDaRota, type ContextoMeta } from './meta-tags';
+import { consultaNormalizada, injetarMeta, metaDaRota, type ContextoMeta } from './meta-tags';
+import { MAX_CODIGO, calcularCenario, codificarCenario, decodificarCenario, placarCenarioTexto } from '../shared/cenarios';
 import { Metricas } from './metrics';
-import { layoutPlacar, layoutTeste, renderPng } from './og';
+import { CC_OG, registrarOg } from './og-rotas';
+import { ServicoOg } from './og-servico';
+import { DadosEstaticos } from './dados-estaticos';
 import { anonimizarRace } from '../shared/anon';
 import { Estaticos, pareceArquivo } from './static';
 import type { TseManager } from './tse';
@@ -73,28 +76,15 @@ export const CC = {
   historicoSemVersao: 'public, max-age=0, s-maxage=30, stale-while-revalidate=60',
   /** logo do patrocínio com o hash do conteúdo na URL */
   imutavel: 'public, max-age=86400, s-maxage=86400, immutable',
-  og: 'public, max-age=30, s-maxage=30, stale-while-revalidate=60',
-  ogTeste: 'public, max-age=86400, s-maxage=86400',
+  og: CC_OG.vivo,
+  /** imagens de dado oficial/real (cargos, ficha, curiosidades, cenários, 1º turno) */
+  ogEstatica: CC_OG.estatica,
+  ogTeste: CC_OG.teste,
   html: 'no-cache',
   privado: 'no-store',
 } as const;
 
-const OG_TTL_MS = 30_000;
-/** Grupo padrão do pacote de fotos oficiais (public/data/fotos/{grupo}.json) quando o candidato não diz. */
-const GRUPO_FOTOS_PADRAO = 'segundo-turno';
-/** Imagem vencida da mesma fonte ainda serve (enquanto a nova é gerada) por até 5 min. */
-const OG_STALE_MS = 5 * 60_000;
-const OG_CACHE_MAX = 128;
-const OG_FILA_MAX = 16;
-
 type Ctx = Context<{ Bindings: HttpBindings }>;
-
-/** Imagem OG pronta: PNG, se usou fotos oficiais e o "versão|modo" do estado com que foi gerada. */
-interface OgPronta {
-  png: Buffer;
-  fotos: boolean;
-  sub: string;
-}
 
 /** Erro HTTP com corpo `{ erro }`. */
 class ErroHttp extends Error {
@@ -150,10 +140,9 @@ export function createApp(deps: AppDeps) {
   const nomes = new Map<string, string>();
   for (const [uf, d] of Object.entries(deps.dataset.ufs)) for (const m of d?.municipios ?? []) nomes.set(`${uf}|${m.cod}`, m.nome);
   const nomeMunicipio = (uf: UF, cod: string) => nomes.get(`${uf}|${cod}`);
-  const ogCache = new Map<string, { png: Buffer | null; fotos: boolean; em: number; sub: string; pendente: Promise<OgPronta> | null }>();
-  let ogFila: Promise<unknown> = Promise.resolve();
-  let ogNaFila = 0;
-  let ogTeste: Promise<Buffer> | null = null;
+  const dadosEstaticos = new DadosEstaticos(config.dataDir, now);
+  // imagens OG: LRU de 256 PNGs / 64 MB, uma renderização por vez e no máximo 16 na fila
+  const servicoOg = new ServicoOg({ now, aoFalhar: (chave, err) => log.erro(`Falha ao gerar a imagem OG ${chave}`, err) });
 
   // ---- utilidades --------------------------------------------------------------------------------
   const ipDe = (c: Ctx): string => {
@@ -401,133 +390,19 @@ export function createApp(deps: AppDeps) {
     });
   });
 
-  // ---- OG images ---------------------------------------------------------------------------------
-  /**
-   * Renderização serial (satori ocupa a thread principal ~0,2–0,3 s por imagem): uma por vez, no máximo
-   * OG_FILA_MAX na fila. Imagem vencida (> 30 s) do MESMO modo é servida na hora enquanto a nova é gerada
-   * em segundo plano; troca de modo (real ↔ simulação, nomes reais ↔ anonimizado) sempre espera a imagem nova
-   * (a marca "SIMULAÇÃO" nunca pode faltar nem sobrar, e nome/foto real nunca acompanha número fictício).
-   * `sub` = "versão|modo" do estado com que a imagem foi gerada.
-   */
-  const modoOg = (st: LiveStatus) => `${st.fonte}${st.anonimizado ? '-anon' : ''}`;
-
-  const renderOg = (chave: string, montar: () => Promise<OgPronta>): Promise<OgPronta> => {
-    let e = ogCache.get(chave);
-    if (!e) {
-      e = { png: null, fotos: false, em: 0, sub: '', pendente: null };
-      ogCache.set(chave, e);
-      while (ogCache.size > OG_CACHE_MAX) ogCache.delete(ogCache.keys().next().value as string);
-    }
-    if (e.pendente) return e.pendente;
-    if (ogNaFila >= OG_FILA_MAX) throw new ErroHttp(503, 'Gerando muitas imagens agora; tente de novo em instantes.', { 'retry-after': '10' });
-    const ent = e;
-    ogNaFila++;
-    const p: Promise<OgPronta> = ogFila.catch(() => undefined).then(async () => {
-      try {
-        const pronta = await montar();
-        Object.assign(ent, { png: pronta.png, fotos: pronta.fotos, em: now(), sub: pronta.sub });
-        return pronta;
-      } finally {
-        ogNaFila--;
-        ent.pendente = null;
-      }
-    });
-    ogFila = p;
-    ent.pendente = p;
-    p.catch((err) => log.erro(`Falha ao gerar a imagem OG ${chave}`, err));
-    return p;
-  };
-
-  /**
-   * Fotos oficiais (pacote DATA_DIR/fotos/{grupo}.json, chave = Candidate.sqcand) para o placar da imagem:
-   * nunca na simulação anonimizada; só quando há foto de TODOS os finalistas (tratamento igual).
-   */
-  const fotosOg = (race: Race, anonimizado: boolean): string[] | undefined => {
-    if (anonimizado) return undefined;
-    const lista = race.candidatos.map((cd) => (cd.agregado || !cd.sqcand ? null : fotos.foto(cd.fotoGrupo || GRUPO_FOTOS_PADRAO, cd.sqcand)));
-    const finalistas = race.candidatos.map((cd, i) => (cd.agregado ? -1 : i)).filter((i) => i >= 0);
-    return finalistas.length >= 2 && finalistas.every((i) => lista[i]) ? lista.map((f) => f ?? '') : undefined;
-  };
-
-  app.get('/api/og/apuracao.png', async (c) => {
-    const race = parseRace(c.req.query('race') || 'pres');
-    const r = dados.race(race);
-    const ufQ = c.req.query('uf');
-    const uf = ufQ ? parseUf(ufQ) : undefined;
-    if (uf && !r.ufs.includes(uf)) throw new NotFoundError(`A UF ${uf} não participa da corrida ${r.id}.`);
-    const st = dados.status();
-    const chave = `${r.id}|${uf ?? 'br'}`;
-    const sub = `${st.versao}|${modoOg(st)}`;
-    const montar = async (): Promise<OgPronta> => {
-      const t0 = perf();
-      const snap = uf ? await dados.uf(r.id, uf) : await dados.nacional(r.id);
-      const resumo = snap.resumo;
-      const agoraSt = dados.status();
-      const simulacao = agoraSt.simulacao && r.turno === 2;
-      const anon = !!agoraSt.anonimizado;
-      const fonteTse = dados.fonteDe(r.id) === 'tse';
-      const raceOg = races.get(snap.race) ?? r;
-      const fotosPlacar = fotosOg(raceOg, anon);
-      const png = await renderPng(
-        layoutPlacar({
-          // simulação anônima: nada de nome nem foto real em imagem com números fictícios
-          race: anon ? anonimizarRace(raceOg) : raceOg,
-          uf,
-          resumo,
-          simulacao,
-          horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
-          pre: r.turno === 2 && resumo.secoesTotalizadas === 0,
-          fotos: fotosPlacar,
-        }),
-      );
-      log.info(
-        `OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB` +
-          `${fotosPlacar ? ', com fotos oficiais' : ''})`,
-      );
-      return { png, fotos: !!fotosPlacar, sub: `${agoraSt.versao}|${modoOg(agoraSt)}` };
-    };
-
-    const e = ogCache.get(chave);
-    const agora = now();
-    const mesmoModo = !!e?.png && e.sub.split('|')[1] === modoOg(st);
-    let pronta: OgPronta;
-    let em: number;
-    if (e?.png && e.sub === sub && agora - e.em < OG_TTL_MS) {
-      [pronta, em] = [{ png: e.png, fotos: e.fotos, sub: e.sub }, e.em]; // fresca
-    } else if (e?.png && mesmoModo && agora - e.em < OG_STALE_MS) {
-      [pronta, em] = [{ png: e.png, fotos: e.fotos, sub: e.sub }, e.em]; // vencida: serve já e renova em segundo plano
-      try {
-        void renderOg(chave, montar).catch(() => undefined);
-      } catch {
-        /* fila cheia: segue com a vencida */
-      }
-    } else {
-      pronta = await renderOg(chave, montar);
-      // a geração em andamento podia ser do modo anterior (ex.: nomes reais → anonimizado): gera de novo
-      if (pronta.sub.split('|')[1] !== modoOg(dados.status())) pronta = await renderOg(chave, montar);
-      em = ogCache.get(chave)?.em ?? agora;
-    }
-    const etag = etagFraco('og', hashCurto(chave), hashCurto(pronta.sub), em.toString(36));
-    const headers = {
-      'content-type': 'image/png',
-      'cache-control': CC.og,
-      etag,
-      'access-control-allow-origin': '*',
-      'x-og-fotos': pronta.fotos ? '1' : '0',
-    };
-    if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
-    return responder(c, pronta.png, 200, headers);
-  });
-
-  app.get('/api/og/teste.png', async (c) => {
-    ogTeste ??= renderPng(layoutTeste());
-    ogTeste.catch(() => (ogTeste = null));
-    const png = await ogTeste;
-    return responder(c, png, 200, {
-      'content-type': 'image/png',
-      'cache-control': CC.ogTeste,
-      'access-control-allow-origin': '*',
-    });
+  // ---- OG images (og-rotas.ts) ------------------------------------------------------------------
+  registrarOg(app, {
+    dados,
+    controller,
+    races,
+    fotos,
+    estaticos: dadosEstaticos,
+    nomeMunicipio,
+    log,
+    now,
+    dominio: config.publicUrl ? new URL(config.publicUrl).host : null,
+    servico: servicoOg,
+    versaoDataset: `t1-${hashCurto(`${deps.dataset.meta.versao}|${deps.dataset.meta.geradoEm}`)}`,
   });
 
   // ---- Admin ---------------------------------------------------------------------------------------
@@ -630,20 +505,39 @@ export function createApp(deps: AppDeps) {
 
   // ---- App (produção): estáticos + SPA com meta tags -------------------------------------------------
   if (estaticos) {
+    /** Placar para a descrição (só fontes do motor: na fonte 'tse' não vale a pena esperar o feed). */
+    const placarMeta = (race: string, snap: { race: string; resumo: Summary }) => {
+      const r = dados.race(race);
+      const raceMeta = races.get(snap.race) ?? r;
+      const st = dados.status();
+      return {
+        resumo: snap.resumo,
+        simulacao: st.simulacao && r.turno === 2,
+        race: st.anonimizado ? anonimizarRace(raceMeta) : raceMeta,
+      };
+    };
     const ctxMeta: ContextoMeta = {
       races,
       nomeMunicipio,
       placar(race, uf) {
         if (dados.fonteDe(race) === 'tse') return null;
-        const r = dados.race(race);
-        const snap = uf ? controller.uf(race, uf) : controller.nacional(race);
-        const raceMeta = races.get(snap.race) ?? r;
-        const st = dados.status();
-        return {
-          resumo: snap.resumo,
-          simulacao: st.simulacao && r.turno === 2,
-          race: st.anonimizado ? anonimizarRace(raceMeta) : raceMeta,
-        };
+        return placarMeta(race, uf ? controller.uf(race, uf) : controller.nacional(race));
+      },
+      placarMunicipio(race, uf, cod) {
+        if (dados.fonteDe(race) === 'tse') return null;
+        return placarMeta(race, controller.municipio(race, uf, cod));
+      },
+      fase: () => dados.status().fase,
+      ficha: (sq) => ({ lida: dadosEstaticos.ficha(sq), existe: dadosEstaticos.existeCandidato(sq) }),
+      cargo: (nome) => dadosEstaticos.cargo(nome),
+      curiosidades: () => dadosEstaticos.curiosidades(),
+      cenario(codigo) {
+        // tamanho e alfabeto conferidos antes de decodificar (códigos gigantes nunca chegam ao decodificador)
+        if (codigo.length > MAX_CODIGO || !/^[A-Za-z0-9_-]+={0,2}$/.test(codigo)) return null;
+        const ds = dadosEstaticos.presidenteT1();
+        const cen = ds ? decodificarCenario(codigo, ds.valor) : null;
+        if (!ds || !cen) return null;
+        return { codigo: codificarCenario(cen), placar: placarCenarioTexto(ds.valor, calcularCenario(ds.valor, cen)), versao: ds.versao };
       },
     };
 
@@ -660,32 +554,37 @@ export function createApp(deps: AppDeps) {
       if (!tpl) return c.text('Build do app ausente (rode npm run build).', 503, { 'cache-control': CC.privado });
 
       const url = new URL(c.req.url);
-      const raceQ = url.searchParams.get('race');
       const st = dados.status();
       const versaoImg = `${st.versao}-${Math.floor(now() / 60_000).toString(36)}`;
-      const chave = `html|${path}|${raceQ ?? ''}|${versaoImg}`;
-      let status: 200 | 404 = 200;
+      // só os parâmetros que mudam a página entram na chave (utm_* e afins não multiplicam o cache)
+      const chave = `html|${path}|${consultaNormalizada(url.searchParams)}|${versaoImg}`;
       const { p } = respostas.obter(chave, () => {
         const m = metaDaRota(path, url.searchParams, ctxMeta);
         const origem = origemDe(c);
-        const pagina = `${origem}${path}${raceQ && races.has(raceQ.toLowerCase()) ? `?race=${raceQ.toLowerCase()}` : ''}`;
-        const html = injetarMeta(tpl, m, origem, pagina, versaoImg);
-        return Object.assign({ bruto: Buffer.from(html) }, { status: m.status });
+        const raceQ = url.searchParams.get('race');
+        const canonico = m.canonico ?? `${path}${raceQ && races.has(raceQ.toLowerCase()) ? `?race=${raceQ.toLowerCase()}` : ''}`;
+        const html = injetarMeta(tpl, m, origem, `${origem}${canonico}`, m.imagemVersao ?? versaoImg, { twitterSite: config.twitterSite });
+        return Object.assign({ bruto: Buffer.from(html) }, { status: m.status, noindex: !!m.noindex });
       });
-      const corpo = (await p) as CorpoPronto & { status: 200 | 404 };
-      status = corpo.status;
+      const corpo = (await p) as CorpoPronto & { status: 200 | 404; noindex: boolean };
       const cod = negociar(c.req.header('accept-encoding'));
       const body = await corpoCodificado(corpo, cod);
       const headers: Record<string, string> = {
         'content-type': 'text/html; charset=utf-8',
         'cache-control': CC.html,
         vary: 'Accept-Encoding',
-        'x-frame-options': 'SAMEORIGIN',
         'permissions-policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
       };
+      if (path.startsWith('/embed/')) {
+        // widgets (/embed/*): podem ser exibidos em iframe de qualquer site — SÓ estas rotas
+        headers['content-security-policy'] = 'frame-ancestors *';
+      } else {
+        headers['x-frame-options'] = 'SAMEORIGIN';
+        headers['content-security-policy'] = "frame-ancestors 'self'";
+      }
       if (body !== corpo.bruto && cod) headers['content-encoding'] = cod;
-      if (path.startsWith('/admin') || path.startsWith('/duelo/')) headers['x-robots-tag'] = 'noindex';
-      return responder(c, head ? null : body, status, headers);
+      if (corpo.noindex || path.startsWith('/admin') || path.startsWith('/duelo/')) headers['x-robots-tag'] = 'noindex';
+      return responder(c, head ? null : body, corpo.status, headers);
     });
   }
 

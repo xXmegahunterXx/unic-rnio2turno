@@ -2,10 +2,12 @@
  * Fundo do hero da Home: "ondas de sintonia" (linhas senoidais na cor da marca, que deslizam em
  * velocidades diferentes e criam interferência suave), aurora violeta e ruído. Só decoração: nunca usa
  * as cores dos candidatos. Tudo em `transform` (GPU) e parado com `prefers-reduced-motion`.
+ * No celular as ondas ficam paradas (poupa CPU e bateria no navegador embutido; o desenho é o mesmo).
  */
 import { useId, useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/app/lib/cn';
+import { useMediaQuery } from '@/app/lib/useMediaQuery';
 
 const W = 1440;
 const H = 560;
@@ -41,7 +43,9 @@ function caminho({ L, A, y, fase }: Onda): string {
 }
 
 export function FundoHero({ className }: { className?: string }) {
-  const reduzir = useReducedMotion();
+  const reduzirPref = useReducedMotion();
+  const largo = useMediaQuery('(min-width: 768px)');
+  const reduzir = reduzirPref || !largo;
   const id = useId().replace(/:/g, '');
   const paths = useMemo(() => ONDAS.map(caminho), []);
   return (

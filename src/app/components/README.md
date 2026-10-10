@@ -379,3 +379,19 @@ PNG real (download) nos 3 formatos em todos os cartões (≈ 290–470 KB no 16:
 marca embutidas. UA do app do X + `navigator.share` removido → sem botão "Compartilhar…", "Salvar imagem" abre o modal com a imagem.
 Web Share mockado: recebe 1 PNG + texto com link; recusa `NotAllowedError` → modal. Intenção do X: texto sem a URL, `url` à parte.
 <!-- fase3-kit:end -->
+
+## Fase 3 · Teste Cego (motor viral)
+
+Arquivos em `src/app/components/pages/teste/` e `src/app/pages/teste/`. Nada sai do aparelho: as imagens são geradas no navegador
+(kit `@/app/components/share`) e as respostas só viajam depois do "#" do link do Duelo, com consentimento explícito.
+
+| Peça | O quê |
+|---|---|
+| Escala | `OPCOES_ESCALA` (sintonia.ts): **discordo totalmente à esquerda → concordo totalmente à direita** (teclas 1–5 na mesma ordem). `EscalaConcordancia` (Quiz.tsx) é usada no quiz e na abertura; a régua do resultado (`AfirmacaoAAfirmacao`) segue a mesma direção. Sem gesto de arrastar (com "concordo" à direita, arrastar para a direita para *voltar* confundiria). |
+| `Quiz` | Barra de progresso **grudada sob o header** (`top: var(--app-header-h)`, vidro quase opaco; no desktop vira pílula) — corrige o progresso escondido sob o cabeçalho no iPhone/iframe. Toque tátil (`haptica.ts`, `navigator.vibrate`, respeita movimento reduzido), avanço automático (420 ms), "Voltar", retomada da posição salva, tempo restante pelo ritmo da pessoa (`segundosRestantes`/`textoRestante`), `ids?` (subconjunto) e `selo?`. |
+| `AfirmacaoEntrada` | A 1ª afirmação já respondível na abertura (`/teste` e Duelo): um toque grava só na aba e abre o quiz na seguinte. Com teste em andamento, mostra a próxima ("Continue de onde parou"). |
+| Modo rápido | `/teste?s=<semente>&r=1`: 12 afirmações, uma por tema (`selecaoRapida(seed)` sorteia entre as 696 combinações equilibradas: concordar aproxima dos dois por igual ±1, opostas ±1, mesma base de cálculo ±1, ≤ 1 controle). Mesmo código de URL (as de fora vão como "não respondida" e ficam fora da conta — fórmula igual). `conjuntoRespondido(respostas)` reconhece o modo no resultado e no Duelo; o resultado oferece "Completar o teste" (retoma com as respostas dadas). |
+| Revelação | `useRevelacao(chave)`: pronto (botão "Revelar minha sintonia") → analisando (~1,3 s, anéis girando, `TrilhaAnalise`) → revelado (os dois medidores viram juntos, toque tátil). Compartilhar e detalhes só aparecem depois da revelação. Já revelado na aba = abre revelado (guarda só um hash do código). |
+| Compartilhar | `PainelCompartilhar`: "Desafio" (padrão, não mostra o resultado) × "Meu resultado" (opt-in com aviso de dado sensível); link sempre `/teste`. `PainelDuelo`: aviso de que quem abrir verá as respostas (e que no X o link é público) + caixa "Entendi" que libera X/WhatsApp/Enviar/Copiar/Imagem. `PainelResultadoDuelo`: só o placar entre as duas pessoas. |
+| Cartões (CartaoTeste.tsx) | Sobre o `CartaoBase`, nos 3 formatos: `CartaoDesafio`, `CartaoMeuResultado` (anel em `conic-gradient`, foto só quando o teste já mostra fotos), `CartaoDuelo`, `CartaoConviteDuelo`. Sem número simulado ⇒ sem selo de simulação. |
+| Textos (textosTeste.ts) | `textoDesafio`, `textoMeuResultado`, `textoDuelo`, `textoConviteDuelo`, `HASHTAGS_TESTE` (testados: ≤ 220 de peso, neutros, ordem da urna). |

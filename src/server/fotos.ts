@@ -66,4 +66,9 @@ export class PacotesFotos {
     const f = this.pacote(grupo)?.[sqcand];
     return typeof f === 'string' && f.length <= MAX_FOTO_CHARS && RE_FOTO.test(f) ? f : null;
   }
+
+  /** Foto para as imagens OG (JPEG/PNG), ou null. */
+  fotoOg(grupo: string, sqcand: string): string | null {
+    return this.foto(grupo, sqcand);
+  }
 }

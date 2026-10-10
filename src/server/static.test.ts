@@ -155,9 +155,11 @@ describe('SPA com meta tags por rota', () => {
     expect(await (await get('/camara')).text()).toContain('Câmara dos Deputados');
     expect(await (await get('/assembleias/sp')).text()).toContain('Assembleia Legislativa · São Paulo');
     expect(await (await get('/assembleias/df')).text()).toContain('Câmara Legislativa · Distrito Federal');
-    const cand = await get('/candidato/280001607829');
+    const cand = await get('/candidato/280002542548');
     expect(cand.status).toBe(200);
-    expect(await cand.text()).toContain('Ficha do candidato · Sintonia');
+    expect(await cand.text()).toContain('Lula (PT) · Presidente · Ficha do candidato · Sintonia');
+    // sequencial bem formado, mas fora do índice de candidatos → 404 (a SPA mostra "não encontrado")
+    expect((await get('/candidato/280001607829')).status).toBe(404);
     expect((await get('/assembleias/zz')).status).toBe(404);
     expect((await get('/assembleias/xx')).status).toBe(404);
     expect((await get('/candidato/abc')).status).toBe(404);

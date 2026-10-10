@@ -70,7 +70,7 @@ export function IntroTeste({ eyebrow, titulo, subtitulo, acoes, extra, semPassos
           >
             {titulo}
           </motion.h1>
-          <motion.p {...entrar(0.12)} className="mt-3 max-w-[36rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:mt-5 sm:text-[18px]">
+          <motion.p {...entrar(0.12)} className="mt-3 max-w-[36rem] text-pretty text-[15.5px] leading-relaxed text-fg-muted sm:mt-5 sm:text-[18px]">
             {subtitulo}
           </motion.p>
         </div>

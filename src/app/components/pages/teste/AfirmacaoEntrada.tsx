@@ -50,7 +50,7 @@ export function AfirmacaoEntrada({ afirmacao, numero, total, onResponder, chamad
         initial={reduzir ? false : { opacity: 0, y: 12, rotate: -0.6 }}
         animate={{ opacity: 1, y: 0, rotate: 0 }}
         transition={{ duration: 0.5, delay: 0.15, ease: [0.22, 0.9, 0.24, 1] }}
-        className="relative overflow-hidden rounded-[26px] border border-line bg-surface p-4 shadow-card sm:p-6"
+        className="relative overflow-hidden rounded-[26px] border border-line bg-surface p-3.5 shadow-card min-[380px]:p-4 sm:p-6"
         data-afirmacao-entrada
       >
         <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-brand/[0.12] blur-3xl" />
