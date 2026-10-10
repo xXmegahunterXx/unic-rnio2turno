@@ -29,7 +29,8 @@ import type { MapMode } from '@/app/components/apuracao/mapModes';
 import { linkUf } from './fase';
 
 type Vista = 'mapa' | 'cartograma';
-const CHAVE_VISTA = 'sintonia:nacional:vista';
+// v2: o padrão passou a ser sempre o mapa geográfico do Brasil (escolhas antigas do padrão automático são descartadas).
+const CHAVE_VISTA = 'sintonia:nacional:vista:v2';
 
 function vistaInicial(): Vista {
   try {
@@ -38,8 +39,8 @@ function vistaInicial(): Vista {
   } catch {
     /* armazenamento indisponível: segue o padrão */
   }
-  // Celular: cartograma (todas as UFs do mesmo tamanho, fácil de tocar). Desktop: mapa.
-  return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 768px)').matches ? 'mapa' : 'cartograma';
+  // Padrão em todas as telas: o mapa do Brasil de verdade. O cartograma fica como alternativa opcional.
+  return 'mapa';
 }
 
 const MODOS_2T: MapMode[] = ['vencedor', 'margem', 'apurado', 'comparecimento', 'variacao'];

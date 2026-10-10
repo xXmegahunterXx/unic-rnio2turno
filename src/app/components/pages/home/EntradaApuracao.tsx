@@ -1,7 +1,7 @@
 /**
  * Cartão de entrada "Apuração ao vivo" da Home.
- *  - Antes das 17h: "Como foi o 1º turno" com o resultado OFICIAL (pres-t1) e o cartograma por UF.
- *  - Apurando/encerrada: o cartograma do 2º turno ao vivo (quem está à frente em cada estado).
+ *  - Antes das 17h: "Como foi o 1º turno" com o resultado OFICIAL (pres-t1) e o mapa do Brasil por UF.
+ *  - Apurando/encerrada: o mapa do Brasil do 2º turno ao vivo (quem está à frente em cada estado).
  * Corridas via `useRace` (anonimizadas na simulação); candidatos na ordem da urna, mesma tipografia.
  */
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ import { LiveDot } from '@/app/ui/LiveDot';
 import { Skeleton } from '@/app/ui/Skeleton';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
-import { TileMap } from '@/app/components/apuracao/TileMap';
+import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { NotaNomesOcultos } from './NotaNomesOcultos';
 
 export function EntradaApuracao({ status, anonimizado, className }: { status: LiveStatus | undefined; anonimizado: boolean; className?: string }) {
@@ -72,7 +72,7 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
           )}
         </p>
 
-        <div className="mt-6 grid grid-cols-1 items-start gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,200px)]">
+        <div className="mt-6 grid grid-cols-1 items-start gap-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,280px)]">
           <div className="min-w-0">
             {race && data ? t1 ? <Linhas race={race} resumo={data.resumo} /> : <PlacarEstados race={race} ufs={data.ufs} /> : <LinhasEsqueleto />}
             {!t1 && status?.simulacao ? (
@@ -82,19 +82,18 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
               </div>
             ) : null}
           </div>
-          <div className="mx-auto w-full max-w-[230px] sm:max-w-none">
+          <div className="mx-auto w-full max-w-[320px] sm:max-w-none">
             {race && data ? (
-              <TileMap
+              <BrazilMap
                 ufs={data.ufs}
                 race={race}
                 valores={false}
-                exterior={false}
                 onSelect={(uf) => navigate(`/apuracao/${uf.toLowerCase()}${t1 ? '?race=pres-t1' : ''}`)}
                 rotuloAcao={(uf) => `Ver ${uf}`}
                 ariaLabel={t1 ? 'Mais votado em cada estado no 1º turno' : 'Quem está à frente em cada estado'}
               />
             ) : (
-              <Skeleton className="aspect-[6/8] w-full" rounded="lg" />
+              <Skeleton className="aspect-square w-full" rounded="lg" />
             )}
             {race ? <LegendaMapa race={race} t1={t1} pendentes={!!data && UFS.some((uf) => !data.ufs[uf] || data.ufs[uf]!.secoesTotalizadas <= 0)} /> : null}
           </div>

@@ -183,7 +183,7 @@ export default function NacionalPage() {
           </div>
           <div className={cn(COLUNA, 'min-[1360px]:col-span-5')}>
             <MapaPanel
-              className="order-3 min-[1360px]:order-none min-[1360px]:flex-1"
+              className="order-2 min-[1360px]:order-none min-[1360px]:flex-1"
               race={race}
               ufs={data.ufs}
               primeiroTurno={dataT1?.ufs}
@@ -193,9 +193,9 @@ export default function NacionalPage() {
               anonimizado={anonimizado}
             />
             {definido ? (
-              <EleitoBanner className="order-2 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
+              <EleitoBanner className="order-3 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
             ) : (
-              <RestantePanel className="order-2 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
+              <RestantePanel className="order-3 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
             )}
           </div>
 
