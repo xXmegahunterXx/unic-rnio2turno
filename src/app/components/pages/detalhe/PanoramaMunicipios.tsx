@@ -95,7 +95,7 @@ export function PanoramaMunicipios({ race, municipios, unidade = 'municípios', 
         <p className="num mt-1.5 text-center text-[11.5px] text-fg-muted">
           {unidade.charAt(0).toUpperCase() + unidade.slice(1)} onde cada um está à frente
           {c.pend > 0 ? <> · {fmtInt(c.pend)} sem seção totalizada</> : null}
-          {c.emp > 0 ? <> · {fmtInt(c.emp)} empatados</> : null}
+          {c.emp > 0 ? <> · {fmtInt(c.emp)} {c.emp === 1 ? 'empatado' : 'empatados'}</> : null}
         </p>
       </div>
     );
@@ -131,7 +131,7 @@ export function PanoramaMunicipios({ race, municipios, unidade = 'municípios', 
       <p className="num mt-2.5 text-[12px] leading-snug text-fg-muted">
         {fmtInt(municipios.length)} {unidade}
         {c.pend > 0 ? <> · {fmtInt(c.pend)} sem seção totalizada</> : null}
-        {c.emp > 0 ? <> · {fmtInt(c.emp)} empatados</> : null}
+        {c.emp > 0 ? <> · {fmtInt(c.emp)} {c.emp === 1 ? 'empatado' : 'empatados'}</> : null}
         {nOutros > 0 ? <> · {fmtInt(nOutros)} com outro candidato à frente</> : null}
       </p>
     </section>

@@ -9,6 +9,7 @@ import { Button, Dialog, Icon, type IconName } from '@/app/ui';
 import { fmtPct } from '@/shared/format';
 import { useNow } from '@/app/lib/useNow';
 import { fmtMs } from './rotulos';
+import { NomesOcultos } from '@/app/components/apuracao/NomesOcultos';
 
 // ---- tipografia / estrutura --------------------------------------------------------------------------
 
@@ -133,27 +134,11 @@ export function Callout({
 }
 
 /**
- * Nota discreta "Nomes ocultos na simulação" (LiveStatus.anonimizado): os candidatos aparecem como "Candidato A/B"
- * para que prints com números fictícios nunca circulem associados a candidatos reais. `onClick` leva ao controle.
+ * Nota discreta "Nomes ocultos na simulação" (componente do kit). `onClick` leva à configuração em Fonte.
  */
 export function NotaNomesOcultos({ onClick, className }: { onClick?: () => void; className?: string }) {
-  const conteudo = (
-    <>
-      <Icon name="olho-fechado" size={14} className="shrink-0" />
-      <span>Nomes ocultos na simulação</span>
-    </>
-  );
-  const cls = cn('inline-flex items-center gap-1.5 whitespace-nowrap text-[12px] font-medium text-fg-muted', className);
-  if (!onClick) return <span className={cls}>{conteudo}</span>;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title="Configurar em Fonte › Nomes na simulação"
-      className={cn(cls, '-mx-1.5 rounded-lg px-1.5 py-0.5 transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand')}
-    >
-      {conteudo}
-    </button>
+    <NomesOcultos onClick={onClick} dica={onClick ? 'Configurar em Fonte › Nomes na simulação' : undefined} className={className} />
   );
 }
 

@@ -179,7 +179,9 @@ export function DataTable<R>({
     // Contêiner de consulta (container queries): colunas e células se adaptam à largura da TABELA.
     <div className={cn('w-full [container-type:inline-size]', className)}>
       <div
-        className={cn('w-full overflow-x-clip', rolagemInterna && 'overflow-y-auto overscroll-contain')}
+        // `relative` na rolagem interna: elementos absolutos das células (ex.: textos sr-only) ficam contidos no
+        // rolador; sem isso escapam para o ancestral posicionado e esticam a página além do rodapé.
+        className={cn('w-full overflow-x-clip', rolagemInterna && 'relative overflow-y-auto overscroll-contain')}
         style={rolagemInterna ? { maxHeight } : undefined}
       >
         <table className={cn('w-full border-separate border-spacing-0', fixo && 'table-fixed', txt)}>

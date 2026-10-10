@@ -29,7 +29,6 @@ export function AppShell({ children }: { children?: ReactNode }) {
       </main>
       <Footer />
       <TabBar />
-      {__DEMO__ ? <AtalhoPainelDemo /> : null}
       <Toaster />
       <ScrollRestoration />
     </div>
@@ -38,22 +37,29 @@ export function AppShell({ children }: { children?: ReactNode }) {
 }
 
 /**
- * Só no build demo (preview estático): atalho fixo para o painel de simulação, já que no preview não dá para
- * digitar /admin na barra de endereço. Fica acima da tab bar do celular.
+ * Só no build demo (preview estático): atalho para o painel de simulação, já que no preview não dá para digitar
+ * /admin na barra de endereço. Fica no header (ícone no celular, rótulo curto no desktop) para nunca cobrir
+ * conteúdo; some dentro da pré-visualização do próprio admin (iframe).
  */
 function AtalhoPainelDemo() {
-  const { pathname } = useLocation();
-  if (pathname.startsWith('/admin')) return null;
+  const emIframe = typeof window !== 'undefined' && window.self !== window.top;
+  if (emIframe) return null;
   return (
     <Link
       to="/admin"
-      className="glass fixed right-4 z-40 inline-flex items-center gap-2 rounded-full border border-line px-4 py-2.5 text-[13px] font-semibold text-fg shadow-glow transition-transform hover:-translate-y-0.5 bottom-[calc(84px+env(safe-area-inset-bottom,0px))] md:bottom-6"
+      aria-label="Painel de simulação"
+      title="Painel de simulação"
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-line text-[13px] font-semibold text-fg-muted transition-colors hover:border-line/[2] hover:text-fg lg:w-auto lg:px-3.5"
     >
       <Icon name="ajustes" size={16} />
-      Painel de simulação
+      <span className="hidden lg:inline">Painel</span>
     </Link>
   );
 }
+
+/** Rotas que exibem números da apuração (e, portanto, a faixa de SIMULAÇÃO quando for o caso). */
+const comNumeros = (pathname: string) =>
+  pathname === '/' || pathname.startsWith('/apuracao') || pathname.startsWith('/governadores');
 
 /** Ruído sutil + brilho violeta no topo (só decoração). */
 function FundoNoite() {
@@ -137,11 +143,12 @@ function Header() {
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
               <StatusPill className="hidden sm:inline-flex" />
               <StatusPill compact className="sm:hidden" />
+              {__DEMO__ ? <AtalhoPainelDemo /> : null}
               <ThemeToggle size="sm" />
             </div>
           </Container>
         </header>
-        {simulacao ? <SimulationRibbon /> : null}
+        {simulacao && comNumeros(pathname) ? <SimulationRibbon /> : null}
       </div>
       <AvisoBanner aviso={status.data?.aviso ?? null} />
     </>

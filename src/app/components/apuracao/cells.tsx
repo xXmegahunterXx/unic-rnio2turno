@@ -72,7 +72,7 @@ export const W = {
   pct: 'w-16 [@container(min-width:520px)]:w-[4.75rem]',
   margem: 'w-[4.5rem] [@container(min-width:520px)]:w-[5.5rem]',
   apurado: 'w-[5rem] [@container(min-width:760px)]:w-[7.75rem]',
-  apuradoSemBarra: 'w-[5rem]',
+  apuradoSemBarra: 'w-[5.75rem]',
   eleitores: 'w-[5.75rem]',
   num: 'w-[4.25rem]',
 } as const;

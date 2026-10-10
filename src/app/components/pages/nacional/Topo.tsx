@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import type { LiveStatus, Summary } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { NomesOcultos } from '@/app/components/apuracao/NomesOcultos';
 import { Badge } from '@/app/ui/Badge';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
@@ -107,20 +108,9 @@ export function SeloFase({ status, resumo, t1 }: { status: LiveStatus | undefine
   );
 }
 
-/**
- * Aviso discreto de anonimização: na simulação os candidatos aparecem como "Candidato A/B" para que
- * prints de números fictícios nunca circulem associados a candidatos reais.
- */
+/** Aviso discreto de anonimização (componente do kit; mantido o nome local por compatibilidade). */
 export function SeloAnonimo({ className }: { className?: string }) {
-  return (
-    <span
-      className={cn('inline-flex h-6 items-center gap-1.5 text-[12px] font-medium text-fg-muted', className)}
-      title="Na simulação, os candidatos aparecem como Candidato A e Candidato B, na ordem do número na urna."
-    >
-      <Icon name="olho-fechado" size={14} />
-      Nomes ocultos na simulação
-    </span>
-  );
+  return <NomesOcultos className={className} />;
 }
 
 /** Rótulo pequeno de seção usado dentro de cartões. */

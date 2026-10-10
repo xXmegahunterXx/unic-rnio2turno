@@ -284,7 +284,8 @@ function LadoDuelo({
             À frente
           </Badge>
         ) : l.eleito ? (
-          <Badge tone={toneFromCor(l.c.cor)} size="xs" caps icon="check">
+          // No desktop o selo "Eleito / Matematicamente eleito" já aparece no cabeçalho do placar.
+          <Badge tone={toneFromCor(l.c.cor)} size="xs" caps icon="check" className="sm:hidden">
             Eleito
           </Badge>
         ) : null}
@@ -349,8 +350,10 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
                 <div className={cn('truncate text-[14.5px] leading-tight', l.lider && !semVotos ? 'font-semibold text-fg' : 'font-medium text-fg')}>
                   {l.c.nomeUrna}
                 </div>
-                <div className="num mt-0.5 truncate text-[12px] text-fg-muted">
-                  {l.c.partido} · {fmtInt(l.votos)} votos
+                {/* O partido trunca; o número de votos nunca é cortado. */}
+                <div className="num mt-0.5 flex min-w-0 text-[12px] text-fg-muted">
+                  <span className="min-w-0 truncate">{l.c.partido}</span>
+                  <span className="shrink-0 whitespace-pre"> · {fmtInt(l.votos)} votos</span>
                 </div>
               </div>
               <NumberRoll

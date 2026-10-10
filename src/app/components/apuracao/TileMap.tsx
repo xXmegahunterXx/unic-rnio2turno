@@ -167,6 +167,9 @@ export function TileMap({
     }
   }
 
+  // Ponto "apuração encerrada" só distingue algo quando há estados ainda apurando (no 1º turno, tudo encerrado).
+  const todasEncerradas = lista.every((uf) => ufs[uf]?.status === 'encerrada');
+
   const descr = (uf: UF) => {
     const t = ufs[uf];
     if (!t || t.secoesTotalizadas <= 0) return `${UF_NOMES[uf]}: nenhuma seção totalizada`;
@@ -198,7 +201,7 @@ export function TileMap({
               const ink = inkToken(v.pendente ? 'rgb(var(--pending))' : v.fill, tokens);
               const sel = selecionada === uf;
               const ext = uf === 'ZZ';
-              const encerrada = ufs[uf]?.status === 'encerrada';
+              const encerrada = !todasEncerradas && ufs[uf]?.status === 'encerrada';
               const lider = lideres[uf];
               return (
                 <button
