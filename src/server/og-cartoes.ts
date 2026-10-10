@@ -831,9 +831,10 @@ export function layoutCalculadora(inp: { dominio?: string }): No {
         h(
           'div',
           { flexDirection: 'column', width: W + 64, background: 'rgba(255,255,255,0.04)', border: `2px solid ${C.line}`, borderRadius: 28, padding: '12px 30px 34px', alignItems: 'center' },
-          controle('ELEITORES DOS DEMAIS CANDIDATOS', 0.56),
-          controle('BRANCOS E NULOS DO 1º TURNO', 0.3),
-          controle('COMPARECIMENTO', 0.7),
+          // ilustração SIMÉTRICA: com as cores de identificação, um lado com mais trilha que o outro viraria "torcida"
+          controle('ELEITORES DOS DEMAIS CANDIDATOS', 0.58),
+          controle('BRANCOS E NULOS DO 1º TURNO', 0.42),
+          controle('COMPARECIMENTO', 0.5),
         ),
       ),
       h(

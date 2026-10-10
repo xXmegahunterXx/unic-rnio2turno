@@ -103,7 +103,7 @@
   --cand-a: 10 150 136;
   --cand-a-soft: 160 228 220;
   --cand-a-ink: 255 255 255;
-  --cand-a-fg: 6 112 103;
+  --cand-a-fg: 5 108 99; /* 4,71:1 sobre bg-cand-a/15 em surface-2 (era 6 112 103: 4,46) */
   --cand-b: 200 120 6;
   --cand-b-soft: 255 214 150;
   --cand-b-ink: 255 255 255;
@@ -155,7 +155,7 @@
     --cand-a: 10 150 136;
     --cand-a-soft: 160 228 220;
     --cand-a-ink: 255 255 255;
-    --cand-a-fg: 6 112 103;
+    --cand-a-fg: 5 108 99;
     --cand-b: 200 120 6;
     --cand-b-soft: 255 214 150;
     --cand-b-ink: 255 255 255;

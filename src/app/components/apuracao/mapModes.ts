@@ -6,8 +6,8 @@
  *
  *  - 'vencedor'       cor do líder, intensidade pela margem em 4 buckets (calc.bucketMargem)
  *  - 'margem'         escala divergente contínua A ↔ B (diferença em p.p., satura em ±40)
- *  - 'apurado'        % de seções totalizadas, sequencial na cor da marca
- *  - 'comparecimento' % de comparecimento nas seções totalizadas, sequencial (68% → 88%)
+ *  - 'apurado'        % de seções totalizadas, sequencial NEUTRA (cinza, sem matiz: ver fillEscalaNeutra)
+ *  - 'comparecimento' % de comparecimento nas seções totalizadas, sequencial neutra (68% → 88%)
  *  - 'variacao'       variação do % do candidato 0 vs 1º turno (divergente, satura em ±10 p.p.).
  *                     Base do 1º turno: participação do candidato 0 entre os dois finalistas,
  *                     v0 / (v0 + v1) — comparável com o % de válidos do 2º turno.
@@ -23,6 +23,7 @@ import {
   FILL_PENDENTE,
   MARGEM_ROTULOS,
   fillApurado,
+  fillEscalaNeutra,
   fillMargem,
   rgbSlot,
   slotDe,
@@ -117,7 +118,7 @@ export function valorModo(modo: MapMode, t: T | undefined | null, ctx: ModeCtx):
       const p = pctComparecimento(t);
       const [lo, hi] = COMPARECIMENTO_DOMINIO;
       return {
-        fill: tokenCss('brand', alphaEscala((p - lo) / (hi - lo))),
+        fill: fillEscalaNeutra(alphaEscala((p - lo) / (hi - lo))),
         pendente: false,
         rotulo: fmtPct(p, 1),
         valor: p,
@@ -271,7 +272,7 @@ export function legendaModo(modo: MapMode, race: Pick<Race, 'candidatos'>): Lege
       return {
         tipo: 'escala',
         titulo: 'Comparecimento',
-        stops: amostras((t) => tokenCss('brand', alphaEscala(t))),
+        stops: amostras((t) => fillEscalaNeutra(alphaEscala(t))),
         ticks: [
           { pos: 0, label: `≤${lo}%` },
           { pos: 0.5, label: `${(lo + hi) / 2}%` },
@@ -358,7 +359,7 @@ export function valorMunBr(modo: MapMode, s: MunicipiosNacionalSnapshot, i: numb
       return { fill: fillApurado(apurado / 10), pendente: false };
     case 'comparecimento': {
       const [lo, hi] = COMPARECIMENTO_DOMINIO;
-      return { fill: tokenCss('brand', alphaQ((s.comparecimento[i] / 10 - lo) / (hi - lo))), pendente: false };
+      return { fill: fillEscalaNeutra(alphaQ((s.comparecimento[i] / 10 - lo) / (hi - lo))), pendente: false };
     }
     case 'margem': {
       if (lider < 0) return { fill: FILL_NEUTRO, pendente: false };

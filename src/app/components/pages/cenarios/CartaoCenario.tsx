@@ -5,7 +5,7 @@
  * sob os números e texto diagonal atrás de tudo, para sobreviver a recortes). As premissas principais vão impressas.
  * Sem fotos (os números são hipotéticos): monograma na cor de identificação de cada finalista (./cores.ts), igual para os dois.
  */
-import type { ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Candidate, CorCandidato } from '@/shared/types';
 import type { GeoBrasil } from '@/shared/dataset';
 import type { Cenario, Premissa, PresidenteT1Dataset, ResultadoCenario } from '@/shared/cenarios';
@@ -143,7 +143,34 @@ function premissasDoCartao(ps: Premissa[], max: number): Premissa[] {
   return [...ps].sort((x, y) => peso(x) - peso(y)).slice(0, max).sort((x, y) => ps.indexOf(x) - ps.indexOf(y));
 }
 
-function ListaPremissas({ itens }: { itens: Premissa[] }) {
+/**
+ * Quantas premissas cabem sem cortar: começa com todas as escolhidas para o formato e tira a menos informativa até o
+ * contêiner (`ref`, com overflow oculto) parar de transbordar. Só se nem uma couber inteira ela vai em linha única com
+ * reticências. Em layout effect (antes da pintura): a prévia e o PNG já saem ajustados; refaz quando as fontes chegam
+ * (a largura do texto muda) ou quando o cenário muda (`chave`).
+ */
+function usePremissasQueCabem(max: number, chave: string): { ref: RefObject<HTMLDivElement | null>; n: number; linhaUnica: boolean } {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fontes, setFontes] = useState(0);
+  const id = `${chave}:${max}:${fontes}`;
+  const [st, setSt] = useState({ n: max, linhaUnica: false, id });
+  if (st.id !== id) setSt({ n: max, linhaUnica: false, id });
+  useEffect(() => {
+    let vivo = true;
+    document.fonts?.ready.then(() => vivo && setFontes((x) => x + 1));
+    return () => {
+      vivo = false;
+    };
+  }, []);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || el.scrollHeight <= el.clientHeight + 1) return;
+    setSt((x) => (x.n > 1 ? { ...x, n: x.n - 1 } : x.linhaUnica ? x : { ...x, linhaUnica: true }));
+  });
+  return { ref, n: Math.min(st.n, max), linhaUnica: st.linhaUnica };
+}
+
+function ListaPremissas({ itens, linhaUnica }: { itens: Premissa[]; linhaUnica?: boolean }) {
   const { k, formato } = useCartao();
   const fs = (formato === 'x' ? 14 : 15.5) * k;
   return (
@@ -151,7 +178,7 @@ function ListaPremissas({ itens }: { itens: Premissa[] }) {
       <RotuloCartao style={{ fontSize: (formato === 'x' ? 13 : 14) * k }}>Premissas de quem montou</RotuloCartao>
       <ul className="flex flex-col" style={{ gap: (formato === 'x' ? 3 : 6) * k, marginTop: (formato === 'x' ? 7 : 9) * k }}>
         {itens.map((p) => (
-          <li key={p.id} className={cn('leading-snug', formato === 'x' && 'truncate')} style={{ fontSize: fs }}>
+          <li key={p.id} className={cn('leading-snug', linhaUnica && 'truncate')} style={{ fontSize: fs }}>
             <span className="font-semibold text-fg">{p.rotulo}:</span> <span className="text-fg-muted">{p.texto}</span>
           </li>
         ))}
@@ -197,6 +224,10 @@ function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; ce
   const cores = coresCenario(ds);
   const race = { candidatos: [comoCandidato(a, cores[0]), comoCandidato(b, cores[1])] };
   const ps = premissasCenario(ds, cenario, r, { detalheCandidatos: 2, nomesCurtos: true });
+  // 16:9: até 2 premissas; feed e story: até 4 — sempre inteiras (o ajuste tira as menos informativas se faltar espaço).
+  const maxPremissas = formato === 'x' ? 2 : 4;
+  const ajuste = usePremissasQueCabem(maxPremissas, `${formato}:${ps.map((p) => p.texto).join('|')}`);
+  const premissas = <ListaPremissas itens={premissasDoCartao(ps, ajuste.n)} linhaUnica={ajuste.linhaUnica} />;
   const nomes = (
     <div className="flex items-start justify-between" style={{ gap: 24 * k }}>
       <Lado cor={cores[0]} nome={a.nomeUrna} partido={a.partido} numero={a.numero} pct={pctFinalista(r.brasil, 0)} votos={r.brasil.votos[0]} alinhar="esq" />
@@ -225,8 +256,8 @@ function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; ce
             <div style={{ marginTop: 18 * k }}>{nomes}</div>
             {barra}
             <LinhaEstados r={r} cores={cores} />
-            <div className="min-h-0 flex-1 overflow-hidden" style={{ marginTop: 14 * k }}>
-              <ListaPremissas itens={premissasDoCartao(ps, 2)} />
+            <div ref={ajuste.ref} className="min-h-0 flex-1 overflow-hidden" style={{ marginTop: 14 * k }}>
+              {premissas}
             </div>
           </div>
           <div className="flex shrink-0 items-center justify-center" style={{ width: 380 }}>
@@ -249,17 +280,19 @@ function Miolo({ ds, cenario, resultado: r, geo }: { ds: PresidenteT1Dataset; ce
         {feed ? (
           <div className="flex min-h-0 flex-1 items-center" style={{ gap: 28 * k, marginTop: 18 * k }}>
             <div className="shrink-0">{mapa(500)}</div>
-            <div className="min-w-0 flex-1">
-              <ListaPremissas itens={premissasDoCartao(ps, 4)} />
+            {/* coluna com altura fixa (a da linha) e overflow oculto: o ajuste mede se as premissas transbordam */}
+            <div ref={ajuste.ref} className="flex min-w-0 flex-1 flex-col justify-center self-stretch overflow-hidden">
+              {premissas}
             </div>
           </div>
         ) : (
           <>
-            <div className="flex min-h-0 flex-1 items-center justify-center" style={{ marginTop: 14 * k }}>
+            {/* o mapa encolhe com min-h-0; se as premissas o espremerem abaixo da altura dele, o ajuste tira premissas */}
+            <div ref={ajuste.ref} className="flex min-h-0 flex-1 items-center justify-center overflow-hidden" style={{ marginTop: 14 * k }}>
               {mapa(560)}
             </div>
-            <div style={{ marginTop: 14 * k }}>
-              <ListaPremissas itens={premissasDoCartao(ps, 4)} />
+            <div className="shrink-0" style={{ marginTop: 14 * k }}>
+              {premissas}
             </div>
           </>
         )}

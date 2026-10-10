@@ -68,3 +68,36 @@ describe('valorModo', () => {
     if (m.tipo === 'escala') expect(m.polos?.direita.nome).toBe('A');
   });
 });
+
+describe('escalas sem candidato (% apurado, comparecimento)', () => {
+  // Com Lula em vermelho e Flávio Bolsonaro em azul, a escala não pode ter matiz de candidato nem o violeta da marca
+  // (violeta-azulado seria lido como "mapa azul"; com daltonismo, violeta e azul quase se igualam).
+  const reais = {
+    candidatos: [
+      { numero: 13, nomeUrna: 'Lula', nome: 'Lula', partido: 'PT', cor: 'vermelho' },
+      { numero: 22, nomeUrna: 'Flávio Bolsonaro', nome: 'Flávio Bolsonaro', partido: 'PL', cor: 'azul' },
+    ],
+  } as Pick<Race, 'candidatos'>;
+  const proibido = /--(brand|brand-2|cand-)/;
+
+  it('mapa: preenchimento neutro (token fg), mais forte quanto maior o valor', () => {
+    for (const m of ['apurado', 'comparecimento'] as const) {
+      const baixo = valorModo(m, t(10, 10, 10, 100), { race: reais }).fill;
+      const alto = valorModo(m, t(10, 10, 100, 100), { race: reais }).fill;
+      for (const f of [baixo, alto]) {
+        expect(f).toMatch(/^rgb\(var\(--fg\) \/ [\d.]+\)$/);
+        expect(f).not.toMatch(proibido);
+      }
+    }
+    const a = (f: string) => Number(/\/ ([\d.]+)\)/.exec(f)![1]);
+    expect(a(valorModo('apurado', t(1, 1, 90, 100), { race: reais }).fill)).toBeGreaterThan(a(valorModo('apurado', t(1, 1, 10, 100), { race: reais }).fill));
+  });
+
+  it('legendas acompanham a escala neutra', () => {
+    for (const m of ['apurado', 'comparecimento'] as const) {
+      const l = legendaModo(m, reais);
+      expect(l.tipo).toBe('escala');
+      if (l.tipo === 'escala') for (const s of l.stops) expect(s).not.toMatch(proibido);
+    }
+  });
+});

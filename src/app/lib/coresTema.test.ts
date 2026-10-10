@@ -54,7 +54,9 @@ describe('tokens dos candidatos (WCAG)', () => {
         expect(contraste(base, surf), `${tema} ${s}/surface`).toBeGreaterThanOrEqual(3);
         expect(contraste(base, surf2), `${tema} ${s}/surface-2`).toBeGreaterThanOrEqual(3);
         expect(contraste(rgb(v, `${s}-ink`), base), `${tema} ${s}-ink`).toBeGreaterThanOrEqual(3);
-        if (s === 'cand-a' || s === 'cand-b') continue; // regra antiga: ver o relatório da frente de cores
+        // vermelho/azul: a tinta sobre o preenchimento vira texto nas siglas de UF da imagem de cenário (og-cartoes.ts)
+        if (s === 'cand-vermelho' || s === 'cand-azul') expect(contraste(rgb(v, `${s}-ink`), base), `${tema} ${s}-ink texto`).toBeGreaterThanOrEqual(4.5);
+        // vale para os quatro (turquesa/âmbar também: governadores e simulação com nomes ocultos)
         expect(contraste(fg, surf), `${tema} ${s}-fg/surface`).toBeGreaterThanOrEqual(4.5);
         expect(contraste(fg, surf2), `${tema} ${s}-fg/surface-2`).toBeGreaterThanOrEqual(4.5);
         expect(contraste(fg, mix(surf, base, 0.15)), `${tema} ${s}-fg/x15 surface`).toBeGreaterThanOrEqual(4.5);

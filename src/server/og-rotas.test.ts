@@ -13,7 +13,7 @@ import { anonimizarRace } from '../shared/anon';
 import { CC } from './app';
 import { C } from './og';
 import { comPrimeiroTurnoLocal } from './og-rotas';
-import { layoutCenario, layoutComposicao, layoutCuriosidade, layoutGovernadores, layoutSecao } from './og-cartoes';
+import { layoutCalculadora, layoutCenario, layoutComposicao, layoutCuriosidade, layoutGovernadores, layoutSecao } from './og-cartoes';
 import { corPartido, svgHemiciclo } from './og-hemiciclo';
 import { RAIZ, comando, login, montar, type Montado } from './test-helpers';
 
@@ -174,7 +174,7 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     expect(txt).not.toContain('data:image/jpeg'); // sem foto: números hipotéticos
   });
 
-  it('composição: cores neutras de partido (nunca as dos slots A/B), maior bancada primeiro', () => {
+  it('composição: PT/PL nas cores de Lula/Flávio, demais partidos sem cor de candidato nem dos slots A/B, maior bancada primeiro', () => {
     const camara = json<{ composicao: { sigla: string; eleitos: number }[] }>('cargos/camara.json');
     const txt = JSON.stringify(layoutComposicao({ kicker: 'K', titulo: 'T', bancadas: camara.composicao, pendentes: 8, rotuloTotal: 'cadeiras' }));
     expect(txt).not.toContain('rgb(25,194,176)');
@@ -195,7 +195,7 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     }
   });
 
-  it('curiosidade com par: os dois finalistas com o mesmo peso (A turquesa antes de B âmbar)', () => {
+  it('curiosidade com par: os dois finalistas com o mesmo peso (menor número antes; vermelho e azul de identificação)', () => {
     const cur = json<CuriosidadesDataset>('curiosidades.json');
     const fato = cur.fatos.find((f) => f.par)!;
     const txt = JSON.stringify(layoutCuriosidade({ fato, finalistas: cur.finalistas }));
@@ -215,6 +215,22 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     const txt = JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: false, simulacao: true, aoVivo: true }));
     expect(txt).not.toContain(C.vermelho);
     expect(txt).not.toContain(C.azul);
+  });
+
+  it('calculadora (sem código): ilustração simétrica, com a mesma trilha vermelha e azul', () => {
+    // com as cores de identificação, um lado com mais trilha que o outro seria lido como torcida
+    const larguras: Record<string, number> = { [C.vermelho]: 0, [C.azul]: 0 };
+    const andar = (n: unknown): void => {
+      if (!n || typeof n !== 'object') return;
+      if (Array.isArray(n)) return n.forEach(andar);
+      const props = (n as { props?: { style?: { height?: number; width?: number; background?: string }; children?: unknown } }).props;
+      const st = props?.style;
+      if (st?.height === 14 && st.background !== undefined && st.background in larguras) larguras[st.background] += st.width ?? 0;
+      andar(props?.children);
+    };
+    andar(layoutCalculadora({}));
+    expect(larguras[C.vermelho]).toBeGreaterThan(0);
+    expect(larguras[C.vermelho]).toBe(larguras[C.azul]);
   });
 
   it('governadores: SIMULAÇÃO só quando simulado', () => {

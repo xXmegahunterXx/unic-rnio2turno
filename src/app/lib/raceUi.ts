@@ -192,11 +192,20 @@ export function fillTally(
   return fillMargem(slotDe(race, m.lider), bucketMargem(m.pp));
 }
 
-/** Opacidade (0–1) para o modo "% apurado" dos mapas: escala sequencial na cor da marca. */
+/**
+ * Escalas sequenciais que NÃO são de candidato ("% apurado", "Comparecimento"): tom neutro, sem matiz (o `fg` do tema
+ * com opacidade). Era o violeta da marca, mas com Flávio Bolsonaro em azul um mapa inteiro em violeta-azulado podia
+ * ser lido como "mapa azul" — e, com daltonismo (protan/deutan), violeta e azul quase se igualam. Teto de 85% para o
+ * tom mais forte não ofuscar. `alpha` em 0–1.
+ */
+export function fillEscalaNeutra(alpha: number): string {
+  return tokenCss('fg', 0.85 * Math.min(1, Math.max(0, alpha)));
+}
+
+/** Preenchimento do modo "% apurado" dos mapas: escala sequencial neutra (`fillEscalaNeutra`). */
 export function fillApurado(pct: number): string {
   if (pct <= 0) return FILL_PENDENTE;
-  const a = 0.18 + 0.82 * Math.min(1, Math.max(0, pct / 100));
-  return tokenCss('brand', a);
+  return fillEscalaNeutra(0.18 + 0.82 * Math.min(1, Math.max(0, pct / 100)));
 }
 
 /** Atalho: fill de % apurado para uma contagem. */

@@ -293,6 +293,8 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
   - Território sem seção apurada usa `pending`.
   - Hover/toque mostra um tooltip com o placar; clique navega.
   - Modos: Vencedor · Margem · % apurado · Comparecimento · Variação vs 1º turno.
+    "% apurado" e "Comparecimento" usam escala neutra (cinza, `fillEscalaNeutra`), nunca a marca: violeta ao lado
+    do azul de Flávio Bolsonaro seria lido como cor de candidato.
   - O DF precisa de alvo de toque acessível (callout).
   - Alternativa: cartograma de blocos (tile map) das 27 UFs.
 - **Acessibilidade**: contraste AA, foco visível, `aria-live="polite"` no placar principal e textos
