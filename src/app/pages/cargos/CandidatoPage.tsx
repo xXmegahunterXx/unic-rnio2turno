@@ -17,10 +17,11 @@ import { Container } from '@/app/components/layout/Container';
 import { Breadcrumbs } from '@/app/components/layout/Breadcrumbs';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
 import { NaoEncontrado } from '@/app/components/pages/detalhe/NaoEncontrado';
+import { abrirBusca } from '@/app/components/busca/BuscaRapida';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { FotoOficial } from '@/app/components/pages/cargos/FotoOficial';
 import { PartidoChip, SituacaoSelo, FonteTse } from '@/app/components/pages/cargos/ui';
-import { cargoExibicao, ehEleito, fmtBens, fmtReais, rotuloSituacao, useFicha, useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
+import { cargoExibicao, ehEleito, fmtBens, fmtReais, rotuloSituacao, rotuloSituacaoCurto, useFicha, useFichasGrupo, useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
 
 /** Página do cargo (para a trilha e o "ver todos"). */
 function rotaCargo(f: CandidatoFicha): { to: string; label: string } {
@@ -41,7 +42,10 @@ function fmtData(iso?: string): string | null {
 export default function CandidatoPage() {
   const { sqcand = '' } = useParams();
   const valido = /^\d{6,16}$/.test(sqcand);
-  const { ficha: f, carregando, naoEncontrada, erro, refetch } = useFicha(valido ? sqcand : undefined);
+  const { ficha: f, grupo, carregando, naoEncontrada, erro, refetch } = useFicha(valido ? sqcand : undefined);
+  const grupoQ = useFichasGrupo(grupo);
+  // vice: a ficha do titular da chapa (mesmo grupo, com `vice.sqcand` = este)
+  const titular = f && /^Vice/.test(f.cargo) ? grupoQ.fichas.find((x) => x.vice?.sqcand === f.sqcand) : undefined;
   const indice = useIndiceCandidatos(!!f);
   useTitulo(f ? `${f.nomeUrna} · ${cargoExibicao(f.cargo, f.genero)}` : 'Ficha do candidato');
 
@@ -54,11 +58,14 @@ export default function CandidatoPage() {
           descricao="Publicamos as fichas dos eleitos no 1º turno, dos candidatos ao 2º turno e de todos os candidatos ao Senado. Procure pelo nome na busca rápida."
           acoes={
             <>
-              <ButtonLink to="/senado" variant="primary">
+              <Button variant="primary" icon="busca" onClick={abrirBusca}>
+                Buscar pelo nome
+              </Button>
+              <ButtonLink to="/senado" variant="outline">
                 Senado
               </ButtonLink>
               <ButtonLink to="/camara" variant="outline">
-                Câmara dos Deputados
+                Câmara
               </ButtonLink>
             </>
           }
@@ -136,7 +143,9 @@ export default function CandidatoPage() {
                   <p className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-fg-muted">% dos válidos</p>
                   <p className="num mt-1 font-display text-[28px] font-semibold leading-none tracking-[-0.02em] text-fg">{fmtPct(r.pct)}</p>
                 </div>
-                <p className="pb-0.5 text-[13px] text-fg-muted">{rotuloSituacao(r.situacao, f.genero)}</p>
+                {rotuloSituacao(r.situacao, f.genero) !== rotuloSituacaoCurto(r.situacao, f.genero) ? (
+                  <p className="pb-0.5 text-[13px] text-fg-muted">{rotuloSituacao(r.situacao, f.genero)}</p>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -154,6 +163,16 @@ export default function CandidatoPage() {
           <Lista>
             <Item rotulo="Cargo" valor={`${cargo} · ${local}`} />
             <Item rotulo="Partido" valor={f.partido} />
+            {titular ? (
+              <Item
+                rotulo="Chapa de"
+                valor={
+                  <Link to={`/candidato/${titular.sqcand}`} className="underline decoration-line/[3] underline-offset-[3px] hover:text-brand-fg">
+                    {titular.nomeUrna} <span className="text-fg-muted">({titular.partido})</span>
+                  </Link>
+                }
+              />
+            ) : null}
             {f.federacao ? <Item rotulo="Federação" valor={f.federacao} /> : null}
             {f.coligacao ? <Item rotulo="Coligação" valor={f.coligacao} /> : null}
             {f.composicao ? <Item rotulo="Composição" valor={f.composicao} /> : null}

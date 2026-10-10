@@ -3,8 +3,10 @@
  * texto do hemiciclo. Passar o mouse/focar numa linha destaca o partido no hemiciclo.
  * `BarraComposicao`: a mesma informação numa barra empilhada fina (para cartões e mapas).
  */
+import { useState } from 'react';
 import { fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { Icon } from '@/app/ui/Icon';
 import { hachuraStyle } from '@/app/components/apuracao/MapHatch';
 import { corPartido } from './partidos';
 
@@ -40,10 +42,12 @@ export function Bancadas({
   max?: number;
   className?: string;
 }) {
+  const [todos, setTodos] = useState(false);
   const lista = bancadas.filter((b) => b.eleitos > 0);
   const maior = Math.max(1, ...lista.map((b) => b.eleitos));
-  const visiveis = max ? lista.slice(0, max) : lista;
-  const resto = max ? lista.slice(max) : [];
+  const cortar = !!max && !todos && lista.length > max + 1;
+  const visiveis = cortar ? lista.slice(0, max) : lista;
+  const resto = cortar ? lista.slice(max) : [];
   return (
     <div className={className}>
       <table className="w-full border-collapse text-left">
@@ -112,7 +116,15 @@ export function Bancadas({
           {resto.length ? (
             <tr className="border-t border-line">
               <th scope="row" className="py-2 pl-1 text-[13px] font-normal text-fg-muted">
-                Demais partidos ({resto.map((b) => b.sigla).join(', ')})
+                <button
+                  type="button"
+                  onClick={() => setTodos(true)}
+                  className="inline-flex items-center gap-1 rounded-md text-left font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                >
+                  Ver os outros {resto.length} partidos
+                  <Icon name="chevron" size={14} />
+                </button>
+                <span className="block truncate text-[11.5px]">{resto.map((b) => b.sigla).join(', ')}</span>
               </th>
               <td className="num py-2 text-right text-[14px] font-semibold text-fg">{fmtInt(resto.reduce((a, b) => a + b.eleitos, 0))}</td>
               {votosValidos ? <td className="hidden min-[440px]:table-cell" /> : null}
@@ -204,7 +216,7 @@ export function BancadasGrade({
             <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px]" style={{ background: corPartido(b.sigla) }} />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-fg">{b.sigla}</span>
             <span className="num shrink-0 text-[13.5px] font-semibold text-fg">{fmtInt(b.eleitos)}</span>
-            <span className="num w-10 shrink-0 text-right text-[11px] text-fg-muted">{fmtPct((b.eleitos / Math.max(1, total)) * 100, 0)}</span>
+            <span className="num w-11 shrink-0 text-right text-[11px] text-fg-muted">{fmtPct((b.eleitos / Math.max(1, total)) * 100, 1)}</span>
           </li>
         );
       })}
@@ -213,7 +225,7 @@ export function BancadasGrade({
           <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px] ring-1 ring-inset ring-line" style={hachuraStyle()} />
           <span className="min-w-0 flex-1 truncate text-[13px] text-fg-muted">{rotuloPendentes}</span>
           <span className="num shrink-0 text-[13.5px] font-semibold text-fg-muted">{fmtInt(pendentes)}</span>
-          <span className="w-10 shrink-0" />
+          <span className="w-11 shrink-0" />
         </li>
       ) : null}
     </ul>

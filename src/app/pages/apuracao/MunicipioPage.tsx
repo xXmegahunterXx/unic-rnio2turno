@@ -2,18 +2,19 @@
  * /apuracao/:uf/:cod?race=&zona= — apuração de um município (ou cidade no exterior).
  *
  * Placar, progresso, participação e a comparação 1º × 2º turno; mosaico com TODAS as seções (clique →
- * Boletim de Urna); zonas (ordenáveis) e, para a zona escolhida, a lista de seções com filtros.
- * 1º turno (race -t1 ou fase 'pre'): resumo do município; o mosaico vem pintado pelo vencedor municipal
- * (a base não tem resultado por seção do 1º turno) — explicamos isso na página.
+ * Boletim de Urna), agrupável por zona ou por local de votação; zonas (ordenáveis) e, para a zona escolhida, a
+ * lista de seções com filtros; locais de votação (busca por escola/bairro) e o perfil do eleitorado.
+ * 1º turno (race -t1 ou fase 'pre'): resultado OFICIAL por seção (dados abertos do TSE). Se a base de uma UF não
+ * tiver o resultado por seção, o mosaico vem pintado pelo vencedor municipal — e explicamos isso na página.
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { RaceId, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtInt } from '@/shared/format';
 import { useMunicipio } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
-import { ButtonLink } from '@/app/ui';
+import { ButtonLink, Segmented } from '@/app/ui';
 import { Container } from '@/app/components/layout/Container';
 import { PageHeader } from '@/app/components/layout/PageHeader';
 import { Section } from '@/app/components/layout/Section';
@@ -45,6 +46,10 @@ import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
 import { Recolhivel } from '@/app/components/pages/detalhe/Recolhivel';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
+import { LocaisVotacao } from '@/app/components/pages/detalhe/LocaisVotacao';
+import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
+
+type Agrupar = 'zona' | 'local';
 
 export default function MunicipioPage() {
   const { uf: ufRaw, cod: codRaw = '' } = useParams();
@@ -57,6 +62,7 @@ export default function MunicipioPage() {
   const q = useMunicipio(ctx.id, uf ?? undefined, cod || undefined);
   const exterior = uf === 'ZZ';
   const paisesQ = usePaisesExterior(exterior);
+  const [agrupar, setAgrupar] = useState<Agrupar>('zona');
 
   const irSecao = useCallback(
     (z: number, s: number) => {
@@ -123,6 +129,8 @@ export default function MunicipioPage() {
   // Um município não elege presidente nem governador: o selo "Eleito" do placar vira "À frente".
   const resumoPlacar = { ...r, eleito: null };
   const t1 = race.turno === 1;
+  // 1º turno com resultado real por seção (senão o motor devolve uma "zona 0" com o agregado do município).
+  const t1PorSecao = t1 && !(snap.zonas.length === 1 && snap.zonas[0].zona === 0);
   const simulado = ctx.simulado && !t1;
   const pais = exterior ? paisesQ.data?.[snap.cod] : undefined;
   const local = exterior ? `${snap.nome}${pais ? ` (${pais})` : ''}` : `${snap.nome} (${uf})`;
@@ -140,7 +148,8 @@ export default function MunicipioPage() {
 
   const subtitulo = (
     <span className="num">
-      {fmtInt(nZonas)} {nZonas === 1 ? 'zona eleitoral' : 'zonas eleitorais'} · {fmtInt(nSecoes)} seções · {fmtEleitores(r.eleitorado)}
+      {fmtInt(nZonas)} {nZonas === 1 ? 'zona eleitoral' : 'zonas eleitorais'} · {fmtInt(nSecoes)} {nSecoes === 1 ? 'seção' : 'seções'} ·{' '}
+      {fmtEleitores(r.eleitorado)}
     </span>
   );
   const eyebrow = exterior ? (
@@ -208,41 +217,76 @@ export default function MunicipioPage() {
         id="secoes"
         title="Todas as seções"
         description={
-          t1 ? (
+          t1 && !t1PorSecao ? (
             <>
               <span className="num">{fmtInt(nSecoes)}</span> seções em <span className="num">{fmtInt(nZonas)}</span>{' '}
               {nZonas === 1 ? 'zona' : 'zonas'}, pintadas pelo resultado do {unidade} no 1º turno.
             </>
-          ) : (
+          ) : t1 ? (
             <>
-              Cada quadrado é uma das <span className="num">{fmtInt(nSecoes)}</span> seções, agrupadas por zona. Toque numa seção para ver o
-              boletim de urna.
+              Cada quadrado é uma das <span className="num">{fmtInt(nSecoes)}</span> seções, com o resultado oficial dela no 1º turno. Toque
+              numa seção para ver o boletim.
             </>
+          ) : (
+            nSecoes === 1 ? (
+              <>Esta cidade tem uma única seção. Toque nela para ver o boletim de urna.</>
+            ) : (
+              <>
+                Cada quadrado é uma das <span className="num">{fmtInt(nSecoes)}</span> seções. Toque numa seção para ver o boletim de urna.
+              </>
+            )
           )
         }
+        actions={
+          snap.mosaico.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[12.5px] text-fg-muted">Agrupar por</span>
+              <Segmented<Agrupar>
+                size="sm"
+                ariaLabel="Agrupar seções por"
+                value={agrupar}
+                onChange={setAgrupar}
+                options={[
+                  { value: 'zona', label: 'Zona' },
+                  { value: 'local', label: 'Local' },
+                ]}
+              />
+            </div>
+          ) : null
+        }
       >
-        {t1 ? (
+        {t1 && !t1PorSecao ? (
           <div className="mb-3 flex items-start gap-2.5 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[13.5px] leading-relaxed text-fg-muted">
             <Icon name="info" size={18} className="mt-0.5 shrink-0" />
             <p>
-              O TSE divulga o resultado do 1º turno por município nesta base; não há dado por seção. Por isso, todas as seções aparecem com
-              a cor de quem venceu em {snap.nome}. No 2º turno, cada seção ganha a própria cor assim que for totalizada.
+              O resultado do 1º turno por seção não está disponível para este {unidade}; todas as seções aparecem com a cor de quem venceu em{' '}
+              {snap.nome}. No 2º turno, cada seção ganha a própria cor assim que for totalizada.
             </p>
           </div>
         ) : null}
         <div className="rounded-2xl border border-line bg-surface p-3 shadow-card sm:p-5">
-          {snap.mosaico.length > 0 ? (
+          {snap.mosaico.length === 0 ? (
+            <p className="py-10 text-center text-[14px] text-fg-muted">O mosaico de seções não está disponível para esta fonte de dados.</p>
+          ) : agrupar === 'local' ? (
+            <LocaisVotacao
+              variante="mosaico"
+              uf={uf}
+              cod={snap.cod}
+              nomeMunicipio={snap.nome}
+              mosaico={snap.mosaico}
+              race={race}
+              onSecao={irSecao}
+            />
+          ) : (
             <Recolhivel alturaMax={lg ? null : 560} rotulo={`Ver as ${fmtInt(nZonas)} zonas`}>
               <SecaoMosaic mosaico={snap.mosaico} race={race} zonaDestaque={t1 ? null : zona} onSelect={irSecao} />
             </Recolhivel>
-          ) : (
-            <p className="py-10 text-center text-[14px] text-fg-muted">O mosaico de seções não está disponível para esta fonte de dados.</p>
           )}
         </div>
       </Section>
 
       {/* ------------------------------------------------------------ zonas e seções */}
-      {!t1 ? (
+      {!t1 || t1PorSecao ? (
         <Section
           id="zonas"
           title="Zonas e seções"
@@ -258,6 +302,20 @@ export default function MunicipioPage() {
             onZona={setZona}
             onSecao={irSecao}
           />
+        </Section>
+      ) : null}
+
+      <Section
+        id="locais"
+        title="Locais de votação"
+        description={`Escolas e prédios onde se vota ${emMun(snap.nome)}, com as seções de cada um. Toque numa seção para ver o boletim.`}
+      >
+        <LocaisVotacao uf={uf} cod={snap.cod} nomeMunicipio={snap.nome} mosaico={snap.mosaico} race={race} onSecao={irSecao} />
+      </Section>
+
+      {!exterior ? (
+        <Section id="eleitorado" title="Quem vota aqui" description={`Perfil do eleitorado ${emMun(snap.nome)}: idade, sexo e escolaridade.`}>
+          <PerfilEleitorado uf={uf} cod={snap.cod} nome={snap.nome} />
         </Section>
       ) : null}
 

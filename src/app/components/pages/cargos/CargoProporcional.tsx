@@ -9,6 +9,7 @@ import type { UFBr } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { Icon } from '@/app/ui/Icon';
 import { SearchBox } from '@/app/ui/SearchBox';
 import { Segmented } from '@/app/ui/Segmented';
@@ -93,6 +94,7 @@ export function VisaoComposicao({
   extraRanking?: ReactNode;
 }) {
   const [destaque, setDestaque] = useState<string | null>(null);
+  const lg = useMediaQuery('(min-width: 1024px)');
   const maioria = Math.floor(comp.total / 2) + 1;
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
@@ -112,12 +114,12 @@ export function VisaoComposicao({
             .join(', ')}${comp.pendentes ? `; ${comp.pendentes} aguardando o TSE` : ''}`}
           centro={
             <>
-              <span className="num font-display text-[32px] font-semibold leading-none tracking-[-0.03em] text-fg sm:text-[44px]">
+              <span className="num font-display text-[26px] font-semibold leading-none tracking-[-0.03em] text-fg min-[480px]:text-[34px] sm:text-[44px]">
                 {fmtInt(comp.total)}
               </span>
-              <span className="mt-1 text-[12px] text-fg-muted">{rotuloCentro}</span>
+              <span className="mt-0.5 text-[11px] text-fg-muted sm:mt-1 sm:text-[12px]">{rotuloCentro}</span>
               {comp.total >= 9 ? (
-                <span className="num mt-0.5 text-[11px] text-fg-subtle">maioria: {fmtInt(maioria)}</span>
+                <span className="num mt-0.5 hidden text-[11px] text-fg-subtle min-[480px]:block">maioria: {fmtInt(maioria)}</span>
               ) : null}
             </>
           }
@@ -136,6 +138,7 @@ export function VisaoComposicao({
           destaque={destaque}
           onDestaque={setDestaque}
           votosValidos={comp.validos}
+          max={lg ? undefined : 8}
         />
         {extraRanking}
       </section>

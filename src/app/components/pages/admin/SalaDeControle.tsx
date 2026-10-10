@@ -21,6 +21,7 @@ import { SecaoControle } from './SecaoControle';
 import { SecaoEstados } from './SecaoEstados';
 import { SecaoFonte } from './SecaoFonte';
 import { SecaoMonitor } from './SecaoMonitor';
+import { SecaoPatrocinio } from './SecaoPatrocinio';
 
 export function SalaDeControle({ offline }: { offline: boolean }) {
   const { secao } = useAdmin();
@@ -63,6 +64,8 @@ function ConteudoSecao({ secao }: { secao: SecaoId }) {
       return <SecaoEstados />;
     case 'comunicacao':
       return <SecaoComunicacao />;
+    case 'patrocinio':
+      return <SecaoPatrocinio />;
     case 'fonte':
       return <SecaoFonte />;
     case 'monitor':
@@ -111,6 +114,11 @@ function useDicas(): Record<SecaoId, ReactNode> {
           {st.congelado ? 'gelo' : 'no ar'}
         </Badge>
       ) : null,
+    patrocinio: st.patrocinio ? (
+      <Badge size="xs" tone="brand" caps>
+        no ar
+      </Badge>
+    ) : null,
     fonte:
       st.fonte === 'simulacao' && st.nomesReais ? (
         <Badge size="xs" tone="alert" caps>
@@ -133,6 +141,7 @@ function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
     cenario: st.cenario.preset === 'padrao' ? null : 'brand',
     estados: ajustes ? 'brand' : null,
     comunicacao: st.congelado || st.aviso?.nivel === 'alerta' ? 'alert' : st.aviso ? 'brand' : null,
+    patrocinio: st.patrocinio ? 'brand' : null,
     fonte: st.fonte === 'simulacao' && st.nomesReais ? 'alert' : null,
     monitor: null,
   };
@@ -442,7 +451,7 @@ export function DialogoAtalhos({ aberto, onFechar }: { aberto: boolean; onFechar
         <>
           <Kbd>1</Kbd>
           <span className="text-fg-subtle">…</span>
-          <Kbd>6</Kbd>
+          <Kbd>7</Kbd>
         </>
       ),
       acao: 'Ir para a seção (Controle … Monitor)',

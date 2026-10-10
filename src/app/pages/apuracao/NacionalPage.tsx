@@ -138,7 +138,8 @@ export default function NacionalPage() {
             <SeloFase status={status} resumo={resumo} t1={t1} revendo={t} />
             {!t ? <PessoasAgora status={status} /> : null}
             {anonimizado ? <SeloAnonimo /> : null}
-            {status?.patrocinio ? <PatrocinioSlot patrocinio={status.patrocinio} className="sm:ml-auto" /> : null}
+            {/* No celular, só o cartão no fim da página (discreto, sem empurrar o placar). */}
+            {status?.patrocinio ? <PatrocinioSlot patrocinio={status.patrocinio} className="hidden sm:ml-auto sm:inline-flex" /> : null}
           </>
         }
         seletor={<RaceSwitcher races={races} value={raceParam} onChange={trocarDisputa} size={desktop ? 'md' : 'sm'} />}

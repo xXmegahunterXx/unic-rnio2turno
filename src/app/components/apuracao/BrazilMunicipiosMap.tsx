@@ -321,28 +321,20 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
     return ordem.uf.map((u) => set.has(u));
   }, [ordem, ufsEscopo]);
 
-  const lotes = useMemo(() => {
+  /** Chave de preenchimento de cada município ('hachura', 'fora' ou o CSS do token) e quantas cores distintas. */
+  const chaves = useMemo(() => {
     if (!prep) return null;
-    const out = new Map<string, number[]>();
-    const add = (k: string, i: number) => {
-      const l = out.get(k);
-      if (l) l.push(i);
-      else out.set(k, [i]);
-    };
+    const out: string[] = new Array(prep.n).fill('');
     const ok = snapshot && snapshot.lider.length === prep.n;
     const ctx = { race, t1: primeiroTurno && primeiroTurno.lider.length === prep.n ? primeiroTurno : null };
     for (let i = 0; i < prep.n; i++) {
       if (!prep.paths[i]) continue;
-      if (escopo && !escopo[i]) {
-        add('fora', i);
-        continue;
+      if (escopo && !escopo[i]) out[i] = 'fora';
+      else if (!ok) out[i] = 'hachura';
+      else {
+        const v = valorMunBr(modo, snapshot!, i, ctx);
+        out[i] = v.pendente ? 'hachura' : v.fill;
       }
-      if (!ok) {
-        add('hachura', i);
-        continue;
-      }
-      const v = valorMunBr(modo, snapshot!, i, ctx);
-      add(v.pendente ? 'hachura' : v.fill, i);
     }
     return out;
   }, [prep, snapshot, modo, race, primeiroTurno, escopo]);
@@ -352,7 +344,7 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
   const cvFade = useRef<HTMLCanvasElement>(null);
   const cvBorda = useRef<HTMLCanvasElement>(null);
   const cvDest = useRef<HTMLCanvasElement>(null);
-  const ultimaVista = useRef('');
+  const ultimoSnap = useRef<MunicipiosNacionalSnapshot | undefined>(undefined);
   const medidas = useRef({ preparo: 0, preenchimento: 0, divisas: 0 });
 
   const matriz = useCallback(
@@ -365,17 +357,28 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
   );
 
   // Preenchimentos: dados, modo, tema, vista, tamanho.
+  // Com a mesma vista e o mesmo tema, uma atualização de dados repinta SÓ os municípios que mudaram de cor (as bordas
+  // antisserrilhadas ficam sob o filete das divisas). Zoom, tamanho, tema ou troca de modo → redesenho completo.
+  const desenhado = useRef<{ chave: string; cores: string[] } | null>(null);
   useLayoutEffect(() => {
     const cv = cvFill.current;
-    if (!cv || !prep || !lotes || !tokens || W <= 0) return;
+    if (!cv || !prep || !chaves || !tokens || W <= 0) return;
     const ctx = cv.getContext('2d');
     if (!ctx) return;
-    const chaveVista = `${W}x${H}@${dpr}|${view.k},${view.x},${view.y}|${JSON.stringify(tokens.surface)}`;
-    const soDados = ultimaVista.current === chaveVista;
-    ultimaVista.current = chaveVista;
-    // Fade: o quadro anterior por cima, esmaecendo (só quando mudam os dados, não no zoom).
+    const chaveVista = `${W}x${H}@${dpr}|${view.k},${view.x},${view.y}|${JSON.stringify(tokens.surface)}|${JSON.stringify(tokens.pending)}`;
+    const anterior = desenhado.current;
+    const mesmaVista = !!anterior && anterior.chave === chaveVista && anterior.cores.length === chaves.length;
+    const dadosNovos = !!ultimoSnap.current && ultimoSnap.current !== snapshot;
+    ultimoSnap.current = snapshot;
+    // Fade: o quadro anterior por cima, esmaecendo (só quando chegam dados novos — não no zoom, tema ou modo).
     const fade = cvFade.current;
-    if (soDados && fade && !prefersReducedMotion()) {
+    const t0 = performance.now();
+    const mudados: number[] = [];
+    if (mesmaVista) for (let i = 0; i < chaves.length; i++) if (chaves[i] !== anterior!.cores[i]) mudados.push(i);
+    if (mesmaVista && mudados.length === 0) return;
+    // Muita coisa mudou (troca de modo): redesenho completo, sem restos de cor nas bordas.
+    const incremental = mesmaVista && mudados.length <= chaves.length * 0.3;
+    if (incremental && dadosNovos && fade && !prefersReducedMotion()) {
       const fctx = fade.getContext('2d');
       if (fctx) {
         fctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -388,33 +391,53 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
         fade.style.opacity = '0';
       }
     }
-    const t0 = performance.now();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (!incremental) ctx.clearRect(0, 0, cv.width, cv.height);
     const k = matriz(ctx, view);
-    const cores = new Map<string, string>();
-    const cor = (css: string) => {
-      let c = cores.get(css);
+    const resolvidas = new Map<string, string | CanvasPattern>();
+    const estilo = (chave: string) => {
+      let c = resolvidas.get(chave);
       if (!c) {
-        c = rgbCss(resolveFill(css, tokens));
-        cores.set(css, c);
+        c =
+          chave === 'hachura'
+            ? (padraoHachura(ctx, tokens, dpr * k) ?? rgbCss(resolveFill(FILL_PENDENTE, tokens)))
+            : rgbCss(resolveFill(chave === 'fora' ? tokenCss('surface-3', 0.55) : chave, tokens));
+        resolvidas.set(chave, c);
       }
       return c;
     };
+    // Em lotes por cor (menos trocas de estado do contexto).
+    const lotes = new Map<string, number[]>();
+    const lista = incremental ? mudados : chaves.map((_, i) => i);
+    for (const i of lista) {
+      const c = chaves[i];
+      if (!c) continue;
+      const l = lotes.get(c);
+      if (l) l.push(i);
+      else lotes.set(c, [i]);
+    }
     for (const [chave, idx] of lotes) {
-      if (chave === 'hachura') ctx.fillStyle = padraoHachura(ctx, tokens, dpr * k) ?? cor(FILL_PENDENTE);
-      else if (chave === 'fora') ctx.fillStyle = cor(tokenCss('surface-3', 0.55));
-      else ctx.fillStyle = cor(chave);
+      ctx.fillStyle = estilo(chave);
       for (const i of idx) ctx.fill(prep.paths[i]!);
     }
+    desenhado.current = { chave: chaveVista, cores: chaves };
     const ms = performance.now() - t0;
     medidas.current.preenchimento = ms;
     medidas.current.preparo = prep.ms;
     boxEl?.setAttribute('data-fill-ms', ms.toFixed(1));
+    boxEl?.setAttribute('data-fill-modo', incremental ? `incremental:${mudados.length}` : 'completo');
     boxEl?.setAttribute('data-prep-ms', prep.ms.toFixed(1));
-    console.debug(`[medida] mapa municípios: preenchimento ${ms.toFixed(1)} ms (${prep.n} municípios, ${lotes.size} cores)`);
+    // Até o próximo quadro (inclui a rasterização que o navegador fizer na thread principal).
+    const raf = requestAnimationFrame(() => {
+      const q = performance.now() - t0;
+      boxEl?.setAttribute('data-quadro-ms', q.toFixed(1));
+      console.debug(
+        `[medida] mapa municípios: ${incremental ? `${mudados.length} mudaram` : 'completo'} · comandos ${ms.toFixed(1)} ms · até o quadro ${q.toFixed(1)} ms (${lotes.size} cores)`,
+      );
+    });
     onMedida?.({ ...medidas.current });
-  }, [prep, lotes, tokens, W, H, dpr, view, matriz, boxEl, onMedida]);
+    return () => cancelAnimationFrame(raf);
+  }, [prep, chaves, tokens, W, H, dpr, view, matriz, boxEl, onMedida, snapshot]);
 
   // Divisas (municípios + UFs): vista, tamanho, tema.
   useLayoutEffect(() => {
@@ -448,6 +471,8 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
   const [tip, setTip] = useState<Tip | null>(null);
   const [selBusca, setSelBusca] = useState<number | null>(null);
   const ultimoPonteiro = useRef<{ tipo: string; t: number }>({ tipo: 'mouse', t: 0 });
+  const cliqueTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(cliqueTimer.current), []);
   useClickOutside(boxEl, !!tip?.fixo, () => setTip(null));
 
   // Destaque (contorno do município sob o ponteiro e do buscado).
@@ -521,7 +546,15 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
       else setTip({ i, ...paraTela(i), fixo: true });
       return;
     }
-    if (m) onSelect?.(m);
+    // Mouse: espera um instante para não confundir com o duplo clique (que amplia).
+    if (m && onSelect) {
+      window.clearTimeout(cliqueTimer.current);
+      cliqueTimer.current = window.setTimeout(() => onSelect(m), 260);
+    }
+  }
+  function onDoubleClick(e: MouseEvent) {
+    window.clearTimeout(cliqueTimer.current);
+    zoom.handlers.onDoubleClick(e);
   }
   function onKeyDown(e: KeyboardEvent) {
     if (e.key === '+' || e.key === '=') zoom.zoomPor(1.6);
@@ -642,7 +675,7 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
             onPointerUp={zoom.handlers.onPointerUp}
             onPointerCancel={zoom.handlers.onPointerCancel}
             onPointerLeave={onPointerLeave}
-            onDoubleClick={estatico ? undefined : zoom.handlers.onDoubleClick}
+            onDoubleClick={estatico ? undefined : onDoubleClick}
             onClick={onClick}
             onKeyDown={estatico ? undefined : onKeyDown}
           >
@@ -819,13 +852,13 @@ function EsqueletoMunicipios({ baixando }: { baixando: boolean }) {
       {br ? (
         <svg viewBox={br.viewBox} className="h-full w-auto max-w-full" aria-hidden>
           <defs>
-            <linearGradient id={`${uid}-brilho`} x1="0" x2="1" y1="0" y2="0.35" gradientUnits="objectBoundingBox">
+            <linearGradient id={`${uid}-brilho`} x1="0" x2="996" y1="0" y2="420" gradientUnits="userSpaceOnUse">
               <stop offset="0" style={{ stopColor: 'rgb(var(--surface-3))' }} />
-              <stop offset="0.45" style={{ stopColor: 'rgb(var(--surface-3))' }} />
-              <stop offset="0.5" style={{ stopColor: 'rgb(var(--brand) / 0.28)' }} />
-              <stop offset="0.55" style={{ stopColor: 'rgb(var(--surface-3))' }} />
+              <stop offset="0.4" style={{ stopColor: 'rgb(var(--surface-3))' }} />
+              <stop offset="0.5" style={{ stopColor: 'rgb(var(--brand) / 0.35)' }} />
+              <stop offset="0.6" style={{ stopColor: 'rgb(var(--surface-3))' }} />
               <stop offset="1" style={{ stopColor: 'rgb(var(--surface-3))' }} />
-              <animateTransform attributeName="gradientTransform" type="translate" from="-1 0" to="1 0" dur="1.6s" repeatCount="indefinite" />
+              <animateTransform attributeName="gradientTransform" type="translate" from="-996 0" to="996 0" dur="1.8s" repeatCount="indefinite" />
             </linearGradient>
           </defs>
           <g style={{ fill: `url(#${uid}-brilho)`, stroke: 'rgb(var(--surface))', strokeWidth: 1.6 }}>
@@ -837,15 +870,17 @@ function EsqueletoMunicipios({ baixando }: { baixando: boolean }) {
       ) : (
         <div className="h-[70%] w-[70%] animate-pulse rounded-[40%] bg-surface-2" />
       )}
-      <motion.span
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="glass absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-2 whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-[12.5px] font-medium text-fg"
-      >
-        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-brand/30 border-t-brand" aria-hidden />
-        {baixando ? 'Carregando os 5.571 municípios…' : 'Desenhando o mapa…'}
-      </motion.span>
+      <div className="absolute inset-x-0 bottom-3 flex justify-center px-3">
+        <motion.span
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="glass inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-full border border-line px-3 py-1.5 text-[12.5px] font-medium text-fg"
+        >
+          <span className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand/30 border-t-brand" aria-hidden />
+          {baixando ? 'Carregando os 5.571 municípios…' : 'Desenhando o mapa…'}
+        </motion.span>
+      </div>
     </div>
   );
 }

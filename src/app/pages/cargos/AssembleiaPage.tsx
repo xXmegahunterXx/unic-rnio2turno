@@ -151,7 +151,13 @@ export default function AssembleiaPage() {
           id="eleitos"
           title={
             <>
-              Os <span className="num">{fmtInt(comp.eleitos.length || comp.total)}</span> eleitos
+              {comp.eleitos.length ? (
+                <>
+                  Os <span className="num">{fmtInt(comp.eleitos.length)}</span> eleitos
+                </>
+              ) : (
+                'Eleitos'
+              )}
             </>
           }
           description="Foto oficial, partido, votos e a forma de eleição. Toque no nome para ver a ficha."

@@ -85,10 +85,10 @@ export default function CamaraPage() {
         breadcrumbs={uf ? [{ label: 'Câmara dos Deputados', to: '/camara' }, { label: UF_NOMES[uf] }] : undefined}
         eyebrow={
           <span className="inline-flex items-center gap-1.5">
-            <Icon name="selo" size={14} /> 1º turno · resultado oficial
+            <Icon name="selo" size={14} /> {uf ? 'Câmara dos Deputados · ' : ''}1º turno · resultado oficial
           </span>
         }
-        title={uf ? `Deputados federais · ${UF_NOMES[uf]}` : 'Câmara dos Deputados'}
+        title={uf ? UF_NOMES[uf] : 'Câmara dos Deputados'}
         subtitle={
           uf ? (
             <>
@@ -122,7 +122,13 @@ export default function CamaraPage() {
           id="eleitos"
           title={
             <>
-              Os <span className="num">{fmtInt(comp.eleitos.length || comp.total)}</span> eleitos
+              {comp.eleitos.length ? (
+                <>
+                  Os <span className="num">{fmtInt(comp.eleitos.length)}</span> eleitos
+                </>
+              ) : (
+                'Eleitos'
+              )}
             </>
           }
           description="Foto oficial, partido, votos e a forma de eleição. Toque no nome para ver a ficha."

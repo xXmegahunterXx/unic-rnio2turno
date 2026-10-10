@@ -41,13 +41,14 @@ export const ORDEM_ROTULO: Record<OrdemRegional, string> = {
   'sul-primeiro': 'Sul e Sudeste bem antes',
 };
 
-export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'fonte' | 'monitor';
+export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'patrocinio' | 'fonte' | 'monitor';
 
 export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: string }[] = [
   { id: 'controle', rotulo: 'Controle', icone: 'ao-vivo', descricao: 'Relógio, linha do tempo e pré-visualização' },
   { id: 'cenario', rotulo: 'Cenário', icone: 'ajustes', descricao: 'Presets e parâmetros do modelo' },
   { id: 'estados', rotulo: 'Estados', icone: 'mapa', descricao: 'Viés e atraso por UF' },
   { id: 'comunicacao', rotulo: 'Comunicação', icone: 'alerta', descricao: 'Aviso global e congelamento' },
+  { id: 'patrocinio', rotulo: 'Patrocínio', icone: 'selo', descricao: '“Oferecido por” (só anunciante não político)' },
   { id: 'fonte', rotulo: 'Fonte', icone: 'globo', descricao: 'Pré-eleição, simulação ou TSE' },
   { id: 'monitor', rotulo: 'Monitor', icone: 'grafico', descricao: 'Métricas e log operacional' },
 ];

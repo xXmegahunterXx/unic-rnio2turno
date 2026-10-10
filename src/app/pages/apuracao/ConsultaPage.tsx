@@ -5,6 +5,8 @@
  * acento-insensível, zonas em grade e validação do nº da seção contra as seções reais da zona.
  * O progresso fica na URL (?uf=&mun=&zona=) — dá para compartilhar e o "voltar" funciona — e a última
  * consulta fica só neste aparelho (localStorage) para o atalho "Ver minha seção".
+ * Com a seção encontrada: o LOCAL DE VOTAÇÃO (escola, endereço, links de mapa) e como a seção votou no 1º turno
+ * (resultado oficial por seção, dados abertos do TSE) antes de abrir o boletim do 2º turno.
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -13,7 +15,7 @@ import { UFS } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { decodeFaixas, encodeFaixas } from '@/shared/calc';
 import { fmtInt } from '@/shared/format';
-import { useMunicipio, useUf, useZona } from '@/app/data/hooks';
+import { useMunicipio, useRaces, useUf, useZona } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { Button, ButtonLink, Combobox, Icon, SearchBox, Skeleton, type ComboOption } from '@/app/ui';
 import { Container } from '@/app/components/layout/Container';
@@ -23,6 +25,8 @@ import { parseUf, rotaSecao } from '@/app/components/pages/detalhe/useDetalhe';
 import { useMinhaSecao } from '@/app/components/pages/detalhe/minhaSecao';
 import { usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
 import { fmt4 } from '@/app/components/pages/detalhe/fmt';
+import { LocalVotacaoCartao } from '@/app/components/pages/detalhe/LocalVotacao';
+import { PrimeiroTurnoSecao } from '@/app/components/pages/detalhe/PrimeiroTurnoSecao';
 
 /** A partir de quantas zonas o passo 3 ganha o filtro por número. */
 const ZONAS_COM_FILTRO = 12;
@@ -45,6 +49,11 @@ export default function ConsultaPage() {
   const qMun = useMunicipio(RACE, uf ?? undefined, cod ?? undefined);
   const qZona = useZona(RACE, uf ?? undefined, cod ?? undefined, zona ?? undefined);
   const paisesQ = usePaisesExterior(uf === 'ZZ');
+  const races = useRaces();
+  const racesT1 = useMemo(
+    () => (uf && races ? races.filter((r) => r.turno === 1 && (r.abrangencia === 'BR' || r.abrangencia === uf) && r.ufs.includes(uf)) : []),
+    [races, uf],
+  );
 
   const ufSnap = qUf.data && qUf.data.uf === uf ? qUf.data : undefined;
   const munSnap = qMun.data && qMun.data.uf === uf && qMun.data.cod === cod ? qMun.data : undefined;
@@ -397,6 +406,26 @@ export default function ConsultaPage() {
                 {mensagemSecao?.texto}
               </p>
             </form>
+            {secaoOk && nSecao !== null && uf && cod && zona !== null ? (
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-line pt-4">
+                {secaoResumo?.local ? (
+                  <LocalVotacaoCartao local={secaoResumo.local} municipio={nomeMun} uf={exterior ? undefined : uf} compacto className="shadow-none" />
+                ) : null}
+                {racesT1.length ? (
+                  <PrimeiroTurnoSecao
+                    key={`${cod}-${zona}-${nSecao}`}
+                    uf={uf}
+                    cod={cod}
+                    zona={zona}
+                    secao={nSecao}
+                    races={racesT1}
+                    compacto
+                    nomeMunicipio={nomeMun}
+                    className="shadow-none"
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </Passo>
         </ol>
 

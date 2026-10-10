@@ -15,8 +15,9 @@ import type { Aviso } from '@/shared/types';
 import { SimulationRibbon } from '../apuracao/SimulationRibbon';
 import { Container } from './Container';
 import { Logo } from './Logo';
-import { NAV } from './nav';
+import { NAV, NAV_TAB } from './nav';
 import { StatusPill } from './StatusPill';
+import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/BuscaRapida';
 
 export function AppShell({ children }: { children?: ReactNode }) {
   return (
@@ -29,6 +30,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       </main>
       <Footer />
       <TabBar />
+      <BuscaRapida />
       <Toaster />
       <ScrollRestoration />
     </div>
@@ -137,6 +139,8 @@ function Header() {
                     className={cn(
                       'relative whitespace-nowrap rounded-[10px] px-2.5 py-2 text-[14px] font-medium transition-colors lg:px-3',
                       ativo ? 'text-fg' : 'text-fg-muted hover:text-fg',
+                      n.header === 'xl' && 'hidden xl:block',
+                      n.header === 'lg' && 'hidden lg:block',
                     )}
                   >
                     {ativo ? (
@@ -154,6 +158,10 @@ function Header() {
               })}
             </nav>
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+              {/* Busca rápida (Ctrl/⌘ K): botão com o atalho a partir de 1360 px; só a lupa entre 768 e 1359 px.
+                  No celular a busca fica na tab bar (o header não tem espaço). */}
+              <BotaoBusca className="hidden min-[1360px]:inline-flex" />
+              <BotaoBusca compacto className="hidden md:inline-flex min-[1360px]:hidden" />
               {/* Pílula completa só a partir de 1024 px: entre 768 e 1023 a navegação do header já ocupa a linha. */}
               <StatusPill className="hidden lg:inline-flex" />
               <StatusPill compact className="lg:hidden" />
@@ -218,38 +226,55 @@ function AvisoBanner({ aviso }: { aviso: Aviso | null }) {
 
 function TabBar() {
   const { pathname } = useLocation();
+  const meio = Math.ceil(NAV_TAB.length / 2);
+  const item = (n: (typeof NAV_TAB)[number]) => {
+    const ativo = n.match(pathname);
+    return (
+      <li key={n.to} className="relative">
+        <Link
+          to={n.to}
+          aria-current={ativo ? 'page' : undefined}
+          className={cn(
+            'flex h-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
+            ativo ? 'text-fg' : 'text-fg-muted active:text-fg',
+          )}
+        >
+          {ativo ? (
+            <motion.span
+              layoutId="tab-ativa"
+              aria-hidden
+              className="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-brand-grad"
+              transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+            />
+          ) : null}
+          <Icon name={n.icon} size={22} className={cn(ativo && 'text-brand-fg')} />
+          <span>{n.short}</span>
+        </Link>
+      </li>
+    );
+  };
   return (
     <nav
       aria-label="Principal"
       className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
     >
-      <ul className="mx-auto grid h-[60px] max-w-md grid-cols-4">
-        {NAV.map((n) => {
-          const ativo = n.match(pathname);
-          return (
-            <li key={n.to} className="relative">
-              <Link
-                to={n.to}
-                aria-current={ativo ? 'page' : undefined}
-                className={cn(
-                  'flex h-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
-                  ativo ? 'text-fg' : 'text-fg-muted active:text-fg',
-                )}
-              >
-                {ativo ? (
-                  <motion.span
-                    layoutId="tab-ativa"
-                    aria-hidden
-                    className="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-brand-grad"
-                    transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                  />
-                ) : null}
-                <Icon name={n.icon} size={22} className={cn(ativo && 'text-brand-fg')} />
-                <span>{n.short}</span>
-              </Link>
-            </li>
-          );
-        })}
+      <ul className="mx-auto grid h-[60px] max-w-md grid-cols-5">
+        {NAV_TAB.slice(0, meio).map(item)}
+        <li className="relative">
+          <button
+            type="button"
+            onClick={abrirBusca}
+            onPointerDown={preCarregarBusca}
+            aria-label="Buscar município, estado, candidato ou seção"
+            className="flex h-full w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] text-fg-muted transition-colors active:text-fg"
+          >
+            <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand/15 text-brand-fg ring-1 ring-inset ring-brand/30">
+              <Icon name="busca" size={18} />
+            </span>
+            <span className="-mt-0.5">Buscar</span>
+          </button>
+        </li>
+        {NAV_TAB.slice(meio).map(item)}
       </ul>
     </nav>
   );
@@ -280,6 +305,9 @@ function Footer() {
             links={[
               { to: '/apuracao', label: 'Apuração' },
               { to: '/governadores', label: 'Governadores' },
+              { to: '/senado', label: 'Senado' },
+              { to: '/camara', label: 'Câmara dos Deputados' },
+              { to: '/assembleias', label: 'Assembleias' },
               { to: '/teste', label: 'Teste Cego' },
               { to: '/apuracao/consulta', label: 'Consulte sua seção' },
             ]}

@@ -33,7 +33,7 @@ interface Pos {
   a: number;
 }
 
-const R0 = 0.36; // raio interno (fração do externo)
+const R0 = 0.4; // raio interno (fração do externo)
 
 /**
  * Posições das N cadeiras, por fileira (de dentro para fora), cada fileira da esquerda para a direita. Puro.
@@ -113,7 +113,7 @@ export function posicionar(assentos: { partido: string; pendente?: boolean }[]):
 
 const W = 1000;
 const ESC = 470; // raio externo em unidades do viewBox
-const H = ESC + 40;
+const TOPO = 10; // respiro acima da fileira externa
 
 export interface HemicicloProps {
   assentos: Assento[];
@@ -138,7 +138,10 @@ export function Hemiciclo({ assentos, destaque, onDestaque, centro, ariaLabel, c
   });
   const toque = useRef(false);
 
-  const raio = Math.max(2.5, r * ESC);
+  // poucas cadeiras (ex.: 8 do AM) não viram bolas gigantes
+  const raio = Math.min(30, Math.max(2.5, r * ESC));
+  const cy = ESC + TOPO;
+  const H = cy + raio + 6;
   const ativo = dica ? assentos[dica.i] : null;
   const pAtivo = dica ? pos[dica.i] : null;
 
@@ -176,7 +179,7 @@ export function Hemiciclo({ assentos, destaque, onDestaque, centro, ariaLabel, c
         <defs>
           <MapHatchPattern id="hemiciclo-pendente" escala={0.9} />
         </defs>
-        <g transform={`translate(${W / 2} ${ESC + 14})`}>
+        <g transform={`translate(${W / 2} ${cy})`}>
           {pos.map((p, i) => {
             const a = assentos[i];
             const apagado = !!destaque && a.partido !== destaque;
@@ -225,7 +228,7 @@ export function Hemiciclo({ assentos, destaque, onDestaque, centro, ariaLabel, c
           className="pointer-events-none absolute z-10 w-max max-w-[240px] -translate-x-1/2 -translate-y-[calc(100%+10px)] rounded-xl border border-line bg-surface/95 px-3 py-2 text-left shadow-card backdrop-blur"
           style={{
             left: `${((W / 2 + pAtivo.x * ESC) / W) * 100}%`,
-            top: `${((ESC + 14 + pAtivo.y * ESC) / H) * 100}%`,
+            top: `${((cy + pAtivo.y * ESC) / H) * 100}%`,
           }}
         >
           <div className="flex items-center gap-1.5 text-[12px] font-semibold text-fg">

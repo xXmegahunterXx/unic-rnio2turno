@@ -265,14 +265,13 @@ function Liderados({ race, liderados }: { race: Race; liderados: number[] | unde
   const verbo = race.turno === 1 ? 'mais votado' : 'à frente';
   if (!liderados) return <p className="text-[12px] text-fg-subtle sm:ml-auto">Contando municípios…</p>;
   return (
-    <p className="num text-[12.5px] leading-snug text-fg-muted sm:ml-auto sm:text-right">
+    <p className="num flex flex-wrap gap-x-3.5 gap-y-1 text-[12.5px] leading-snug text-fg-muted sm:ml-auto sm:justify-end">
       {fin.map(({ c, i }, k) => (
         <span key={c.numero} className="inline-flex items-center gap-1.5 whitespace-nowrap">
-          {k > 0 ? <span className="mx-1.5 text-fg-subtle">·</span> : null}
           <span aria-hidden className={cn('h-2 w-2 rounded-full', corSlot(c.cor).bg)} />
           <span className="font-semibold text-fg">{c.nomeUrna}</span>
-          {k === 0 ? ` ${verbo} em` : ' em'} <span className="font-semibold text-fg">{fmtInt(liderados[i] ?? 0)}</span>
-          {k === 0 ? ' municípios' : ''}
+          {k === 0 ? `${verbo} em` : 'em'} <span className="font-semibold text-fg">{fmtInt(liderados[i] ?? 0)}</span>
+          {k === 0 ? 'municípios' : ''}
         </span>
       ))}
     </p>

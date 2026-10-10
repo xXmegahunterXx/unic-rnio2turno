@@ -108,9 +108,9 @@ export function PatrocinioSlot({ patrocinio, variant = 'linha', tv, className }:
   return (
     <aside
       aria-label="Publicidade"
-      className={cn('flex flex-col gap-3 rounded-2xl border border-line bg-surface/70 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-5', className)}
+      className={cn('flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl border border-line bg-surface/70 p-4 sm:p-5', className)}
     >
-      <div className="flex min-w-0 items-center gap-3">
+      <div className="flex min-w-0 max-w-full items-center gap-3">
         {logo ?? (
           <span aria-hidden className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-3 font-display text-[17px] font-semibold text-fg">
             {marca.charAt(0).toUpperCase()}
@@ -121,13 +121,17 @@ export function PatrocinioSlot({ patrocinio, variant = 'linha', tv, className }:
           <p className="truncate font-display text-[17px] font-semibold leading-tight text-fg">{marca}</p>
         </div>
       </div>
-      {patrocinio.texto?.trim() ? <p className="min-w-0 flex-1 text-pretty text-[13.5px] leading-snug text-fg-muted">{patrocinio.texto.trim()}</p> : <span className="flex-1" />}
+      {patrocinio.texto?.trim() ? (
+        <p className="min-w-0 flex-1 basis-[16rem] text-pretty text-[13.5px] leading-snug text-fg-muted">{patrocinio.texto.trim()}</p>
+      ) : (
+        <span className="flex-1" />
+      )}
       {url ? (
         <a
           href={url}
           target="_blank"
           rel="sponsored noopener noreferrer"
-          className="inline-flex h-9 shrink-0 items-center gap-1.5 self-start rounded-xl border border-line bg-surface-2 px-3 text-[13px] font-semibold text-fg transition-colors hover:border-line/[2] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:self-auto"
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-line bg-surface-2 px-3 text-[13px] font-semibold text-fg transition-colors hover:border-line/[2] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           {dominio(url)}
           <Icon name="externo" size={14} className="text-fg-muted" />

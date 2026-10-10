@@ -100,7 +100,7 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 
 | Componente | Props |
 |---|---|
-| `CandidateAvatar` | `candidato?` (ou `nome` + `cor`), `size: 'xs'\|'sm'\|'md'\|'lg'\|'xl'`, `eleito?`, `dim?`. Monograma (`iniciais()` ignora títulos como “Professora”). |
+| `CandidateAvatar` | `candidato?` (ou `nome` + `cor`), `size: 'xs'\|'sm'\|'md'\|'lg'\|'xl'`, `eleito?`, `dim?`, `foto?` (data URI oficial; ausente → monograma; falhou ao carregar → monograma). Mesmo tamanho e anel na cor do slot com ou sem foto. Monograma (`iniciais()` ignora títulos como “Professora”). **Nunca escolha a foto à mão**: use `useFotosRace(race)[i]` (veja “Fase 2”). |
 | `CandidateName` | `candidato`, `showPartido=true`, `showNumero=true`, `showVice?`, `size: 'sm'\|'md'\|'lg'\|'xl'`, `align`, `colored?`. |
 | `Placar` | `race`, `resumo: Summary`, `variant: 'hero'\|'default'\|'compact'`, `titulo?`, `subtitulo?` (compact), `to?`/`onClick?` (compact clicável), `showProgress=true`, `showVice?`, `simulado?`, `actions?` (ex.: `<ShareButton iconOnly/>`). `aria-live` com resumo em 1 casa decimal. Selo “À frente” / “Eleito” / “Matematicamente eleito”; 1º turno mostra “Demais candidatos”. | `live?` (padrão: só no `hero`) liga o `aria-live`; cartões compactos em grade não anunciam.
 | `VoteSplitBar` | `votos`, `cores?`, `apurado?` (trilho), `size: 'xs'\|'sm'\|'md'\|'lg'`, `showMarker=true` (50%), `showLabels?`, `nomes?`, `ariaLabel?`. |
@@ -219,3 +219,71 @@ const { data: t1 } = useNacional('pres-t1');
 
 (Os tempos de "atualização → pintura" incluem gerar a fixture e esperar o próximo quadro.)
 <!-- viz:end -->
+
+<!-- fase2a:start -->
+## Fase 2 · frente A (mapa por município, fotos, reveja a noite, Modo TV, pessoas agora, patrocínio)
+
+Tudo em `src/app/components/apuracao/`, um componente por arquivo. Testes das partes puras em `frenteA.test.ts`.
+
+### Fotos oficiais
+
+| Export | Uso |
+|---|---|
+| `useFotosRace(race, { real?, desligado? })` (`fotos.ts`) | `(string \| undefined)[]` na ordem de `race.candidatos`. Regras embutidas: **nunca** na simulação anonimizada (salvo `real: true`, para dados reais do 1º turno); **tudo ou nada** entre os finalistas (se faltar a foto de um, nenhum tem foto — mesmo tratamento); "Outros" nunca tem foto. Carrega o pacote `data/fotos/{grupo}.json` sob demanda (cache do React Query). |
+| `CandidateAvatar foto={fotos[i]}` | Foto recortada em círculo (`object-cover`, sem filtro), moldura na cor do slot + filete da superfície; selo de eleito igual ao do monograma. |
+
+Já usam fotos: `Placar` (hero 56/72 px, default 44/56 px, compact 40 px), `EventFeed` (liderança/virada/eleito: rosto com o ícone num selo), `RegionBars` (rosto de quem lidera; monograma quando anonimizado), cartões de governador/presidente, `EleitoBanner`, destaque do feed, `PreHero`, `LiderancaCard`, `ComparacaoT1` e `ShareCard` (este **só** com dados reais: nunca numa imagem de SIMULAÇÃO).
+
+### `BrazilMunicipiosMap` (canvas, 5.571 municípios)
+
+`snapshot: MunicipiosNacionalSnapshot \| undefined` (de `useMunicipiosBr(race, t, ativo)`) · `race` · `modo?: MapMode` · `primeiroTurno?` (snapshot `-t1`, modo `'variacao'`) · `ufsEscopo?` (governador: municípios fora da UF ficam neutros) · `onSelect?({ uf, cod, ibge, nome })` · `rotuloAcao?` · `alturaMax?` · `estatico?` (Modo TV: sem tooltip/controles) · `busca?` (padrão sim) · `onMedida?` · `ariaLabel?`.
+
+- Carregue com `lazy()` (o chunk tem ~8 KB gzip) e só monte quando a pessoa escolher "Municípios": ele baixa `geo/br-mun.json` (~1,9 MB) e `data/municipios-br.json`. Enquanto isso, esqueleto com a silhueta das UFs.
+- `Path2D` + caixas + grade de hit-test criados uma vez por sessão (`prepararMunicipios`, exportado). Três camadas: preenchimentos, divisas (municípios + contorno das UFs) e destaque. Com a mesma vista, uma atualização de dados repinta **só os municípios que mudaram de cor** (fade de 360 ms); zoom/tema/modo → redesenho completo.
+- Cores: as mesmas escalas e legendas do mapa por UF (`valorMunBr`, `pctsMunBr`, `baseFinalistasMunBr` em `mapModes.ts`; `legendaModo` serve igual).
+- Interação: hover (tooltip com nome, UF, % de cada um, vantagem, comparecimento); clique abre (260 ms de espera para não confundir com o duplo clique, que amplia); toque: 1º mostra (encaixado sob o mapa no celular), 2º abre. Zoom: Ctrl/⌘ + roda ou pinça, duplo clique, botões, teclado `+ − 0`/setas. Busca por nome (ícone de lupa): enquadra e fixa o tooltip.
+- Medidas no contêiner: `data-prep-ms`, `data-fill-ms`, `data-fill-modo` (`completo` ou `incremental:N`), `data-borda-ms`, `data-quadro-ms`.
+
+No `MapaPanel` da página nacional: alternância **Estados · Municípios · Blocos**, legenda e a linha "Candidato A à frente em N municípios · Candidato B em M" (`municipiosLiderados`). "Municípios" fica salvo só na sessão (não força os 2 MB em toda visita).
+
+### `LinhaDoTempo` — "Reveja a noite"
+
+`status` · `recebidoEm` (`statusQ.dataUpdatedAt`) · `serie` e `eventos` **ao vivo** (marcos 1/25/50/75/99% e "eleito") · `cores?` (slots, para a faixa de quem liderava em cada momento) · `t` · `onChange(t \| undefined)` · `carregando?` (`q.isPlaceholderData`: o play espera) · `grudar?` (fixa no topo enquanto revendo).
+
+```tsx
+const statusQ = useStatus();
+const { t, setT } = useInstanteParam(statusQ.data, statusQ.dataUpdatedAt); // ?t=18h42 (ou epoch); nunca futuro
+const q = useNacional(race, t);      // instante pedido (sem polling)
+const vivo = useNacional(race).data; // marcos da régua
+<LinhaDoTempo status={statusQ.data} recebidoEm={statusQ.dataUpdatedAt} serie={vivo.serie} eventos={vivo.eventos}
+  cores={r.candidatos.map((c) => c.cor)} t={t} onChange={setT} carregando={q.isPlaceholderData} />
+```
+
+- Play = 1 h em 30 s, passos de 1 min (instantes cacheáveis) e só avança quando o passo anterior chegou. Arrastar confirma no máximo a cada 350 ms. Teclado: ←/→ 1 min, Shift/PageUp/PageDown 10 min, Home início, End ao vivo, Espaço play. Some na fase `'pre'`.
+- Helpers: `formatarInstante(t)` → `"18h42"`, `lerInstante(s)`, `comInstante(caminho, t)` (links que levam o instante, ex.: `linkUf(uf, race, t)`), `agoraApuracao(status, recebidoEm)`.
+
+### `PessoasAgora`, `PatrocinioSlot`
+
+| Componente | Props |
+|---|---|
+| `PessoasAgora` | `status` (usa `status.pessoasAgora`; ausente → não renderiza — o demo não tem e **nunca inventamos número**), `variant: 'pill' \| 'inline'`. `textoPessoas(n)` → "12,3 mil pessoas". A `StatusPill` completa mostra o número em ≥ 1280 px. |
+| `PatrocinioSlot` | `patrocinio` (`status.patrocinio`; nulo → nada), `variant: 'linha'` ("Oferecido por [logo] Marca", topo) ou `'cartao'` (marca + texto + link, fim da página), `tv?`. Link com `rel="sponsored noopener"`, rotulado como publicidade, sem modal. `urlPatrocinio`, `imagemPatrocinio` (data URI, https ou `/api/patrocinio/logo`). |
+
+Admin: seção **Patrocínio** (`components/pages/admin/SecaoPatrocinio.tsx`, atalho 5): marca (60), texto (140), link https, logo por upload (≤ 60 KB em data URI; rasters maiores são só redimensionados — `prepararLogo`), prévia (topo, cartão e TV), confirmação obrigatória "anunciante não político", Publicar/Remover (`AdminCommand 'patrocinio'`).
+
+### Modo TV (`/tv`, fora do AppShell)
+
+Placar gigante com fotos, mapa grande (estados ou municípios), ticker de eventos, relógio de Brasília, faixa SIMULAÇÃO, QR + endereço (`qr.ts`: `gerarQr(texto, 'L' \| 'M')` + `qrPath`, sem dependência; matrizes conferidas com uma implementação de referência) e patrocínio. Rodízio opcional pelas 5 UFs mais disputadas a cada 12 s. Tela cheia (Fullscreen API, tolera recusa) e Wake Lock. Medidas em `--u` (≈ 1% da altura útil): legível a 3 m em 1920×1080 e 1280×720; em retrato (tablet) empilha. Parâmetros: `?race=gov-xx`, `?mapa=municipios`, `?rodizio=0`. Link "Modo TV" no topo da página nacional (`LinkModoTv`).
+
+### Desempenho do mapa por município (Chromium headless, sem GPU — rasterização por software)
+
+| Medida | Desktop 1440 px | Celular 390 px, DPR 3 (canvas a 2×), CPU 4× mais lenta |
+|---|---|---|
+| Preparo (uma vez por sessão: 5.571 `Path2D` + caixas + grade) | ~60–70 ms | ~240–265 ms (com o esqueleto na tela) |
+| Atualização de dados (só os ~60–100 municípios que mudaram): comandos + rasterização | ~1 ms + ~1 ms | ~1 ms + ~5 ms |
+| Redesenho completo (troca de modo, zoom, tema): comandos | mediana 4 ms (1º desenho 9–11 ms) | mediana 16 ms (1º desenho ~45 ms) |
+| Redesenho completo: rasterização (software) | ~40 ms | ~170 ms |
+| Divisas (municípios + UFs) | ~2 ms | ~10 ms |
+
+Meta de < 120 ms por desenho: cumprida em todos os casos no desktop e nas atualizações ao vivo no celular; o redesenho completo no celular emulado (4× + sem GPU) passa da meta só na rasterização, que nos aparelhos reais é feita pela GPU.
+<!-- fase2a:end -->

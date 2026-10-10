@@ -4,7 +4,8 @@
  * O BU em destaque (recibo), navegação para a seção anterior/próxima da mesma zona, compartilhar,
  * "guardar como minha seção" e o contexto (como votaram a zona e o município, participação, a posição
  * da seção no mosaico da zona). Seção ainda não totalizada: dizemos só isso (sem estimar horário).
- * Seção/zona inexistente: 404 amigável com link para a Consulta. Só existe BU no 2º turno.
+ * Seção/zona inexistente: 404 amigável com link para a Consulta. O BU em destaque é o do 2º turno; ao lado,
+ * o LOCAL DE VOTAÇÃO (com links de mapa) e o boletim REAL da seção no 1º turno (resultado oficial).
  */
 import { useMemo, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -36,15 +37,15 @@ import { NaoEncontrado } from '@/app/components/pages/detalhe/NaoEncontrado';
 import { EsqueletoSecao } from '@/app/components/pages/detalhe/Esqueletos';
 import {
   ComparaAbrangencias,
-  DemaisCandidatos,
   ParticipacaoComparada,
   fraseDiferenca,
-  tallyPrimeiroTurno,
   type Abrangencia,
 } from '@/app/components/pages/detalhe/SecaoContexto';
 import { mesmaSecao, useMinhaSecao } from '@/app/components/pages/detalhe/minhaSecao';
 import { emMun, emUf, fmt4 } from '@/app/components/pages/detalhe/fmt';
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
+import { LocalVotacaoCartao } from '@/app/components/pages/detalhe/LocalVotacao';
+import { PrimeiroTurnoSecao } from '@/app/components/pages/detalhe/PrimeiroTurnoSecao';
 
 /** SecaoDetalhe → Tally (para os cálculos de calc.ts). */
 function tallySecao(s: SecaoDetalhe): Tally {
@@ -95,6 +96,12 @@ export default function SecaoPage() {
   }, [zSnap, secao]);
 
   const mosaicoZona = useMemo(() => (mSnap ? mSnap.mosaico.filter((z) => z.zona === zona) : []), [mSnap, zona]);
+  // Corridas de 1º turno desta UF (Presidente e, se houver, Governador), a da página primeiro.
+  const racesT1 = useMemo(() => {
+    if (!uf || !ctx.races) return [];
+    const lista = ctx.races.filter((r) => r.turno === 1 && (r.abrangencia === 'BR' || r.abrangencia === uf) && r.ufs.includes(uf));
+    return lista.sort((a, b) => Number(b.id === ctx.idT1) - Number(a.id === ctx.idT1));
+  }, [ctx.races, ctx.idT1, uf]);
 
   const nomeUf = uf ? UF_NOMES[uf] : '';
   const erroSec = qSec.error ?? qSec.failureReason;
@@ -270,7 +277,7 @@ export default function SecaoPage() {
       ) : pediuT1 ? (
         <div role="note" className="mb-6 flex items-start gap-2 rounded-2xl border border-line bg-surface-2 px-4 py-3 text-[14px] text-fg">
           <Icon name="info" size={18} className="mt-px shrink-0 text-fg-muted" />
-          <span>No 1º turno, esta base traz o resultado só por município. Este é o boletim da seção no 2º turno.</span>
+          <span>Este é o boletim da seção no 2º turno. O resultado oficial desta seção no 1º turno está ao lado.</span>
         </div>
       ) : null}
 
@@ -332,20 +339,11 @@ export default function SecaoPage() {
         <div className="min-w-0 space-y-4">
           <StatusSecao sec={sec} pre={pre} />
 
-          {pre && mSnap?.primeiroTurno && ctx.raceT1 ? (
+          {sec.local ? <LocalVotacaoCartao local={sec.local} municipio={nomeMun} uf={exterior ? undefined : uf!} /> : null}
+
+          {!pre && (sec.totalizada || (zSnap && validos(zSnap.resumo) > 0) || (mSnap && validos(mSnap.resumo) > 0)) ? (
             <Cartao
-              titulo={`Como ${nomeMun} votou no 1º turno`}
-              subtitulo="Resultado oficial do município (4 de outubro), em % dos votos válidos. Não há dado por seção do 1º turno."
-            >
-              <ComparaAbrangencias
-                race={ctx.raceT1}
-                linhas={[{ rotulo: nomeMun, sub: 'resultado oficial', t: { ...mSnap.resumo, ...tallyPrimeiroTurno(mSnap.primeiroTurno) } }]}
-              />
-              <DemaisCandidatos race={ctx.raceT1} votos={mSnap.primeiroTurno.votos} className="mt-3" />
-            </Cartao>
-          ) : sec.totalizada || (zSnap && validos(zSnap.resumo) > 0) || (mSnap && validos(mSnap.resumo) > 0) ? (
-            <Cartao
-              titulo="Como esta seção votou"
+              titulo={`Como esta seção votou no 2º turno${ctx.status?.simulacao ? ' (simulação)' : ''}`}
               subtitulo={
                 sec.totalizada
                   ? 'Em % dos votos válidos, comparada com a zona e o município.'
@@ -355,6 +353,10 @@ export default function SecaoPage() {
               <ComparaAbrangencias race={race} linhas={linhas} />
               {frase ? <p className="mt-4 text-pretty text-[14px] leading-relaxed text-fg">{frase}</p> : null}
             </Cartao>
+          ) : null}
+
+          {racesT1.length ? (
+            <PrimeiroTurnoSecao uf={uf!} cod={cod} zona={zona!} secao={secao!} races={racesT1} nomeMunicipio={nomeMun} />
           ) : null}
 
           {sec.totalizada || (mSnap && mSnap.resumo.comparecimento > 0) ? (

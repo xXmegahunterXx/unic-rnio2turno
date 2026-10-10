@@ -260,6 +260,7 @@ export default function UfPage() {
         subtitle={subtitulo}
         actions={
           <>
+            {statusQ.data?.patrocinio ? <PatrocinioSlot patrocinio={statusQ.data.patrocinio} className="hidden sm:inline-flex" /> : null}
             {ctx.anonimizado ? <NomesOcultos /> : null}
             <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={exterior ? 'Exterior' : nomeUf} size="sm" />
           </>
@@ -288,11 +289,6 @@ export default function UfPage() {
           carregando={q.isPlaceholderData}
           className="mb-3 sm:mb-4"
         />
-      ) : null}
-      {statusQ.data?.patrocinio ? (
-        <div className="-mt-1 mb-3 flex sm:mb-4 sm:justify-end">
-          <PatrocinioSlot patrocinio={statusQ.data.patrocinio} />
-        </div>
       ) : null}
 
       <div className={cn('transition-opacity', atualizando && 'opacity-60')}>

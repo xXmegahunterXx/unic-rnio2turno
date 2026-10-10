@@ -124,12 +124,12 @@ export function CandidatoLinha({
       ) : null}
       <FotoOficial sqcand={c.sqcand} fotoGrupo={fotoGrupo} nome={c.nomeUrna} tamanho={tamanhoFoto} />
       <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 items-center">
           <NomeLink sqcand={c.sqcand} nome={c.nomeUrna} comFicha={comFicha} className="text-[14.5px] font-semibold text-fg" />
-          {selo && (ehEleito(c.situacao) || c.situacao === 'segundo-turno') ? <SituacaoSelo situacao={c.situacao} genero={c.genero} /> : null}
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-2">
           <PartidoChip sigla={c.partido} numero={c.numero} />
+          {selo && (ehEleito(c.situacao) || c.situacao === 'segundo-turno') ? <SituacaoSelo situacao={c.situacao} genero={c.genero} /> : null}
           {extra}
         </div>
         {barra !== undefined ? (
