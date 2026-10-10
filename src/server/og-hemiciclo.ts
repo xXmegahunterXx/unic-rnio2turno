@@ -1,10 +1,11 @@
 /**
- * Hemiciclo e cores neutras de partido para as imagens de compartilhamento (OG) — espelho, no servidor, de
+ * Hemiciclo e cores de partido para as imagens de compartilhamento (OG) — espelho, no servidor, de
  * src/app/components/pages/cargos/Hemiciclo.tsx (layoutLinhas/posicionar) e partidos.ts (corPartido), que vivem no
  * app (React) e não entram no bundle do servidor. Se mudar lá, mude aqui.
  *
- * Regras (ARCHITECTURE §1.1 e §10.2.9): paleta categórica própria e estável, sem relação com as cores oficiais
- * dos partidos, sem turquesa/âmbar (slots A/B) nem o violeta da marca; os 10 maiores partidos pelo nº de eleitos
+ * Regras (ARCHITECTURE §1.1 e §10.2.9): paleta categórica própria e estável; PT no vermelho do Lula e PL no azul do
+ * Flávio Bolsonaro (os mesmos valores de C.vermelho/C.azul em og.ts); os demais fogem de vermelho, azul, turquesa/âmbar
+ * (slots A/B) e do violeta da marca (ver partidos.ts no app); os 10 maiores partidos pelo nº de eleitos
  * (critério de TAMANHO, nunca de espectro) têm cor própria e os demais ficam em dois cinzas; bancadas da
  * esquerda para a direita por tamanho. Identidade nunca só pela cor: a imagem sempre traz a sigla ao lado.
  *
@@ -16,17 +17,17 @@
 export const PARTIDOS_COM_COR = ['PL', 'PT', 'MDB', 'PSD', 'PP', 'REPUBLICANOS', 'UNIÃO', 'PODE', 'PSB', 'PSOL'] as const;
 
 /** Tokens `--partido-1..10` do tema escuro (src/app/styles.css), "R G B". */
-const PALETA_ESCURA = [
-  [202, 109, 173],
-  [99, 85, 162],
-  [149, 61, 124],
-  [160, 124, 219],
-  [194, 115, 95],
-  [152, 153, 18],
-  [30, 119, 41],
-  [192, 85, 114],
-  [146, 98, 157],
-  [87, 143, 49],
+export const PALETA_ESCURA = [
+  [44, 140, 238], // PL = --cand-azul (Flávio Bolsonaro)
+  [239, 68, 68], // PT = --cand-vermelho (Lula)
+  [143, 60, 161], // MDB · púrpura
+  [131, 64, 10], // PSD · ferrugem
+  [158, 197, 55], // PP · lima
+  [221, 117, 208], // REPUBLICANOS · orquídea
+  [114, 65, 107], // UNIÃO · berinjela
+  [169, 102, 175], // PODE · malva
+  [159, 167, 117], // PSB · cáqui
+  [37, 129, 1], // PSOL · verde
 ] as const;
 
 /** Cinzas dos demais partidos: cand-outros (85%) e fg-subtle (50%) do tema escuro, já compostos sobre a superfície. */
@@ -36,7 +37,7 @@ export const COR_PENDENTE = 'rgb(58,58,80)';
 
 const normSigla = (s: string) => s.trim().toUpperCase().replace('UNIAO', 'UNIÃO');
 
-/** Cor neutra do partido (rgb()). */
+/** Cor do partido (rgb()). */
 export function corPartido(sigla: string): string {
   const k = normSigla(sigla);
   const i = (PARTIDOS_COM_COR as readonly string[]).indexOf(k);

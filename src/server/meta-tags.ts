@@ -3,8 +3,8 @@
  *
  * Todo link do Sintonia postado no X/WhatsApp vira um cartão grande (`summary_large_image`, imagem 1200×630) com a
  * imagem ESPECÍFICA da página (ver og-rotas.ts): município, boletim da seção, ficha do candidato, Senado/Câmara/
- * Assembleias, governadores, curiosidades e cenários. Textos descritivos, neutros e simétricos (A antes de B, sempre
- * pela ordem do número na urna); títulos "perenes" (o X guarda o cartão por dias), números na descrição.
+ * Assembleias, governadores, curiosidades e cenários. Textos descritivos, neutros e simétricos (o menor número antes,
+ * sempre pela ordem da urna); títulos "perenes" (o X guarda o cartão por dias), números na descrição.
  *
  * O código do Duelo (/duelo/:codigo) NUNCA é lido nem decodificado aqui: ele carrega respostas do Teste Cego (dado
  * sensível, LGPD). Cenários (/cenarios?c=) são hipóteses de quem compartilha: o texto diz "cenário hipotético · não é

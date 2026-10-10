@@ -60,6 +60,7 @@ import {
   type TseSecoesArquivo,
 } from './feed';
 import * as map from './map';
+import { aplicarCores } from '../shared/cores';
 import { type Abr, HistoricoCorrida, type HistoricoSerializado } from './eventos';
 import { lerBoletimUrna } from './bu';
 
@@ -319,7 +320,8 @@ export class TseSource {
   constructor(opts: TseSourceOptions) {
     if (!opts.races?.length) throw new Error('TseSource: lista de corridas vazia');
     this.config = { ...opts.config };
-    this.races = opts.races;
+    // cores da fonte única (CORES_IDENTIDADE: Presidente vermelho/azul; governador a/b), mesmo se o meta for antigo
+    this.races = opts.races.map(aplicarCores);
     this.now = opts.now ?? Date.now;
     this.log = opts.log ?? (() => undefined);
     this.client =

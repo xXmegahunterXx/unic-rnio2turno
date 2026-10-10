@@ -50,7 +50,7 @@ export interface PresidenteT1Dataset {
   fonte: string;
   /** Todos os candidatos do 1º turno, ordenados por votos (desc). */
   candidatos: CandidatoPresidenteT1[];
-  /** Números dos finalistas [a, b] — a = menor número na urna (slot turquesa), b = maior (âmbar). */
+  /** Números dos finalistas [a, b] — a = menor número na urna, b = maior. Cores: CORES_IDENTIDADE (Lula vermelho, Flávio azul). */
   finalistas: [number, number];
   /** 27 UFs + 'ZZ' (exterior), na ordem de UFS e depois ZZ. */
   ufs: ResultadoUfPresidenteT1[];

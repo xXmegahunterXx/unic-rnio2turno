@@ -357,12 +357,16 @@ function Fundamentos() {
             <Swatch cls="bg-brand-grad" nome="brand-grad" />
             <Swatch cls="bg-cand-a" nome="cand-a" />
             <Swatch cls="bg-cand-b" nome="cand-b" />
+            <Swatch cls="bg-cand-vermelho" nome="cand-vermelho" />
+            <Swatch cls="bg-cand-azul" nome="cand-azul" />
             <Swatch cls="bg-cand-outros" nome="cand-outros" />
             <Swatch cls="bg-ok" nome="ok" />
             <Swatch cls="bg-alert" nome="alert" />
             <Swatch cls="bg-pending" nome="pending" />
             <Swatch cls="bg-cand-a-soft" nome="cand-a-soft" />
             <Swatch cls="bg-cand-b-soft" nome="cand-b-soft" />
+            <Swatch cls="bg-cand-vermelho-soft" nome="cand-vermelho-soft" />
+            <Swatch cls="bg-cand-azul-soft" nome="cand-azul-soft" />
             <Swatch cls="bg-fg-subtle" nome="fg-subtle" />
             <Swatch cls="bg-brand-deep" nome="brand-deep" />
             <Swatch cls="bg-brand-cta" nome="brand-cta" />
@@ -375,6 +379,8 @@ function Fundamentos() {
               <span className="text-brand-fg">brand-fg</span>
               <span className="text-cand-a-fg">cand-a-fg</span>
               <span className="text-cand-b-fg">cand-b-fg</span>
+              <span className="text-cand-vermelho-fg">cand-vermelho-fg</span>
+              <span className="text-cand-azul-fg">cand-azul-fg</span>
               <span className="text-ok-fg">ok-fg</span>
               <span className="text-alert-fg">alert-fg</span>
               <span className="text-fg-subtle">fg-subtle</span>
@@ -382,7 +388,7 @@ function Fundamentos() {
           </div>
           <div className="mt-5">
             <div className="mb-2 text-[12px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Margem (mapas) · raceUi.fillMargem</div>
-            {(['a', 'b'] as const).map((c) => (
+            {(['vermelho', 'azul', 'a', 'b'] as const).map((c) => (
               <div key={c} className="mb-1.5 grid grid-cols-5 gap-1.5">
                 <div className="h-7 rounded-md" style={{ background: FILL_PENDENTE }} title="pendente" />
                 {([0, 1, 2, 3] as const).map((b) => (

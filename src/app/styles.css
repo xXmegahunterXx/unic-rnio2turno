@@ -54,10 +54,10 @@
   --cand-vermelho-soft: 252 165 165;
   --cand-vermelho-ink: 40 6 6;
   --cand-vermelho-fg: 248 113 113; /* 6,78:1 surface · 5,45:1 sobre bg-x/15 em surface-2 */
-  --cand-azul: 59 130 246; /* 5,10:1 sobre surface */
+  --cand-azul: 44 140 238; /* 5,45:1 sobre surface; matiz puxado para o azul puro, longe do violeta da marca */
   --cand-azul-soft: 147 197 253;
   --cand-azul-ink: 4 18 48;
-  --cand-azul-fg: 96 165 250; /* 7,38:1 surface · 5,75:1 sobre bg-x/15 em surface-2 */
+  --cand-azul-fg: 96 165 250; /* 7,38:1 surface · 5,70:1 sobre bg-x/15 em surface-2 */
   --cand-outros: 139 139 163;
   --ok: 52 211 153;
   --ok-fg: 52 211 153;
@@ -65,21 +65,22 @@
   --alert-fg: 251 113 133;
   --pending: 58 58 80; /* território ainda não apurado */
   /*
-   * Partidos (cargos do 1º turno: Senado, Câmara, Assembleias, governadores eleitos): paleta categórica NEUTRA,
-   * estável, sem relação com as cores oficiais. Sem vermelho/azul saturados, sem turquesa/âmbar (slots A/B) e sem
-   * o violeta da marca. Ordem = PARTIDOS_COM_COR em components/pages/cargos/partidos.ts (por tamanho, nunca por
-   * espectro). Identidade nunca só pela cor: sempre há sigla ao lado.
+   * Partidos (cargos do 1º turno: Senado, Câmara, Assembleias, governadores eleitos): paleta categórica estável.
+   * PL = azul do Flávio Bolsonaro e PT = vermelho do Lula (mesmo token, decisão do dono do produto); os outros 8
+   * fogem de vermelho/rosa-avermelhado, azul/anil, turquesa/âmbar (slots A/B) e do violeta da marca. Ordem =
+   * PARTIDOS_COM_COR em components/pages/cargos/partidos.ts (por tamanho, nunca por espectro). Identidade nunca só
+   * pela cor: sempre há sigla ao lado.
    */
-  --partido-1: 202 109 173; /* orquídea */
-  --partido-2: 99 85 162; /* anil */
-  --partido-3: 149 61 124; /* ameixa */
-  --partido-4: 160 124 219; /* lavanda */
-  --partido-5: 194 115 95; /* salmão */
-  --partido-6: 152 153 18; /* oliva */
-  --partido-7: 30 119 41; /* floresta */
-  --partido-8: 192 85 114; /* rosa */
-  --partido-9: 146 98 157; /* malva */
-  --partido-10: 87 143 49; /* folha */
+  --partido-1: var(--cand-azul); /* PL · azul do Flávio Bolsonaro */
+  --partido-2: var(--cand-vermelho); /* PT · vermelho do Lula */
+  --partido-3: 143 60 161; /* púrpura */
+  --partido-4: 131 64 10; /* ferrugem */
+  --partido-5: 158 197 55; /* lima */
+  --partido-6: 221 117 208; /* orquídea */
+  --partido-7: 114 65 107; /* berinjela */
+  --partido-8: 169 102 175; /* malva */
+  --partido-9: 159 167 117; /* cáqui */
+  --partido-10: 37 129 1; /* verde */
 }
 
 :root[data-theme='light'] {
@@ -111,26 +112,26 @@
   --cand-vermelho-soft: 254 202 202;
   --cand-vermelho-ink: 255 255 255;
   --cand-vermelho-fg: 185 28 28; /* 6,47:1 surface · 4,55:1 sobre bg-x/15 em surface-2 */
-  --cand-azul: 37 99 235; /* 5,17:1 sobre surface */
+  --cand-azul: 22 101 216; /* 5,40:1 sobre surface */
   --cand-azul-soft: 191 219 254;
   --cand-azul-ink: 255 255 255;
-  --cand-azul-fg: 29 78 216; /* 6,70:1 surface · 4,84:1 sobre bg-x/15 em surface-2 */
+  --cand-azul-fg: 29 78 216; /* 6,70:1 surface · 4,82:1 sobre bg-x/15 em surface-2 */
   --cand-outros: 120 120 145;
   --ok: 16 160 110;
   --ok-fg: 8 122 84;
   --alert: 225 60 90;
   --alert-fg: 190 34 66;
   --pending: 214 214 228;
-  --partido-1: 228 134 198;
-  --partido-2: 88 73 149;
-  --partido-3: 136 49 112;
-  --partido-4: 185 149 246;
-  --partido-5: 229 146 125;
-  --partido-6: 177 178 57;
-  --partido-7: 10 107 29;
-  --partido-8: 201 93 123;
-  --partido-9: 150 101 161;
-  --partido-10: 95 152 58;
+  --partido-1: var(--cand-azul);
+  --partido-2: var(--cand-vermelho);
+  --partido-3: 143 60 161;
+  --partido-4: 131 64 10;
+  --partido-5: 158 197 55;
+  --partido-6: 221 117 208;
+  --partido-7: 114 65 107;
+  --partido-8: 169 102 175;
+  --partido-9: 159 167 117;
+  --partido-10: 37 129 1;
 }
 
 @media (prefers-color-scheme: light) {
@@ -163,7 +164,7 @@
     --cand-vermelho-soft: 254 202 202;
     --cand-vermelho-ink: 255 255 255;
     --cand-vermelho-fg: 185 28 28;
-    --cand-azul: 37 99 235;
+    --cand-azul: 22 101 216;
     --cand-azul-soft: 191 219 254;
     --cand-azul-ink: 255 255 255;
     --cand-azul-fg: 29 78 216;
@@ -173,16 +174,16 @@
     --alert: 225 60 90;
     --alert-fg: 190 34 66;
     --pending: 214 214 228;
-    --partido-1: 228 134 198;
-    --partido-2: 88 73 149;
-    --partido-3: 136 49 112;
-    --partido-4: 185 149 246;
-    --partido-5: 229 146 125;
-    --partido-6: 177 178 57;
-    --partido-7: 10 107 29;
-    --partido-8: 201 93 123;
-    --partido-9: 150 101 161;
-    --partido-10: 95 152 58;
+    --partido-1: var(--cand-azul);
+    --partido-2: var(--cand-vermelho);
+    --partido-3: 143 60 161;
+    --partido-4: 131 64 10;
+    --partido-5: 158 197 55;
+    --partido-6: 221 117 208;
+    --partido-7: 114 65 107;
+    --partido-8: 169 102 175;
+    --partido-9: 159 167 117;
+    --partido-10: 37 129 1;
   }
 }
 

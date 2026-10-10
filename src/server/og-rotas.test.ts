@@ -11,9 +11,10 @@ import type { PresidenteT1Dataset } from '../shared/cenarios';
 import { MARCA_CENARIO, calcularCenario, cenarioDoPreset, codificarCenario, premissasCenario } from '../shared/cenarios';
 import { anonimizarRace } from '../shared/anon';
 import { CC } from './app';
+import { C } from './og';
 import { comPrimeiroTurnoLocal } from './og-rotas';
 import { layoutCenario, layoutComposicao, layoutCuriosidade, layoutGovernadores, layoutSecao } from './og-cartoes';
-import { svgHemiciclo } from './og-hemiciclo';
+import { corPartido, svgHemiciclo } from './og-hemiciclo';
 import { RAIZ, comando, login, montar, type Montado } from './test-helpers';
 
 const json = <T>(p: string) => JSON.parse(readFileSync(join(RAIZ, 'public/data', p), 'utf8')) as T;
@@ -164,8 +165,12 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     const txt = JSON.stringify(layoutCenario({ ds, cenario: c, resultado: r, premissas: premissasCenario(ds, c, r) }));
     expect(txt).toContain('CENÁRIO HIPOTÉTICO');
     expect(txt).toContain(MARCA_CENARIO.toUpperCase());
-    expect(txt).toContain('rgb(25,194,176)'); // A turquesa
-    expect(txt).toContain('rgb(245,165,36)'); // B âmbar
+    // nomes reais com números hipotéticos: cores de identificação (Lula vermelho, Flávio Bolsonaro azul)
+    expect(txt).toContain(C.vermelho);
+    expect(txt).toContain(C.azul);
+    expect(txt).not.toContain(C.a);
+    expect(txt).not.toContain(C.b);
+    expect(txt.indexOf(C.vermelho)).toBeLessThan(txt.indexOf(C.azul)); // ordem da urna: 13 antes de 22
     expect(txt).not.toContain('data:image/jpeg'); // sem foto: números hipotéticos
   });
 
@@ -179,6 +184,15 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     const svg = Buffer.from(hem.uri.split(',')[1], 'base64').toString();
     expect(svg.match(/<circle/g)).toHaveLength(513);
     expect(svg).not.toMatch(/rgb\(25,194,176\)|rgb\(245,165,36\)/);
+    // PT no vermelho do Lula e PL no azul do Flávio Bolsonaro (os mesmos valores dos candidatos)
+    expect(corPartido('PT')).toBe(C.vermelho);
+    expect(corPartido('PL')).toBe(C.azul);
+    expect(svg).toContain(C.vermelho);
+    expect(svg).toContain(C.azul);
+    // nenhum outro partido com cor de candidato
+    for (const sg of ['MDB', 'PSD', 'PP', 'REPUBLICANOS', 'UNIÃO', 'PODE', 'PSB', 'PSOL']) {
+      expect([C.vermelho, C.azul, C.a, C.b]).not.toContain(corPartido(sg));
+    }
   });
 
   it('curiosidade com par: os dois finalistas com o mesmo peso (A turquesa antes de B âmbar)', () => {
@@ -187,6 +201,20 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
     const txt = JSON.stringify(layoutCuriosidade({ fato, finalistas: cur.finalistas }));
     expect(txt.indexOf(cur.finalistas.a.nomeUrna)).toBeLessThan(txt.indexOf(cur.finalistas.b.nomeUrna));
     expect(txt).toContain('DADOS OFICIAIS · TSE');
+    // dado real com nomes reais: cada finalista na sua cor de identificação, na ordem da urna
+    expect(txt).toContain(C.vermelho);
+    expect(txt).toContain(C.azul);
+    expect(txt.indexOf(C.vermelho)).toBeLessThan(txt.indexOf(C.azul));
+    expect(txt).not.toContain(C.a);
+  });
+
+  it('governadores: sempre cores neutras (turquesa/âmbar), nunca vermelho/azul — nem com nomes reais', () => {
+    const disputas = m.ds.meta.races
+      .filter((r) => r.turno === 2 && r.cargo === 'Governador')
+      .map((r) => ({ uf: r.abrangencia as 'RJ', race: r, resumo: m.controller.nacional(r.id).resumo }));
+    const txt = JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: false, simulacao: true, aoVivo: true }));
+    expect(txt).not.toContain(C.vermelho);
+    expect(txt).not.toContain(C.azul);
   });
 
   it('governadores: SIMULAÇÃO só quando simulado', () => {

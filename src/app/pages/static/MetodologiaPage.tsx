@@ -206,6 +206,13 @@ export default function MetodologiaPage() {
         <Lista
           itens={[
             <>Os dois candidatos aparecem sempre na ordem da urna, com a mesma tipografia e o mesmo tamanho. Nunca reordenamos por quem lidera.</>,
+            <>
+              No Teste Cego, as cores dos candidatos só aparecem depois da revelação; antes dela, nada na tela indica de quem é cada posição.
+            </>,
+            <>
+              Nos cargos do 1º turno (Senado, Câmara e Assembleias), cada partido tem uma cor fixa: PT no mesmo vermelho de Lula, PL no mesmo azul
+              de Flávio Bolsonaro e os demais em tons que não se confundem com eles. A sigla aparece sempre ao lado.
+            </>,
             <>Usamos monogramas (iniciais) em vez de fotos. Não usamos imagens geradas de candidatos.</>,
             <>Os textos são descritivos (“passa à frente”, “matematicamente eleito”), sem adjetivos nem torcida.</>,
             <>

@@ -45,7 +45,7 @@ export function ApuradoCell({ t, compact, bar = true }: { t: Pick<Tally, 'secoes
     <span className={cn('inline-flex items-center gap-2', compact ? 'w-full' : 'justify-end')}>
       {/* a mini-barra só aparece quando a TABELA é larga (container query da DataTable) */}
       <span className={cn('h-1 shrink-0 overflow-hidden rounded-full bg-surface-3', compact ? 'w-10' : bar ? 'hidden w-12 [@container(min-width:760px)]:block' : 'hidden')} aria-hidden>
-        {/* progresso sempre na cor da marca (verde ficaria parecido com o turquesa do candidato A) */}
+        {/* progresso sempre na cor da marca (verde ficaria parecido com o turquesa dos slots neutros) */}
         <span className="block h-full rounded-full bg-brand" style={{ width: `${p}%` }} />
       </span>
       <span className={cn('num whitespace-nowrap', compact ? 'text-[11.5px] text-fg-muted' : 'text-fg')}>{fmtPct(p, p >= 99.95 || p === 0 ? 0 : 1)}</span>

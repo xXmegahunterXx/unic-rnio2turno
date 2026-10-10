@@ -14,8 +14,8 @@
  *  - Candidatos ordenados pelo número na urna. Cor: Presidente com as cores de identificação de CORES_IDENTIDADE
  *    (Lula vermelho, Flávio Bolsonaro azul); governador com slots neutros ('a' = menor número, 'b' = maior).
  *  - Corridas de 2º turno ('pres', 'gov-xx'): exatamente os 2 finalistas.
- *  - Corridas de 1º turno ('pres-t1', 'gov-xx-t1'): [finalista de menor nº (cor 'a'), finalista de maior nº
- *    (cor 'b'), pseudo-candidato { nomeUrna: 'Outros', numero: 0, cor: 'outros', agregado: true }].
+ *  - Corridas de 1º turno ('pres-t1', 'gov-xx-t1'): [finalista de menor nº, finalista de maior nº (cores como acima),
+ *    pseudo-candidato { nomeUrna: 'Outros', numero: 0, cor: 'outros', agregado: true }].
  *    "Outros" vem SEMPRE por último (apesar do número 0) e soma os votos válidos de todos os demais candidatos.
  *    Assim o índice 0/1 de um candidato é o mesmo no 1º e no 2º turno.
  *  - `primeiroTurno.pct` = votos ÷ válidos computados (`vvc`) × 100 com 2 casas — exatamente o `pvap` publicado

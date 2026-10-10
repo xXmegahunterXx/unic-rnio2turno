@@ -2,7 +2,8 @@
  * OG images: PNG válido 1200×630, marca "SIMULAÇÃO" quando simulado, cache de 30 s e validação.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { layoutPlacar } from './og';
+import { C, layoutPlacar } from './og';
+import { anonimizarRace } from '../shared/anon';
 import { comando, login, montar, type Montado } from './test-helpers';
 
 function dimensoesPng(buf: Buffer) {
@@ -59,9 +60,18 @@ describe('GET /api/og/apuracao.png', () => {
     expect(sim).toContain('das seções totalizadas');
     const real = JSON.stringify(layoutPlacar({ race, resumo: n.resumo, simulacao: false, horario: n.simNow, pre: false }));
     expect(real).not.toContain('SIMULAÇÃO');
-    // cores por slot (turquesa = menor número), nunca de partido
-    expect(sim).toContain('rgb(25,194,176)');
-    expect(sim).toContain('rgb(245,165,36)');
+    // nomes reais: cores de identificação (Lula vermelho, Flávio Bolsonaro azul — CORES_IDENTIDADE), vindas dos dados
+    expect(sim).toContain(C.vermelho);
+    expect(sim).toContain(C.azul);
+    expect(sim).not.toContain(C.a);
+    expect(sim).not.toContain(C.b);
+    // nomes ocultos: cores NEUTRAS (turquesa = menor número; âmbar), nunca vermelho/azul
+    const anon = JSON.stringify(layoutPlacar({ race: anonimizarRace(race), resumo: n.resumo, simulacao: true, horario: n.simNow, pre: false }));
+    expect(anon).toContain('Candidato A');
+    expect(anon).toContain(C.a);
+    expect(anon).toContain(C.b);
+    expect(anon).not.toContain(C.vermelho);
+    expect(anon).not.toContain(C.azul);
   }, 30_000);
 });
 

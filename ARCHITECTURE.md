@@ -13,8 +13,18 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
 ## 1. Regras inegociáveis (eleitorais, LGPD e neutralidade)
 
 1. **Neutralidade visual e textual.**
-   - Candidatos usam cores neutras por **ordem do número na urna**: menor número = slot `a` (turquesa) e
-     maior número = slot `b` (âmbar). Nunca use vermelho, verde-amarelo ou azul partidário.
+   - **Cores dos candidatos (decisão do dono do produto, out/2026):** Presidente com cores de identificação —
+     **Lula em vermelho** (`cor: 'vermelho'`) e **Flávio Bolsonaro em azul** (`cor: 'azul'`). Disputas de governador
+     e a simulação com nomes ocultos (`status.anonimizado`) usam cores neutras pela **ordem do número na urna**:
+     menor número = slot `a` (turquesa), maior = slot `b` (âmbar).
+     - Fonte única: `CORES_IDENTIDADE` em `src/shared/constants.ts` (e `corCandidato`/`aplicarCores` em
+       `src/shared/cores.ts`); o gerador grava as cores no `meta.json` e o adaptador do TSE as reaplica.
+     - `anonimizarRace` troca vermelho/azul por `a`/`b` pela ordem (vermelho ao lado de "Candidato A" diria quem é).
+     - Componentes usam sempre a cor que vem dos dados (`corSlot(c.cor)`, `slotDe(race, i)`, `brilhoDe(race)`),
+       nunca a posição nem classe fixa. Governador nunca herda vermelho/azul (o mesmo número muda de partido por UF).
+     - Teste Cego: nenhuma cor de candidato antes da revelação.
+     - Partidos (cargos do 1º turno): PT no mesmo vermelho de Lula, PL no mesmo azul de Flávio; os demais em tons
+       que não se confundem com eles, nem com turquesa/âmbar nem com o violeta da marca (`partidos.ts`).
    - Textos de eventos são descritivos ("Com 63,2% das seções, X passa à frente"). Nada de adjetivos,
      torcida, "vitória esmagadora" etc.
    - Fotos: só as fotos oficiais do TSE, com o mesmo tamanho e tratamento para todos, sem edição.
@@ -265,8 +275,8 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 
 - **Tema escuro como padrão** ("noite da apuração"), com tema claro completo. Todas as cores vêm dos
   tokens de `src/app/styles.css`: `bg`, `surface`, `surface-2`, `surface-3`, `fg`, `fg-muted`,
-  `fg-subtle`, `line`, `brand`, `brand-2`, `cand-a*`, `cand-b*`, `cand-outros`, `pending`, `ok`,
-  `alert`. **Nunca use hex solto em componente.** Para bordas, use a classe `border-line`.
+  `fg-subtle`, `line`, `brand`, `brand-2`, `cand-a*`, `cand-b*`, `cand-vermelho*`, `cand-azul*`, `cand-outros`,
+  `pending`, `ok`, `alert`, `partido-1..10`. **Nunca use hex solto em componente.** Para bordas, use a classe `border-line`.
 - **Tipografia**:
   - display Bricolage Grotesque (títulos e números grandes);
   - Inter para texto;
@@ -366,8 +376,8 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
 8. **Pessoas agora:** `LiveStatus.pessoasAgora`, só no servidor. No demo fica oculto; nunca inventamos número.
 9. **1º turno de todos os cargos:**
    - `/senado` (2 vagas por UF em 2026);
-   - `/camara` (513 cadeiras, com hemiciclo por partido em cores neutras por bancada — sem associar cor a
-     lado político);
+   - `/camara` (513 cadeiras, com hemiciclo por partido; PT e PL nas cores de Lula e Flávio, demais partidos em
+     tons que não se confundem com elas; bancadas por tamanho, nunca por espectro);
    - `/assembleias/:uf`;
    - governadores eleitos no 1º turno;
    - ficha `/candidato/:sqcand`: dados públicos do TSE, patrimônio declarado e resultado.

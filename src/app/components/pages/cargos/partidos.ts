@@ -1,25 +1,29 @@
 /**
- * Cores NEUTRAS por partido (cargos do 1º turno: Senado, Câmara, Assembleias, governadores eleitos).
+ * Cores por partido (cargos do 1º turno: Senado, Câmara, Assembleias, governadores eleitos).
  *
  * Regras (ARCHITECTURE §1.1 e §10.2.9):
- *  - paleta categórica própria, ESTÁVEL (a mesma cor para o mesmo partido em todas as telas) e sem relação
- *    com as cores oficiais dos partidos. Sem vermelho nem azul saturados (nenhum eixo "vermelho = esquerda /
- *    azul = direita"), sem turquesa nem âmbar (reservados aos slots A/B dos candidatos do 2º turno) e sem o
- *    violeta da marca;
- *  - os 10 maiores partidos pelo nº de eleitos em 2026 (Câmara + Assembleias + Senado; critério de TAMANHO,
- *    nunca de espectro) recebem uma cor cada; os demais ficam em dois cinzas neutros alternados;
+ *  - paleta categórica própria e ESTÁVEL (a mesma cor para o mesmo partido em todas as telas);
+ *  - PT no vermelho do Lula e PL no azul do Flávio Bolsonaro — os MESMOS tokens dos candidatos (`--partido-2` =
+ *    `var(--cand-vermelho)`, `--partido-1` = `var(--cand-azul)`), para a cor do partido nunca contradizer a do seu
+ *    candidato a Presidente (decisão do dono do produto; ver CORES_IDENTIDADE em src/shared/constants.ts);
+ *  - os outros 8 fogem de vermelho/rosa-avermelhado, de azul/anil, de turquesa e âmbar (slots neutros A/B, ainda usados
+ *    nos governadores e na simulação com nomes ocultos) e do violeta da marca;
+ *  - os 10 maiores partidos pelo nº de eleitos em 2026 (Câmara + Assembleias + Senado; critério de TAMANHO, nunca de
+ *    espectro) recebem uma cor cada; os demais ficam em dois cinzas neutros alternados;
  *  - identidade nunca só pela cor: toda legenda, dica e lista traz a sigla do partido.
  *
- * Paleta escolhida por otimização (OKLab ×100, simulação CVD Machado 2009) para maximizar a PIOR separação entre
- * QUAISQUER dois partidos nos dois temas — nas Assembleias, quase todo par de partidos fica lado a lado em alguma
- * UF. Lightness e croma dentro das faixas; pior par: visão normal ≈ 8–10 e CVD ≈ 5–6 (abaixo das metas de 15/8,
- * inevitável com 10 cores "todos os pares"), então a identidade NUNCA depende só da cor: cadeiras separadas,
- * legenda/lista com a sigla ao lado, dica com o partido. A atribuição partido → cor também foi otimizada e
- * evita a cor oficial de cada partido (e nada de verde-amarelo para o PT nem tons avermelhados para o PL).
- * Contraste < 3:1 de algumas cores sobre a superfície → sempre há rótulo (regra de alívio).
+ * Os 8 tons foram escolhidos por otimização (OKLab ×100, simulação de daltonismo Machado 2009 — protan, deutan e
+ * tritan, severidade 1) para maximizar a PIOR separação entre QUAISQUER dois dos 10 partidos nos dois temas (nas
+ * Assembleias quase todo par fica lado a lado em alguma UF), com matiz fora das faixas proibidas e distância mínima
+ * de vermelho/azul (≥ 15 normal, ≥ 5 com daltonismo), da marca (≥ 15) e de turquesa/âmbar (≥ 12). Pior par: visão
+ * normal ≈ 10,4 (MDB × UNIÃO) e daltonismo ≈ 5,0–5,8 (PL × REPUBLICANOS no escuro, PT × PSD no claro) — abaixo das
+ * metas de 15/8, inevitável com 10 cores "todos os pares" e as faixas proibidas; por isso a sigla vem sempre junto.
+ * A atribuição evita as cores oficiais conhecidas dos demais partidos (verde/amarelo para MDB, PSD, REPUBLICANOS e
+ * PODE; amarelo/vermelho para PSB e PSOL). Contraste < 3:1 de algumas cores sobre a superfície → sempre há rótulo.
  *
  * Os valores são tokens do tema em src/app/styles.css (`--partido-1..10`, "R G B", tema escuro e claro), na ordem
- * de PARTIDOS_COM_COR; os componentes só usam `rgb(var(--partido-n))` via `corPartido()`.
+ * de PARTIDOS_COM_COR; os componentes só usam `rgb(var(--partido-n))` via `corPartido()`. Espelho no servidor:
+ * src/server/og-hemiciclo.ts.
  */
 import { tokenCss } from '@/app/lib/tokens';
 

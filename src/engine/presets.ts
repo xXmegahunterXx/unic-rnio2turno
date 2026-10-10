@@ -1,6 +1,7 @@
 /**
  * Presets do admin (ARCHITECTURE.md §5.3). Neutralidade: todo preset que favorece um lado tem o espelho.
- * "A" = candidato de menor número (slot de cor 'a'); "B" = o outro.
+ * "A" = candidato de menor número (índice 0 em Race.candidatos); "B" = o outro. (A cor não indica a posição: Presidente
+ * usa vermelho/azul de identificação; ver CORES_IDENTIDADE.)
  *
  * Um preset é aplicado SOBRE o cenário padrão neutro (não sobre o cenário atual) para ser reprodutível;
  * só a semente atual é mantida. Para ajustes finos, use o comando `cenario` depois.

@@ -46,7 +46,7 @@ export const C = {
   bInk: 'rgb(48,28,0)',
   vermelho: 'rgb(239,68,68)',
   vermelhoInk: 'rgb(40,6,6)',
-  azul: 'rgb(59,130,246)',
+  azul: 'rgb(44,140,238)',
   azulInk: 'rgb(4,18,48)',
   outros: 'rgb(139,139,163)',
   pending: 'rgb(58,58,80)',

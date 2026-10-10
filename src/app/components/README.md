@@ -9,20 +9,24 @@ Fixtures falsas e consistentes para testes: `src/app/fixtures/core.ts` (`coreFix
 Regras que os componentes já cumprem — e que as páginas devem manter:
 
 - **Só tokens** (`bg-surface`, `text-fg-muted`, `border-line`, `bg-cand-a`…). Cores de candidato **sempre** via
-  `corSlot(candidato.cor)` de `src/app/lib/raceUi.ts` — nunca escolha cor por partido/nome.
-- **Candidatos na ordem da urna** (slot `a` à esquerda/em cima). Nunca reordene por quem lidera.
+  `corSlot(candidato.cor)` de `src/app/lib/raceUi.ts`, com a cor que vem dos dados — nunca pela posição nem por
+  classe fixa. `Candidate.cor`: `'vermelho'`/`'azul'` = cores de identificação de Presidente (Lula vermelho, Flávio
+  Bolsonaro azul; decisão do dono do produto, fonte única `CORES_IDENTIDADE` em `src/shared/constants.ts`);
+  `'a'`/`'b'` = slots neutros turquesa/âmbar (governadores e simulação com nomes ocultos — `anonimizarRace`
+  neutraliza as cores); `'outros'` = cinza. Antes da revelação do Teste Cego, nada na cor de candidato.
+- **Candidatos na ordem da urna** (menor número à esquerda/em cima). Nunca reordene por quem lidera.
 - **Números**: classe `.num` + formatadores de `src/shared/format.ts`; percentuais de `src/shared/calc.ts`.
 - **Simulação sinalizada**: o AppShell já mostra a faixa quando `status.simulacao`; passe `simulado` para
   `Placar`, `ShareCard`/`ShareButton` (e o BU usa `secao.simulado`).
 - **Linhas**: `border-line`, `bg-line`, `divide-line`, `ring-line`, `decoration-line` saem sempre sutis (o alfa vem
   do tema, `--line-alpha`). O modificador multiplica esse alfa: `border-line/[2]` = 2× mais visível (hover).
 - **Texto colorido** usa os tokens `*-fg` (AA ≥ 4,5:1 nos dois temas, inclusive sobre o fundo suave `bg-x/15`):
-  `text-brand-fg`, `text-cand-a-fg`, `text-cand-b-fg`, `text-ok-fg`, `text-alert-fg`. As cores puras
+  `text-brand-fg`, `text-cand-a-fg`, `text-cand-b-fg`, `text-cand-vermelho-fg`, `text-cand-azul-fg`, `text-ok-fg`, `text-alert-fg`. As cores puras
   (`text-cand-a`, `text-brand-2`…) só em números grandes (≥ 24 px, 3:1) e ícones. `corSlot(cor).text` já devolve o `*-fg`.
 - **Botões com texto branco** sobre a marca: `bg-brand-cta` (violeta → púrpura, ≥ 4,5:1). `bg-brand-grad`
   (violeta → lilás) é decorativo (barras, realces) — nunca sob texto.
 - **Progresso = marca** (`bg-brand`/`bg-brand-grad`), inclusive em 100%. Não use `ok` (verde) perto de dados de
-  candidato: fica parecido com o turquesa do slot A.
+  candidato: fica parecido com o turquesa do slot neutro A.
 - **Tabelas respondem à largura delas mesmas** (container query da `DataTable`): use `hideBelowWidth` nas colunas
   secundárias e `soAbaixoDe[...]` para o conteúdo que as substitui (ex.: % apurado sob o nome). Assim a mesma tabela
   fica certa no celular e num cartão de meia largura no desktop. `LARGURA` e `W` (em `cells.tsx`) trazem os padrões.
@@ -326,7 +330,7 @@ importante vira **imagem + texto + link** bonitos e neutros para o X, inclusive 
 | `interface ConteudoCompartilhavel` | `titulo` (do sheet) · `texto` (neutro, **sem url**, ≤ 220 de peso do X) · `caminho` (rota do app; vira URL absoluta, funciona no HashRouter do demo) · `hashtags?` (sem `#`) · `nomeArquivo` (sem extensão) · `cartao?(formato)` (desenha o cartão em px reais) · `formatos?` (o 1º é o inicial) · `simulado?` (prefixa "[SIMULAÇÃO]" no texto, sem duplicar). |
 | `BotaoCompartilhar` | `ConteudoCompartilhavel` + `label?` (padrão "Compartilhar"), `variant?`, `size?`, `className?`, `soIcone?`, `icone?`, `descricao?` (linha do sheet), `carregando?` (dados do cartão chegando: as ações de imagem esperam). O cartão só é montado com o sheet aberto. |
 | `CompartilharSheet` | o mesmo + `aberto`, `onFechar`. Prévia escalada, seletor de formato, "Postar no X" (link de verdade para `x.com/intent/post`), "Compartilhar…" (Web Share com o PNG quando `canShare({files})`, senão texto+link), WhatsApp, Baixar/Salvar imagem, Copiar link, Copiar texto, contador de caracteres do X. |
-| `CartaoBase` | `formato`, `simulado?`, `titulo?`, `rodape?`, `children` (o miolo), `className?` + extras: `sobrancelha?`, `caminho?` (mostrado após o domínio), `instante?` (epoch; `null` esconde; padrão agora), `rotuloInstante?` ("Dados de"), `fonte?`, `selo?` (ex.: `<SeloOficial>Resultado oficial</SeloOficial>`), `brilho?` (`'duelo'` A×B, `'marca'`, `'neutro'` ou um par de slots). Moldura: fundo com brilho em gradiente (sem blur), logo, URL apresentável (`siteExibicao()`; em prévia/localhost vira "Apuração ao vivo"), data/hora de Brasília. **Simulado** = selo no topo + faixa "SIMULAÇÃO · dados fictícios · não são resultados reais" no rodapé + marca-d'água diagonal (sobrevive a recortes). |
+| `CartaoBase` | `formato`, `simulado?`, `titulo?`, `rodape?`, `children` (o miolo), `className?` + extras: `sobrancelha?`, `caminho?` (mostrado após o domínio), `instante?` (epoch; `null` esconde; padrão agora), `rotuloInstante?` ("Dados de"), `fonte?`, `selo?` (ex.: `<SeloOficial>Resultado oficial</SeloOficial>`), `brilho?` (`'duelo'` = par neutro turquesa/âmbar, `'marca'`, `'neutro'` ou um par de cores — com candidatos use `brilhoDe(race)`, que pega as cores dos dados). Moldura: fundo com brilho em gradiente (sem blur), logo, URL apresentável (`siteExibicao()`; em prévia/localhost vira "Apuração ao vivo"), data/hora de Brasília. **Simulado** = selo no topo + faixa "SIMULAÇÃO · dados fictícios · não são resultados reais" no rodapé + marca-d'água diagonal (sobrevive a recortes). |
 | `useCartao()` | `{ formato, w, h, k, retrato }` dentro do cartão: `k` = escala em relação ao 16:9 (x 1 · feed 1,3 · story 1,42). Escreva o miolo com `style={{ fontSize: 40 * k }}`. |
 | `PreviaCartao` | `formato`, `children`, `ref` → nó em tamanho real (é dele que sai o PNG). `ShareCardPreview` (antigo) continua funcionando. |
 | Peças | `AvatarCartao` (foto oficial ou monograma, mesmo recorte), `PctGigante`, `BarraDuelo` (marca dos 50%), `PilulaApurado`, `RotuloCartao`, `SeloSimulacao`, `SeloOficial`. |
