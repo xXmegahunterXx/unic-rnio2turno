@@ -1,5 +1,7 @@
 /**
- * Abertura do Teste Cego (e do Duelo): título, fatos rápidos, como funciona, privacidade e o aviso editorial.
+ * Abertura do Teste Cego (e do Duelo), pensada para quem chega pelo X no celular: o gancho em 3 segundos é o título
+ * curto + a PRIMEIRA AFIRMAÇÃO já respondível (`vitrine`). No celular a ordem é título → afirmação → ações; no desktop,
+ * texto e ações à esquerda e a afirmação à direita. Depois: como funciona, privacidade e o aviso editorial.
  */
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -8,6 +10,7 @@ import { AFIRMACOES } from '@/app/content/afirmacoes';
 import { cn } from '@/app/lib/cn';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import { IlustracaoAfirmacao } from './IlustracaoAfirmacao';
+import { minutosEstimados } from './sintonia';
 
 export interface IntroTesteProps {
   eyebrow: ReactNode;
@@ -19,12 +22,16 @@ export interface IntroTesteProps {
   extra?: ReactNode;
   /** Esconde a seção "Como funciona". */
   semPassos?: boolean;
+  /** Bloco ao lado do texto (desktop) / logo abaixo do título (celular). Padrão: a ilustração. */
+  vitrine?: ReactNode;
+  /** Fatos rápidos (padrão: afirmações, tempo e privacidade). */
+  fatos?: ReactNode;
   passos?: { icone: IconName; titulo: string; texto: string }[];
 }
 
 export const N_AFIRMACOES = AFIRMACOES.length;
-/** Tempo estimado (minutos). */
-export const MINUTOS_TESTE = 3;
+/** Tempo estimado (minutos), honesto: 7,5 s por afirmação (ver `minutosEstimados`). */
+export const MINUTOS_TESTE = minutosEstimados(N_AFIRMACOES);
 
 export const PASSOS_TESTE: NonNullable<IntroTesteProps['passos']> = [
   {
@@ -35,7 +42,7 @@ export const PASSOS_TESTE: NonNullable<IntroTesteProps['passos']> = [
   {
     icone: 'check-circulo',
     titulo: 'Diga o quanto concorda',
-    texto: 'De “concordo totalmente” a “discordo totalmente”. “Neutro” conta como meio-termo; se não souber, pule. Marque o que pesa mais para você.',
+    texto: 'Da esquerda para a direita: de “discordo totalmente” a “concordo totalmente”. “Neutro” conta como meio-termo; se não souber, pule. Marque o que pesa mais para você.',
   },
   {
     icone: 'selo',
@@ -47,41 +54,48 @@ export const PASSOS_TESTE: NonNullable<IntroTesteProps['passos']> = [
 /** Há afirmações ainda sem a revisão humana editorial e jurídica? (ver content/FONTES.md) */
 export const EM_REVISAO = AFIRMACOES.some((a) => !a.revisado);
 
-export function IntroTeste({ eyebrow, titulo, subtitulo, acoes, extra, semPassos, passos = PASSOS_TESTE }: IntroTesteProps) {
+export function IntroTeste({ eyebrow, titulo, subtitulo, acoes, extra, semPassos, passos = PASSOS_TESTE, vitrine, fatos }: IntroTesteProps) {
   const reduzir = useReducedMotion();
   const entrar = (d: number) =>
     reduzir ? {} : { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.5, delay: d, ease: [0.22, 0.9, 0.24, 1] as const } };
   return (
     <div>
-      <section className="grid grid-cols-1 items-center gap-6 pt-6 sm:pt-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-12 lg:pt-14">
-        <div className="min-w-0">
+      {/* Celular: título → vitrine → ações. Desktop (lg): texto + ações à esquerda, vitrine à direita. */}
+      <section className="grid grid-cols-1 items-center gap-x-12 gap-y-5 pt-5 sm:gap-y-7 sm:pt-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] lg:gap-y-0 lg:pt-14">
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-end">
           <motion.div {...entrar(0)}>{eyebrow}</motion.div>
           <motion.h1
             {...entrar(0.06)}
-            className="mt-4 text-balance font-display text-[40px] font-semibold leading-[0.98] tracking-[-0.04em] text-fg sm:text-[60px] lg:text-[64px] xl:text-[72px]"
+            className="mt-3.5 text-balance font-display text-[40px] font-semibold leading-[0.98] tracking-[-0.04em] text-fg sm:mt-4 sm:text-[60px] lg:text-[60px] xl:text-[66px]"
           >
             {titulo}
           </motion.h1>
-          <motion.p {...entrar(0.12)} className="mt-4 max-w-[36rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:mt-5 sm:text-[18px]">
+          <motion.p {...entrar(0.12)} className="mt-3 max-w-[36rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:mt-5 sm:text-[18px]">
             {subtitulo}
           </motion.p>
-          <motion.ul {...entrar(0.18)} className="mt-5 flex flex-wrap gap-2 sm:mt-6">
-            <Fato icone="lista">
-              <span className="num">{N_AFIRMACOES}</span> afirmações
-            </Fato>
-            <Fato icone="relogio">
-              ≈ <span className="num">{MINUTOS_TESTE}</span> minutos
-            </Fato>
-            <Fato icone="olho-fechado">Nada sai do seu aparelho</Fato>
-          </motion.ul>
-          <motion.div {...entrar(0.24)} className="mt-6 flex flex-col gap-2.5 sm:mt-8 sm:flex-row sm:flex-wrap sm:items-center">
+        </div>
+        <motion.div {...entrar(0.16)} className="mx-auto w-full max-w-[520px] lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:max-w-none">
+          {vitrine ?? <IlustracaoAfirmacao />}
+        </motion.div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-start">
+          <motion.div {...entrar(0.2)} className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center lg:mt-8">
             {acoes}
           </motion.div>
+          <motion.ul {...entrar(0.24)} className="mt-4 flex flex-wrap gap-2 sm:mt-6">
+            {fatos ?? (
+              <>
+                <Fato icone="lista">
+                  <span className="num">{N_AFIRMACOES}</span> afirmações
+                </Fato>
+                <Fato icone="relogio">
+                  ≈ <span className="num">{MINUTOS_TESTE}</span> min
+                </Fato>
+                <Fato icone="olho-fechado">Nada sai do seu aparelho</Fato>
+              </>
+            )}
+          </motion.ul>
           {extra ? <motion.div {...entrar(0.3)} className="mt-4">{extra}</motion.div> : null}
         </div>
-        <motion.div {...entrar(0.16)} className="mx-auto w-full max-w-[460px] lg:max-w-none">
-          <IlustracaoAfirmacao />
-        </motion.div>
       </section>
 
       {!semPassos ? (
@@ -125,7 +139,7 @@ export function IntroTeste({ eyebrow, titulo, subtitulo, acoes, extra, semPassos
   );
 }
 
-function Fato({ icone, children }: { icone: IconName; children: ReactNode }) {
+export function Fato({ icone, children }: { icone: IconName; children: ReactNode }) {
   return (
     <li className="inline-flex h-9 items-center gap-2 rounded-full border border-line bg-surface/70 px-3.5 text-[13.5px] font-medium text-fg backdrop-blur">
       <Icon name={icone} size={16} className="text-brand-fg" />

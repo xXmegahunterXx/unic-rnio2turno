@@ -34,6 +34,7 @@ describe('rotas do Teste Cego (v2)', () => {
 
   it('teste: a semente vai na query (só a ordem, nunca respostas)', () => {
     expect(caminhoTeste(12345)).toBe(`/teste?s=${sementeParaTexto(12345)}`);
+    expect(caminhoTeste(12345, true)).toBe(`/teste?s=${sementeParaTexto(12345)}&r=1`);
   });
 
   it('duelo: desafio no caminho e respostas depois do "#"', () => {

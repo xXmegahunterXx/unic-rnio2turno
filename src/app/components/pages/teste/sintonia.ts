@@ -11,8 +11,12 @@ import {
   AFIRMACOES,
   calcularConcordancia,
   CANDIDATOS,
+  direcao,
   ESCALA,
   ehResposta,
+  ladoDoConcordo,
+  ordemDoTeste,
+  TEMAS,
   type Afirmacao,
   type Candidato,
   type Resposta,
@@ -124,3 +128,128 @@ export function frasesConcordancia(iguais: number, total: number): string {
   if (iguais / total >= 0.4) return 'Vocês concordam em parte — e discordam em temas que valem uma conversa.';
   return 'Vocês pensam diferente na maioria das afirmações — assunto não falta para uma boa conversa.';
 }
+
+// ── Tempo estimado (honesto) ──────────────────────────────────────────────────
+//
+// Medimos a leitura: as afirmações têm até 110 caracteres (~18 palavras ≈ 5 s de leitura no celular) e a decisão leva
+// mais 2–3 s. 7,5 s por afirmação ⇒ 24 em ≈ 3 min e 12 em ≈ 2 min. Durante o teste, a estimativa do que falta usa o
+// RITMO DA PRÓPRIA PESSOA (mediana dos intervalos entre respostas, limitada a 3–20 s) a partir da 3ª resposta.
+
+export const SEGUNDOS_POR_AFIRMACAO = 7.5;
+
+/** Minutos estimados para `n` afirmações (arredondado, mínimo 1). */
+export const minutosEstimados = (n: number) => Math.max(1, Math.round((n * SEGUNDOS_POR_AFIRMACAO) / 60));
+
+/** Segundos que faltam, pelo ritmo da pessoa (intervalos em ms entre respostas) ou pelo padrão. */
+export function segundosRestantes(restantes: number, intervalosMs: readonly number[] = []): number {
+  if (restantes <= 0) return 0;
+  const validos = intervalosMs.filter((x) => Number.isFinite(x) && x > 0);
+  let porItem = SEGUNDOS_POR_AFIRMACAO;
+  if (validos.length >= 3) {
+    const ord = [...validos].sort((a, b) => a - b);
+    const meio = ord.length >> 1;
+    const mediana = ord.length % 2 ? ord[meio] : (ord[meio - 1] + ord[meio]) / 2;
+    porItem = Math.min(20, Math.max(3, mediana / 1000));
+  }
+  return restantes * porItem;
+}
+
+/** "menos de 1 min" · "≈ 2 min" (sem número quando não falta nada). */
+export function textoRestante(segundos: number): string {
+  if (segundos <= 0) return '';
+  if (segundos < 45) return 'menos de 1 min';
+  return `≈ ${Math.max(1, Math.round(segundos / 60))} min`;
+}
+
+// ── Modo rápido (12 afirmações, uma por tema) ─────────────────────────────────
+//
+// Cabe no modelo atual sem mudar o código da URL: as 12 afirmações que ficam de fora vão como "não respondida" (0 no
+// código), que o cálculo já trata como fora da conta. A fórmula é a MESMA; só há menos itens (resultado menos preciso,
+// e a página diz isso). Para não distorcer, a seleção sorteada pela semente sai só entre as combinações "uma por tema"
+// que mantêm o equilíbrio do teste completo (ver `validarAfirmacoes`):
+//   - concordar aproxima de cada candidato em quantidades iguais (±1);
+//   - afirmações com posições opostas: tantas em que o 13 concorda quanto em que o 22 concorda (±1);
+//   - o número de afirmações com posição documentada é o mesmo para os dois (±1) — os dois percentuais têm a mesma base;
+//   - no máximo 1 afirmação de controle (os dois planos com a mesma posição).
+// O Duelo de quem fez o modo rápido usa exatamente as afirmações que essa pessoa respondeu.
+
+export interface EquilibrioSelecao {
+  ladoDoConcordo: { 13: number; 22: number; ambos: number };
+  opostas: { 13: number; 22: number };
+  comPosicao: { 13: number; 22: number };
+  controles: number;
+}
+
+export function equilibrioDe(lista: readonly Afirmacao[]): EquilibrioSelecao {
+  const e: EquilibrioSelecao = { ladoDoConcordo: { 13: 0, 22: 0, ambos: 0 }, opostas: { 13: 0, 22: 0 }, comPosicao: { 13: 0, 22: 0 }, controles: 0 };
+  for (const a of lista) {
+    const l = ladoDoConcordo(a);
+    if (l !== null) e.ladoDoConcordo[l]++;
+    const d = direcao(a);
+    if (d) e.opostas[d]++;
+    for (const c of CANDIDATOS) if (a.posicoes[c].valor !== 'sem-posicao') e.comPosicao[c]++;
+    if (a.posicoes[13].valor === a.posicoes[22].valor && a.posicoes[13].valor !== 'sem-posicao') e.controles++;
+  }
+  return e;
+}
+
+export const selecaoEquilibrada = (e: EquilibrioSelecao) =>
+  Math.abs(e.ladoDoConcordo[13] - e.ladoDoConcordo[22]) <= 1 &&
+  Math.abs(e.opostas[13] - e.opostas[22]) <= 1 &&
+  Math.abs(e.comPosicao[13] - e.comPosicao[22]) <= 1 &&
+  e.controles <= 1;
+
+let combinacoes: string[][] | null = null;
+
+/** Todas as seleções "uma afirmação por tema" equilibradas (ids na ordem canônica). Calculado uma vez (2¹² combinações). */
+export function selecoesRapidas(): readonly string[][] {
+  if (combinacoes) return combinacoes;
+  const grupos = TEMAS.map((t) => AFIRMACOES.filter((a) => a.tema === t.id)).filter((g) => g.length > 0);
+  const out: string[][] = [];
+  const n = 1 << grupos.length;
+  for (let m = 0; m < n; m++) {
+    // Tema com uma só afirmação: o bit é ignorado (evita repetir a mesma seleção).
+    if (grupos.some((g, i) => g.length < 2 && (m >> i) & 1)) continue;
+    const sel = grupos.map((g, i) => g[Math.min(g.length - 1, (m >> i) & 1)]);
+    if (selecaoEquilibrada(equilibrioDe(sel))) out.push(AFIRMACOES.filter((a) => sel.includes(a)).map((a) => a.id));
+  }
+  combinacoes = out;
+  return out;
+}
+
+/** Número de afirmações do modo rápido (uma por tema). */
+export const N_RAPIDO = TEMAS.length;
+
+/** As afirmações do modo rápido para uma semente (determinístico; ids na ordem canônica). */
+export function selecaoRapida(seed: number): string[] {
+  const todas = selecoesRapidas();
+  if (!todas.length) return AFIRMACOES.map((a) => a.id); // nunca deveria acontecer (testado)
+  // Mistura a semente (a mesma semente define a ordem; aqui escolhe a combinação).
+  let h = Math.imul((seed >>> 0) ^ 0x9e3779b9, 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return [...todas[(h >>> 0) % todas.length]];
+}
+
+/** Ordem de exibição do quiz: as 24 (ou só `ids`, no modo rápido/duelo rápido), embaralhadas pela semente. */
+export function ordemQuiz(seed: number, ids?: readonly string[] | null): Afirmacao[] {
+  if (!ids || ids.length === 0 || ids.length >= AFIRMACOES.length) return ordemDoTeste(seed);
+  const set = new Set(ids);
+  return ordemDoTeste(
+    seed,
+    AFIRMACOES.filter((a) => set.has(a.id)),
+  );
+}
+
+/**
+ * Qual conjunto de afirmações uma pessoa recebeu, a partir das respostas decodificadas do link: as 24 (teste completo,
+ * todas com resposta ou "pular") ou só as que têm resposta (modo rápido — as demais vêm como "não respondida").
+ */
+export function conjuntoRespondido(respostas: Respostas): { rapido: boolean; ids: string[] } {
+  const ids = AFIRMACOES.filter((a) => respostas[a.id] !== undefined).map((a) => a.id);
+  const rapido = ids.length > 0 && ids.length < AFIRMACOES.length;
+  return { rapido, ids: rapido ? ids : AFIRMACOES.map((a) => a.id) };
+}
+
+/** Quantas foram puladas ("Pular") entre `ids` (não conta as que ficaram de fora do modo rápido). */
+export const contarPuladas = (respostas: Respostas, ids: readonly string[]) => ids.reduce((n, id) => n + (respostas[id] === 'pular' ? 1 : 0), 0);

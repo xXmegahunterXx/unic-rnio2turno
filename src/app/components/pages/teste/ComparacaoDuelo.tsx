@@ -18,15 +18,28 @@ import { fmtSintonia, type Autor, type ComparacaoDuelo } from './sintonia';
  * Placar do Duelo como título (h1): "Vocês concordaram em N de M afirmações" (mesmo lado da escala), e uma
  * fileira de marcadores na ordem em que as afirmações apareceram.
  */
-export function PlacarConcordancia({ comp, revelado, id }: { comp: ComparacaoDuelo; revelado: boolean; id?: string }) {
+export function PlacarConcordancia({ comp, revelado, analisando, id }: { comp: ComparacaoDuelo; revelado: boolean; analisando?: boolean; id?: string }) {
   const reduzir = useReducedMotion();
   const total = comp.emComum;
   return (
     <div className="flex flex-col items-center text-center">
-      <h1 id={id} className="flex flex-col items-center font-display font-semibold text-fg">
-        <span className="text-balance text-[22px] leading-tight tracking-[-0.025em] sm:text-[30px]">Vocês concordaram em</span>
+      <h1 id={id} className="flex flex-col items-center font-display font-semibold text-fg" aria-live="polite">
+        <span className="text-balance text-[22px] leading-tight tracking-[-0.025em] sm:text-[30px]">
+          {revelado ? 'Vocês concordaram em' : analisando ? 'Comparando as respostas…' : 'Em quantas vocês concordam?'}
+        </span>
         <span className="mt-1 flex items-baseline gap-2 tracking-[-0.05em] sm:mt-2">
-          <NumberRoll value={revelado ? comp.iguais : 0} className="text-[88px] leading-[0.9] sm:text-[128px]" duration={900} ariaLabel={String(comp.iguais)} />
+          {revelado ? (
+            <NumberRoll value={comp.iguais} className="text-[88px] leading-[0.9] sm:text-[128px]" duration={900} ariaLabel={String(comp.iguais)} />
+          ) : (
+            <motion.span
+              aria-label="Placar oculto"
+              className="inline-block text-[88px] leading-[0.9] text-fg-subtle sm:text-[128px]"
+              animate={analisando && !reduzir ? { opacity: [1, 0.35, 1] } : { opacity: 1 }}
+              transition={analisando ? { duration: 0.7, repeat: Infinity } : undefined}
+            >
+              ?
+            </motion.span>
+          )}
           <span className="num text-[30px] tracking-[-0.03em] text-fg-muted sm:text-[44px]">
             <span className="sr-only">de</span>
             <span aria-hidden>/</span> {fmtInt(total)}

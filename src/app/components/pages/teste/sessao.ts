@@ -14,6 +14,8 @@ export interface Progresso {
   importantes: string[];
   /** Posição atual na ordem embaralhada. */
   idx: number;
+  /** Modo rápido (12 afirmações, uma por tema — ver `selecaoRapida`). */
+  rapido?: boolean;
 }
 
 const CHAVE_TESTE = 'sintonia:teste:v2:progresso';
@@ -53,7 +55,7 @@ function normalizar(v: unknown): Progresso | null {
     ? o.importantes.filter((id): id is string => typeof id === 'string' && !!AFIRMACAO_POR_ID[id] && typeof respostas[id] === 'number')
     : [];
   const idx = typeof o.idx === 'number' ? Math.max(0, Math.min(TOTAL - 1, Math.floor(o.idx))) : 0;
-  return { seed: o.seed, respostas, importantes, idx };
+  return { seed: o.seed, respostas, importantes, idx, ...(o.rapido === true ? { rapido: true } : {}) };
 }
 
 /** Progresso do teste em andamento (opcionalmente só se for da semente dada). */
@@ -65,9 +67,10 @@ export function lerProgresso(seed?: number): Progresso | null {
 export const gravarProgresso = (p: Progresso) => gravar(CHAVE_TESTE, p);
 export const apagarProgresso = () => apagar(CHAVE_TESTE);
 
-/** Quantas afirmações já têm resposta (inclui "Pular"). */
-export const concluidas = (r: MapaRespostas) => AFIRMACOES.reduce((n, a) => n + (r[a.id] !== undefined ? 1 : 0), 0);
-export const completo = (r: MapaRespostas) => concluidas(r) === TOTAL;
+/** Quantas afirmações já têm resposta (inclui "Pular"). Com `ids`, só entre elas (modo rápido). */
+export const concluidas = (r: MapaRespostas, ids?: readonly string[]) =>
+  ids ? ids.reduce((n, id) => n + (r[id] !== undefined ? 1 : 0), 0) : AFIRMACOES.reduce((n, a) => n + (r[a.id] !== undefined ? 1 : 0), 0);
+export const completo = (r: MapaRespostas, ids?: readonly string[]) => concluidas(r, ids) === (ids ? ids.length : TOTAL);
 
 /** Respostas de quem recebeu o desafio, por código do desafio (inclui as respostas de quem desafiou). */
 export function lerDuelo(chave: string): Progresso | null {

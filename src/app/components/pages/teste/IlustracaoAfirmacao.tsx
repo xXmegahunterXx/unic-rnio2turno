@@ -37,7 +37,7 @@ export function IlustracaoAfirmacao({ className, compacta }: { className?: strin
             <div className="absolute left-[10%] right-[10%] top-1/2 h-[2px] -translate-y-1/2 rounded-full bg-line/[2]" />
             <div className="relative grid grid-cols-5">
               {PONTOS.map((n, i) => {
-                const marcado = i === 1;
+                const marcado = i === 3; // "Concordo" (a escala vai de discordo, à esquerda, a concordo, à direita)
                 return (
                   <span key={i} className="flex h-8 items-center justify-center sm:h-9">
                     {/* fundo opaco (bg-surface) por baixo da tinta: o trilho não aparece dentro do círculo */}
@@ -61,11 +61,11 @@ export function IlustracaoAfirmacao({ className, compacta }: { className?: strin
               })}
             </div>
             <div className="mt-1.5 grid grid-cols-5 text-center text-[9.5px] font-medium leading-tight text-fg-subtle sm:text-[10.5px]">
-              <span>Concordo totalmente</span>
-              <span className="text-fg">Concordo</span>
-              <span>Neutro</span>
-              <span>Discordo</span>
               <span>Discordo totalmente</span>
+              <span>Discordo</span>
+              <span>Neutro</span>
+              <span className="text-fg">Concordo</span>
+              <span>Concordo totalmente</span>
             </div>
           </div>
         </div>

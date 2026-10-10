@@ -1,6 +1,6 @@
 /**
  * "Afirmação a afirmação": para cada afirmação, a resposta da pessoa e a posição DOCUMENTADA de cada candidato
- * na mesma régua (concordo totalmente ← → discordo totalmente). Aberta, mostra o trecho literal do plano entre
+ * na mesma régua do quiz (discordo totalmente ← → concordo totalmente). Aberta, mostra o trecho literal do plano entre
  * aspas e o link para a página do PDF. Candidatos na ordem da urna, mesma tipografia para os dois.
  * No Duelo, a régua ganha um segundo marcador (quem desafiou).
  */
@@ -38,8 +38,8 @@ interface Contexto {
   duelo?: boolean;
 }
 
-/** Posição horizontal (%) de um valor −2…+2 na régua: +2 à esquerda (10%), −2 à direita (90%). */
-const xDe = (v: number) => 10 + ((2 - v) / 4) * 80;
+/** Posição horizontal (%) de um valor −2…+2 na régua, na mesma ordem do quiz: −2 à esquerda (10%), +2 à direita (90%). */
+const xDe = (v: number) => 10 + ((v + 2) / 4) * 80;
 const pontos = (p: Posicao) => (p.valor === 'concorda' ? 2 : p.valor === 'discorda' ? -2 : p.valor === 'neutro' ? 0 : null);
 
 export function LegendaRegua({ duelo, className }: { duelo?: boolean; className?: string }) {
@@ -47,9 +47,9 @@ export function LegendaRegua({ duelo, className }: { duelo?: boolean; className?
     <div className={cn('flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px] text-fg-muted', className)}>
       <span className="inline-flex items-center gap-1.5">
         <Icon name="seta-esquerda" size={14} className="text-fg-subtle" />
-        Concordo totalmente
-        <span className="mx-1 inline-block h-px w-6 bg-line/[3]" aria-hidden />
         Discordo totalmente
+        <span className="mx-1 inline-block h-px w-6 bg-line/[3]" aria-hidden />
+        Concordo totalmente
         <Icon name="seta" size={14} className="text-fg-subtle" />
       </span>
       <span className="inline-flex items-center gap-1.5">
@@ -102,7 +102,7 @@ export function Regua({ linha, ctx }: { linha: LinhaAfirmacao; ctx: Contexto }) 
       ))}
       {/* trilho */}
       <span className="absolute left-[10%] right-[10%] top-[42px] h-[2px] -translate-y-1/2 rounded-full bg-line/[2.5]" />
-      {[2, 1, 0, -1, -2].map((v) => (
+      {[-2, -1, 0, 1, 2].map((v) => (
         <span key={v} className="absolute top-[42px] h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg-subtle/50" style={{ left: `${xDe(v)}%` }} />
       ))}
       {/* respostas (no trilho) */}

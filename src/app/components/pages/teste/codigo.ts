@@ -5,7 +5,7 @@
  *   "2" + semente(5) + respostas(24)  — 30 caracteres [0-9a-z]
  *
  * Onde cada parte vive:
- *  - teste em andamento:  /teste?s=<semente>                  (a semente só define a ordem; não é dado pessoal)
+ *  - teste em andamento:  /teste?s=<semente>[&r=1]            (a semente só define a ordem; r=1 = modo rápido)
  *  - resultado:           /teste/resultado#<código>
  *  - duelo:               /duelo/<"2" + semente>#<respostas>  (aceita também o código inteiro no caminho ou no hash)
  *
@@ -79,5 +79,5 @@ export const caminhoResultado = (seed: number, respostas: Respostas, importantes
 export const caminhoDuelo = (seed: number, respostas: Respostas, importantes: Iterable<string> = []) =>
   `/duelo/${codigoDesafio(seed)}#${codificarRespostas(respostas, importantes)}`;
 
-/** Caminho do teste com a semente (reproduz a mesma ordem). */
-export const caminhoTeste = (seed: number) => `/teste?s=${sementeParaTexto(seed)}`;
+/** Caminho do teste com a semente (reproduz a mesma ordem). `rapido` = modo rápido (12 afirmações, `&r=1`). */
+export const caminhoTeste = (seed: number, rapido = false) => `/teste?s=${sementeParaTexto(seed)}${rapido ? '&r=1' : ''}`;
