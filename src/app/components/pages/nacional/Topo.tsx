@@ -4,6 +4,7 @@
  * Mais baixo que o PageHeader padrão para que placar e mapa fiquem acima da dobra no desktop.
  */
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import type { LiveStatus, Summary } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
@@ -11,6 +12,7 @@ import { NomesOcultos } from '@/app/components/apuracao/NomesOcultos';
 import { Badge } from '@/app/ui/Badge';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
+import { buttonClasses } from '@/app/ui/Button';
 
 export interface TopoProps {
   eyebrow: ReactNode;
@@ -59,7 +61,25 @@ export function Topo({ eyebrow, titulo, contexto, selos, seletor, acoes, classNa
 }
 
 /** Selo com o estado da apuração (complementa a pílula do cabeçalho do app, sem repetir o relógio). */
-export function SeloFase({ status, resumo, t1 }: { status: LiveStatus | undefined; resumo?: Pick<Summary, 'status' | 'ultimaAtualizacao'>; t1?: boolean }) {
+export function SeloFase({
+  status,
+  resumo,
+  t1,
+  revendo,
+}: {
+  status: LiveStatus | undefined;
+  resumo?: Pick<Summary, 'status' | 'ultimaAtualizacao'>;
+  t1?: boolean;
+  /** "Reveja a noite": instante exibido (os números não atualizam sozinhos). */
+  revendo?: number;
+}) {
+  if (revendo !== undefined && !t1) {
+    return (
+      <Badge tone="brand" size="sm" icon="relogio">
+        Revendo a apuração às <span className="num">{fmtHora(revendo)}</span>
+      </Badge>
+    );
+  }
   if (t1) {
     return (
       <>
@@ -120,5 +140,40 @@ export function Rotulo({ icon, children, className }: { icon?: Parameters<typeof
       {icon ? <Icon name={icon} size={14} /> : null}
       {children}
     </div>
+  );
+}
+
+/** Ícone de TV (traço, `currentColor`) — o kit de ícones não tem um. */
+export function IconeTv({ size = 18, className }: { size?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
+      <rect x="2.75" y="4.75" width="18.5" height="12.5" rx="2.25" />
+      <path d="M8 20.25h8M12 17.25v3" />
+    </svg>
+  );
+}
+
+/** Link para o Modo TV (/tv), no topo da página nacional. `compacto` = só o ícone (celular). */
+export function LinkModoTv({ compacto, raceQs = '', className }: { compacto?: boolean; raceQs?: string; className?: string }) {
+  if (compacto) {
+    return (
+      <Link
+        to={`/tv${raceQs}`}
+        aria-label="Modo TV (tela cheia para transmissão)"
+        title="Modo TV"
+        className={cn(
+          'inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+          className,
+        )}
+      >
+        <IconeTv />
+      </Link>
+    );
+  }
+  return (
+    <Link to={`/tv${raceQs}`} title="Tela cheia para transmissão, telões e bares" className={cn(buttonClasses({ variant: 'ghost', size: 'md' }), 'gap-2', className)}>
+      <IconeTv />
+      Modo TV
+    </Link>
   );
 }

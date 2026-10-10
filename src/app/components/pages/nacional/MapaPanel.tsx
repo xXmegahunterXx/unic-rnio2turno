@@ -24,6 +24,7 @@ import { Sheet } from '@/app/ui/Sheet';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { useMunicipiosBr } from '@/app/data/hooks';
 import { comInstante } from '@/app/components/apuracao/LinhaDoTempo';
+
 import type { MunicipioSelecionado } from '@/app/components/apuracao/BrazilMunicipiosMap';
 import { TileMap } from '@/app/components/apuracao/TileMap';
 import { MapLegend } from '@/app/components/apuracao/MapLegend';
@@ -109,7 +110,7 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
   // Sheet do toque (guarda a última UF para a animação de saída).
   const [sheet, setSheet] = useState<{ uf: UF; aberto: boolean } | null>(null);
   const toqueEm = useRef(0);
-  const abrirUf = useCallback((uf: UF) => navigate(comInstante(linkUf(uf, raceLink), t)), [navigate, raceLink, t]);
+  const abrirUf = useCallback((uf: UF) => navigate(linkUf(uf, raceLink, t)), [navigate, raceLink, t]);
 
   function onPointerDownCapture(e: PointerEvent) {
     toqueEm.current = e.pointerType === 'touch' ? performance.now() : 0;
@@ -244,6 +245,7 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
           t1={anonimizado ? undefined : primeiroTurno?.[sheet.uf]}
           raceT1={raceT1}
           raceLink={raceLink}
+          t={t}
           simulado={simulado}
         />
       ) : null}
@@ -287,9 +289,11 @@ function UfSheet({
   t1,
   raceT1,
   raceLink,
+  t,
   simulado,
 }: {
   uf: UF;
+  t?: number;
   aberto: boolean;
   onClose: () => void;
   race: Race;
@@ -313,7 +317,7 @@ function UfSheet({
           : `${REGIAO_NOMES[UF_REGIAO[uf]]}${resumo ? ` · ${fmtInt(resumo.eleitorado)} eleitores` : ''}`
       }
       footer={
-        <ButtonLink to={linkUf(uf, raceLink)} variant="primary" size="lg" block iconRight="seta" className="mb-3">
+        <ButtonLink to={linkUf(uf, raceLink, t)} variant="primary" size="lg" block iconRight="seta" className="mb-3">
           Ver {nome}
         </ButtonLink>
       }

@@ -48,7 +48,6 @@ export function FotoOficial({ sqcand, fotoGrupo, nome, tamanho = 'md', real = tr
           src={foto}
           alt=""
           draggable={false}
-          loading="lazy"
           decoding="async"
           className="h-full w-full object-cover object-top"
         />

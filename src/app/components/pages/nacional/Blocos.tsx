@@ -37,11 +37,14 @@ export const LiderancaCard = memo(function LiderancaCard({
   race,
   ufs,
   raceLink,
+  t,
   className,
 }: {
   race: Race;
   ufs: Partial<Record<UF, Summary>>;
   raceLink: RaceId;
+  /** Instante do "reveja a noite" (links levam `?t=`). */
+  t?: number;
   className?: string;
 }) {
   const t1 = race.turno === 1;
@@ -91,7 +94,7 @@ export const LiderancaCard = memo(function LiderancaCard({
                   {lista.map((uf) => (
                     <Link
                       key={uf}
-                      to={linkUf(uf, raceLink)}
+                      to={linkUf(uf, raceLink, t)}
                       title={UF_NOMES[uf]}
                       aria-label={`${UF_NOMES[uf]}: ver resultado`}
                       className={cn(
@@ -141,15 +144,18 @@ export const EstadosSecao = memo(function EstadosSecao({
   race,
   ufs,
   raceLink,
+  t,
   className,
 }: {
   race: Race;
   ufs: Partial<Record<UF, Summary>>;
   raceLink: RaceId;
+  /** Instante do "reveja a noite" (links levam `?t=`). */
+  t?: number;
   className?: string;
 }) {
   const navigate = useNavigate();
-  const abrir = useCallback((uf: UF) => navigate(linkUf(uf, raceLink)), [navigate, raceLink]);
+  const abrir = useCallback((uf: UF) => navigate(linkUf(uf, raceLink, t)), [navigate, raceLink, t]);
   return (
     <section aria-labelledby="estados-titulo" className={cn('min-w-0', className)}>
       <div className="mb-3.5 sm:mb-4">

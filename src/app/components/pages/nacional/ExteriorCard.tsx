@@ -20,10 +20,12 @@ export interface ExteriorCardProps {
   resumo: Summary;
   meta?: UfMeta;
   raceLink: RaceId;
+  /** Instante do "reveja a noite" (o link leva `?t=`). */
+  t?: number;
   className?: string;
 }
 
-export const ExteriorCard = memo(function ExteriorCard({ race, resumo, meta, raceLink, className }: ExteriorCardProps) {
+export const ExteriorCard = memo(function ExteriorCard({ race, resumo, meta, raceLink, t, className }: ExteriorCardProps) {
   const tem = validos(resumo) > 0;
   const finalistas = race.candidatos.map((c, i) => ({ c, i })).filter(({ c }) => !c.agregado);
   return (
@@ -79,7 +81,7 @@ export const ExteriorCard = memo(function ExteriorCard({ race, resumo, meta, rac
 
         {pctTotalizadas(resumo) < 100 || resumo.status !== 'encerrada' ? <ApuracaoProgress resumo={resumo} variant="compact" className="mt-4" /> : null}
 
-        <ButtonLink to={linkUf('ZZ', raceLink)} variant="outline" size="sm" iconRight="chevron-direita" className="mt-4 w-full">
+        <ButtonLink to={linkUf('ZZ', raceLink, t)} variant="outline" size="sm" iconRight="chevron-direita" className="mt-4 w-full">
           Ver cidades e seções do exterior
         </ButtonLink>
       </div>

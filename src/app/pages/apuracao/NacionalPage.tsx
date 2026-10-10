@@ -4,6 +4,10 @@
  *
  * Fases: 'pre' → contagem regressiva + 1º turno real (corridas '-t1'); 'apurando' → ao vivo;
  * 'encerrada' → resultado final. `?race=gov-xx` redireciona para a página da UF.
+ *
+ * "Reveja a noite": `?t=18h42` mostra placar, mapa (estados e municípios), corrida e feed naquele instante
+ * (LinhaDoTempo). Sem `t` = ao vivo. Também: link para o Modo TV, "N pessoas agora" (só no servidor) e o
+ * patrocínio discreto quando configurado no admin.
  */
 import { useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -24,7 +28,10 @@ import { RaceSwitcher } from '@/app/components/apuracao/RaceSwitcher';
 import { RestantePanel } from '@/app/components/apuracao/RestantePanel';
 import { ShareButton } from '@/app/components/apuracao/ShareCard';
 import { EmptyState, ErrorState } from '@/app/components/apuracao/States';
-import { Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
+import { LinkModoTv, Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
+import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
+import { PessoasAgora } from '@/app/components/apuracao/PessoasAgora';
+import { PatrocinioSlot } from '@/app/components/apuracao/PatrocinioSlot';
 import { PreHero } from '@/app/components/pages/nacional/PreHero';
 import { MapaPanel } from '@/app/components/pages/nacional/MapaPanel';
 import { CorridaPanel } from '@/app/components/pages/nacional/CorridaPanel';
@@ -57,7 +64,12 @@ export default function NacionalPage() {
   const raceT1 = useRace(`${semT1(raceId)}-t1`);
   const race2T = useRace(semT1(raceId));
   const anonimizado = useAnonimizado();
-  const q = useNacional(raceId);
+  // "Reveja a noite": instante passado na URL (só no 2º turno; o 1º turno é o resultado final).
+  const { t: tUrl, setT } = useInstanteParam(status, statusQ.dataUpdatedAt);
+  const t = t1 ? undefined : tUrl;
+  const q = useNacional(raceId, t);
+  // Série/eventos AO VIVO para os marcos da régua (mesma consulta de `q` quando não há `t`).
+  const qVivo = useNacional(raceId);
   // 1º turno sempre à mão: modo "variação" do mapa, comparação e Sheet da UF (em t1 é a mesma consulta).
   const qT1 = useNacional(`${semT1(raceId)}-t1`);
 
@@ -107,6 +119,9 @@ export default function NacionalPage() {
   const resumo = data.resumo;
   const definido = race.turno === 2 && resumo.eleito !== null;
   const semApuracao = resumo.secoesTotalizadas === 0;
+  const vivo = qVivo.data && qVivo.data.race === raceId ? qVivo.data : undefined;
+  const caminhoShare = t1 && !pre ? '/apuracao?race=pres-t1' : comInstante('/apuracao', t);
+  const tvQs = raceParam !== 'pres' && !raceParam.endsWith('-t1') ? `?race=${raceParam}` : '';
 
   return (
     <Container wide className="pb-6 sm:pb-10">
@@ -120,13 +135,33 @@ export default function NacionalPage() {
         contexto={t1 ? '1º turno' : '2º turno'}
         selos={
           <>
-            <SeloFase status={status} resumo={resumo} t1={t1} />
+            <SeloFase status={status} resumo={resumo} t1={t1} revendo={t} />
+            {!t ? <PessoasAgora status={status} /> : null}
             {anonimizado ? <SeloAnonimo /> : null}
+            {status?.patrocinio ? <PatrocinioSlot patrocinio={status.patrocinio} className="sm:ml-auto" /> : null}
           </>
         }
         seletor={<RaceSwitcher races={races} value={raceParam} onChange={trocarDisputa} size={desktop ? 'md' : 'sm'} />}
-        acoes={<ShareButton race={race} resumo={resumo} simulado={simulado} caminho={t1 && !pre ? '/apuracao?race=pres-t1' : '/apuracao'} iconOnly={!desktop} size={desktop ? 'md' : 'sm'} />}
+        acoes={
+          <>
+            {!pre ? <LinkModoTv compacto={!desktop} raceQs={tvQs} /> : null}
+            <ShareButton race={race} resumo={resumo} simulado={simulado} caminho={caminhoShare} iconOnly={!desktop} size={desktop ? 'md' : 'sm'} />
+          </>
+        }
       />
+
+      {!pre && !t1 && status && vivo ? (
+        <LinhaDoTempo
+          status={status}
+          recebidoEm={statusQ.dataUpdatedAt}
+          serie={vivo.serie}
+          eventos={vivo.eventos}
+          t={t}
+          onChange={setT}
+          carregando={q.isPlaceholderData}
+          className="mb-4 sm:mb-6"
+        />
+      ) : null}
 
       {pre ? (
         <>
@@ -191,6 +226,7 @@ export default function NacionalPage() {
               raceLink={raceParam}
               simulado={simulado}
               anonimizado={anonimizado}
+              t={t}
             />
             {definido ? (
               <EleitoBanner className="order-3 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
@@ -206,14 +242,16 @@ export default function NacionalPage() {
           <ParticipacaoSecao className="order-8 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" t={resumo} />
           <GovernadoresFaixa className="order-9 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" races={races} t1={false} />
 
-          <EstadosSecao className="order-10 pt-2 min-[1360px]:order-none min-[1360px]:col-span-8 min-[1360px]:pt-4" race={race} ufs={data.ufs} raceLink={raceParam} />
+          <EstadosSecao className="order-10 pt-2 min-[1360px]:order-none min-[1360px]:col-span-8 min-[1360px]:pt-4" race={race} ufs={data.ufs} raceLink={raceParam} t={t} />
           <div className={cn(COLUNA, 'min-[1360px]:col-span-4 min-[1360px]:pt-[5.25rem]')}>
-            <ExteriorResumo className="order-11 min-[1360px]:order-none" race={race} data={data} meta={meta} raceLink={raceParam} />
+            <ExteriorResumo className="order-11 min-[1360px]:order-none" race={race} data={data} meta={meta} raceLink={raceParam} t={t} />
             <ComparacaoT1 className="order-6 min-[1360px]:order-none" race={race} resumo={resumo} raceT1={raceT1} anonimizado={anonimizado} />
-            <LiderancaCard className="order-12 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} />
+            <LiderancaCard className="order-12 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} t={t} />
           </div>
         </div>
       )}
+
+      {status?.patrocinio ? <PatrocinioSlot patrocinio={status.patrocinio} variant="cartao" className="mt-8 sm:mt-10" /> : null}
     </Container>
   );
 }
@@ -223,17 +261,19 @@ function ExteriorResumo({
   data,
   meta,
   raceLink,
+  t,
   className,
 }: {
   race: Race;
   data: Pick<NationalSnapshot, 'ufs'>;
   meta: Pick<PublicMeta, 'ufs'>;
   raceLink: RaceId;
+  t?: number;
   className?: string;
 }) {
   const zz = data.ufs.ZZ;
   if (!zz) return null;
-  return <ExteriorCard className={className} race={race} resumo={zz} meta={meta.ufs.find((u) => u.uf === 'ZZ')} raceLink={raceLink} />;
+  return <ExteriorCard className={className} race={race} resumo={zz} meta={meta.ufs.find((u) => u.uf === 'ZZ')} raceLink={raceLink} t={t} />;
 }
 
 /** Hero da contagem regressiva com o próprio relógio (o tique não re-renderiza a página). */
