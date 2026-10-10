@@ -1,6 +1,7 @@
 /**
  * Acontecimentos da apuração: lista (desktop, em cartão) ou ticker deslizável (celular).
- * O evento mais recente de 'virada' ou 'eleito' ganha um destaque na cor do candidato.
+ * O evento mais recente de 'virada' ou 'eleito' ganha um destaque na cor do candidato (com o rosto, quando a corrida
+ * tem fotos oficiais e não está anonimizada).
  */
 import { memo } from 'react';
 import type { CorCandidato, FeedEvent, Race } from '@/shared/types';
@@ -10,6 +11,8 @@ import { corSlot, slotDe } from '@/app/lib/raceUi';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
 import { Icon } from '@/app/ui/Icon';
 import { EventFeed } from '@/app/components/apuracao/EventFeed';
+import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
+import { useFotosRace } from '@/app/components/apuracao/fotos';
 
 export interface FeedPanelProps {
   eventos: FeedEvent[];
@@ -113,8 +116,13 @@ function Destaque({ e, race, className }: { e: FeedEvent; race: Race; className?
   const cor = slotDe(race, e.candidato);
   const s = corSlot(cor);
   const eleito = e.tipo === 'eleito';
+  const fotos = useFotosRace(race);
+  const c = e.candidato !== undefined ? race.candidatos[e.candidato] : undefined;
+  const foto = e.candidato !== undefined ? fotos[e.candidato] : undefined;
   return (
-    <div role="note" className={cn('relative overflow-hidden rounded-2xl border bg-gradient-to-br p-3.5 sm:p-4', BORDA[cor], s.glow, className)}>
+    <div role="note" className={cn('relative flex gap-3.5 overflow-hidden rounded-2xl border bg-gradient-to-br p-3.5 sm:p-4', BORDA[cor], s.glow, className)}>
+      {c && foto ? <CandidateAvatar candidato={c} foto={foto} size="lg" eleito={eleito} className="mt-0.5" /> : null}
+      <div className="min-w-0 flex-1">
       <div className={cn('flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.12em]', s.text)}>
         <Icon name={eleito ? 'selo' : 'troca'} size={15} strokeWidth={2} />
         {eleito ? 'Resultado definido' : 'Virada'}
@@ -125,6 +133,7 @@ function Destaque({ e, race, className }: { e: FeedEvent; race: Race; className?
       </div>
       <p className="mt-1.5 text-pretty text-[15.5px] font-semibold leading-snug text-fg">{e.titulo}</p>
       {e.detalhe ? <p className="num mt-1 text-[12.5px] leading-snug text-fg-muted">{e.detalhe}</p> : null}
+      </div>
     </div>
   );
 }

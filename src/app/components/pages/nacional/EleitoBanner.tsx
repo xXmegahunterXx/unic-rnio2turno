@@ -9,8 +9,10 @@ import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
+import { useFotosRace } from '@/app/components/apuracao/fotos';
 
 export function EleitoBanner({ race, resumo, restante, className }: { race: Race; resumo: Summary; restante: Restante; className?: string }) {
+  const fotos = useFotosRace(race);
   if (race.turno !== 2 || resumo.eleito === null) return null;
   const c = race.candidatos[resumo.eleito];
   if (!c) return null;
@@ -29,7 +31,7 @@ export function EleitoBanner({ race, resumo, restante, className }: { race: Race
     >
       <div aria-hidden className={cn('pointer-events-none absolute inset-0 bg-gradient-to-br', s.glow)} />
       <div className="relative flex items-start gap-4">
-        <CandidateAvatar candidato={c} size="lg" eleito />
+        <CandidateAvatar candidato={c} foto={fotos[resumo.eleito]} size={fotos[resumo.eleito] ? 'xl' : 'lg'} eleito />
         <div className="min-w-0">
           <div className={cn('flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.12em]', s.text)}>
             <Icon name="selo" size={15} strokeWidth={2} />

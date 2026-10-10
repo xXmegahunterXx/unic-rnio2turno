@@ -95,9 +95,18 @@ export function CandidatoLinha({
   tamanhoFoto = 'sm',
   barra,
   extra,
+  selo = true,
+  principal = 'pct',
+  onde,
   className,
 }: {
   c: CandidatoLinhaDados;
+  /** Mostra o selo "Eleito"/"2º turno" ao lado do nome. */
+  selo?: boolean;
+  /** Número em destaque à direita: % (padrão) ou votos. */
+  principal?: 'pct' | 'votos';
+  /** Abrangência do % (ex.: "SP"), quando `principal = 'votos'`. */
+  onde?: string;
   fotoGrupo?: string;
   comFicha: boolean;
   /** Posição (1º, 2º…) à esquerda. */
@@ -117,7 +126,7 @@ export function CandidatoLinha({
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-center gap-2">
           <NomeLink sqcand={c.sqcand} nome={c.nomeUrna} comFicha={comFicha} className="text-[14.5px] font-semibold text-fg" />
-          {ehEleito(c.situacao) || c.situacao === 'segundo-turno' ? <SituacaoSelo situacao={c.situacao} genero={c.genero} /> : null}
+          {selo && (ehEleito(c.situacao) || c.situacao === 'segundo-turno') ? <SituacaoSelo situacao={c.situacao} genero={c.genero} /> : null}
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-2">
           <PartidoChip sigla={c.partido} numero={c.numero} />
@@ -129,10 +138,20 @@ export function CandidatoLinha({
           </div>
         ) : null}
       </div>
-      <div className="shrink-0 text-right">
-        <div className="num font-display text-[15px] font-semibold leading-tight text-fg">{fmtPct(c.pct)}</div>
-        <div className="num text-[11.5px] leading-tight text-fg-muted">{fmtInt(c.votos)} votos</div>
-      </div>
+      {principal === 'pct' ? (
+        <div className="shrink-0 text-right">
+          <div className="num font-display text-[15px] font-semibold leading-tight text-fg">{fmtPct(c.pct)}</div>
+          <div className="num text-[11.5px] leading-tight text-fg-muted">{fmtInt(c.votos)} votos</div>
+        </div>
+      ) : (
+        <div className="shrink-0 text-right">
+          <div className="num font-display text-[15px] font-semibold leading-tight text-fg">{fmtInt(c.votos)}</div>
+          <div className="num text-[11.5px] leading-tight text-fg-muted">
+            {fmtPct(c.pct)}
+            {onde ? ` em ${onde}` : ''}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

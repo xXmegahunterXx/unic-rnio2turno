@@ -10,15 +10,18 @@
  *    anterior chegou (`carregando`).
  *  - Arrastar mostra o horário na hora e confirma o instante no máximo a cada 350 ms (e ao soltar).
  *  - Marcos: 1%, 25%, 50%, 75% e 99% das seções (da série ao vivo) e "eleito" (evento).
+ *  - O trilho é a "faixa da noite": a cor de quem estava à frente em cada momento (slot do candidato, intensidade
+ *    pela margem, como no mapa) — as viradas ficam visíveis. O trecho depois do instante exibido fica esmaecido.
  *  - Teclado: ←/→ ±1 min, Shift ou PageUp/PageDown ±10 min, Home = início, End = ao vivo, Espaço = play/pause.
  *  - Na fase 'pre' (ou sem nada apurado ainda) não aparece.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import type { FeedEvent, LiveStatus, SeriePoint } from '@/shared/types';
+import type { CorCandidato, FeedEvent, LiveStatus, SeriePoint } from '@/shared/types';
 import { BRT_OFFSET_MS, INICIO_APURACAO } from '@/shared/constants';
 import { fmtHora, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { FILL_PENDENTE, rgbSlot } from '@/app/lib/raceUi';
 import { estimarSimNow, useNow } from '@/app/lib/useNow';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
@@ -123,6 +126,8 @@ export interface LinhaDoTempoProps {
   serie: SeriePoint[];
   /** Eventos AO VIVO — o de "eleito" vira marco. */
   eventos?: FeedEvent[];
+  /** Slots dos candidatos (ordem da urna) para a faixa de quem estava à frente. */
+  cores?: CorCandidato[];
   /** Instante exibido (undefined = ao vivo). */
   t: number | undefined;
   onChange: (t: number | undefined) => void;
@@ -155,7 +160,36 @@ function pstEm(serie: SeriePoint[], t: number): number {
   return a.pst + ((t - a.t) / Math.max(1, b.t - a.t)) * (b.pst - a.pst);
 }
 
-export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, serie, eventos, t, onChange, carregando, grudar = true, className }: LinhaDoTempoProps) {
+/** Trechos da faixa: [x0, x1) em 0–1000 e o preenchimento (cor de quem estava à frente, pela margem). */
+function faixaDaNoite(serie: SeriePoint[], cores: CorCandidato[], ini: number, fim: number): { x: number; w: number; fill: string }[] {
+  const out: { x: number; w: number; fill: string }[] = [];
+  const span = Math.max(1, fim - ini);
+  const X = (t: number) => Math.max(0, Math.min(1000, ((t - ini) / span) * 1000));
+  let atual: { x: number; fill: string } | null = null;
+  for (let i = 0; i < serie.length; i++) {
+    const p = serie[i];
+    let fill = FILL_PENDENTE;
+    if (p.pst > 0 && p.pv.length >= 2) {
+      const [a, b] = p.pv;
+      if (a !== b) {
+        const lider = a > b ? 0 : 1;
+        // Faixa fina: cor viva; a margem (até 15 p.p.) só modula a intensidade, em degraus (poucos trechos).
+        const alfa = 0.5 + 0.5 * Math.min(1, Math.round((Math.abs(a - b) / 15) * 4) / 4);
+        fill = rgbSlot(cores[lider] ?? (lider === 0 ? 'a' : 'b'), alfa);
+      }
+    }
+    const x = X(p.t);
+    if (!atual) atual = { x, fill };
+    else if (atual.fill !== fill) {
+      out.push({ x: atual.x, w: x - atual.x, fill: atual.fill });
+      atual = { x, fill };
+    }
+  }
+  if (atual) out.push({ x: atual.x, w: X(fim) - atual.x, fill: atual.fill });
+  return out.filter((s) => s.w > 0);
+}
+
+export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, serie, eventos, cores = ['a', 'b'], t, onChange, carregando, grudar = true, className }: LinhaDoTempoProps) {
   const agora = useNow(status.velocidade > 1 ? 500 : 1000);
   const simNow = agoraApuracao(status, recebidoEm, agora) ?? status.simNow;
   const ini = status.inicioApuracao ?? INICIO_APURACAO;
@@ -184,6 +218,10 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
     if (el) out.push({ t: el.t, rotulo: 'Eleito', eleito: true });
     return out;
   }, [serie, eventos]);
+
+  // Faixa: recalcula quando a série cresce ou o fim da régua anda (quantizado a 1 min).
+  const fimQ = q(fim);
+  const faixa = useMemo(() => faixaDaNoite(serie, cores, ini, fimQ), [serie, cores, ini, fimQ]);
 
   // ---------------------------------------------------------------- play
   const ref = useRef({ t, carregando, ultimo, onChange });
@@ -352,7 +390,8 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
                 className="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 text-[12px] font-semibold text-fg transition-colors hover:border-line/[2] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <LiveDot tone={status.simulacao ? 'brand' : 'live'} size={6} />
-                Voltar ao vivo
+                <span className="hidden min-[420px]:inline">Voltar ao vivo</span>
+                <span className="min-[420px]:hidden">Ao vivo</span>
               </button>
             ) : (
               <span className="inline-flex h-7 shrink-0 items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-[0.12em] text-fg-muted">
@@ -379,11 +418,18 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
             onKeyDown={onKeyDown}
             className="group relative mt-1.5 h-7 cursor-pointer touch-none rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
-            <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-surface-3" />
-            <div
-              className={cn('absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-brand-grad', tocando && 'transition-[width] duration-500 ease-linear')}
-              style={{ width: `${pos * 100}%` }}
-            />
+            <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3" title="Quem estava à frente em cada momento da noite">
+              <svg viewBox="0 0 1000 1" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+                {faixa.map((f) => (
+                  <rect key={`${f.x}-${f.fill}`} x={f.x} y={0} width={f.w + 0.6} height={1} style={{ fill: f.fill }} />
+                ))}
+              </svg>
+              {/* depois do instante exibido: esmaecido */}
+              <div
+                className={cn('absolute inset-y-0 right-0 bg-surface/75', tocando && 'transition-[left] duration-500 ease-linear')}
+                style={{ left: `${pos * 100}%` }}
+              />
+            </div>
             {rotulos.map(({ m, x }) => (
               <span
                 key={m.rotulo}

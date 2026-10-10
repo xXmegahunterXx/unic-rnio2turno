@@ -96,7 +96,7 @@ export function VisaoComposicao({
   const maioria = Math.floor(comp.total / 2) + 1;
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
-      <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-7">
+      <section className="min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)] lg:col-span-7">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="font-display text-[19px] font-semibold tracking-[-0.01em] text-fg">{titulo}</h2>
           <span className="text-[12.5px] text-fg-muted">Uma bolinha por cadeira · maior bancada à esquerda</span>
@@ -308,7 +308,9 @@ export function MaisVotadosPais({ comp, n = 12 }: { comp: Composicao; n?: number
               posicao={i + 1}
               tamanhoFoto="md"
               barra={(c.votos / maior) * 100}
-              extra={<span className="font-mono text-[11.5px] font-semibold text-fg-subtle">{c.uf}</span>}
+              selo={false}
+              principal="votos"
+              onde={c.uf}
             />
           </li>
         ))}

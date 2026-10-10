@@ -156,6 +156,7 @@ export default function NacionalPage() {
           recebidoEm={statusQ.dataUpdatedAt}
           serie={vivo.serie}
           eventos={vivo.eventos}
+          cores={race.candidatos.map((c) => c.cor)}
           t={t}
           onChange={setT}
           carregando={q.isPlaceholderData}

@@ -10,9 +10,13 @@
  *    nunca de espectro) recebem uma cor cada; os demais ficam em dois cinzas neutros alternados;
  *  - identidade nunca só pela cor: toda legenda, dica e lista traz a sigla do partido.
  *
- * Paleta validada com o validador de paletas categóricas (OKLab, CVD Machado 2009): lightness/croma dentro da
- * faixa, separação CVD ≥ 9,6 e visão normal ≥ 15 entre vizinhos nas ordens reais (Câmara, Assembleias, Senado),
- * nos dois temas. Contraste < 3:1 de 5 cores no tema claro → sempre há rótulo/legenda (regra de alívio).
+ * Paleta escolhida por otimização (OKLab ×100, simulação CVD Machado 2009) para maximizar a PIOR separação entre
+ * QUAISQUER dois partidos nos dois temas — nas Assembleias, quase todo par de partidos fica lado a lado em alguma
+ * UF. Lightness e croma dentro das faixas; pior par: visão normal ≈ 8–10 e CVD ≈ 5–6 (abaixo das metas de 15/8,
+ * inevitável com 10 cores "todos os pares"), então a identidade NUNCA depende só da cor: cadeiras separadas,
+ * legenda/lista com a sigla ao lado, dica com o partido. A atribuição partido → cor também foi otimizada e
+ * evita a cor oficial de cada partido (e nada de verde-amarelo para o PT nem tons avermelhados para o PL).
+ * Contraste < 3:1 de algumas cores sobre a superfície → sempre há rótulo (regra de alívio).
  *
  * Os valores ficam como variáveis CSS `--partido-1..10` ("R G B", mesma convenção de src/app/styles.css),
  * injetadas uma vez no <head>; os componentes só usam `rgb(var(--partido-n))` via `corPartido()`.
@@ -23,30 +27,30 @@ import { tokenCss } from '@/app/lib/tokens';
 /** Ordem por tamanho (nº de eleitos em 2026: Câmara + Assembleias + Senado, dados do TSE). */
 export const PARTIDOS_COM_COR = ['PL', 'PT', 'MDB', 'PSD', 'PP', 'REPUBLICANOS', 'UNIÃO', 'PODE', 'PSB', 'PSOL'] as const;
 
-/** "R G B" por slot (1..10), tema escuro e claro. */
+/** "R G B" por slot (1..10), tema escuro e claro. Mesma ordem de PARTIDOS_COM_COR. */
 const ESCURO = [
-  '155 78 140', // ameixa
-  '93 165 110', // sálvia
-  '152 75 22', // argila
-  '165 131 203', // lavanda
-  '115 116 21', // oliva
-  '204 118 139', // rosa antigo
-  '87 85 162', // anil
-  '109 163 97', // musgo
-  '178 73 129', // fúcsia
-  '166 145 63', // cáqui
+  '202 109 173', // orquídea
+  '149 61 124', // ameixa
+  '99 85 162', // anil
+  '160 124 219', // lavanda
+  '194 115 95', // salmão
+  '152 153 18', // oliva
+  '30 119 41', // floresta
+  '192 85 114', // rosa
+  '146 98 157', // malva
+  '87 143 49', // folha
 ];
 const CLARO = [
-  '136 60 122',
-  '111 184 128',
-  '170 88 48',
-  '184 150 223',
-  '109 110 10',
-  '229 141 161',
-  '85 84 153',
-  '109 163 97',
-  '178 73 129',
-  '198 176 95',
+  '228 134 198',
+  '136 49 112',
+  '88 73 149',
+  '185 149 246',
+  '229 146 125',
+  '177 178 57',
+  '10 107 29',
+  '201 93 123',
+  '150 101 161',
+  '95 152 58',
 ];
 
 function css(): string {

@@ -35,9 +35,11 @@ interface Pos {
 
 const R0 = 0.36; // raio interno (fração do externo)
 
-/** Posições das N cadeiras ordenadas da esquerda para a direita (ângulo decrescente). Puro. */
-export function layoutHemiciclo(n: number): { pos: Pos[]; r: number } {
-  if (n <= 0) return { pos: [], r: 0 };
+/**
+ * Posições das N cadeiras, por fileira (de dentro para fora), cada fileira da esquerda para a direita. Puro.
+ */
+export function layoutLinhas(n: number): { linhas: Pos[][]; r: number } {
+  if (n <= 0) return { linhas: [], r: 0 };
   let linhas = 1;
   let d = 0;
   let caps: number[] = [];
@@ -46,24 +48,67 @@ export function layoutHemiciclo(n: number): { pos: Pos[]; r: number } {
     caps = Array.from({ length: linhas }, (_, i) => Math.max(1, Math.floor((Math.PI * (R0 + d * (i + 0.5))) / d)));
     if (caps.reduce((a, b) => a + b, 0) >= n) break;
   }
-  // distribui n proporcionalmente à capacidade (maior resto)
-  const tot = caps.reduce((a, b) => a + b, 0);
-  const brutos = caps.map((c) => (c / tot) * n);
-  const porLinha = brutos.map(Math.floor);
-  let falta = n - porLinha.reduce((a, b) => a + b, 0);
-  const ordem = brutos.map((b, i) => [b - Math.floor(b), i] as const).sort((a, b) => b[0] - a[0]);
-  for (let k = 0; falta > 0; k = (k + 1) % ordem.length, falta--) porLinha[ordem[k][1]]++;
-  const pos: Pos[] = [];
-  porLinha.forEach((m, i) => {
+  const porLinha = maiorResto(caps, n);
+  const out: Pos[][] = porLinha.map((m, i) => {
     const rho = R0 + d * (i + 0.5);
-    for (let k = 0; k < m; k++) {
+    return Array.from({ length: m }, (_, k) => {
       const a = m === 1 ? Math.PI / 2 : Math.PI - (k * Math.PI) / (m - 1);
-      pos.push({ x: rho * Math.cos(a), y: -rho * Math.sin(a), a });
-    }
+      return { x: rho * Math.cos(a), y: -rho * Math.sin(a), a };
+    });
   });
-  // esquerda → direita; no mesmo ângulo, de dentro para fora
-  pos.sort((p, q) => q.a - p.a || Math.hypot(p.x, p.y) - Math.hypot(q.x, q.y));
-  return { pos, r: d * 0.4 };
+  return { linhas: out, r: d * 0.4 };
+}
+
+/** Divide `total` proporcionalmente a `pesos` (maior resto), sem passar de `teto[i]` quando dado. */
+function maiorResto(pesos: number[], total: number, teto?: number[]): number[] {
+  const soma = pesos.reduce((a, b) => a + b, 0);
+  if (soma <= 0 || total <= 0) return pesos.map(() => 0);
+  const brutos = pesos.map((p) => (p / soma) * total);
+  const out = brutos.map((b, i) => Math.min(Math.floor(b), teto ? teto[i] : Infinity));
+  let falta = total - out.reduce((a, b) => a + b, 0);
+  const ordem = brutos.map((b, i) => [b - Math.floor(b), i] as const).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (let volta = 0; falta > 0 && volta < 4; volta++) {
+    for (const [, i] of ordem) {
+      if (falta <= 0) break;
+      if (teto && out[i] >= teto[i]) continue;
+      out[i]++;
+      falta--;
+    }
+  }
+  return out;
+}
+
+/**
+ * Posição de cada cadeira (na ordem de `assentos`): cada partido ocupa a mesma "fatia" em todas as fileiras
+ * (repartição proporcional fileira a fileira), o que mantém as bancadas contíguas mesmo com poucas cadeiras.
+ */
+export function posicionar(assentos: { partido: string; pendente?: boolean }[]): { pos: Pos[]; r: number } {
+  const { linhas, r } = layoutLinhas(assentos.length);
+  // grupos consecutivos (partido ou pendentes), na ordem recebida
+  const grupos: { chave: string; idx: number[] }[] = [];
+  assentos.forEach((a, i) => {
+    const chave = a.pendente ? '__pendente' : a.partido;
+    const g = grupos[grupos.length - 1];
+    if (g && g.chave === chave) g.idx.push(i);
+    else grupos.push({ chave, idx: [i] });
+  });
+  const resta = grupos.map((g) => g.idx.length);
+  const usados = grupos.map(() => 0);
+  const pos: Pos[] = new Array(assentos.length);
+  // de fora para dentro: as fileiras maiores definem a fatia, as menores recebem o resto exato
+  for (let li = linhas.length - 1; li >= 0; li--) {
+    const linha = linhas[li];
+    const cotas = li === 0 ? [...resta] : maiorResto(resta, linha.length, resta);
+    let k = 0;
+    cotas.forEach((q, gi) => {
+      for (let j = 0; j < q; j++) {
+        const g = grupos[gi];
+        pos[g.idx[usados[gi]++]] = linha[k++];
+      }
+      resta[gi] -= q;
+    });
+  }
+  return { pos, r };
 }
 
 const W = 1000;
@@ -82,7 +127,9 @@ export interface HemicicloProps {
 
 export function Hemiciclo({ assentos, destaque, onDestaque, centro, ariaLabel, className }: HemicicloProps) {
   const navigate = useNavigate();
-  const { pos, r } = useMemo(() => layoutHemiciclo(assentos.length), [assentos.length]);
+  const estrutura = assentos.map((a) => (a.pendente ? '_' : a.partido)).join('|');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const { pos, r } = useMemo(() => posicionar(assentos), [estrutura]);
   const [boxEl, setBoxEl] = useState<HTMLDivElement | null>(null);
   const [dica, setDica] = useState<{ i: number; fixa: boolean } | null>(null);
   useClickOutside(boxEl, !!dica?.fixa, () => {
@@ -151,7 +198,7 @@ export function Hemiciclo({ assentos, destaque, onDestaque, centro, ariaLabel, c
                   strokeWidth: a.pendente ? 1 : undefined,
                   fillOpacity: apagado ? 0.16 : 1,
                   strokeOpacity: apagado ? 0.16 : 1,
-                  animationDelay: `${Math.round((i / Math.max(1, pos.length)) * 450)}ms`,
+                  animationDelay: `${Math.round((1 - p.a / Math.PI) * 450)}ms`,
                   transformBox: 'fill-box',
                   transformOrigin: 'center',
                 }}

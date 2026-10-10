@@ -14,6 +14,7 @@ import { corSlot } from '@/app/lib/raceUi';
 import { ButtonLink } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
+import { useFotosRace } from '@/app/components/apuracao/fotos';
 
 export interface ComparacaoT1Props {
   race: Race;
@@ -28,6 +29,7 @@ export interface ComparacaoT1Props {
 export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, anonimizado, className }: ComparacaoT1Props) {
   if (anonimizado) return <ComparacaoOculta className={className} />;
   const tem = validos(resumo) > 0;
+  const fotos = useFotosRace(race);
   const outros = raceT1?.candidatos.find((c) => c.agregado)?.primeiroTurno;
   const pst = pctTotalizadas(resumo);
   return (
@@ -48,7 +50,7 @@ export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, a
             <li key={c.numero}>
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <CandidateAvatar candidato={c} size="sm" />
+                  <CandidateAvatar candidato={c} foto={fotos[i]} size="sm" />
                   <div className="min-w-0">
                     <div className="truncate text-[15px] font-semibold leading-tight text-fg">{c.nomeUrna}</div>
                     <div className="num text-[12px] text-fg-muted">

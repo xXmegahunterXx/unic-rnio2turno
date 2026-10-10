@@ -80,7 +80,7 @@ export function Bancadas({
                   apagado && 'opacity-45',
                 )}
               >
-                <th scope="row" className="py-2 pl-1 pr-2 font-normal">
+                <th scope="row" className="py-1.5 pl-1 pr-2 font-normal">
                   <div className="flex min-w-0 items-center gap-2">
                     <span aria-hidden className="h-3 w-3 shrink-0 rounded-[4px]" style={{ background: corPartido(b.sigla) }} />
                     <span className="truncate text-[14px] font-semibold text-fg" title={b.nome}>
@@ -92,18 +92,18 @@ export function Bancadas({
                       </span>
                     ) : null}
                   </div>
-                  <div className="ml-5 mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
+                  <div className="ml-5 mt-1 h-1 overflow-hidden rounded-full bg-surface-3">
                     <div className="h-full rounded-full" style={{ width: `${(b.eleitos / maior) * 100}%`, background: corPartido(b.sigla) }} />
                   </div>
                 </th>
-                <td className="py-2 text-right align-top">
-                  <span className="num font-display text-[17px] font-semibold leading-none text-fg">{fmtInt(b.eleitos)}</span>
-                  <span className="num block pt-1 text-[11px] text-fg-muted">{fmtPct((b.eleitos / Math.max(1, total)) * 100, 1)}</span>
+                <td className="py-1.5 text-right align-top">
+                  <span className="num font-display text-[16px] font-semibold leading-none text-fg">{fmtInt(b.eleitos)}</span>
+                  <span className="num block pt-0.5 text-[11px] text-fg-muted">{fmtPct((b.eleitos / Math.max(1, total)) * 100, 1)}</span>
                 </td>
                 {votosValidos ? (
-                  <td className="hidden py-2 pr-1 text-right align-top min-[440px]:table-cell">
-                    <span className="num text-[13px] text-fg">{b.votos !== undefined ? fmtPct((b.votos / votosValidos) * 100, 1) : '—'}</span>
-                    <span className="num block pt-1 text-[11px] text-fg-muted">{b.votos !== undefined ? fmtInt(b.votos) : ''}</span>
+                  <td className="hidden py-1.5 pr-1 text-right align-top min-[440px]:table-cell">
+                    <span className="num text-[13px] leading-none text-fg">{b.votos !== undefined ? fmtPct((b.votos / votosValidos) * 100, 1) : '—'}</span>
+                    <span className="num block pt-0.5 text-[11px] text-fg-muted">{b.votos !== undefined ? fmtInt(b.votos) : ''}</span>
                   </td>
                 ) : null}
               </tr>

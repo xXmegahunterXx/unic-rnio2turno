@@ -162,7 +162,7 @@ export function LinkModoTv({ compacto, raceQs = '', className }: { compacto?: bo
         aria-label="Modo TV (tela cheia para transmissão)"
         title="Modo TV"
         className={cn(
-          'inline-flex h-9 w-9 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+          'hidden h-9 w-9 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:inline-flex',
           className,
         )}
       >

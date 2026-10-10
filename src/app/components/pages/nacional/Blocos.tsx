@@ -12,6 +12,7 @@ import { fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
+import { useFotosRace } from '@/app/components/apuracao/fotos';
 import { RegionBars } from '@/app/components/apuracao/RegionBars';
 import { StatsGrid } from '@/app/components/apuracao/StatsGrid';
 import { UfTable } from '@/app/components/apuracao/UfTable';
@@ -48,6 +49,7 @@ export const LiderancaCard = memo(function LiderancaCard({
   className?: string;
 }) {
   const t1 = race.turno === 1;
+  const fotos = useFotosRace(race, { real: t1 });
   const { grupos, pendentes } = useMemo(() => {
     const g = new Map<number, UF[]>();
     const pend: UF[] = [];
@@ -79,7 +81,7 @@ export const LiderancaCard = memo(function LiderancaCard({
             <li key={c.numero}>
               <div className="flex items-center justify-between gap-3">
                 <span className="flex min-w-0 items-center gap-2.5">
-                  <CandidateAvatar candidato={c} size="sm" />
+                  <CandidateAvatar candidato={c} foto={fotos[i]} size="sm" />
                   <span className="truncate text-[15px] font-semibold text-fg">{c.agregado ? 'Demais candidatos' : c.nomeUrna}</span>
                 </span>
                 <span className="shrink-0 text-[13px] text-fg-muted">

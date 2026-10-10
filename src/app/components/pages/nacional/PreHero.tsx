@@ -10,6 +10,7 @@ import { Button, ButtonLink } from '@/app/ui/Button';
 import { Countdown } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
+import { useFotosRace } from '@/app/components/apuracao/fotos';
 
 export interface PreHeroProps {
   /** Instante do início da divulgação (epoch ms). */
@@ -42,6 +43,7 @@ export function PreHero({
     document.getElementById(ancora)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const finalistas = race?.candidatos.filter((c) => !c.agregado) ?? [];
+  const fotos = useFotosRace(race);
 
   return (
     <section
@@ -85,7 +87,7 @@ export function PreHero({
                 <span key={c.numero} className="contents">
                   {i === 1 ? <span aria-hidden className="text-[13px] font-semibold text-fg-subtle">×</span> : null}
                   <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-surface-2/70 py-1 pl-1 pr-3">
-                    <CandidateAvatar candidato={c} size="sm" />
+                    <CandidateAvatar candidato={c} foto={fotos[race?.candidatos.indexOf(c) ?? -1]} size="sm" />
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] font-semibold leading-tight text-fg">{c.nomeUrna}</span>
                       <span className={cn('num block text-[11.5px] font-medium leading-tight', corSlot(c.cor).text)}>

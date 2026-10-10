@@ -5,13 +5,17 @@
  * modos, busca (destaca e enquadra) e seleção (painel lateral no desktop, Sheet no celular); destaques;
  * gráfico da apuração e eventos; tabela completa de municípios. No exterior não há mapa: lista de cidades
  * e países. Na fase 'pre' mostra o 1º turno oficial com contagem regressiva.
+ * "Reveja a noite": `?t=18h42` mostra placar, mapa, série e eventos da UF naquele instante (LinhaDoTempo).
+ * Patrocínio discreto quando configurado no admin.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { MunicipioResumo } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt } from '@/shared/format';
-import { useMunicipio, useUf } from '@/app/data/hooks';
+import { useMunicipio, useStatus, useUf } from '@/app/data/hooks';
+import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
+import { PatrocinioSlot } from '@/app/components/apuracao/PatrocinioSlot';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
 import { Badge, ButtonLink, Combobox, Icon, IconButton, Segmented, Sheet, type ComboOption } from '@/app/ui';
@@ -63,7 +67,13 @@ export default function UfPage() {
   const navigate = useNavigate();
   const lg = useMediaQuery('(min-width: 1024px)');
 
-  const q = useUf(ctx.id, uf ?? undefined);
+  // "Reveja a noite" (só no 2º turno; o 1º turno é o resultado final).
+  const statusQ = useStatus();
+  const { t: tUrl, setT } = useInstanteParam(statusQ.data, statusQ.dataUpdatedAt);
+  const t = ctx.t1 ? undefined : tUrl;
+  const q = useUf(ctx.id, uf ?? undefined, t);
+  // Série/eventos AO VIVO para os marcos da régua (mesma consulta de `q` quando não há `t`).
+  const qVivo = useUf(ctx.id, uf ?? undefined);
   const qT1 = useUf(ctx.idT1, uf ?? undefined);
   const exterior = uf === 'ZZ';
   const paisesQ = usePaisesExterior(exterior);
@@ -103,7 +113,7 @@ export default function UfPage() {
   const nomeUf = uf ? UF_NOMES[uf] : '';
   // UF de um município só (DF): no lugar do mapa, as seções do município.
   const codUnico = ufMeta && ufMeta.uf !== 'ZZ' && ufMeta.municipios === 1 && ufMeta.capitalCod ? ufMeta.capitalCod : undefined;
-  const qUnico = useMunicipio(ctx.id, uf ?? undefined, codUnico);
+  const qUnico = useMunicipio(ctx.id, uf ?? undefined, codUnico, t);
 
   // ---------------------------------------------------------------- estados de erro/carregamento
   if (!uf) {
@@ -192,6 +202,7 @@ export default function UfPage() {
   const unico = codUnico ? snap.municipios.find((m) => m.cod === codUnico) : undefined;
   const snapUnico = qUnico.data && qUnico.data.cod === codUnico && qUnico.data.race === snap.race ? qUnico.data : undefined;
   const restanteVisivel = !t1 && r.eleito === null && r.status !== 'encerrada';
+  const vivo = qVivo.data && qVivo.data.uf === uf && qVivo.data.race === ctx.id ? qVivo.data : undefined;
 
   // Ao lado do placar (desktop) ou depois do mapa (celular): o que falta, 1º × 2º turno ou a participação no 1º turno.
   const lateral = restanteVisivel ? (
@@ -243,7 +254,7 @@ export default function UfPage() {
   return (
     <Container wide>
       <PageHeader
-        breadcrumbs={[{ label: 'Brasil', to: rotaBrasil(ctx.pedida) }, { label: exterior ? 'Exterior' : nomeUf }]}
+        breadcrumbs={[{ label: 'Brasil', to: comInstante(rotaBrasil(ctx.pedida), t) }, { label: exterior ? 'Exterior' : nomeUf }]}
         eyebrow={t1 ? 'Resultado oficial · 1º turno' : '2º turno · 25 de outubro'}
         title={exterior ? 'Votos no exterior' : nomeUf}
         subtitle={subtitulo}
@@ -263,6 +274,25 @@ export default function UfPage() {
         <PreApuracaoAviso inicio={ctx.status.inicioApuracao} agora={ctx.simNow} local={local} className="mb-4" />
       ) : t1 && !ctx.autoT1 ? (
         <PrimeiroTurnoAviso onVoltar={() => ctx.setRace(ctx.idT2)} className="mb-4" />
+      ) : null}
+
+      {!t1 && ctx.fase !== 'pre' && statusQ.data && vivo ? (
+        <LinhaDoTempo
+          status={statusQ.data}
+          recebidoEm={statusQ.dataUpdatedAt}
+          serie={vivo.serie}
+          eventos={vivo.eventos}
+          cores={race.candidatos.map((c) => c.cor)}
+          t={t}
+          onChange={setT}
+          carregando={q.isPlaceholderData}
+          className="mb-3 sm:mb-4"
+        />
+      ) : null}
+      {statusQ.data?.patrocinio ? (
+        <div className="-mt-1 mb-3 flex sm:mb-4 sm:justify-end">
+          <PatrocinioSlot patrocinio={statusQ.data.patrocinio} />
+        </div>
       ) : null}
 
       <div className={cn('transition-opacity', atualizando && 'opacity-60')}>
@@ -456,6 +486,8 @@ export default function UfPage() {
           )}
         </Section>
       ) : null}
+
+      {statusQ.data?.patrocinio ? <PatrocinioSlot patrocinio={statusQ.data.patrocinio} variant="cartao" className="mt-8" /> : null}
 
       {/* ------------------------------------------------------------ Sheet (celular/tablet) */}
       {!lg && selM ? (
