@@ -226,7 +226,9 @@ python3 -I scripts/data/py/locais_nomes.py     # autotestes da capitalização d
 Fontes (`cdn.tse.jus.br/estatistica/sead/odsele/`, lidas em streaming de dentro do ZIP, latin-1/`;`):
 `votacao_secao_2026_BR.zip` (Presidente) e `_{AC,AM,DF,ES,RJ,RN,TO}.zip` (Governador), `detalhe_votacao_secao_2026.zip`
 (aptos, comparecimento, brancos, nulos) e `eleitorado_local_votacao_2026.zip` (seção → local, 1º turno; o 2º turno
-entra no campo extra `segundoTurno`). Precisa de `public/data/uf/*.json` (ordem canônica e conferência) e, para validar
+entra no campo extra `segundoTurno`: seções que mudam de local em 25/10 e também as de locais que mantêm o número mas
+mudam de nome/endereço no cadastro do 2º turno — o TSE reaproveita o `NR_LOCAL_VOTACAO`, às vezes para outro prédio).
+Precisa de `public/data/uf/*.json` (ordem canônica e conferência) e, para validar
 as coordenadas dos locais por município, de `data-raw/ibge/mun/{uf}.topo.json` (`fetch-ibge.ts`). As regras
 (finalistas a/b, "outros", nulos técnicos, `gov.aptos`, agregadas, capitalização) estão no topo de cada script. Os
 scripts param com erro se qualquer seção ou município não fechar com o dataset da fase 1.

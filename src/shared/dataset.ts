@@ -118,6 +118,11 @@ export interface SecaoUfDataset {
 export interface LocaisUfDataset {
   uf: UF;
   locais: LocalVotacao[];
+  /**
+   * Mudanças de local no 2º turno (cadastro de 25/10). `mudancas["cod:zona:secao"]` = índice na lista
+   * `[...locais, ...segundoTurno.locais]`. Seção ausente em `mudancas` = mesmo local do 1º turno.
+   */
+  segundoTurno?: { mudancas: Record<string, number>; locais: LocalVotacao[] };
 }
 
 export interface LocalVotacao {
@@ -135,6 +140,8 @@ export interface LocalVotacao {
   secoes: string;
   /** eleitores aptos no local */
   aptos: number;
+  /** seções agregadas a uma principal neste local: "45>12,46>12" (agregada > principal) — para a Consulta */
+  agregadas?: string;
 }
 
 /** Perfil do eleitorado (perfil_eleitorado_2026.zip), agregado. Arquivo: public/data/perfil/{uf}.json */
