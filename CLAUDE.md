@@ -3,7 +3,8 @@
 Leia `ARCHITECTURE.md` antes de codar. Contratos em `src/shared/*` (types, dataset, api, calc, format, constants) são a fonte da verdade; não os altere sem necessidade real — se alterar, mantenha compatibilidade e diga no relatório.
 
 - Idioma da interface e dos comentários: **português do Brasil**. Identificadores podem ser pt ou en, siga o arquivo.
-- Neutralidade é regra: cores por slot (`cand-a` turquesa = menor número na urna; `cand-b` âmbar), textos descritivos, nunca cores partidárias.
+- Cores (decisão do dono, out/2026): Presidente usa cores de identificação — Lula `cand-vermelho`, Flávio Bolsonaro `cand-azul` (fonte única: `CORES_IDENTIDADE` em `src/shared/constants.ts` + `src/shared/cores.ts`); partidos PT = vermelho e PL = azul na paleta `--partido-*`. Disputas de governador e a simulação com nomes ocultos (`status.anonimizado`) usam slots neutros (`cand-a` turquesa = menor número na urna; `cand-b` âmbar) — `anonimizarRace` neutraliza as cores. Sempre use `corSlot(c.cor)` vindo dos dados, nunca a posição.
+- Neutralidade de conteúdo continua regra: textos descritivos e simétricos entre os finalistas, sem adjetivos.
 - Fotos: só as fotos OFICIAIS do TSE (pacotes em public/data/fotos), mesmo tamanho e tratamento para todos, nunca editadas (só redimensionar/recortar). Na simulação anonimizada (`status.anonimizado`) NÃO mostre foto (use o monograma).
 - Nunca use cor hex solta em componente — só tokens Tailwind (`bg-surface`, `text-fg-muted`, `bg-cand-a`, `border-line`…).
 - Todo número exibido usa a classe `.num` e os formatadores de `src/shared/format.ts`; percentuais derivam de `src/shared/calc.ts`.
