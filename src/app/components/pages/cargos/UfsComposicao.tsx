@@ -1,5 +1,5 @@
 /**
- * Visão por estado de um cargo proporcional: cartograma com a MAIOR bancada de cada UF (cor neutra do partido)
+ * Visão por estado de um cargo proporcional: mapa do Brasil com a MAIOR bancada de cada UF (cor neutra do partido)
  * e a lista de UFs com nº de cadeiras e barra de composição. Clique → detalhe da UF.
  */
 import { useMemo } from 'react';
@@ -9,7 +9,6 @@ import { UF_NOMES } from '@/shared/constants';
 import { fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
-import { hachuraStyle } from '@/app/components/apuracao/MapHatch';
 import { MapaUfs, type CelulaUf } from './MapaUfs';
 import { BarraComposicao } from './Bancadas';
 import { corPartido, porTamanho } from './partidos';
@@ -53,7 +52,7 @@ export function UfsComposicao({
       const empate = l.bancadas.filter((b) => maior && b.eleitos === maior.eleitos);
       out[l.uf] = {
         faixas: maior ? empate.slice(0, 2).map((b) => corPartido(b.sigla)) : [],
-        especial: maior ? undefined : <span className="absolute inset-0" style={hachuraStyle()} />,
+        marca: maior ? undefined : 'pendente',
         rotulo: `${UF_NOMES[l.uf]}: ${maior ? `maior bancada ${empate.map((b) => b.sigla).join(' e ')} com ${maior.eleitos} de ${l.vagas}` : 'aguardando o TSE'}`,
         dica: (
           <span className="block min-w-[160px]">
@@ -83,7 +82,7 @@ export function UfsComposicao({
       <section className="min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5">
         <h3 className="font-display text-[17px] font-semibold tracking-[-0.01em] text-fg">Maior bancada em cada estado</h3>
         <p className="mt-1 text-[12.5px] leading-snug text-fg-muted">
-          Cor do partido com mais cadeiras (duas faixas em caso de empate). Toque numa UF para ver a composição.
+          Cor do partido com mais cadeiras (listrado em caso de empate). Toque numa UF para ver a composição.
         </p>
         <MapaUfs celulas={celulas} onSelect={onSelect} ariaLabel="Maior bancada por estado" className="mt-4" />
       </section>

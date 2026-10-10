@@ -192,7 +192,7 @@ export default function UfPage() {
   const selM = (sel ? porCod.get(sel) : undefined) ?? capital ?? snap.municipios[0];
   const modos = t1 ? MODOS_1T : MODOS_2T.filter((m) => m !== 'variacao' || !!primeiroTurno);
   const modoAtual = modos.includes(modo) ? modo : 'vencedor';
-  const paraMun = (m: MunicipioResumo) => rotaMun(uf, m.cod, ctx.pedida);
+  const paraMun = (m: MunicipioResumo) => comInstante(rotaMun(uf, m.cod, ctx.pedida), t);
   // "Eleito" só faz sentido onde a disputa se decide (governador na própria UF). Presidente num estado:
   // o selo fica "À frente" e, com a apuração local encerrada, "Mais votado" (Placar).
   const resumoPlacar = race.abrangencia === uf ? r : { ...r, eleito: null };

@@ -36,11 +36,13 @@ export interface ZonasExplorerProps {
   zona: number | null;
   onZona: (z: number | null) => void;
   onSecao: (zona: number, secao: number) => void;
+  /** "Reveja a noite": instante exibido (ausente = ao vivo). */
+  t?: number;
 }
 
 const fmtZona = (z: number) => String(z).padStart(4, '0');
 
-export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZona, onSecao }: ZonasExplorerProps) {
+export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZona, onSecao, t }: ZonasExplorerProps) {
   const lg = useMediaQuery('(min-width: 1024px)');
   const detalheRef = useRef<HTMLDivElement>(null);
   const zonaValida = zona !== null && zonas.some((z) => z.zona === zona) ? zona : null;
@@ -146,7 +148,7 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
         {zonaValida === null ? (
           <SemZona zonas={zonas} onZona={(z) => escolher(z)} />
         ) : (
-          <ZonaDetalhe race={race} uf={uf} cod={cod} zona={zonaValida} unica={unica} onFechar={() => onZona(null)} onSecao={onSecao} />
+          <ZonaDetalhe race={race} uf={uf} cod={cod} zona={zonaValida} unica={unica} t={t} onFechar={() => onZona(null)} onSecao={onSecao} />
         )}
       </div>
     </div>
@@ -184,6 +186,7 @@ function ZonaDetalhe({
   cod,
   zona,
   unica,
+  t,
   onFechar,
   onSecao,
 }: {
@@ -192,10 +195,11 @@ function ZonaDetalhe({
   cod: string;
   zona: number;
   unica: boolean;
+  t?: number;
   onFechar: () => void;
   onSecao: (zona: number, secao: number) => void;
 }) {
-  const q = useZona(race.id, uf, cod, zona);
+  const q = useZona(race.id, uf, cod, zona, t);
   const snap = q.data && q.data.zona === zona && q.data.cod === cod && q.data.race === race.id ? q.data : undefined;
   const erro = q.error ?? q.failureReason;
 

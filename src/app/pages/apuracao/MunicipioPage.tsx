@@ -11,10 +11,11 @@ import { useCallback, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { RaceId, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
-import { fmtInt } from '@/shared/format';
-import { useMunicipio } from '@/app/data/hooks';
+import { fmtHora, fmtInt } from '@/shared/format';
+import { useMunicipio, useStatus } from '@/app/data/hooks';
+import { useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
 import { cn } from '@/app/lib/cn';
-import { ButtonLink, Segmented } from '@/app/ui';
+import { Badge, Button, ButtonLink, Segmented } from '@/app/ui';
 import { Container } from '@/app/components/layout/Container';
 import { PageHeader } from '@/app/components/layout/PageHeader';
 import { Section } from '@/app/components/layout/Section';
@@ -59,7 +60,11 @@ export default function MunicipioPage() {
   const navigate = useNavigate();
   const lg = useMediaQuery('(min-width: 1024px)');
   const [zona, setZona] = useZonaParam();
-  const q = useMunicipio(ctx.id, uf ?? undefined, cod || undefined);
+  // "Reveja a noite": o clique no mapa nacional/da UF durante a reprise traz o `?t=` (só no 2º turno).
+  const statusQ = useStatus();
+  const { t: tUrl, setT } = useInstanteParam(statusQ.data, statusQ.dataUpdatedAt);
+  const t = ctx.t1 ? undefined : tUrl;
+  const q = useMunicipio(ctx.id, uf ?? undefined, cod || undefined, t);
   const exterior = uf === 'ZZ';
   const paisesQ = usePaisesExterior(exterior);
   const [agrupar, setAgrupar] = useState<Agrupar>('zona');
@@ -191,6 +196,18 @@ export default function MunicipioPage() {
         ) : null}
       </PageHeader>
 
+      {t !== undefined ? (
+        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-brand/40 bg-brand/[0.06] px-4 py-3">
+          <Badge tone="brand" size="sm" icon="relogio">
+            Revendo a apuração às <span className="num">{fmtHora(t)}</span>
+          </Badge>
+          <span className="text-[12.5px] text-fg-muted">Os números mostram {emMun(snap.nome)} naquele instante.</span>
+          <Button size="sm" variant="secondary" onClick={() => setT(undefined)} className="ml-auto">
+            Voltar ao vivo
+          </Button>
+        </div>
+      ) : null}
+
       {ctx.fase === 'pre' && ctx.status ? (
         <PreApuracaoAviso inicio={ctx.status.inicioApuracao} agora={ctx.simNow} local={emMun(snap.nome)} className="mb-4" />
       ) : t1 && !ctx.autoT1 ? (
@@ -301,6 +318,7 @@ export default function MunicipioPage() {
             zona={zona}
             onZona={setZona}
             onSecao={irSecao}
+            t={t}
           />
         </Section>
       ) : null}

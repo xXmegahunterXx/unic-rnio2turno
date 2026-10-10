@@ -1,7 +1,7 @@
 /**
  * Governadores do 1º turno (resultado oficial, 4/10/2026) — componente para a página /governadores.
  *
- *  - cartograma: as 20 UFs que elegeram governador no 1º turno, na cor NEUTRA do partido do eleito, e as 7 que
+ *  - mapa do Brasil: as 20 UFs que elegeram governador no 1º turno, na cor NEUTRA do partido do eleito, e as 7 que
  *    decidem no 2º turno em destaque ("2T");
  *  - legenda por partido (maior primeiro) e cartões dos 20 eleitos (foto oficial, nome → ficha, partido, % e votos);
  *  - as 7 disputas do 2º turno com os dois finalistas e o % de cada um no 1º turno (dado oficial).
@@ -38,7 +38,7 @@ export interface GovernadoresEleitosT1Props {
   titulo?: string | null;
   /**
    * Lista "Decidem no 2º turno" (padrão sim). Na /governadores as 7 disputas já aparecem acima, então a página
-   * passa `false` (o cartograma continua marcando as 7 UFs e levando à apuração).
+   * passa `false` (o mapa continua marcando as 7 UFs e levando à apuração).
    */
   mostrarSegundoTurno?: boolean;
   className?: string;
@@ -99,15 +99,7 @@ export function GovernadoresEleitosT1({
     for (const { uf, fin } of segundo) {
       out[uf] = {
         faixas: [],
-        especial: (
-          <span className="flex h-full w-full items-end justify-center bg-brand/10 pb-[9%] ring-2 ring-inset ring-brand/50">
-            <span className="whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.08em] text-brand-fg min-[400px]:text-[10px]">
-              {/* Bloco estreito no celular: "2º T" (o "2º turno" inteiro quebrava e escondia o "2º"). */}
-              <span className="sm:hidden">2º T</span>
-              <span className="hidden sm:inline">2º turno</span>
-            </span>
-          </span>
-        ),
+        marca: 'segundo-turno',
         rotulo: `${UF_NOMES[uf]}: 2º turno em 25 de outubro${verFinalistas ? ` entre ${fin.map((c) => c.nomeUrna).join(' e ')}` : ''}`,
         dica: (
           <span className="block min-w-[150px]">
@@ -172,7 +164,11 @@ export function GovernadoresEleitosT1({
               </li>
             ))}
             <li className="flex items-center gap-1.5 text-[12px] text-fg-muted">
-              <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-brand/15 ring-1 ring-inset ring-brand/60" />
+              <span
+                aria-hidden
+                className="h-2.5 w-2.5 rounded-[3px] ring-1 ring-inset ring-brand/50"
+                style={{ background: 'repeating-linear-gradient(135deg, rgb(var(--brand) / 0.6) 0 1.5px, rgb(var(--brand) / 0.15) 1.5px 4px)' }}
+              />
               <span className="font-medium text-fg">2º turno</span>
               <span className="num">{segundo.length}</span>
             </li>

@@ -2,7 +2,7 @@
  * /governadores — as 7 disputas de governador do 2º turno lado a lado (AC, AM, DF, ES, RJ, RN, TO):
  * mini mapa por município, placar, diferença, progresso e selo de resultado definido; ordenável por
  * "mais apertadas". Na fase 'pre', contagem regressiva + o 1º turno real de governador nessas UFs.
- * No fim, os governadores eleitos no 1º turno nas outras 20 UFs (cartograma por partido, fotos oficiais).
+ * No fim, os governadores eleitos no 1º turno nas outras 20 UFs (mapa por partido, fotos oficiais).
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';

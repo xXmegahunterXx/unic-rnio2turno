@@ -58,8 +58,8 @@
    * espectro). Identidade nunca só pela cor: sempre há sigla ao lado.
    */
   --partido-1: 202 109 173; /* orquídea */
-  --partido-2: 149 61 124; /* ameixa */
-  --partido-3: 99 85 162; /* anil */
+  --partido-2: 99 85 162; /* anil */
+  --partido-3: 149 61 124; /* ameixa */
   --partido-4: 160 124 219; /* lavanda */
   --partido-5: 194 115 95; /* salmão */
   --partido-6: 152 153 18; /* oliva */
@@ -101,8 +101,8 @@
   --alert-fg: 190 34 66;
   --pending: 214 214 228;
   --partido-1: 228 134 198;
-  --partido-2: 136 49 112;
-  --partido-3: 88 73 149;
+  --partido-2: 88 73 149;
+  --partido-3: 136 49 112;
   --partido-4: 185 149 246;
   --partido-5: 229 146 125;
   --partido-6: 177 178 57;
@@ -145,8 +145,8 @@
     --alert-fg: 190 34 66;
     --pending: 214 214 228;
     --partido-1: 228 134 198;
-    --partido-2: 136 49 112;
-    --partido-3: 88 73 149;
+    --partido-2: 88 73 149;
+    --partido-3: 136 49 112;
     --partido-4: 185 149 246;
     --partido-5: 229 146 125;
     --partido-6: 177 178 57;

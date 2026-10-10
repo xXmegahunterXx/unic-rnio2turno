@@ -64,8 +64,8 @@ export interface BrazilMapProps {
 }
 
 /** Espaço extra à direita do viewBox para as caixas das UFs pequenas do Nordeste. */
-const EXTRA_DIREITA = 120;
-const OFFSHORE: readonly UFBr[] = ['RN', 'PB', 'PE', 'AL', 'SE'];
+export const EXTRA_DIREITA = 120;
+export const OFFSHORE: readonly UFBr[] = ['RN', 'PB', 'PE', 'AL', 'SE'];
 const ORDEM_TAB: UFBr[] = [...UFS].sort((a, b) => UF_NOMES[a].localeCompare(UF_NOMES[b], 'pt-BR'));
 
 interface Tip {
@@ -86,7 +86,7 @@ interface Caixa {
 }
 
 /** Distribui as caixas fora da costa: perto da altura da UF, sem sobreposição. */
-function layoutCaixas(geo: GeoBrasil, bb: Map<string, BBox>, vbW: number, k: number): Caixa[] {
+export function layoutCaixas(geo: GeoBrasil, bb: Map<string, BBox>, vbW: number, k: number): Caixa[] {
   const w = 27 * k;
   const h = 17 * k;
   const gap = 5 * k;
@@ -112,7 +112,7 @@ const cabeValor = (b: BBox, k: number) => b.w / k >= 60 && b.h / k >= 58;
  * Posição do callout do DF: entre candidatos ao redor do DF (raios de 30–42 px), escolhe o que fica
  * mais longe dos rótulos das outras UFs — assim a bolha nunca cobre uma sigla, em qualquer largura.
  */
-function posicionarCalloutDf(geo: GeoBrasil, bb: Map<string, BBox>, k: number, fontPx: number, valores: boolean) {
+export function posicionarCalloutDf(geo: GeoBrasil, bb: Map<string, BBox>, k: number, fontPx: number, valores: boolean) {
   const f = geo.ufs.DF;
   const r = 12.5 * k;
   if (!f) return { ax: 0, ay: 0, bx: 0, by: 0, r };

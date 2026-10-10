@@ -1,7 +1,7 @@
 /**
  * /senado — Senado no 1º turno de 2026 (resultado oficial): 2 vagas por UF, 54 das 81 cadeiras.
  *
- *  - mapa (cartograma) com as 2 vagas de cada UF pintadas pela cor NEUTRA do partido do eleito;
+ *  - mapa do Brasil com as 2 vagas de cada UF pintadas pela cor NEUTRA do partido do eleito;
  *  - composição das 54 vagas por partido (hemiciclo + bancadas, maior primeiro);
  *  - grade com os 2 eleitos de cada UF (foto oficial, nome → ficha, partido, votos e %);
  *  - toque numa UF → lista completa dos candidatos dela (painel; `?uf=` na URL para compartilhar).
@@ -163,7 +163,7 @@ export default function SenadoPage() {
             Quem ganhou em cada estado
           </h2>
           <p className="mt-1 text-[13px] leading-snug text-fg-muted">
-            Cada bloco é uma UF; as duas faixas são as duas vagas, na cor do partido de cada eleito. Toque para ver todos os candidatos.
+            Cada estado na cor do partido dos dois eleitos; listrado quando são de partidos diferentes. Toque para ver todos os candidatos.
           </p>
           <MapaUfs
             celulas={celulas}
@@ -185,7 +185,7 @@ export default function SenadoPage() {
             </h2>
             <span className="text-[12.5px] text-fg-muted">Eleitos em 2026 · maior bancada primeiro</span>
           </div>
-          {/* No desktop o cartão acompanha a altura do cartograma: hemiciclo e legenda ficam centrados, sem vazio embaixo. */}
+          {/* No desktop o cartão acompanha a altura do mapa: hemiciclo e legenda ficam centrados, sem vazio embaixo. */}
           <div className="flex flex-1 flex-col justify-center">
             <div className="mx-auto mt-4 w-full max-w-[600px]">
               <Hemiciclo
