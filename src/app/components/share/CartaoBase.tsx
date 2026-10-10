@@ -194,7 +194,8 @@ export const CartaoBase = forwardRef<HTMLDivElement, CartaoBaseProps>(function C
                 Sintonia
               </div>
               {sobrancelha ? (
-                <div className="truncate font-semibold uppercase leading-none tracking-[0.16em] text-fg-muted" style={{ fontSize: 15 * k, marginTop: 8 * k }}>
+                // leading folgado: com `truncate` (overflow oculto) e leading-none, acentos de caixa alta ("CENÁRIO") eram cortados.
+                <div className="truncate font-semibold uppercase leading-[1.35] tracking-[0.16em] text-fg-muted" style={{ fontSize: 15 * k, marginTop: 5 * k }}>
                   {sobrancelha}
                 </div>
               ) : null}

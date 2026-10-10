@@ -68,7 +68,7 @@ function Miolo({ nome, uf, race, t, fotos }: Omit<CartaoMunicipioT1Props, 'forma
             Minha cidade no 1º turno
           </div>
         </div>
-        <div className="truncate font-display font-semibold leading-none tracking-[-0.03em] text-fg-muted" style={{ fontSize: (retrato ? 40 : 30) * k, marginTop: retrato ? 12 * k : 0 }}>
+        <div className="truncate font-display font-semibold leading-[1.25] tracking-[-0.03em] text-fg-muted" style={{ fontSize: (retrato ? 40 : 30) * k, marginTop: retrato ? 8 * k : 0 }}>
           {nome}
         </div>
       </div>
