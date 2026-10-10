@@ -29,6 +29,11 @@ const routes: RouteObject[] = [
       { path: '/apuracao/:uf', element: page(() => import('./pages/apuracao/UfPage')) },
       { path: '/apuracao/:uf/:cod', element: page(() => import('./pages/apuracao/MunicipioPage')) },
       { path: '/apuracao/:uf/:cod/:zona/:secao', element: page(() => import('./pages/apuracao/SecaoPage')) },
+      { path: '/senado', element: page(() => import('./pages/cargos/SenadoPage')) },
+      { path: '/camara', element: page(() => import('./pages/cargos/CamaraPage')) },
+      { path: '/assembleias', element: page(() => import('./pages/cargos/AssembleiaPage')) },
+      { path: '/assembleias/:uf', element: page(() => import('./pages/cargos/AssembleiaPage')) },
+      { path: '/candidato/:sqcand', element: page(() => import('./pages/cargos/CandidatoPage')) },
       { path: '/metodologia', element: page(() => import('./pages/static/MetodologiaPage')) },
       { path: '/privacidade', element: page(() => import('./pages/static/PrivacidadePage')) },
       { path: '/sobre', element: page(() => import('./pages/static/SobrePage')) },
@@ -39,6 +44,8 @@ const routes: RouteObject[] = [
   },
   // Admin fica fora do AppShell público (layout próprio).
   { path: '/admin', element: page(() => import('./pages/admin/AdminPage')) },
+  // Modo TV: tela cheia própria (fora do AppShell), para transmissão.
+  { path: '/tv', element: page(() => import('./pages/tv/TvPage')) },
 ];
 
 export const router = __DEMO__ ? createHashRouter(routes) : createBrowserRouter(routes);
