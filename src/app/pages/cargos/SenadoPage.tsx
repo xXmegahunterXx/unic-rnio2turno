@@ -34,6 +34,8 @@ import { FotoOficial } from '@/app/components/pages/cargos/FotoOficial';
 import { CandidatoLinha, FonteTse, NomeLink, PartidoChip } from '@/app/components/pages/cargos/ui';
 import { emUf } from '@/app/components/pages/detalhe/fmt';
 import { NavCargos } from '@/app/components/pages/cargos/NavCargos';
+import { BotaoCompartilharComposicao, BotaoCompartilharSenadoUf } from '@/app/components/share/cartoes/Cargos';
+import { hashtags } from '@/app/components/share/textos';
 
 const GRUPO = 'senado';
 
@@ -153,6 +155,20 @@ export default function SenadoPage() {
             <span className="num">{fmtInt(totalVagas)}</span> das <span className="num">81</span> cadeiras, para mandatos de 8 anos.
           </>
         }
+        actions={
+          <BotaoCompartilharComposicao
+            casa="Senado"
+            subtitulo={`${fmtInt(totalVagas)} das 81 cadeiras, eleitas em 2026 · 2 por estado`}
+            bancadas={bancadas}
+            total={totalVagas}
+            rotuloCentro="vagas em 2026"
+            rotuloTexto="vagas"
+            caminho="/senado"
+            tags={hashtags('senado')}
+            nomeArquivo="sintonia-senado-2026"
+            size="sm"
+          />
+        }
       >
         <NavCargos atual="senado" />
       </PageHeader>
@@ -247,7 +263,22 @@ export default function SenadoPage() {
         description={ufAberta ? `${fmtInt(ufAberta.candidatos.length)} candidatos · 2 vagas · % dos votos válidos` : undefined}
         width="lg"
       >
-        {ufAberta ? <DetalheUf u={ufAberta} comFicha={(sq) => fichas.porSq.has(sq)} generoDe={(sq) => fichas.porSq.get(sq)?.genero} /> : null}
+        {ufAberta && ufSel ? (
+          <>
+            <div className="mb-4 flex justify-end">
+              <BotaoCompartilharSenadoUf
+                uf={ufSel}
+                eleitos={ufAberta.candidatos.filter((c) => ehEleito(c.situacao)).slice(0, 2)}
+                fotoGrupo={GRUPO}
+                caminho={`/senado?uf=${ufSel.toLowerCase()}`}
+                label="Compartilhar os eleitos"
+                size="sm"
+                variant="secondary"
+              />
+            </div>
+            <DetalheUf u={ufAberta} comFicha={(sq) => fichas.porSq.has(sq)} generoDe={(sq) => fichas.porSq.get(sq)?.genero} />
+          </>
+        ) : null}
       </Sheet>
     </Container>
   );

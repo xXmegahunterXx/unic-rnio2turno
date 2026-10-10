@@ -2,8 +2,10 @@
  * Acontecimentos da apuração: lista (desktop, em cartão) ou ticker deslizável (celular).
  * O evento mais recente de 'virada' ou 'eleito' ganha um destaque na cor do candidato (com o rosto, quando a corrida
  * tem fotos oficiais e não está anonimizada).
+ * Viradas, lideranças, marcos de % e "eleito" têm um botão discreto de compartilhar (kit de compartilhamento): imagem
+ * "momento" com o placar daquele instante e link com `?t=`.
  */
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
 import type { CorCandidato, FeedEvent, Race } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
@@ -13,6 +15,8 @@ import { Icon } from '@/app/ui/Icon';
 import { EventFeed } from '@/app/components/apuracao/EventFeed';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
+import { useStatus } from '@/app/data/hooks';
+import { BotaoMomento, eventoCompartilhavel } from '@/app/components/share/cartoes/Momento';
 
 export interface FeedPanelProps {
   eventos: FeedEvent[];
@@ -31,6 +35,12 @@ const BORDA: Record<CorCandidato, string> = {
 
 export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, className }: FeedPanelProps) {
   const desktop = useIsDesktop();
+  // O feed é sempre do 2º turno (ao vivo ou simulação): a imagem leva a marca SIMULAÇÃO quando for o caso.
+  const simulado = !!useStatus().data?.simulacao;
+  const acao = useCallback(
+    (e: FeedEvent) => (eventoCompartilhavel(e) ? <BotaoMomento evento={e} race={race} simulado={simulado} /> : null),
+    [race, simulado],
+  );
   const destaque = eventos.find((e) => e.tipo === 'eleito' || e.tipo === 'virada');
   // O destaque sai da lista para não aparecer duas vezes.
   const resto = destaque ? eventos.filter((e) => e.id !== destaque.id) : eventos;
@@ -43,8 +53,8 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
         <h2 id="feed-titulo" className="mb-3 font-display text-[19px] font-semibold leading-tight tracking-[-0.015em] text-fg">
           Acontecimentos
         </h2>
-        {destaque ? <Destaque e={destaque} race={race} className="mb-2.5" /> : null}
-        <EventFeed eventos={resto} race={race} variant="ticker" max={10} emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
+        {destaque ? <Destaque e={destaque} race={race} simulado={simulado} className="mb-2.5" /> : null}
+        <EventFeed eventos={resto} race={race} variant="ticker" max={10} acao={acao} emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
         {poucos ? <ComoAcompanhar className="mt-3 rounded-2xl border border-line bg-surface p-4" /> : null}
       </section>
     );
@@ -61,8 +71,8 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
         </div>
         <div className={cn('flex flex-1 flex-col', largo && 'lg:grid lg:grid-cols-2 lg:gap-10')}>
           <div className="min-w-0">
-            {destaque ? <Destaque e={destaque} race={race} className="mb-4" /> : null}
-            <EventFeed eventos={resto} race={race} variant="list" max={20} emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
+            {destaque ? <Destaque e={destaque} race={race} simulado={simulado} className="mb-4" /> : null}
+            <EventFeed eventos={resto} race={race} variant="list" max={20} acao={acao} emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
           </div>
           <ComoAcompanhar className={cn('mt-auto border-t border-line pt-4', largo && 'lg:mt-0 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0')} />
         </div>
@@ -78,10 +88,10 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
         </h2>
         <span className="text-[12px] text-fg-muted">horário de Brasília</span>
       </div>
-      {destaque ? <Destaque e={destaque} race={race} className="mb-4" /> : null}
+      {destaque ? <Destaque e={destaque} race={race} simulado={simulado} className="mb-4" /> : null}
       <div className="relative min-h-0 flex-1">
         <div className="-mr-2 max-h-[400px] overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black_calc(100%-36px),transparent)] min-[1360px]:absolute min-[1360px]:inset-0 min-[1360px]:max-h-none">
-          <EventFeed eventos={resto} race={race} variant="list" max={20} className="pb-8" emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
+          <EventFeed eventos={resto} race={race} variant="list" max={20} acao={acao} className="pb-8" emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
         </div>
       </div>
     </section>
@@ -112,7 +122,7 @@ function ComoAcompanhar({ className }: { className?: string }) {
   );
 }
 
-function Destaque({ e, race, className }: { e: FeedEvent; race: Race; className?: string }) {
+function Destaque({ e, race, simulado, className }: { e: FeedEvent; race: Race; simulado?: boolean; className?: string }) {
   const cor = slotDe(race, e.candidato);
   const s = corSlot(cor);
   const eleito = e.tipo === 'eleito';
@@ -134,6 +144,7 @@ function Destaque({ e, race, className }: { e: FeedEvent; race: Race; className?
       <p className="mt-1.5 text-pretty text-[15.5px] font-semibold leading-snug text-fg">{e.titulo}</p>
       {e.detalhe ? <p className="num mt-1 text-[12.5px] leading-snug text-fg-muted">{e.detalhe}</p> : null}
       </div>
+      <BotaoMomento evento={e} race={race} simulado={simulado} className="-mr-1.5 -mt-1.5 self-start" />
     </div>
   );
 }

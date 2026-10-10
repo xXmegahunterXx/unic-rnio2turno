@@ -4,6 +4,7 @@
  * Eventos de liderança, virada e eleito mostram o rosto do candidato (foto oficial) com o ícone do tipo num
  * selo — só quando a corrida tem fotos (useFotosRace: nunca na simulação anonimizada); senão, o ícone.
  */
+import type { ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { FeedEvent, Race, TipoEvento } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
@@ -26,6 +27,11 @@ export interface EventFeedProps {
   emptyText?: string;
   /** Ticker: sangra até a borda da tela (−16 px nas laterais). Padrão true; use false dentro de cartões. */
   bleed?: boolean;
+  /**
+   * Ação discreta por evento (ex.: `<BotaoMomento/>` do kit de compartilhamento para viradas, marcos e "eleito").
+   * Devolva null para os eventos sem ação.
+   */
+  acao?: (e: FeedEvent) => ReactNode;
   className?: string;
 }
 
@@ -76,7 +82,7 @@ function tomEvento(e: FeedEvent, race?: Race) {
   return 'bg-surface-3 text-fg-muted';
 }
 
-export function EventFeed({ eventos, race, variant = 'list', max, showUf = true, emptyText = 'Os acontecimentos da apuração aparecem aqui.', bleed = true, className }: EventFeedProps) {
+export function EventFeed({ eventos, race, variant = 'list', max, showUf = true, emptyText = 'Os acontecimentos da apuração aparecem aqui.', bleed = true, acao, className }: EventFeedProps) {
   const fotos = useFotosRace(race);
   const lista = eventos.slice(0, max ?? (variant === 'ticker' ? 8 : 12));
   if (lista.length === 0) {
@@ -116,13 +122,14 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
                     <Icon name={ICONE[e.tipo]} size={15} strokeWidth={2} />
                   </span>
                 )}
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <div className="num text-[11px] font-medium text-fg-muted">
                     {fmtHora(e.t)}
                     {showUf && e.abrangencia !== 'BR' ? ` · ${e.abrangencia}` : ''}
                   </div>
                   <div className="mt-0.5 line-clamp-2 text-[13.5px] font-medium leading-snug text-fg">{e.titulo}</div>
                 </div>
+                {acao ? <div className="-mr-1.5 -mt-1.5 shrink-0">{acao(e)}</div> : null}
               </motion.li>
             ))}
           </AnimatePresence>
@@ -168,6 +175,7 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
                 </p>
                 {e.detalhe ? <p className="num mt-0.5 text-[12.5px] leading-snug text-fg-muted">{e.detalhe}</p> : null}
               </div>
+              {acao ? <div className="-mr-1 -mt-0.5 shrink-0 self-start">{acao(e)}</div> : null}
             </div>
           </motion.li>
         ))}

@@ -26,6 +26,8 @@ import { EleitosUf, MaisVotadosPais, VisaoComposicao, useComposicao } from '@/ap
 import { UfsComposicao } from '@/app/components/pages/cargos/UfsComposicao';
 import { useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
 import { FonteTse } from '@/app/components/pages/cargos/ui';
+import { BotaoCompartilharComposicao } from '@/app/components/share/cartoes/Cargos';
+import { hashtags } from '@/app/components/share/textos';
 
 export default function CamaraPage() {
   const q = useCargo('camara');
@@ -111,7 +113,28 @@ export default function CamaraPage() {
             </>
           )
         }
-        actions={seletor}
+        actions={
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="min-w-0 flex-1 sm:flex-none">{seletor}</div>
+            <BotaoCompartilharComposicao
+              casa={uf ? `Câmara dos Deputados · ${UF_NOMES[uf]}` : 'Câmara dos Deputados'}
+              subtitulo={
+                uf
+                  ? `A bancada ${deUf(uf, UF_NOMES[uf])}: ${fmtInt(comp.total)} das 513 cadeiras`
+                  : 'Os 513 deputados federais eleitos em 4 de outubro'
+              }
+              bancadas={comp.bancadas}
+              total={comp.total}
+              rotuloCentro={uf ? 'deputados federais' : 'deputados'}
+              caminho={uf ? `/camara?uf=${uf.toLowerCase()}` : '/camara'}
+              tags={hashtags('camara')}
+              nomeArquivo={uf ? `sintonia-camara-${uf.toLowerCase()}` : 'sintonia-camara-2026'}
+              soIcone
+              size="md"
+              className="shrink-0 border border-line"
+            />
+          </div>
+        }
       >
         <NavCargos atual="camara" />
       </PageHeader>

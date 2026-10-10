@@ -34,6 +34,7 @@ import { MapModeSwitch } from '@/app/components/apuracao/MapModeSwitch';
 import { MunicipioTable } from '@/app/components/apuracao/MunicipioTable';
 import { TimelineChart } from '@/app/components/apuracao/TimelineChart';
 import { EventFeed } from '@/app/components/apuracao/EventFeed';
+import { BotaoMomento, eventoCompartilhavel } from '@/app/components/share/cartoes/Momento';
 import { ErrorState } from '@/app/components/apuracao/States';
 import { votosPorIbge, type MapMode } from '@/app/components/apuracao/mapModes';
 import {
@@ -289,6 +290,7 @@ export default function UfPage() {
           t={t}
           onChange={setT}
           carregando={q.isPlaceholderData}
+          compartilhar={{ race, uf, simulado }}
           className="mb-3 sm:mb-4"
         />
       ) : null}
@@ -460,7 +462,14 @@ export default function UfPage() {
             )}
           </Section>
           <Section id="eventos" title="Acontecimentos" className="min-w-0 lg:col-span-4" card>
-            <EventFeed eventos={eventos} race={race} showUf={false} max={8} bleed={false} />
+            <EventFeed
+              eventos={eventos}
+              race={race}
+              showUf={false}
+              max={8}
+              bleed={false}
+              acao={(e) => (eventoCompartilhavel(e) && !t1 ? <BotaoMomento evento={e} race={race} simulado={simulado} /> : null)}
+            />
           </Section>
         </div>
       ) : null}

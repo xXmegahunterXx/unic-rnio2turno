@@ -14,9 +14,7 @@ import { fmtPct, fmtPP } from '@/shared/format';
 import { useAnonimizado, useMeta, useNacional, useRace, useRaces, useStatus } from '@/app/data/hooks';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
 import { useSimNow } from '@/app/lib/useNow';
-import { compartilhar, urlAbsoluta } from '@/app/lib/share';
 import { Badge } from '@/app/ui/Badge';
-import { Button, IconButton } from '@/app/ui/Button';
 import { Segmented } from '@/app/ui/Segmented';
 import { Container } from '@/app/components/layout/Container';
 import { ErrorState } from '@/app/components/apuracao/States';
@@ -28,6 +26,7 @@ import { useGovernadoresUf } from '@/app/components/pages/nacional/useGovernador
 import { GOV_RACES, linkUf } from '@/app/components/pages/nacional/fase';
 import { GovernadoresEleitosT1 } from '@/app/components/pages/cargos/GovernadoresEleitosT1';
 import { cn } from '@/app/lib/cn';
+import { BotaoCompartilharGovernadores, type DisputaGov } from '@/app/components/share/cartoes/Governadores';
 
 type Ordem = 'apertadas' | 'apuradas' | 'az';
 const CHAVE_ORDEM = 'sintonia:governadores:ordem';
@@ -113,14 +112,21 @@ export default function GovernadoresPage() {
   const secoes = resumos.reduce((s, r) => s + r.secoes, 0);
   const totalizadas = resumos.reduce((s, r) => s + r.secoesTotalizadas, 0);
 
-  const compartilharPagina = () =>
-    compartilhar({
-      titulo: 'Sintonia · Governadores',
-      texto: pre
-        ? 'Governador no 2º turno em 7 estados (AC, AM, DF, ES, RJ, RN e TO): veja o 1º turno e acompanhe a apuração ao vivo.'
-        : `${status?.simulacao ? '[SIMULAÇÃO] ' : ''}Apuração do 2º turno para governador em 7 estados, ao vivo e seção por seção.`,
-      url: urlAbsoluta('/governadores'),
-    });
+  // Imagem com as 7 disputas (na ordem alfabética, estável) + texto neutro para o X.
+  const disputas: DisputaGov[] = [...itens]
+    .sort((a, b) => UF_NOMES[a.uf].localeCompare(UF_NOMES[b.uf], 'pt-BR'))
+    .filter((x) => x.race && x.snap)
+    .map((x) => ({ uf: x.uf, race: x.race!, resumo: x.snap!.resumo }));
+  const compartilharPagina = (
+    <BotaoCompartilharGovernadores
+      itens={disputas}
+      simulado={!!status?.simulacao}
+      t1={pre}
+      carregando={disputas.length < itens.length}
+      soIcone={!desktop}
+      size={desktop ? 'md' : 'sm'}
+    />
+  );
 
   return (
     <Container wide className="pb-6 sm:pb-10">
@@ -150,15 +156,7 @@ export default function GovernadoresPage() {
             ]}
           />
         }
-        acoes={
-          desktop ? (
-            <Button icon="compartilhar" onClick={compartilharPagina}>
-              Compartilhar
-            </Button>
-          ) : (
-            <IconButton icon="compartilhar" label="Compartilhar" size="sm" onClick={compartilharPagina} />
-          )
-        }
+        acoes={compartilharPagina}
       />
 
       {pre ? (

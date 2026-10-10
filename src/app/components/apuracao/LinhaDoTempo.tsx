@@ -16,10 +16,11 @@
  *  - Na fase 'pre' (ou sem nada apurado ainda) não aparece.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { useIsFetching, useQueryClient, type Query } from '@tanstack/react-query';
-import { instanteChave } from '@/app/data/hooks';
-import type { CorCandidato, FeedEvent, LiveStatus, SeriePoint } from '@/shared/types';
+import { instanteChave, useRace } from '@/app/data/hooks';
+import type { CorCandidato, FeedEvent, LiveStatus, Race, SeriePoint, UF } from '@/shared/types';
+import { UFS } from '@/shared/types';
 import { BRT_OFFSET_MS, INICIO_APURACAO } from '@/shared/constants';
 import { fmtHora, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
@@ -28,6 +29,7 @@ import { estimarSimNow, useNow } from '@/app/lib/useNow';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
 import { useElementSize } from './MapHooks';
+import { BotaoInstante } from '@/app/components/share/cartoes/Momento';
 
 const MIN = 60_000;
 /** Quanto a noite anda por passo do play (1 min simulado)… */
@@ -167,6 +169,11 @@ export interface LinhaDoTempoProps {
   carregando?: boolean;
   /** Fixa no topo enquanto revendo (padrão true). */
   grudar?: boolean;
+  /**
+   * "Compartilhar este momento" (kit de compartilhamento): corrida, UF e simulação do placar do instante. Ausente =
+   * deduz da rota (`/apuracao` ou `/apuracao/:uf`, `?race=`); `false` esconde o botão.
+   */
+  compartilhar?: { race: Race; uf?: UF; simulado?: boolean } | false;
   className?: string;
 }
 
@@ -221,7 +228,7 @@ function faixaDaNoite(serie: SeriePoint[], cores: CorCandidato[], ini: number, f
   return out.filter((s) => s.w > 0);
 }
 
-export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, serie, eventos, cores = ['a', 'b'], t, onChange, carregando, grudar = true, className }: LinhaDoTempoProps) {
+export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, serie, eventos, cores = ['a', 'b'], t, onChange, carregando, grudar = true, compartilhar, className }: LinhaDoTempoProps) {
   const agora = useNow(status.velocidade > 1 ? 500 : 1000);
   const simNow = agoraApuracao(status, recebidoEm, agora) ?? status.simNow;
   const ini = status.inicioApuracao ?? INICIO_APURACAO;
@@ -415,6 +422,9 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
                 </>
               )}
             </p>
+            {revendo && !tocando && arrasto === null && t !== undefined && compartilhar !== false ? (
+              <CompartilharInstante t={t} simulacao={status.simulacao} dados={compartilhar} />
+            ) : null}
             {revendo ? (
               <button
                 type="button"
@@ -517,3 +527,27 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
     </section>
   );
 });
+
+// =============================================================================================
+// "Compartilhar este momento"
+// =============================================================================================
+
+const CLASSE_BOTAO_INSTANTE = '!h-7 !w-7 -mr-1';
+
+function CompartilharInstante({ t, simulacao, dados }: { t: number; simulacao: boolean; dados?: { race: Race; uf?: UF; simulado?: boolean } }) {
+  if (dados) {
+    return <BotaoInstante race={dados.race} uf={dados.uf} t={t} simulado={dados.simulado ?? simulacao} soIcone size="sm" className={CLASSE_BOTAO_INSTANTE} />;
+  }
+  return <CompartilharInstanteDaRota t={t} simulacao={simulacao} />;
+}
+
+/** Deduz corrida e UF da rota da página (`/apuracao`, `/apuracao/:uf`, `?race=`). */
+function CompartilharInstanteDaRota({ t, simulacao }: { t: number; simulacao: boolean }) {
+  const { uf: ufRaw } = useParams();
+  const [params] = useSearchParams();
+  const race = useRace(params.get('race') || 'pres');
+  const U = ufRaw?.toUpperCase();
+  const uf = U === 'ZZ' ? 'ZZ' : U && (UFS as readonly string[]).includes(U) ? (U as UF) : undefined;
+  if (!race || race.turno !== 2) return null;
+  return <BotaoInstante race={race} uf={uf} t={t} simulado={simulacao} soIcone size="sm" className={CLASSE_BOTAO_INSTANTE} />;
+}

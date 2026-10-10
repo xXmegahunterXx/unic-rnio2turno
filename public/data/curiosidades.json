@@ -1,0 +1,1255 @@
+{
+ "versao": 1,
+ "geradoEm": "2026-10-10T12:04:42.868Z",
+ "fonte": "Calculado pelo Sintonia a partir dos dados oficiais do TSE do 1º turno de 04/10/2026 (resultado por município e por seção, locais de votação, perfil do eleitorado, candidaturas e resultados de Câmara, Senado e Governador). Script: scripts/data/curiosidades.ts.",
+ "finalistas": {
+  "a": {
+   "slot": "a",
+   "numero": 13,
+   "nomeUrna": "Lula",
+   "partido": "PT"
+  },
+  "b": {
+   "slot": "b",
+   "numero": 22,
+   "nomeUrna": "Flávio Bolsonaro",
+   "partido": "PL"
+  }
+ },
+ "pisos": {
+  "eleitoradoMunicipio": 5000,
+  "secaoValidos": 20
+ },
+ "fatos": [
+  {
+   "id": "brasil-eleitorado",
+   "tema": "brasil",
+   "titulo": "O tamanho da eleição",
+   "destaque": {
+    "valor": 158745502,
+    "formato": "int",
+    "unidade": "eleitores aptos"
+   },
+   "contexto": "Eles estavam distribuídos em 499.248 seções eleitorais: 5.571 municípios no Brasil e 186 cidades no exterior.",
+   "texto": "158.745.502 eleitores estavam aptos a votar no 1º turno de 2026, em 499.248 seções de 5.571 municípios e 186 cidades no exterior.",
+   "lugares": [
+    {
+     "nome": "Brasil",
+     "rota": "/apuracao?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "dados": {
+    "eleitorado": 158745502,
+    "secoes": 499248,
+    "municipios": 5571,
+    "cidadesExterior": 186
+   }
+  },
+  {
+   "id": "brasil-abstencao",
+   "tema": "brasil",
+   "titulo": "Quem não foi votar",
+   "destaque": {
+    "valor": 33469667,
+    "formato": "int",
+    "unidade": "eleitores não compareceram"
+   },
+   "contexto": "São 21,08% do eleitorado. Compareceram 125.275.835 pessoas (78,92%). O voto é facultativo para quem tem 16 ou 17 anos ou mais de 70.",
+   "texto": "No 1º turno de 2026, 33.469.667 eleitores (21,08%) não foram votar. Compareceram 125.275.835 (78,92%).",
+   "lugares": [
+    {
+     "nome": "Brasil",
+     "rota": "/apuracao?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "dados": {
+    "eleitorado": 158745502,
+    "comparecimento": 125275835,
+    "abstencao": 33469667,
+    "pctAbstencao": 21.08
+   }
+  },
+  {
+   "id": "brasil-cidade-maior-que-estados",
+   "tema": "brasil",
+   "titulo": "Mais eleitores que 22 estados e o DF",
+   "destaque": {
+    "valor": 9145124,
+    "formato": "int",
+    "unidade": "eleitores na cidade de São Paulo"
+   },
+   "contexto": "Só SP, MG, RJ e BA têm mais. A capital tem mais eleitores que Roraima, Amapá, Acre, Tocantins, Rondônia, Sergipe e Mato Grosso do Sul somados (7.804.732).",
+   "texto": "A cidade de São Paulo tem 9.145.124 eleitores: mais que 23 das 27 unidades da federação. Só SP, MG, RJ e BA têm mais.",
+   "lugares": [
+    {
+     "nome": "São Paulo (SP)",
+     "uf": "SP",
+     "cod": "71072",
+     "rota": "/apuracao/sp/71072?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/sp/71072?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Eleitores aptos no 1º turno de 2026: o município contra cada unidade da federação (27, com o DF).",
+   "dados": {
+    "municipio": "São Paulo",
+    "eleitoradoMunicipio": 9145124,
+    "ufsMenores": [
+     "AC",
+     "AL",
+     "AM",
+     "AP",
+     "CE",
+     "DF",
+     "ES",
+     "GO",
+     "MA",
+     "MS",
+     "MT",
+     "PA",
+     "PB",
+     "PE",
+     "PI",
+     "PR",
+     "RN",
+     "RO",
+     "RR",
+     "RS",
+     "SC",
+     "SE",
+     "TO"
+    ],
+    "ufsMaiores": [
+     "SP",
+     "MG",
+     "RJ",
+     "BA"
+    ],
+    "ufsSomadas": [
+     "RR",
+     "AP",
+     "AC",
+     "TO",
+     "RO",
+     "SE",
+     "MS"
+    ],
+    "eleitoradoSomado": 7804732
+   }
+  },
+  {
+   "id": "brasil-menor-municipio",
+   "tema": "brasil",
+   "titulo": "O menor colégio eleitoral",
+   "destaque": {
+    "valor": 1094,
+    "formato": "int",
+    "unidade": "eleitores aptos"
+   },
+   "contexto": "Borá (SP) é o município com menos eleitores do país; 78,79% deles votaram no 1º turno. São Paulo, o maior, tem 8.359 vezes mais.",
+   "texto": "Borá (SP) é o menor colégio eleitoral do Brasil: 1.094 eleitores aptos. São Paulo, o maior, tem 8.359 vezes mais.",
+   "lugares": [
+    {
+     "nome": "Borá (SP)",
+     "uf": "SP",
+     "cod": "62430",
+     "rota": "/apuracao/sp/62430?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/sp/62430?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "dados": {
+    "municipio": "Borá",
+    "uf": "SP",
+    "eleitorado": 1094,
+    "comparecimento": 862,
+    "maiorMunicipio": "São Paulo",
+    "eleitoradoMaior": 9145124,
+    "vezes": 8359
+   }
+  },
+  {
+   "id": "finalistas-empate-municipio",
+   "tema": "finalistas",
+   "titulo": "Empate voto a voto",
+   "destaque": {
+    "valor": 2,
+    "formato": "int",
+    "unidade": "municípios com empate exato"
+   },
+   "contexto": "Os dois finalistas tiveram exatamente o mesmo número de votos em Crixás do Tocantins (TO), 679 a 679, e Trabiju (SP), 574 a 574. No exterior, Bissau (Guiné-Bissau) também empatou: 17 a 17.",
+   "texto": "No 1º turno, os dois finalistas à Presidência empataram voto a voto em 2 municípios: Crixás do Tocantins (TO), 679 a 679, e Trabiju (SP), 574 a 574.",
+   "lugares": [
+    {
+     "nome": "Crixás do Tocantins (TO)",
+     "uf": "TO",
+     "cod": "73555",
+     "rota": "/apuracao/to/73555?race=pres-t1"
+    },
+    {
+     "nome": "Trabiju (SP)",
+     "uf": "SP",
+     "cod": "62448",
+     "rota": "/apuracao/sp/62448?race=pres-t1"
+    },
+    {
+     "nome": "Bissau (Guiné-Bissau)",
+     "uf": "ZZ",
+     "cod": "29394",
+     "rota": "/apuracao/zz/29394?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/to/73555?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Votos de Lula (13) = votos de Flávio Bolsonaro (22), com pelo menos 1 voto.",
+   "dados": {
+    "municipios": [
+     "TO:73555:Crixás do Tocantins:679",
+     "SP:62448:Trabiju:574"
+    ],
+    "exterior": [
+     "29394:Bissau:17"
+    ]
+   }
+  },
+  {
+   "id": "finalistas-menor-diferenca",
+   "tema": "finalistas",
+   "titulo": "Separados por 1 voto",
+   "destaque": {
+    "valor": 1,
+    "formato": "int",
+    "unidade": "voto de diferença"
+   },
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 8138,
+      "formato": "int",
+      "unidade": "votos"
+     },
+     "rotulo": "45,33% dos válidos",
+     "lugar": {
+      "nome": "São Joaquim de Bicas (MG)",
+      "uf": "MG",
+      "cod": "41629",
+      "rota": "/apuracao/mg/41629?race=pres-t1"
+     }
+    },
+    "b": {
+     "valor": {
+      "valor": 8139,
+      "formato": "int",
+      "unidade": "votos"
+     },
+     "rotulo": "45,34% dos válidos",
+     "lugar": {
+      "nome": "São Joaquim de Bicas (MG)",
+      "uf": "MG",
+      "cod": "41629",
+      "rota": "/apuracao/mg/41629?race=pres-t1"
+     }
+    }
+   },
+   "contexto": "Em São Joaquim de Bicas (MG), com 25.074 eleitores, os dois finalistas ficaram a 1 voto de distância: 8.138 a 8.139. É a menor diferença entre os municípios com pelo menos 5.000 eleitores.",
+   "texto": "Em São Joaquim de Bicas (MG), os dois finalistas à Presidência ficaram separados por 1 voto no 1º turno: 8.138 a 8.139.",
+   "lugares": [
+    {
+     "nome": "São Joaquim de Bicas (MG)",
+     "uf": "MG",
+     "cod": "41629",
+     "rota": "/apuracao/mg/41629?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/mg/41629?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Menor diferença em pontos percentuais dos votos válidos entre os dois finalistas, sem contar empates exatos. Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "dados": {
+    "uf": "MG",
+    "cod": "41629",
+    "municipio": "São Joaquim de Bicas",
+    "eleitorado": 25074,
+    "votosA": 8138,
+    "votosB": 8139,
+    "validos": 17953,
+    "piso": 5000
+   }
+  },
+  {
+   "id": "finalistas-empate-secoes",
+   "tema": "finalistas",
+   "titulo": "Empates na urna",
+   "destaque": {
+    "valor": 2148,
+    "formato": "int",
+    "unidade": "seções com empate exato"
+   },
+   "contexto": "Nessas seções, os dois finalistas tiveram exatamente o mesmo número de votos. O maior empate foi em Belo Horizonte (MG), na seção 109 da zona 35: 171 a 171.",
+   "texto": "Em 2.148 seções eleitorais, os dois finalistas à Presidência empataram no 1º turno. O maior empate: 171 a 171, em Belo Horizonte (MG).",
+   "lugares": [
+    {
+     "nome": "Belo Horizonte (MG) · zona 35, seção 109",
+     "uf": "MG",
+     "cod": "41238",
+     "zona": 35,
+     "secao": 109,
+     "rota": "/apuracao/mg/41238/35/109?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/mg/41238/35/109?race=pres-t1",
+   "rotuloRota": "Ver o boletim",
+   "fonte": "TSE · votação por seção eleitoral do 1º turno (dados abertos)",
+   "criterio": "Votos iguais e maiores que zero para os dois finalistas na seção (Brasil e exterior).",
+   "dados": {
+    "secoes": 2148,
+    "uf": "MG",
+    "cod": "41238",
+    "zona": 35,
+    "secao": 109,
+    "votosCada": 171,
+    "comparecimento": 384
+   }
+  },
+  {
+   "id": "finalistas-municipios",
+   "tema": "finalistas",
+   "titulo": "Municípios em que cada um ficou à frente",
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 2663,
+      "formato": "int",
+      "unidade": "municípios"
+     },
+     "rotulo": "e em 12 UFs"
+    },
+    "b": {
+     "valor": {
+      "valor": 2906,
+      "formato": "int",
+      "unidade": "municípios"
+     },
+     "rotulo": "e em 15 UFs"
+    }
+   },
+   "contexto": "No 1º turno, Lula (13) teve mais votos que Flávio Bolsonaro (22) em 2.663 municípios, e Flávio Bolsonaro teve mais que Lula em 2.906; houve empate em 2. Entre as 27 unidades da federação: 12 e 15.",
+   "texto": "No 1º turno, Lula teve mais votos que Flávio Bolsonaro em 2.663 municípios; Flávio Bolsonaro, mais que Lula em 2.906. Empate em 2.",
+   "lugares": [
+    {
+     "nome": "Brasil",
+     "rota": "/apuracao?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Comparação direta entre os votos dos dois finalistas em cada município (os demais candidatos não entram).",
+   "dados": {
+    "municipiosA": 2663,
+    "municipiosB": 2906,
+    "municipiosEmpate": 2,
+    "ufsA": 12,
+    "ufsB": 15,
+    "municipios": 5571
+   }
+  },
+  {
+   "id": "finalistas-maior-uf",
+   "tema": "finalistas",
+   "titulo": "O estado de maior votação de cada um",
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 70.99,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "Piauí",
+     "lugar": {
+      "nome": "Piauí",
+      "uf": "PI",
+      "rota": "/apuracao/pi?race=pres-t1"
+     }
+    },
+    "b": {
+     "valor": {
+      "valor": 71.06,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "Roraima",
+     "lugar": {
+      "nome": "Roraima",
+      "uf": "RR",
+      "rota": "/apuracao/rr?race=pres-t1"
+     }
+    }
+   },
+   "contexto": "Lula teve 70,99% dos votos válidos no Piauí; Flávio Bolsonaro, 71,06% em Roraima. Os menores percentuais de cada um: 22,86% em Roraima e 24,09% no Piauí.",
+   "texto": "Maior votação de cada finalista num estado, no 1º turno: Lula, 70,99% dos válidos no Piauí; Flávio Bolsonaro, 71,06% em Roraima.",
+   "lugares": [
+    {
+     "nome": "Piauí",
+     "uf": "PI",
+     "rota": "/apuracao/pi?race=pres-t1"
+    },
+    {
+     "nome": "Roraima",
+     "uf": "RR",
+     "rota": "/apuracao/rr?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Percentual dos votos válidos (sem brancos e nulos) de cada finalista, por unidade da federação.",
+   "dados": {
+    "ufA": "PI",
+    "pctA": 70.99,
+    "votosA": 1523710,
+    "validosUfA": 2146394,
+    "ufB": "RR",
+    "pctB": 71.06,
+    "votosB": 231322,
+    "validosUfB": 325545,
+    "ufMenorA": "RR",
+    "pctMenorA": 22.86,
+    "ufMenorB": "PI",
+    "pctMenorB": 24.09
+   }
+  },
+  {
+   "id": "finalistas-maior-municipio",
+   "tema": "finalistas",
+   "titulo": "A maior votação de cada um num município",
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 88.33,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "Carnaubeira da Penha (PE)",
+     "lugar": {
+      "nome": "Carnaubeira da Penha (PE)",
+      "uf": "PE",
+      "cod": "23167",
+      "rota": "/apuracao/pe/23167?race=pres-t1"
+     }
+    },
+    "b": {
+     "valor": {
+      "valor": 84.13,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "Novo Progresso (PA)",
+     "lugar": {
+      "nome": "Novo Progresso (PA)",
+      "uf": "PA",
+      "cod": "04383",
+      "rota": "/apuracao/pa/04383?race=pres-t1"
+     }
+    }
+   },
+   "contexto": "Lula teve 88,33% dos votos válidos em Carnaubeira da Penha (PE); Flávio Bolsonaro, 84,13% em Novo Progresso (PA). Valem os municípios com pelo menos 5.000 eleitores; sem esse piso, Bonfim do Piauí (PI), 88,73%, e Nova Pádua (RS), 87,02%.",
+   "texto": "Maior votação de cada finalista num município, no 1º turno: Lula, 88,33% em Carnaubeira da Penha (PE); Flávio Bolsonaro, 84,13% em Novo Progresso (PA).",
+   "lugares": [
+    {
+     "nome": "Carnaubeira da Penha (PE)",
+     "uf": "PE",
+     "cod": "23167",
+     "rota": "/apuracao/pe/23167?race=pres-t1"
+    },
+    {
+     "nome": "Novo Progresso (PA)",
+     "uf": "PA",
+     "cod": "04383",
+     "rota": "/apuracao/pa/04383?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/pe/23167?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Percentual dos votos válidos de cada finalista. Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "dados": {
+    "codA": "PE:23167",
+    "pctA": 88.33,
+    "votosA": 8527,
+    "validosA": 9654,
+    "codB": "PA:04383",
+    "pctB": 84.13,
+    "votosB": 14798,
+    "validosB": 17589,
+    "semPisoA": "PI:10081",
+    "semPisoPctA": 88.73,
+    "semPisoB": "RS:87220",
+    "semPisoPctB": 87.02,
+    "piso": 5000
+   }
+  },
+  {
+   "id": "finalistas-maior-capital",
+   "tema": "finalistas",
+   "titulo": "A capital de maior votação de cada um",
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 65.26,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "Salvador (BA)",
+     "lugar": {
+      "nome": "Salvador (BA)",
+      "uf": "BA",
+      "cod": "38490",
+      "rota": "/apuracao/ba/38490?race=pres-t1"
+     }
+    },
+    "b": {
+     "valor": {
+      "valor": 73.38,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "Boa Vista (RR)",
+     "lugar": {
+      "nome": "Boa Vista (RR)",
+      "uf": "RR",
+      "cod": "03018",
+      "rota": "/apuracao/rr/03018?race=pres-t1"
+     }
+    }
+   },
+   "contexto": "Entre as 27 capitais, Lula teve mais votos que Flávio Bolsonaro em 11 e Flávio Bolsonaro, mais que Lula em 16. Os maiores percentuais: 65,26% em Salvador e 73,38% em Boa Vista.",
+   "texto": "Capital com maior votação de cada finalista no 1º turno: Lula, 65,26% dos válidos em Salvador (BA); Flávio Bolsonaro, 73,38% em Boa Vista (RR).",
+   "lugares": [
+    {
+     "nome": "Salvador (BA)",
+     "uf": "BA",
+     "cod": "38490",
+     "rota": "/apuracao/ba/38490?race=pres-t1"
+    },
+    {
+     "nome": "Boa Vista (RR)",
+     "uf": "RR",
+     "cod": "03018",
+     "rota": "/apuracao/rr/03018?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/ba/38490?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Percentual dos votos válidos nas 26 capitais estaduais e em Brasília.",
+   "dados": {
+    "capitalA": "BA:38490",
+    "pctA": 65.26,
+    "capitalB": "RR:03018",
+    "pctB": 73.38,
+    "capitaisA": 11,
+    "capitaisB": 16,
+    "capitais": 27
+   }
+  },
+  {
+   "id": "finalistas-secoes-100",
+   "tema": "finalistas",
+   "titulo": "Seções com 100% dos válidos",
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 34,
+      "formato": "int",
+      "unidade": "seções"
+     },
+     "rotulo": "maior: Montes Altos (MA)",
+     "lugar": {
+      "nome": "Montes Altos (MA) · zona 103, seção 28",
+      "uf": "MA",
+      "cod": "08397",
+      "zona": 103,
+      "secao": 28,
+      "rota": "/apuracao/ma/08397/103/28?race=pres-t1"
+     }
+    },
+    "b": {
+     "valor": {
+      "valor": 2,
+      "formato": "int",
+      "unidade": "seções"
+     },
+     "rotulo": "maior: Cândido Godói (RS)",
+     "lugar": {
+      "nome": "Cândido Godói (RS) · zona 166, seção 81",
+      "uf": "RS",
+      "cod": "85839",
+      "zona": 166,
+      "secao": 81,
+      "rota": "/apuracao/rs/85839/166/81?race=pres-t1"
+     }
+    }
+   },
+   "contexto": "Seções em que todos os votos válidos foram para um só finalista: 34 para Lula e 2 para Flávio Bolsonaro. As maiores: a seção 28 da zona 103 de Montes Altos (MA), com 281 votos válidos, e a seção 81 da zona 166 de Cândido Godói (RS), com 81 votos válidos.",
+   "texto": "No 1º turno, 34 seções deram 100% dos votos válidos a Lula e 2 a Flávio Bolsonaro (seções com pelo menos 20 votos válidos).",
+   "lugares": [
+    {
+     "nome": "Montes Altos (MA) · zona 103, seção 28",
+     "uf": "MA",
+     "cod": "08397",
+     "zona": 103,
+     "secao": 28,
+     "rota": "/apuracao/ma/08397/103/28?race=pres-t1"
+    },
+    {
+     "nome": "Cândido Godói (RS) · zona 166, seção 81",
+     "uf": "RS",
+     "cod": "85839",
+     "zona": 166,
+     "secao": 81,
+     "rota": "/apuracao/rs/85839/166/81?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/ma/08397/103/28?race=pres-t1",
+   "rotuloRota": "Ver o boletim",
+   "fonte": "TSE · votação por seção eleitoral do 1º turno (dados abertos)",
+   "criterio": "Seções com pelo menos 20 votos válidos (brancos e nulos não contam), para não destacar seções minúsculas nem expor o voto de quem vota em seções com pouquíssimos eleitores.",
+   "dados": {
+    "secoesA": 34,
+    "secoesB": 2,
+    "exemploA": "MA:08397:103:28:281",
+    "exemploB": "RS:85839:166:81:81",
+    "pisoValidos": 20
+   }
+  },
+  {
+   "id": "comparecimento-maior",
+   "tema": "comparecimento",
+   "titulo": "Onde mais se votou",
+   "destaque": {
+    "valor": 91.07,
+    "formato": "pct",
+    "unidade": "de comparecimento"
+   },
+   "contexto": "Em Jacobina do Piauí (PI), 4.764 dos 5.231 eleitores votaram. No país, o comparecimento foi de 78,92%. Maior entre as capitais: Fortaleza (CE), com 86,98%.",
+   "texto": "Jacobina do Piauí (PI) teve o maior comparecimento do 1º turno entre os municípios com 5.000 eleitores ou mais: 91,07%. No país: 78,92%.",
+   "lugares": [
+    {
+     "nome": "Jacobina do Piauí (PI)",
+     "uf": "PI",
+     "cod": "10286",
+     "rota": "/apuracao/pi/10286?race=pres-t1"
+    },
+    {
+     "nome": "Fortaleza (CE)",
+     "uf": "CE",
+     "cod": "13897",
+     "rota": "/apuracao/ce/13897?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/pi/10286?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Comparecimento ÷ eleitores aptos. Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "dados": {
+    "cod": "PI:10286",
+    "eleitorado": 5231,
+    "comparecimento": 4764,
+    "capital": "CE:13897",
+    "pctCapital": 86.98,
+    "piso": 5000
+   }
+  },
+  {
+   "id": "comparecimento-menor",
+   "tema": "comparecimento",
+   "titulo": "Onde menos se votou",
+   "destaque": {
+    "valor": 59.91,
+    "formato": "pct",
+    "unidade": "de comparecimento"
+   },
+   "contexto": "Em Rio Vermelho (MG), 6.096 dos 10.175 eleitores votaram. No país, o comparecimento foi de 78,92%. Menor entre as capitais: Rio de Janeiro (RJ), com 73,88%.",
+   "texto": "Rio Vermelho (MG) teve o menor comparecimento do 1º turno entre os municípios com 5.000 eleitores ou mais: 59,91%. No país: 78,92%.",
+   "lugares": [
+    {
+     "nome": "Rio Vermelho (MG)",
+     "uf": "MG",
+     "cod": "51195",
+     "rota": "/apuracao/mg/51195?race=pres-t1"
+    },
+    {
+     "nome": "Rio de Janeiro (RJ)",
+     "uf": "RJ",
+     "cod": "60011",
+     "rota": "/apuracao/rj/60011?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/mg/51195?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Comparecimento ÷ eleitores aptos. Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "dados": {
+    "cod": "MG:51195",
+    "eleitorado": 10175,
+    "comparecimento": 6096,
+    "capital": "RJ:60011",
+    "pctCapital": 73.88,
+    "piso": 5000
+   }
+  },
+  {
+   "id": "comparecimento-brancos",
+   "tema": "comparecimento",
+   "titulo": "Recorde de votos em branco",
+   "destaque": {
+    "valor": 5.43,
+    "formato": "pct",
+    "unidade": "dos votos em branco"
+   },
+   "contexto": "Em Santana da Boa Vista (RS), 268 dos 4.933 votos para presidente foram em branco. No país, foram 1,84%.",
+   "texto": "Santana da Boa Vista (RS) teve a maior proporção de votos em branco para presidente no 1º turno (municípios com 5.000 eleitores ou mais): 5,43%. No país: 1,84%.",
+   "lugares": [
+    {
+     "nome": "Santana da Boa Vista (RS)",
+     "uf": "RS",
+     "cod": "88439",
+     "rota": "/apuracao/rs/88439?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/rs/88439?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Brancos ÷ comparecimento (regra do TSE). Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "dados": {
+    "cod": "RS:88439",
+    "brancos": 268,
+    "comparecimento": 4933,
+    "pctNacional": 1.84,
+    "piso": 5000
+   }
+  },
+  {
+   "id": "comparecimento-nulos",
+   "tema": "comparecimento",
+   "titulo": "Recorde de votos nulos",
+   "destaque": {
+    "valor": 8.04,
+    "formato": "pct",
+    "unidade": "dos votos nulos"
+   },
+   "contexto": "Em Queimada Nova (PI), 482 dos 5.996 votos para presidente foram nulos. No país, foram 2,93%.",
+   "texto": "Queimada Nova (PI) teve a maior proporção de votos nulos para presidente no 1º turno (municípios com 5.000 eleitores ou mais): 8,04%. No país: 2,93%.",
+   "lugares": [
+    {
+     "nome": "Queimada Nova (PI)",
+     "uf": "PI",
+     "cod": "10421",
+     "rota": "/apuracao/pi/10421?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/pi/10421?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Nulos ÷ comparecimento (regra do TSE). Entre os municípios com pelo menos 5.000 eleitores aptos (4.138 de 5.571), para não destacar oscilações de cidades muito pequenas.",
+   "dados": {
+    "cod": "PI:10421",
+    "nulos": 482,
+    "comparecimento": 5996,
+    "pctNacional": 2.93,
+    "piso": 5000
+   }
+  },
+  {
+   "id": "secoes-maior",
+   "tema": "secoes",
+   "titulo": "A maior seção eleitoral",
+   "destaque": {
+    "valor": 930,
+    "formato": "int",
+    "unidade": "eleitores numa só seção"
+   },
+   "contexto": "Fica em Chicago (Estados Unidos). No Brasil, a maior é a seção 310 da zona 39 de Belo Horizonte (MG), com 534. A média nacional é de 318 eleitores por seção.",
+   "texto": "A maior seção eleitoral do 1º turno tinha 930 eleitores aptos, em Chicago (Estados Unidos). No Brasil, a maior tinha 534, em Belo Horizonte (MG).",
+   "lugares": [
+    {
+     "nome": "Chicago (Estados Unidos) · zona 1, seção 3012",
+     "uf": "ZZ",
+     "cod": "29513",
+     "zona": 1,
+     "secao": 3012,
+     "rota": "/apuracao/zz/29513/1/3012?race=pres-t1"
+    },
+    {
+     "nome": "Belo Horizonte (MG) · zona 39, seção 310",
+     "uf": "MG",
+     "cod": "41238",
+     "zona": 39,
+     "secao": 310,
+     "rota": "/apuracao/mg/41238/39/310?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/zz/29513/1/3012?race=pres-t1",
+   "rotuloRota": "Ver o boletim",
+   "fonte": "TSE · votação por seção eleitoral do 1º turno (dados abertos)",
+   "criterio": "Eleitores aptos por seção (seções agregadas já somadas à principal, como no TSE).",
+   "dados": {
+    "secao": "ZZ:29513:1:3012",
+    "aptos": 930,
+    "secaoBrasil": "MG:41238:39:310",
+    "aptosBrasil": 534,
+    "media": 318
+   }
+  },
+  {
+   "id": "secoes-maior-local",
+   "tema": "secoes",
+   "titulo": "O local de votação com mais seções",
+   "destaque": {
+    "valor": 58,
+    "formato": "int",
+    "unidade": "seções num só local"
+   },
+   "contexto": "ISEP (Porto, Portugal) reuniu 58 seções e 45.484 eleitores. No Brasil, o recorde: Faculdades Oswaldo Cruz (São Paulo, SP), com 49 seções e 14.033 eleitores.",
+   "texto": "O local de votação com mais seções no 1º turno: ISEP (Porto, Portugal), com 58. No Brasil: Faculdades Oswaldo Cruz (São Paulo, SP), com 49.",
+   "lugares": [
+    {
+     "nome": "Porto (Portugal)",
+     "uf": "ZZ",
+     "cod": "30341",
+     "rota": "/apuracao/zz/30341?race=pres-t1"
+    },
+    {
+     "nome": "São Paulo (SP)",
+     "uf": "SP",
+     "cod": "71072",
+     "rota": "/apuracao/sp/71072?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/zz/30341?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · eleitorado por local de votação 2026 (dados abertos)",
+   "criterio": "Seções por local de votação, como o TSE cadastra (um local por zona eleitoral).",
+   "dados": {
+    "local": "Isep - R. Dr. Antonio Bernardino / R. de São Tomé (Entradas Separadas)",
+    "municipio": "ZZ:30341",
+    "zona": 1,
+    "secoes": 58,
+    "aptos": 45484,
+    "localBrasil": "Faculdades Oswaldo Cruz",
+    "municipioBrasil": "SP:71072",
+    "zonaBrasil": 3,
+    "secoesBrasil": 49,
+    "aptosBrasil": 14033
+   }
+  },
+  {
+   "id": "exterior-eleitorado",
+   "tema": "exterior",
+   "titulo": "Brasileiros que votam fora",
+   "destaque": {
+    "valor": 916534,
+    "formato": "int",
+    "unidade": "eleitores no exterior"
+   },
+   "contexto": "Em 186 cidades de 133 países e territórios. Compareceram 341.766 (37,29%), contra 79,16% no Brasil. No exterior, só se vota para presidente.",
+   "texto": "916.534 brasileiros estavam aptos a votar no exterior, em 186 cidades. No 1º turno, 37,29% compareceram (no Brasil, 79,16%).",
+   "lugares": [
+    {
+     "nome": "Exterior",
+     "uf": "ZZ",
+     "rota": "/apuracao/zz?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/zz?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "criterio": "Países pela tabela editorial do pipeline (o feed do TSE não traz o país); Taipé e Ramallah contam como territórios, sem país atribuído.",
+   "dados": {
+    "eleitorado": 916534,
+    "comparecimento": 341766,
+    "cidades": 186,
+    "paises": 131,
+    "territoriosSemPais": 2,
+    "pctBrasil": 79.16
+   }
+  },
+  {
+   "id": "exterior-maior-cidade",
+   "tema": "exterior",
+   "titulo": "A maior cidade eleitoral fora do Brasil",
+   "destaque": {
+    "valor": 78607,
+    "formato": "int",
+    "unidade": "eleitores em Lisboa"
+   },
+   "contexto": "Lisboa (Portugal) é a cidade com mais eleitores brasileiros no exterior, seguida de Boston (Estados Unidos), com 53.358. Por país, os Estados Unidos lideram: 265.022 eleitores em 11 cidades.",
+   "texto": "Lisboa (Portugal) é a cidade do exterior com mais eleitores brasileiros: 78.607. Por país, os Estados Unidos lideram, com 265.022.",
+   "lugares": [
+    {
+     "nome": "Lisboa (Portugal)",
+     "uf": "ZZ",
+     "cod": "29955",
+     "rota": "/apuracao/zz/29955?race=pres-t1"
+    },
+    {
+     "nome": "Boston (Estados Unidos)",
+     "uf": "ZZ",
+     "cod": "29416",
+     "rota": "/apuracao/zz/29416?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/zz/29955?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "dados": {
+    "cidade": "Lisboa",
+    "eleitorado": 78607,
+    "segunda": "Boston",
+    "eleitoradoSegunda": 53358,
+    "pais": "Estados Unidos",
+    "eleitoradoPais": 265022,
+    "cidadesPais": 11
+   }
+  },
+  {
+   "id": "exterior-finalistas",
+   "tema": "exterior",
+   "titulo": "O voto no exterior",
+   "par": {
+    "a": {
+     "valor": {
+      "valor": 47.57,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "à frente em 85 cidades"
+    },
+    "b": {
+     "valor": {
+      "valor": 43.49,
+      "formato": "pct",
+      "unidade": "dos válidos"
+     },
+     "rotulo": "à frente em 59 cidades"
+    }
+   },
+   "contexto": "Percentual dos votos válidos nas 186 cidades do exterior: 157.387 votos para Lula e 143.900 para Flávio Bolsonaro. Nas outras 42 cidades houve empate ou nenhum voto nos dois.",
+   "texto": "No exterior, no 1º turno, Lula teve 47,57% dos votos válidos e Flávio Bolsonaro, 43,49%. Cidades à frente: 85 e 59.",
+   "lugares": [
+    {
+     "nome": "Exterior",
+     "uf": "ZZ",
+     "rota": "/apuracao/zz?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/zz?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) para Presidente, por município",
+   "dados": {
+    "votosA": 157387,
+    "votosB": 143900,
+    "validos": 330882,
+    "cidadesA": 85,
+    "cidadesB": 59,
+    "cidadesOutras": 42
+   }
+  },
+  {
+   "id": "eleitorado-mulheres",
+   "tema": "eleitorado",
+   "titulo": "Elas são a maioria",
+   "destaque": {
+    "valor": 52.84,
+    "formato": "pct",
+    "unidade": "do eleitorado são mulheres"
+   },
+   "contexto": "São 83.876.462 eleitoras, 9.032.008 a mais que os homens. A maior proporção feminina está no Distrito Federal: 54,13%.",
+   "texto": "As mulheres são 52,84% do eleitorado brasileiro em 2026: 83.876.462 eleitoras, 9.032.008 a mais que os homens.",
+   "lugares": [
+    {
+     "nome": "Distrito Federal",
+     "uf": "DF",
+     "rota": "/apuracao/df?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/df?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
+   "criterio": "Gênero declarado no cadastro eleitoral; sem informação fica fora das duas contagens. Inclui o exterior.",
+   "dados": {
+    "eleitores": 158745463,
+    "mulheres": 83876462,
+    "homens": 74844454,
+    "ufMaior": "DF",
+    "pctUfMaior": 54.13
+   }
+  },
+  {
+   "id": "eleitorado-jovens",
+   "tema": "eleitorado",
+   "titulo": "Votando aos 16 e 17 anos",
+   "destaque": {
+    "valor": 1634244,
+    "formato": "int",
+    "unidade": "eleitores de 16 e 17 anos"
+   },
+   "contexto": "São 1,03% do eleitorado, e o voto é facultativo nessa idade. A maior proporção está em Roraima (2,88%); a menor, no Rio de Janeiro (0,53%).",
+   "texto": "1.634.244 jovens de 16 e 17 anos tiraram o título para 2026, quando o voto é facultativo. A maior proporção está em Roraima: 2,88% do eleitorado.",
+   "lugares": [
+    {
+     "nome": "Roraima",
+     "uf": "RR",
+     "rota": "/apuracao/rr?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/rr?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
+   "criterio": "Idade na data da eleição, conforme o perfil do eleitorado do TSE. Inclui o exterior no total.",
+   "dados": {
+    "jovens": 1634244,
+    "eleitores": 158745463,
+    "ufMaior": "RR",
+    "pctUfMaior": 2.88,
+    "ufMenor": "RJ",
+    "pctUfMenor": 0.53
+   }
+  },
+  {
+   "id": "eleitorado-70-mais",
+   "tema": "eleitorado",
+   "titulo": "Com 70 anos ou mais",
+   "destaque": {
+    "valor": 17237195,
+    "formato": "int",
+    "unidade": "eleitores com 70 anos ou mais"
+   },
+   "contexto": "São 10,86% do eleitorado, e o voto também é facultativo para eles. A maior proporção está no Rio Grande do Sul (14,52%); a menor, no Amazonas (6,10%).",
+   "texto": "O Brasil tem 17.237.195 eleitores com 70 anos ou mais (10,86%), para quem o voto é facultativo. A maior proporção está no Rio Grande do Sul: 14,52%.",
+   "lugares": [
+    {
+     "nome": "Rio Grande do Sul",
+     "uf": "RS",
+     "rota": "/apuracao/rs?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/rs?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
+   "criterio": "Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE. Inclui o exterior no total.",
+   "dados": {
+    "idosos": 17237195,
+    "eleitores": 158745463,
+    "ufMaior": "RS",
+    "pctUfMaior": 14.52,
+    "ufMenor": "AM",
+    "pctUfMenor": 6.1
+   }
+  },
+  {
+   "id": "eleitorado-superior",
+   "tema": "eleitorado",
+   "titulo": "Eleitores com curso superior",
+   "destaque": {
+    "valor": 11.36,
+    "formato": "pct",
+    "unidade": "têm ensino superior completo"
+   },
+   "contexto": "São 18.037.161 eleitores. A escolaridade mais comum é \"médio completo\" (27,90%). A maior proporção com superior completo está no Distrito Federal: 23,34%.",
+   "texto": "11,36% dos eleitores brasileiros têm ensino superior completo. A maior proporção está no Distrito Federal: 23,34%.",
+   "lugares": [
+    {
+     "nome": "Distrito Federal",
+     "uf": "DF",
+     "rota": "/apuracao/df?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/df?race=pres-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
+   "criterio": "Escolaridade declarada no cadastro eleitoral. Inclui o exterior no total.",
+   "dados": {
+    "superior": 18037161,
+    "eleitores": 158745463,
+    "maisComum": "Médio completo",
+    "qtdMaisComum": 44292209,
+    "ufMaior": "DF",
+    "pctUfMaior": 23.34
+   }
+  },
+  {
+   "id": "cargos-deputado-mais-votado",
+   "tema": "cargos",
+   "titulo": "Deputado federal mais votado",
+   "destaque": {
+    "valor": 3119318,
+    "formato": "int",
+    "unidade": "votos para Nikolas Ferreira"
+   },
+   "contexto": "Nikolas Ferreira (PL-MG) teve 27,19% dos votos válidos para a Câmara em Minas Gerais, também o maior percentual do país. Em seguida vem Lucas Pavanato (PL-SP), com 3.038.438.",
+   "texto": "Nikolas Ferreira (PL-MG) foi o deputado federal mais votado do país em 2026: 3.119.318 votos, 27,19% dos válidos em Minas Gerais.",
+   "lugares": [
+    {
+     "nome": "Nikolas Ferreira (PL-MG)",
+     "uf": "MG",
+     "rota": "/candidato/130002542026"
+    }
+   ],
+   "rota": "/candidato/130002542026",
+   "rotuloRota": "Ver a ficha",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026)",
+   "criterio": "Votos nominais para deputado federal; percentual sobre os votos válidos para a Câmara na UF.",
+   "dados": {
+    "sqcand": "130002542026",
+    "nome": "Nikolas Ferreira",
+    "partido": "PL",
+    "uf": "MG",
+    "votos": 3119318,
+    "pct": 27.19,
+    "segundo": "Lucas Pavanato",
+    "votosSegundo": 3038438,
+    "maiorPct": "Nikolas Ferreira",
+    "maiorPctValor": 27.19
+   }
+  },
+  {
+   "id": "cargos-senador-mais-votado",
+   "tema": "cargos",
+   "titulo": "Senador mais votado",
+   "destaque": {
+    "valor": 13273880,
+    "formato": "int",
+    "unidade": "votos para Guilherme Derrite"
+   },
+   "contexto": "Guilherme Derrite (PP-SP) teve a maior votação para o Senado no país. Em São Paulo, cada eleitor podia votar em 2 candidatos, para 2 vagas. Em seguida vem André do Prado (PL-SP), com 12.703.089.",
+   "texto": "Guilherme Derrite (PP-SP) foi o candidato ao Senado com mais votos em 2026: 13.273.880.",
+   "lugares": [
+    {
+     "nome": "Guilherme Derrite (PP-SP)",
+     "uf": "SP",
+     "rota": "/candidato/250002541312"
+    }
+   ],
+   "rota": "/candidato/250002541312",
+   "rotuloRota": "Ver a ficha",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026)",
+   "dados": {
+    "sqcand": "250002541312",
+    "nome": "Guilherme Derrite",
+    "partido": "PP",
+    "uf": "SP",
+    "votos": 13273880,
+    "vagas": 2,
+    "segundo": "André do Prado",
+    "votosSegundo": 12703089
+   }
+  },
+  {
+   "id": "cargos-governador-maior",
+   "tema": "cargos",
+   "titulo": "A maior votação para governador",
+   "destaque": {
+    "valor": 70.9,
+    "formato": "pct",
+    "unidade": "dos votos válidos"
+   },
+   "contexto": "Rafael Fonteles (PT) foi eleito no Piauí com 70,90% dos válidos (1.436.697 votos), o maior percentual entre os 20 governadores eleitos no 1º turno. Em seguida: Arthur Henrique (PL-RR), 69,13%, e Jorginho Mello (PL-SC), 68,98%.",
+   "texto": "Rafael Fonteles (PT-PI) teve 70,90% dos votos válidos, o maior percentual entre os 20 governadores eleitos no 1º turno de 2026.",
+   "lugares": [
+    {
+     "nome": "Rafael Fonteles (PT-PI)",
+     "uf": "PI",
+     "rota": "/candidato/180002532987"
+    }
+   ],
+   "rota": "/candidato/180002532987",
+   "rotuloRota": "Ver a ficha",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026)",
+   "dados": {
+    "sqcand": "180002532987",
+    "nome": "Rafael Fonteles",
+    "uf": "PI",
+    "votos": 1436697,
+    "pct": 70.9,
+    "eleitosPrimeiroTurno": 20
+   }
+  },
+  {
+   "id": "cargos-governador-apertada",
+   "tema": "cargos",
+   "titulo": "A disputa de governador mais apertada",
+   "destaque": {
+    "valor": 0.78,
+    "formato": "pp",
+    "unidade": "de diferença"
+   },
+   "contexto": "No Rio Grande do Norte, Cadu de Lula (PT) teve 36,16% e Allyson (UNIÃO), 36,94%: 15.509 votos de diferença. Os dois disputam o 2º turno em 25 de outubro.",
+   "texto": "A disputa de governador mais apertada do 1º turno foi no Rio Grande do Norte: Cadu de Lula (PT), 36,16%, e Allyson (UNIÃO), 36,94%.",
+   "lugares": [
+    {
+     "nome": "Rio Grande do Norte",
+     "uf": "RN",
+     "rota": "/apuracao/rn?race=pres-t1"
+    }
+   ],
+   "rota": "/apuracao/rn?race=gov-rn-t1",
+   "rotuloRota": "Ver no mapa",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026)",
+   "criterio": "Menor diferença, em pontos percentuais dos votos válidos, entre o 1º e o 2º colocados nas 27 disputas.",
+   "dados": {
+    "uf": "RN",
+    "primeiro": "Allyson",
+    "pctPrimeiro": 36.94,
+    "votosPrimeiro": 733809,
+    "segundo": "Cadu de Lula",
+    "pctSegundo": 36.16,
+    "votosSegundo": 718300
+   }
+  },
+  {
+   "id": "cargos-mulheres-eleitas",
+   "tema": "cargos",
+   "titulo": "Mulheres eleitas",
+   "destaque": {
+    "valor": 108,
+    "formato": "int",
+    "unidade": "deputadas federais eleitas"
+   },
+   "contexto": "São 21,39% dos 505 deputados federais eleitos já divulgados (falta o Amazonas, com 8 vagas). No Senado, 12 das 54 vagas; entre os 20 governadores eleitos no 1º turno, 1 mulher: Raquel Lyra (PE). As mulheres são 52,84% do eleitorado.",
+   "texto": "108 mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (21,39% dos eleitos já divulgados). No Senado, 12 das 54 vagas.",
+   "lugares": [
+    {
+     "nome": "Câmara dos Deputados",
+     "rota": "/camara"
+    }
+   ],
+   "rota": "/camara",
+   "rotuloRota": "Ver a Câmara",
+   "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) · gênero: TSE, candidaturas 2026",
+   "criterio": "Eleitos já divulgados pelo TSE. AM: totalização ainda não divulgada (8 vagas).",
+   "dados": {
+    "deputadasEleitas": 108,
+    "deputadosEleitos": 505,
+    "ufsPendentes": [
+     "AM"
+    ],
+    "vagasPendentes": 8,
+    "senadorasEleitas": 12,
+    "senadoresEleitos": 54,
+    "governadorasEleitas": 1,
+    "governadoresEleitos": 20
+   }
+  }
+ ]
+}

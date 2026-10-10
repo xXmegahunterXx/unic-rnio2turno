@@ -29,6 +29,8 @@ import { UfsComposicao } from '@/app/components/pages/cargos/UfsComposicao';
 import { BancadasGrade, BarraComposicao } from '@/app/components/pages/cargos/Bancadas';
 import { useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
 import { AvisoTse, FonteTse, textoReprocessamento } from '@/app/components/pages/cargos/ui';
+import { BotaoCompartilharComposicao } from '@/app/components/share/cartoes/Cargos';
+import { hashtags } from '@/app/components/share/textos';
 
 /** Nome da casa legislativa da UF. */
 function nomeCasa(uf: UFBr): string {
@@ -136,7 +138,24 @@ export default function AssembleiaPage() {
               </>
             )
           }
-          actions={seletor}
+          actions={
+            <div className="flex w-full items-center gap-2 sm:w-auto">
+              <div className="min-w-0 flex-1 sm:flex-none">{seletor}</div>
+              <BotaoCompartilharComposicao
+                casa={nomeCasa(uf)}
+                subtitulo={`${fmtInt(comp.total)} ${distrital ? 'deputados distritais' : 'deputados estaduais'} eleitos em 4 de outubro`}
+                bancadas={comp.bancadas}
+                total={comp.total}
+                rotuloCentro={distrital ? 'deputados distritais' : 'deputados estaduais'}
+                caminho={`/assembleias/${uf.toLowerCase()}`}
+                tags={hashtags('assembleia')}
+                nomeArquivo={`sintonia-assembleia-${uf.toLowerCase()}`}
+                soIcone
+                size="md"
+                className="shrink-0 border border-line"
+              />
+            </div>
+          }
         >
           <NavCargos atual="assembleias" />
         </PageHeader>
@@ -182,7 +201,24 @@ export default function AssembleiaPage() {
             <span className="num">26</span> Assembleias e na Câmara Legislativa do DF.
           </>
         }
-        actions={seletor}
+        actions={
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="min-w-0 flex-1 sm:flex-none">{seletor}</div>
+            <BotaoCompartilharComposicao
+              casa="Assembleias Legislativas"
+              subtitulo="Deputados estaduais e distritais eleitos nas 27 casas"
+              bancadas={compBr}
+              total={totalBr}
+              rotuloCentro="deputados estaduais e distritais"
+              caminho="/assembleias"
+              tags={hashtags('assembleia')}
+              nomeArquivo="sintonia-assembleias-2026"
+              soIcone
+              size="md"
+              className="shrink-0 border border-line"
+            />
+          </div>
+        }
       >
         <NavCargos atual="assembleias" />
       </PageHeader>

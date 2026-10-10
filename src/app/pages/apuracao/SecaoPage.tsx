@@ -15,7 +15,7 @@ import { validos } from '@/shared/calc';
 import { fmtHoraSeg, fmtInt } from '@/shared/format';
 import { useMunicipio, useSecao, useZona } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
-import { compartilhar, copiarLink, urlAbsoluta } from '@/app/lib/share';
+import { copiarLink, urlAbsoluta } from '@/app/lib/share';
 import { Button, ButtonLink, Icon, toast } from '@/app/ui';
 import { Container } from '@/app/components/layout/Container';
 import { PageHeader } from '@/app/components/layout/PageHeader';
@@ -46,6 +46,7 @@ import { emMun, emUf, fmt4 } from '@/app/components/pages/detalhe/fmt';
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { LocalVotacaoCartao } from '@/app/components/pages/detalhe/LocalVotacao';
 import { PrimeiroTurnoSecao } from '@/app/components/pages/detalhe/PrimeiroTurnoSecao';
+import { BotaoCompartilharSecao } from '@/app/components/share/cartoes/Secao';
 
 /** SecaoDetalhe → Tally (para os cálculos de calc.ts). */
 function tallySecao(s: SecaoDetalhe): Tally {
@@ -201,11 +202,18 @@ export default function SecaoPage() {
   };
   const caminho = rotaSecao(uf!, cod, zona!, secao!, linkRace);
 
-  async function compartilharSecao() {
-    const texto = `${sec!.simulado ? '[SIMULAÇÃO] ' : ''}Veja o boletim da minha seção: seção ${fmt4(secao!)}, zona ${fmt4(zona!)} · ${nomeMun} (${uf}).`;
-    const r = await compartilhar({ titulo: 'Sintonia · Boletim de urna', texto, url: urlAbsoluta(caminho) });
-    if (r === 'erro') toast('Não foi possível compartilhar', { tone: 'alert' });
-  }
+  // "Como votou a minha seção": imagem do boletim (2º turno + 1º turno oficial), texto neutro e link.
+  const partilha = {
+    uf: uf!,
+    cod,
+    zona: zona!,
+    secao: secao!,
+    bu: buExibido,
+    race,
+    racesT1,
+    simulado: !!simulacao,
+    caminho,
+  };
   async function copiar() {
     const ok = await copiarLink(urlAbsoluta(caminho));
     toast(ok ? 'Link copiado' : 'Não foi possível copiar', { tone: ok ? 'ok' : 'alert', icon: ok ? 'link' : undefined });
@@ -261,9 +269,7 @@ export default function SecaoPage() {
         actions={
           <>
             {ctx.anonimizado ? <NomesOcultos /> : null}
-            <Button variant="secondary" size="sm" icon="compartilhar" onClick={compartilharSecao}>
-              Compartilhar
-            </Button>
+            <BotaoCompartilharSecao {...partilha} variant="secondary" size="sm" />
             <Button variant="ghost" size="sm" icon="link" onClick={copiar} aria-label="Copiar link" title="Copiar link">
               {/* No celular só o ícone (o compartilhamento principal fica sob o boletim). */}
               <span className="hidden sm:inline">Copiar link</span>
@@ -325,9 +331,7 @@ export default function SecaoPage() {
               </p>
             ) : null}
             <div className="mx-auto mt-4 flex max-w-[400px] flex-col gap-2">
-              <Button variant="primary" icon="whatsapp" onClick={compartilharSecao} block>
-                Veja o boletim da minha seção
-              </Button>
+              <BotaoCompartilharSecao {...partilha} variant="primary" label="Compartilhar o boletim da minha seção" className="w-full" />
               <Button variant={salva ? 'secondary' : 'ghost'} icon={salva ? 'check-circulo' : 'pin'} onClick={alternarMinha} block>
                 {salva ? 'Guardada como minha seção' : 'Esta é a minha seção'}
               </Button>

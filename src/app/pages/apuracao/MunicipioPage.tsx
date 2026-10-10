@@ -23,6 +23,7 @@ import { Placar } from '@/app/components/apuracao/Placar';
 import { StatsGrid } from '@/app/components/apuracao/StatsGrid';
 import { RaceSwitcher } from '@/app/components/apuracao/RaceSwitcher';
 import { ShareButton } from '@/app/components/apuracao/ShareCard';
+import { BotaoCompartilharMunicipioT1 } from '@/app/components/share/cartoes/MunicipioT1';
 import { SecaoMosaic } from '@/app/components/apuracao/SecaoMosaic';
 import { ErrorState } from '@/app/components/apuracao/States';
 import { Icon } from '@/app/ui/Icon';
@@ -142,10 +143,25 @@ export default function MunicipioPage() {
   const nZonas = snap.mosaico.length;
   const nSecoes = r.secoes;
   const unidade = exterior ? 'cidade' : 'município';
+  // "Minha cidade no 1º turno" (resultado oficial): imagem e texto prontos para postar.
+  const caminhoMun = `/apuracao/${uf.toLowerCase()}/${snap.cod}?race=${ctx.idT1}`;
   const compara =
     !t1 && ctx.raceT1 && snap.primeiroTurno ? (
       <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
-        <h3 className="mb-1 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
+        <div className="mb-1 flex items-start justify-between gap-2">
+          <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
+          <BotaoCompartilharMunicipioT1
+            nome={snap.nome}
+            uf={uf}
+            race={ctx.raceT1}
+            t={snap.primeiroTurno}
+            caminho={caminhoMun}
+            soIcone
+            size="sm"
+            label="Compartilhar: minha cidade no 1º turno"
+            className="-mr-2 -mt-2"
+          />
+        </div>
         <p className="mb-4 text-[12.5px] text-fg-muted">% dos votos válidos {emMun(snap.nome)}</p>
         <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto />
       </section>
@@ -187,7 +203,11 @@ export default function MunicipioPage() {
         actions={
           <>
             {ctx.anonimizado ? <NomesOcultos /> : null}
-            <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={local} size="sm" />
+            {t1 ? (
+              <BotaoCompartilharMunicipioT1 nome={snap.nome} uf={uf} race={race} t={r} caminho={caminhoMun} size="sm" label="Compartilhar" />
+            ) : (
+              <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={local} size="sm" />
+            )}
           </>
         }
       >
