@@ -454,7 +454,7 @@ export function layoutComposicao(inp: OgComposicaoInput): No {
     kicker: inp.kicker,
     titulo: inp.titulo,
     corpo,
-    rodapeEsq: 'Cores neutras por partido (por tamanho de bancada, nunca por espectro) · fonte: TSE',
+    rodapeEsq: 'PT e PL nas cores de Lula e Flávio Bolsonaro · bancadas por tamanho, nunca por espectro · fonte: TSE',
     rodapeDir: inp.dominio ?? null,
   });
 }

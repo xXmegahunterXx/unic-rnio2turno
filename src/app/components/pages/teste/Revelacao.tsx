@@ -144,9 +144,11 @@ export function MedidorSintonia({
             fill="none"
             strokeWidth="7"
             strokeLinecap="round"
-            className={s.stroke}
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: revelado && pct !== null ? Math.max(0.0001, valor / 100) : 0 }}
+            // Antes da revelação o arco não existe: com pathLength 0 a ponta arredondada ainda desenhava um ponto na cor
+            // do candidato (vermelho/azul diriam quem é quem). Cor e opacidade só depois do toque.
+            className={revelado ? s.stroke : 'stroke-surface-3'}
+            initial={{ pathLength: 0, opacity: 0 }}
+            animate={{ pathLength: revelado && pct !== null ? Math.max(0.0001, valor / 100) : 0, opacity: revelado && pct !== null ? 1 : 0 }}
             transition={{ duration: reduzir ? 0 : 1.1, delay: reduzir ? 0 : 0.15 + ordem * 0.12, ease: [0.22, 0.9, 0.24, 1] }}
           />
         </svg>

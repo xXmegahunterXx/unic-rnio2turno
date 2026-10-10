@@ -1,7 +1,7 @@
 /**
  * Hemiciclo (SVG): uma bolinha por cadeira, em fileiras concêntricas, com os partidos em "fatias" da esquerda
  * para a direita NA ORDEM RECEBIDA (o chamador ordena por tamanho de bancada — nunca por espectro).
- * Cores neutras por partido (`corPartido`); cadeiras sem resultado (ex.: AM em reprocessamento) com hachura.
+ * Cores por partido (`corPartido`: PT e PL nas cores de Lula e Flávio, demais em tons próprios); cadeiras sem resultado (ex.: AM em reprocessamento) com hachura.
  *
  * Interação: passar o mouse/tocar numa cadeira mostra a dica (partido e, quando houver, o nome do eleito);
  * clique abre a ficha. `destaque` esmaece os demais partidos (ligado à lista de bancadas).
