@@ -464,6 +464,10 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     modo,
     meta,
     status,
+    // TODO(fase 2): implementado pelo agente do motor.
+    municipiosBr: () => {
+      throw new Error('municipiosBr ainda não implementado');
+    },
     state: () => structuredCloneSafe(state),
     setState(s: AdminState) {
       const next = parseAdminState(s, state, st);

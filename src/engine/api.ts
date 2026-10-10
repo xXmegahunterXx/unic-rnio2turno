@@ -9,6 +9,7 @@ import type {
   AdminState,
   LiveStatus,
   MunicipioSnapshot,
+  MunicipiosNacionalSnapshot,
   NationalSnapshot,
   PresetInfo,
   RaceId,
@@ -58,11 +59,16 @@ export interface Controller {
    * Os objetos devolvidos vêm do cache interno (compartilhados entre chamadas): trate-os como IMUTÁVEIS —
    * alterar um campo (ex.: `snap.zonas.length = 0`) corrompe as respostas seguintes do mesmo instante.
    */
-  nacional(race: RaceId): NationalSnapshot;
-  uf(race: RaceId, uf: UF): UfSnapshot;
-  municipio(race: RaceId, uf: UF, cod: string): MunicipioSnapshot;
-  zona(race: RaceId, uf: UF, cod: string, zona: number): ZonaSnapshot;
-  secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number): SecaoDetalhe | null;
+  nacional(race: RaceId, t?: number): NationalSnapshot;
+  uf(race: RaceId, uf: UF, t?: number): UfSnapshot;
+  municipio(race: RaceId, uf: UF, cod: string, t?: number): MunicipioSnapshot;
+  zona(race: RaceId, uf: UF, cod: string, zona: number, t?: number): ZonaSnapshot;
+  secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number, t?: number): SecaoDetalhe | null;
+  /** Mapa nacional por município (ordem de public/data/municipios-br.json). */
+  municipiosBr(race: RaceId, t?: number): MunicipiosNacionalSnapshot;
+
+  // `t` (opcional, epoch ms) = "reveja a noite": estado da apuração num instante PASSADO; limitado ao simNow atual
+  // (nunca futuro). Ausente = agora.
 
   // --- extensões (retrocompatíveis) -------------------------------------------------------------
   /** Relógio da apuração agora (simulado; = wallNow nas fontes 'pre' e 'tse'). */
