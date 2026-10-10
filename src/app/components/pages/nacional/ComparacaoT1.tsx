@@ -15,6 +15,7 @@ import { ButtonLink } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
+import { partidoENumero } from '@/shared/anon';
 
 export interface ComparacaoT1Props {
   race: Race;
@@ -54,7 +55,7 @@ export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, a
                   <div className="min-w-0">
                     <div className="truncate text-[15px] font-semibold leading-tight text-fg">{c.nomeUrna}</div>
                     <div className="num text-[12px] text-fg-muted">
-                      {c.partido} · {c.numero}
+                      {partidoENumero(c)}
                     </div>
                   </div>
                 </div>

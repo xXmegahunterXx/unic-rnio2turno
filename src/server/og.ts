@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 import satori from 'satori';
 import { renderAsync } from '@resvg/resvg-js';
 import { pngDeRgba } from './png';
+import { partidoENumero } from '../shared/anon';
 import { pctTotalizadas, pctValidos } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
 import { fmtHora, fmtInt, fmtPct } from '../shared/format';
@@ -301,9 +302,9 @@ function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar:
         { fontFamily: 'Bricolage', fontWeight: 700, fontSize: tamNome(c.nomeUrna), color: C.fg, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 420 },
         c.nomeUrna,
       ),
-      // 1º turno é resultado OFICIAL: com os nomes ocultos (simulação anônima) não mostra "Simulação · 1" (partido e
-      // número fictícios da anonimização) num cartão de dado real
-      h('div', { fontSize: 22, color: C.muted, marginTop: 4 }, inp.race.turno === 1 && c.partido === 'Simulação' ? 'nome oculto' : `${c.partido} · ${c.numero}`),
+      // 1º turno é resultado OFICIAL: com os nomes ocultos, `anonimizarRace` põe "nome oculto" no partido e
+      // `partidoENumero` não mostra o número fictício da anonimização num cartão de dado real
+      h('div', { fontSize: 22, color: C.muted, marginTop: 4 }, partidoENumero(c)),
     ),
   ];
   if (alinhar === 'right') cabecalho.reverse();

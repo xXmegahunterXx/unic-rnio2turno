@@ -2,7 +2,7 @@
 
 > **Sintonia** é um produto viral e apartidário para o 2º turno das eleições de 2026 (25/10/2026).
 > Tem duas frentes: **Apuração ao vivo**, o carro-chefe, com detalhe por estado, município, zona e seção, e o
-> **Teste Cego**, em que a pessoa escolhe propostas sem saber de quem são.
+> **Teste Cego**, em que a pessoa diz o quanto concorda com afirmações tiradas dos planos de governo, sem saber de quem são.
 > Há também um **Admin** que simula a noite da apuração inteira com a estrutura real do país.
 
 Este documento é o contrato entre as partes. Todo código novo segue o que está aqui. Em caso de dúvida, a
@@ -84,7 +84,7 @@ src/app/
     apuracao/    Componentes de dados eleitorais (mapas, barras, gráfico, mosaico, BU…)
     teste/       Componentes do Teste Cego
   pages/         Uma página por arquivo (ver router.tsx)
-  content/       Conteúdo editorial (propostas do Teste Cego)
+  content/       Conteúdo editorial (afirmações do Teste Cego; `propostas.ts` = formato antigo, só para links velhos)
 scripts/data/    Pipeline de dados (TSE + IBGE → public/data, public/geo)
 scripts/preview/ Screenshots/vídeo com Playwright
 public/data/     Dataset compilado (commitado)
@@ -264,7 +264,8 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
   mapeado para os mesmos snapshots. Detalhe por município sob demanda, com cache de 60 s. Mosaico e
   seção na fonte TSE, se indisponíveis: o mosaico fica vazio e a seção dá 404 coerente.
 - **OG image**: `/api/og/apuracao.png` (satori + resvg) com o placar atual e a faixa "SIMULAÇÃO"
-  quando for o caso.
+  quando for o caso. Na fase 3, uma imagem por tipo de página (município, seção, candidato, cargos, governadores,
+  curiosidades, cenários, Teste): ver §11.7.
 - **Meta tags**: ao servir `index.html`, injeta `og:title`, `og:description` e `og:image` conforme a
   rota (`<!--app-meta-->`).
 - `GET /healthz`.
@@ -318,6 +319,11 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 | `/teste`, `/teste/resultado`, `/duelo/:codigo` | Teste Cego |
 | `/admin` | Painel de simulação (relógio, cenário, UFs, aviso, fonte, monitor, preview) |
 | `/metodologia`, `/privacidade`, `/sobre` | Conteúdo institucional |
+| `/curiosidades?tema=&fato=` | Fatos verificáveis do 1º turno, com cartão de compartilhar por fato (§11.3) |
+| `/cenarios?c=` | "E se…? Monte seu cenário": calculadora do 2º turno a partir do 1º turno oficial (§11.4) |
+| `/candidato/:sqcand`, `/senado`, `/camara`, `/assembleias/:uf` | Cargos do 1º turno e fichas (§10.2) |
+| `/tv` | Modo TV (fora do AppShell) |
+| `/embed/placar`, `/embed/mapa`, `/embed/uf` | Widgets para incorporar em outros sites (§11.6) |
 | `/kit` | Vitrine do design system (QA visual) |
 
 Antes de 25/10 17h, com fonte `pre`, as páginas de apuração mostram o **1º turno real** (`pres-t1`) com
@@ -387,3 +393,158 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
     - slot discreto "Oferecido por", só para anunciante não político;
     - configurado no admin (`AdminCommand 'patrocinio'`, `LiveStatus.patrocinio`);
     - desligado por padrão.
+
+---
+
+## 11. Fase 3: viral no X
+
+Quem chega pelo X está no celular, quase sempre no navegador embutido do app do X (WKWebView/Android WebView) e, no
+demo, dentro de um iframe de outra origem (Artifact do claude.ai). Cada tela precisa causar impacto em 3 segundos,
+gerar **imagem + texto + link** bonitos e neutros para postar, e funcionar sem `navigator.share` e sem download.
+
+Regras que valem para tudo abaixo: número simulado → "SIMULAÇÃO · dados fictícios" na imagem e no texto; nunca foto real
+com número simulado; com `status.anonimizado`, nunca nome real na simulação; nada de enquete, palpite agregado ou ranking
+de usuários; as respostas do Teste Cego nunca saem do aparelho (exceto o link de Duelo, com aviso, depois do `#`).
+
+### 11.1 Kit de compartilhamento (`src/app/components/share`, `src/app/lib/share.ts`)
+
+- **Formatos** (`DIMENSOES_CARTAO`): `x` 1200×675 (16:9), `feed` 1080×1350 (4:5), `story` 1080×1920 (9:16). Os miolos
+  leem `useCartao()` (`k` = escala em relação ao 16:9; `retrato`).
+- **`CartaoBase`**: logo, sobrancelha, título, rodapé com domínio + rota (ou um texto quando o domínio não é apresentável),
+  data/hora de Brasília e fonte. `simulado` → selo no topo, faixa no rodapé e marca-d'água diagonal (sobrevive a
+  recortes). `brilho` pelas cores que vêm dos dados (`brilhoDe(race)`). Sem blur nem animação (o PNG sai do DOM).
+- **`CompartilharSheet` / `BotaoCompartilhar`**: prévia, seletor X/Feed/Story, "Postar no X" (link de verdade para
+  `x.com/intent/post`, texto sem a URL, `url` e hashtags à parte, peso do X ≤ 280), "Compartilhar…" (Web Share com o
+  PNG), WhatsApp, Baixar/Salvar, Copiar link, Copiar texto. O PNG é gerado em segundo plano assim que o sheet abre (o
+  Safari recusa `navigator.share` depois de uma espera); texto e imagem ficam congelados do momento da abertura.
+- **Navegador embutido e iframe** (`navegadorEmbutido()`, `emIframe()`): sem Web Share de arquivo ou com download
+  bloqueado, "Salvar imagem" abre um modal com a imagem ("toque e segure para salvar") + copiar texto. `NotAllowedError`
+  no Web Share cai no mesmo modal. Esc/Tab só afetam a janela do topo (`ui/overlay.ts`).
+- **`png.ts`**: html-to-image com só os subconjuntos de fonte usados no cartão (cache por sessão), duas passadas no WebKit,
+  sem a textura de ruído (`data-sem-png`: o arquivo dobraria de tamanho). 16:9 ≈ 0,3–0,45 MB; story ≈ 0,7–1 MB.
+- **Textos** (`textos.ts` e os `textos*.ts` de cada página): só fatos e números, ordem da urna, sem adjetivos nem "vai
+  ganhar", ≤ 220 de peso antes do link, "[SIMULAÇÃO]" quando houver número simulado, `#Eleições2026` + uma temática.
+- **URL pública** (`VITE_SITE_URL`, no build): `urlAbsoluta`, `hostExibicao`/`siteExibicao`, o código de incorporação e
+  o rodapé das imagens passam a apontar para o site público. Sem ela vale o endereço da página — no demo, o do iframe,
+  que não abre fora do claude.ai. Terminada em `#`, gera rotas de HashRouter (`https://exemplo.org/sintonia/#/teste`).
+
+### 11.2 Cartões por tela
+
+| Tela | Cartão | Dado | Foto |
+|---|---|---|---|
+| Nacional, UF, município | placar (`apuracao/ShareCard`), com 16:9 de números gigantes, diferença e % apurado | 2º turno (simulado ou TSE) ou 1º turno oficial | só com dado real e nome real |
+| Seção | "Como votou a minha seção" (`cartoes/Secao`): recibo do 2º turno (carimbo de simulação) + 1º turno oficial | misto | nunca |
+| Município | "Minha cidade no 1º turno" (`cartoes/MunicipioT1`) | oficial | oficial (nunca com nomes ocultos) |
+| Candidato | ficha (`cartoes/Candidato`) | oficial | oficial |
+| Senado, Câmara, Assembleias | mini hemiciclo + maiores bancadas; Senado com `?uf=` mostra os 2 eleitos | oficial | Senado por UF |
+| Governadores | as 7 disputas (antes do dia 25, o 1º turno) | idem | nunca |
+| Feed e "Reveja a noite" | "momento" com o placar daquele instante; o link leva `?t=` | idem placar | idem placar |
+| Teste Cego | Desafio (padrão, sem resultado), Meu resultado (escolha explícita, com aviso), Duelo (placar entre duas pessoas), convite | respostas da pessoa | nunca |
+| Curiosidades | fato (par simétrico dos finalistas) e resumo de 3 destaques | oficial | nunca |
+| Cenários | cenário hipotético + premissas; marca "Cenário hipotético · não é pesquisa nem previsão" em três camadas | hipotético | nunca |
+| Home | convite "Compartilhar o Sintonia" (data e contagem, sem número nem candidato) | — | — |
+
+O cartão de cenários ajusta as premissas ao espaço (layout effect, antes da prévia e do PNG): começa com as mais
+informativas (2 no 16:9, 4 no feed/story) e tira as menos informativas até nada transbordar — nunca corta uma premissa ao
+meio; só se nem uma couber inteira ela vai em linha única com reticências.
+
+### 11.3 Curiosidades (`/curiosidades`)
+
+- Dados: `public/data/curiosidades.json` (29 fatos em 7 temas; tipos em `src/shared/curiosidades.ts`), gerado por
+  `scripts/data/curiosidades.ts` (`npm run data:curiosidades`), que lê só o dataset compilado (`public/data/**`) e ABORTA
+  se os totais não baterem com `meta.totaisPrimeiroTurno`, se faltar número, se título/texto passar do limite ou se
+  aparecer NaN. Percentuais de `calc.ts`, números de `format.ts`. Regenere quando os dados mudarem (ex.: eleitos do AM).
+- Regras editoriais: fatos dos finalistas sempre em **par** com o mesmo critério (teste confere) e palavras opinativas
+  barradas ("reduto", "fraude", "vitória"…); pisos (recordes municipais só com ≥ 5.000 eleitores); **nenhuma seção
+  unânime** (exporia o voto de cada eleitor e é gatilho de desinformação — removido no QA); perfil do eleitorado só com
+  afirmações verdadeiras em qualquer cenário (24.547 eleitores sem gênero/idade no arquivo).
+- Página: filtro `?tema=` fixo no topo, link direto `?fato=id` (rola e realça; é o link dos posts), "Fonte e critério",
+  "Ver no mapa", "Como calculamos" com o JSON bruto. `DestaquesCuriosidades` na home.
+- Nomes reais (dado oficial), sem foto, cores de identificação. Atenção: "Ver no mapa" leva à apuração do 1º turno, que
+  durante a simulação com nomes ocultos mostra os mesmos números como "Candidato A/B" (faixa e "nome oculto" explicam).
+
+### 11.4 Cenários (`/cenarios`, "E se…? Monte seu cenário")
+
+- Dados: `public/data/presidente-t1.json` (12 candidatos, votos por UF + exterior), gerado por
+  `scripts/data/presidente-t1.ts` (`npm run data:presidente-t1`), que confere UF a UF com o TSE e com `meta.json`.
+- Lógica isomórfica (`src/shared/cenarios.ts`): cada grupo (os 10 eliminados e os brancos/nulos do 1º turno) tem três
+  números — quanto escolhe um finalista, quanto disso vai para A, e quanto do resto vota branco/nulo em vez de se abster.
+  Comparecimento de −10 a +10 p.p. Arredondamento por UF preservando o total e **sem desempatar os finalistas** (a
+  unidade extra vai para brancos/nulos). Pontos de partida neutros: proporcional, metade para cada, todos branco/nulo.
+- Link `?c=`: código versionado (base64url), validado; qualquer entrada inválida vira o ponto de partida, com aviso.
+- **Divisor** (`SliderDivisao`): metáfora de "puxar" — arrastar (ou teclar) na direção de um candidato aumenta a parte
+  dele. Cada metade da trilha é o território de um lado (cor suave); o preenchimento sólido vai do meio até o divisor, na
+  cor de quem leva mais. O valor do `<input range>` é a posição do divisor (= parte do lado direito; seta para a direita
+  dá mais ao lado direito) e o `aria-valuetext` diz as duas partes. Toque em qualquer ponto da trilha (o range nativo do
+  WebKit só responde ao polegar).
+- Não é pesquisa: nada é coletado nem somado; o cenário fica no aparelho (localStorage, conveniência) e só sai no link que
+  a pessoa compartilha. Aviso permanente na página e marca tripla nas imagens. Sem fotos (números hipotéticos).
+
+### 11.5 Teste Cego (motor viral)
+
+- Escala de "Discordo totalmente" (esquerda) a "Concordo totalmente" (direita), teclas 1–5 na mesma ordem.
+- Modo rápido (12 afirmações, uma por tema, `/teste?s=…&r=1`) sorteado só entre combinações equilibradas; retomada de onde
+  parou; tempo restante pelo ritmo da pessoa.
+- Revelação em três tempos; **nenhuma cor de candidato antes da revelação** (nem o arco de comprimento zero).
+- Compartilhar: Desafio (padrão; o link é sempre `/teste`), Meu resultado (escolha explícita, aviso de dado sensível) e
+  Duelo (só libera X/WhatsApp/copiar depois de "Entendi: quem abrir o link verá minhas respostas").
+
+### 11.6 Home, navegação e widgets
+
+- Home pensada para o celular vindo do X: na 1ª dobra, título, contagem regressiva (ou placar compacto, com selo de
+  simulação) e "Faça o Teste Cego"; logo depois a busca de cidade/seção ("Campinas 33 120" leva ao boletim) e a entrada
+  da apuração. Lembrete da apuração (.ics gerado no aparelho, Google, Outlook). O resto vem num chunk separado.
+- Navegação: header desktop com menu "Mais"; tab bar do celular **Apuração · Teste Cego · Buscar · Sua seção · Mais**.
+  **Governadores saiu da tab bar e está no "Mais"** (com Curiosidades, "E se…?", Modo TV, cargos, compartilhar,
+  incorporar e institucionais). A busca rápida inclui Curiosidades e "E se…?".
+- Widgets `/embed/placar`, `/embed/mapa`, `/embed/uf`: sem cabeçalho, tema pela URL (sem gravar preferência), atualização
+  automática, selo SIMULAÇÃO, "via Sintonia ↗", altura avisada ao site hospedeiro por `postMessage`. O servidor libera
+  `frame-ancestors *` só nessas rotas (o resto: `SAMEORIGIN`). Diálogo "Incorporar" com prévia e código.
+- `manifest.webmanifest` e ícones; a cor da barra do navegador acompanha o tema desde o carregamento.
+
+### 11.7 Imagens de prévia (OG) e meta tags (servidor)
+
+| Rota | Conteúdo |
+|---|---|
+| `/api/og/apuracao.png?race=&uf=` | placar (Brasil ou UF) |
+| `/api/og/municipio.png?race=&uf=&cod=` | município: 1º turno oficial antes da apuração, placar ao vivo durante |
+| `/api/og/secao.png?race=&uf=&cod=&zona=&secao=` | boletim de urna (2º turno, se houver, + 1º turno oficial) e local |
+| `/api/og/candidato.png?sq=` | ficha com foto oficial (candidato inexistente → 404) |
+| `/api/og/senado.png`, `/camara.png`, `/assembleia.png` (`?uf=`) | hemiciclo e maiores bancadas; Senado por UF com os eleitos |
+| `/api/og/governadores.png` | as 7 disputas (sempre turquesa/âmbar) |
+| `/api/og/curiosidade.png?f=` | fato (ou capa com 3 destaques) |
+| `/api/og/cenario.png?c=` | cenário recalculado do código validado (inválido → cartão genérico da calculadora) |
+| `/api/og/teste.png` | Teste Cego (genérico; o código de um Duelo nunca é lido) |
+
+- `summary_large_image` 1200×630 em todas as rotas; títulos e descrições neutros por rota, `og:locale`, largura/altura,
+  canônico só com os parâmetros que mudam a página (`utm_*` não multiplica o cache), `twitter:site` por `TWITTER_SITE`.
+- Simulação: selo e **nunca foto**; com nomes ocultos, "Candidato A/B" nos dois turnos e, no 1º turno oficial, "nome
+  oculto" no lugar do partido (`partidoENumero`, `src/shared/anon.ts`). Ficha, cargos, curiosidades e cenários mantêm
+  nomes reais (sem número simulado).
+- Fotos WebP do TSE decodificadas em TS puro (`webp.ts`, RFC 6386) para o satori; PNG em RGB (WhatsApp ignora prévia
+  pesada). Cache LRU 256 imagens / 64 MB, fila limitada (503 + `Retry-After`); dado oficial com cache longo e `v=` =
+  versão do dataset. `robots.txt` libera `/api/og/` (o robô do X respeita o robots também para a imagem).
+- `/cenarios?c=` e `/duelo/*` ficam fora dos buscadores (`noindex`); o código do Duelo não aparece no HTML nem no canônico.
+
+### 11.8 Cores de identificação (decisão do dono, depois dos QAs)
+
+Lula em vermelho e Flávio Bolsonaro em azul, com nomes reais (§1.1). Governadores e simulação com nomes ocultos seguem
+em turquesa/âmbar pela ordem da urna (`anonimizarRace` neutraliza). Tokens `cand-vermelho*`/`cand-azul*` com contraste AA
+nos dois temas (protegido por `src/app/lib/coresTema.test.ts`); paleta de partidos com PT = vermelho e PL = azul e os
+demais otimizados contra daltonismo; mapas "% apurado" e "Comparecimento" em cinza (`fillEscalaNeutra`). Vale também
+nos cartões, nas imagens de prévia, na TV e nos widgets.
+
+### 11.9 Desempenho e limites conhecidos
+
+- JS inicial (build de produção, gzip): entrada **165,5 kB**; com o chunk da rota de entrada pré-carregado (`/` ou
+  `/teste`) ≈ **191 kB** (meta: < 200). Curiosidades, cenários, widgets e o kit de compartilhar são chunks sob demanda.
+- Barras ao vivo (`VoteSplitBar`, `ApuracaoProgress`, `StatsGrid`) animam só `transform` (antes `width`/`flex-grow`, que
+  faziam layout a cada quadro) e o brilho da barra de progresso usa `translateX` em vez de `background-position`. Medido
+  em `/apuracao` (build demo, CPU 4× mais lenta): layout −40% (≈ 258 → 158 ms a cada 3 s) e tarefas longas −23%.
+  Continuam custando: os números que rolam (`NumberRoll`), o fade de cor do mapa (`fill` no SVG) e o framer-motion
+  (≈ 40 kB gzip no pacote principal).
+- Worker do demo: baixa `data/uf` (2,3 MB) + `data/secao` (12 MB; ≈ 5,8 MB em gzip) ao abrir. **Não dá para adiar
+  `secao` sem mudar os números**: o modelo do 2º turno usa a seção real do 1º turno (aptos, comparecimento, preferência),
+  e é isso que garante números idênticos aos do servidor; montar sem ela e trocar depois faria o placar "pular". Caminho
+  futuro: um pacote compacto pré-computado do modelo.
+- No Artifact, "Postar no X" e "WhatsApp" abrem em nova aba: dependem de o iframe permitir pop-ups.

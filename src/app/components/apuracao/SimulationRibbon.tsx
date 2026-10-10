@@ -12,12 +12,22 @@ export const CARIMBO_SOBRE_PAPEL = 'dark:text-[color:color-mix(in_srgb,rgb(var(-
 
 export interface SimulationRibbonProps {
   variant?: 'bar' | 'badge' | 'stamp';
-  /** Texto complementar (bar). */
+  /** Texto complementar (bar; só a partir de `sm`). */
   detalhe?: string;
+  /**
+   * Texto principal da faixa (bar), visível também no celular. Padrão: "Simulação · dados fictícios". Nas páginas do
+   * 1º turno durante a simulação os números são OFICIAIS: lá a faixa diz isso (ver AppShell).
+   */
+  titulo?: string;
   className?: string;
 }
 
-export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta página não são resultados reais.', className }: SimulationRibbonProps) {
+export function SimulationRibbon({
+  variant = 'bar',
+  detalhe = 'Os números desta página não são resultados reais.',
+  titulo = 'Simulação · dados fictícios',
+  className,
+}: SimulationRibbonProps) {
   if (variant === 'badge') {
     return (
       <span
@@ -51,7 +61,7 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
   return (
     <div
       role="note"
-      aria-label="Simulação: dados fictícios"
+      aria-label={`${titulo}. ${detalhe}`}
       className={cn(
         // Fundo OPACO (surface + tinta violeta): a faixa fica presa sob o header e o conteúdo rola por baixo.
         'relative isolate flex h-7 items-center justify-center gap-2 overflow-hidden border-b border-brand/25 bg-surface px-4',
@@ -67,7 +77,7 @@ export function SimulationRibbon({ variant = 'bar', detalhe = 'Os números desta
       />
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
-        Simulação · dados fictícios
+        {titulo}
       </span>
       <span className="hidden truncate font-medium normal-case tracking-normal text-fg-muted sm:inline">— {detalhe}</span>
     </div>

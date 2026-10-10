@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { DatasetMeta } from './dataset';
-import { anonimizarRace, anonimizarTexto } from './anon';
+import { PARTIDO_OCULTO, anonimizarRace, anonimizarTexto, partidoENumero } from './anon';
 
 const meta = JSON.parse(readFileSync(path.resolve(__dirname, '../../public/data/meta.json'), 'utf8')) as DatasetMeta;
 const race = (id: string) => meta.races.find((r) => r.id === id)!;
@@ -34,6 +34,18 @@ describe('anonimizarRace', () => {
     expect(a.candidatos.map((c) => c.cor)).toEqual(['a', 'b', 'outros']);
     expect(a.candidatos[2].nomeUrna).toBe('Outros');
     expect(anonimizarRace(a)).toEqual(a);
+  });
+
+  it('1º turno oficial com nomes ocultos: partido "nome oculto" (nunca "Simulação"), sem número fictício na linha', () => {
+    for (const r of meta.races.filter((x) => x.turno === 1)) {
+      const a = anonimizarRace(r).candidatos.filter((c) => !c.agregado);
+      expect(a.map((c) => c.partido)).toEqual([PARTIDO_OCULTO, PARTIDO_OCULTO]);
+      expect(a.map(partidoENumero)).toEqual(['nome oculto', 'nome oculto']);
+      expect(JSON.stringify(a)).not.toMatch(/Simulação|simulação/);
+    }
+    // 2º turno simulado continua "Simulação · 1"; nomes reais, "PT · 13"
+    expect(anonimizarRace(race('pres')).candidatos.map(partidoENumero)).toEqual(['Simulação · 1', 'Simulação · 2']);
+    expect(race('pres').candidatos.map(partidoENumero)).toEqual(['PT · 13', 'PL · 22']);
   });
 
   it('governador continua a/b (já eram neutras)', () => {

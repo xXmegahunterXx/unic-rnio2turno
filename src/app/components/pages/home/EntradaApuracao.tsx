@@ -19,6 +19,7 @@ import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { NotaNomesOcultos } from './NotaNomesOcultos';
+import { partidoENumero } from '@/shared/anon';
 
 export function EntradaApuracao({ status, anonimizado, className }: { status: LiveStatus | undefined; anonimizado: boolean; className?: string }) {
   const navigate = useNavigate();
@@ -142,7 +143,7 @@ function Linha({ c, pct, votos, semVotos }: { c: Candidate; pct: number; votos: 
           </div>
           {!agregado ? (
             <div className="num mt-0.5 truncate text-[12px] text-fg-muted">
-              {c.partido} · {c.numero}
+              {partidoENumero(c)}
             </div>
           ) : null}
         </div>

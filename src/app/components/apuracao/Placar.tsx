@@ -27,6 +27,7 @@ import { CandidateAvatar } from './CandidateAvatar';
 import { useFotosRace } from './fotos';
 import { SimulationRibbon } from './SimulationRibbon';
 import { VoteSplitBar } from './VoteSplitBar';
+import { partidoENumero } from '@/shared/anon';
 
 export interface PlacarProps {
   race: Race;
@@ -268,7 +269,7 @@ function LadoDuelo({
 }) {
   const s = corSlot(l.c.cor);
   const dir = lado === 'dir';
-  const meta = [l.c.partido, String(l.c.numero)].join(' · ');
+  const meta = partidoENumero(l.c);
   return (
     <div className={cn('flex min-w-0 flex-col', dir ? 'items-end text-right' : 'items-start text-left')}>
       <div className={cn('flex min-w-0 flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3', dir ? 'items-end sm:flex-row-reverse' : 'items-start')}>

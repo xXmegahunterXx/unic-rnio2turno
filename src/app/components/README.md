@@ -354,6 +354,7 @@ Hashtags neutras em `HASHTAGS` / `hashtags('apuracao' | 'governador' | 'primeiro
 | `emIframe()`, `telaDeToque()`, `baixarArquivo(blob, nome)`, `blobParaDataUrl`, `abrirExterno(href)` | apoio do fallback (download silenciosamente bloqueado em WebViews/iframes → modal com `<img src=data:…>` "toque e segure para salvar"). |
 | `pesoTextoX`, `pesoPostX`, `textoParaX`, `normalizarHashtags`, `textoComLink`, `LIMITE_X`, `PESO_LINK_X` | contagem ponderada do X (link = 23; fora das faixas latinas = 2). |
 | `hostBonito(host)` / `siteExibicao()` | domínio apresentável nas imagens (esconde localhost, IP, portas e domínios de prévia). |
+| `sitePublico()` · `normalizarSitePublico(s)` · `urlNoSite(site, rota)` | URL pública do build (`VITE_SITE_URL`). Com ela, `urlAbsoluta`/`hostExibicao` apontam para o site público em vez do endereço da página (no demo, o iframe do Artifact). Termina em `#` para um site com HashRouter. |
 
 Comportamento do sheet: o PNG do formato atual é gerado **em segundo plano** assim que o sheet abre (e refeito se o cartão mudar —
 `MutationObserver`); assim o `navigator.share` sai dentro do gesto do usuário (o Safari recusa se houver espera). Texto e imagem ficam
@@ -399,3 +400,18 @@ Arquivos em `src/app/components/pages/teste/` e `src/app/pages/teste/`. Nada sai
 | Compartilhar | `PainelCompartilhar`: "Desafio" (padrão, não mostra o resultado) × "Meu resultado" (opt-in com aviso de dado sensível); link sempre `/teste`. `PainelDuelo`: aviso de que quem abrir verá as respostas (e que no X o link é público) + caixa "Entendi" que libera X/WhatsApp/Enviar/Copiar/Imagem. `PainelResultadoDuelo`: só o placar entre as duas pessoas. |
 | Cartões (CartaoTeste.tsx) | Sobre o `CartaoBase`, nos 3 formatos: `CartaoDesafio`, `CartaoMeuResultado` (anel em `conic-gradient`, foto só quando o teste já mostra fotos), `CartaoDuelo`, `CartaoConviteDuelo`. Sem número simulado ⇒ sem selo de simulação. |
 | Textos (textosTeste.ts) | `textoDesafio`, `textoMeuResultado`, `textoDuelo`, `textoConviteDuelo`, `HASHTAGS_TESTE` (testados: ≤ 220 de peso, neutros, ordem da urna). |
+
+## Fase 3 · home, navegação e widgets (integração)
+
+| Export | Onde | Uso |
+|---|---|---|
+| `abrirCompartilharSite()` | `layout/acoesGlobais.tsx` | abre, de qualquer página, o sheet "Compartilhar o Sintonia" (cartão-convite sem números) |
+| `abrirIncorporar(opcoes?)` | `layout/acoesGlobais.tsx` | abre o diálogo "Incorporar" (opções, prévia e código do `<iframe>` de `/embed/placar`, `/embed/mapa`, `/embed/uf`) |
+| `<BotaoIncorporar opcoes compacto />` | `embed/BotaoIncorporar.tsx` | ícone `</>` que chama `abrirIncorporar` |
+| `propsPreCarregar(to)` | `layout/prefetch.ts` | espalhe num `<Link>`: pré-carrega o chunk da rota ao passar o mouse/tocar |
+| `partidoENumero(c)` | `@/shared/anon` | "PT · 13"; no 1º turno oficial com nomes ocultos, só "nome oculto" (sem o número fictício da anonimização) |
+| `<SimulationRibbon titulo detalhe />` | `apuracao/SimulationRibbon.tsx` | `titulo` troca o texto principal (visível no celular); nas páginas `-t1` durante a simulação: "1º turno oficial · simulação só no 2º" |
+
+Barras ao vivo (`VoteSplitBar`, `ApuracaoProgress`, `StatsGrid`): animadas só com `transform` (segmentos com translateX + scaleX; preenchimentos
+de largura total deslizando com translateX, para não deformar a ponta arredondada). Nada de animar `width`/`flex-grow` em componente que
+atualiza a cada segundo — faz layout da página a cada quadro.

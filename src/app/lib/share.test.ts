@@ -4,10 +4,12 @@ import {
   detectarNavegadorEmbutido,
   hostBonito,
   normalizarHashtags,
+  normalizarSitePublico,
   pesoPostX,
   pesoTextoX,
   textoComLink,
   textoParaX,
+  urlNoSite,
   whatsappUrl,
   xIntentUrl,
 } from './share';
@@ -107,5 +109,24 @@ describe('detectarNavegadorEmbutido', () => {
   ];
   it.each(casos)('%s → %s', (ua, esperado) => {
     expect(detectarNavegadorEmbutido(ua)).toBe(esperado);
+  });
+});
+
+describe('site público (VITE_SITE_URL)', () => {
+  it('normaliza: só http(s), sem barra final; mantém o "#" de um site com HashRouter', () => {
+    expect(normalizarSitePublico('https://sintonia.app/')).toBe('https://sintonia.app');
+    expect(normalizarSitePublico('  https://sintonia.app  ')).toBe('https://sintonia.app');
+    expect(normalizarSitePublico('https://exemplo.org/sintonia/#')).toBe('https://exemplo.org/sintonia/#');
+    expect(normalizarSitePublico('http://localhost:8787')).toBe('http://localhost:8787');
+    for (const ruim of [undefined, null, '', 'sintonia.app', 'javascript:alert(1)', 'ftp://x.org', 'https://', 42]) {
+      expect(normalizarSitePublico(ruim)).toBe('');
+    }
+  });
+
+  it('monta a URL da rota no site público (caminho ou hash)', () => {
+    expect(urlNoSite('https://sintonia.app', '/cenarios?c=AQ')).toBe('https://sintonia.app/cenarios?c=AQ');
+    expect(urlNoSite('https://sintonia.app', 'teste')).toBe('https://sintonia.app/teste');
+    expect(urlNoSite('https://sintonia.app', '/')).toBe('https://sintonia.app/');
+    expect(urlNoSite('https://exemplo.org/sintonia/#', '/apuracao/sp?race=pres')).toBe('https://exemplo.org/sintonia/#/apuracao/sp?race=pres');
   });
 });

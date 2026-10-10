@@ -27,6 +27,7 @@ import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { LogoMark } from '@/app/components/layout/Logo';
 import { useRelogioApuracao } from '@/app/components/pages/home/relogio';
 import { caminhoPaginaCompleta, type OpcoesEmbed } from './codigo';
+import { partidoENumero } from '@/shared/anon';
 
 export function WidgetEmbed({ opcoes, className }: { opcoes: OpcoesEmbed; className?: string }) {
   if (opcoes.tipo === 'mapa') return <WidgetMapa opcoes={opcoes} className={className} />;
@@ -127,7 +128,7 @@ function Duelo({ race, resumo }: { race: Race; resumo: Summary }) {
                 <div className="min-w-0">
                   <div className="truncate text-[14px] font-semibold leading-tight">{c.nomeUrna}</div>
                   <div className="num truncate text-[11.5px] text-fg-muted">
-                    {c.partido} · {c.numero}
+                    {partidoENumero(c)}
                   </div>
                 </div>
               </div>
@@ -184,7 +185,7 @@ function Disputante({ c, mostrar1t }: { c: Candidate; mostrar1t: boolean }) {
       <div className="min-w-0">
         <div className="truncate text-[13px] font-semibold leading-tight">{c.nomeUrna}</div>
         <div className="num truncate text-[11px] text-fg-muted">
-          {c.partido} · {c.numero}
+          {partidoENumero(c)}
           {mostrar1t && c.primeiroTurno ? ` · ${fmtPct(c.primeiroTurno.pct)} no 1º turno` : ''}
         </div>
       </div>

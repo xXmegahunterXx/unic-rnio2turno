@@ -12,6 +12,7 @@ import type { Cenario, Premissa, PresidenteT1Dataset, ResultadoCenario } from '@
 import { MARCA_CENARIO, finalistasDe, margemArea, pctFinalista, premissasCenario } from '@/shared/cenarios';
 import { fmtCompact, fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { siteExibicao } from '@/app/lib/share';
 import { corSlot } from '@/app/lib/raceUi';
 import { CartaoBase, useCartao, type FormatoCartao } from '@/app/components/share';
 import { AvatarCartao, BarraDuelo, RotuloCartao } from '@/app/components/share';
@@ -38,6 +39,8 @@ export function CartaoCenario({ formato, ds, cenario, resultado, geo, caminho }:
       selo={<SeloHipotetico />}
       titulo={formato === 'x' ? undefined : 'Meu cenário para o 2º turno'}
       brilho={[...coresCenario(ds)]}
+      // sem domínio apresentável (prévia, localhost) o rodapé padrão diria "Apuração ao vivo", que não é o caso aqui
+      rodape={siteExibicao() ? undefined : 'Monte o seu cenário no Sintonia'}
     >
       <Miolo ds={ds} cenario={cenario} resultado={resultado} geo={geo} />
     </CartaoBase>

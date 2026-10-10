@@ -216,7 +216,9 @@
   }
   /* `border-line`, `bg-line`, `divide-line`, `ring-line` vêm do tailwind.config (alfa = --line-alpha × modificador). */
   .glass {
-    background: rgb(var(--surface) / 0.82);
+    /* 0,9 (antes 0,82): sem o desfoque (WebViews antigas, economia de energia, prints) o texto que rola por trás do
+       cabeçalho aparecia, sobretudo no tema claro */
+    background: rgb(var(--surface) / 0.9);
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
   }

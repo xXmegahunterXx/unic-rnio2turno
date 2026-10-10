@@ -88,7 +88,7 @@ export default function PrivacidadePage() {
         </p>
         <Lista
           itens={[
-            <>As propostas, o sorteio da ordem e o cálculo da sintonia acontecem no seu navegador.</>,
+            <>As afirmações, o sorteio da ordem, as suas respostas e o cálculo da sintonia ficam no seu navegador.</>,
             <>Não há envio das respostas a servidor, nem registro, nem ferramenta de analytics com as escolhas.</>,
             <>
               Não fazemos enquetes: como não recebemos respostas, não temos como somá-las, e nunca mostramos preferência de usuários.

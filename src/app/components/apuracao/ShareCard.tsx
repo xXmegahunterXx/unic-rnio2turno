@@ -20,6 +20,7 @@ import { BotaoCompartilhar, CartaoBase, DIMENSOES_CARTAO, brilhoDe, PreviaCartao
 import { AvatarCartao, BarraDuelo, PctGigante, PilulaApurado, RotuloCartao } from '@/app/components/share/cartoes/partes';
 import { hashtags, textoPlacar } from '@/app/components/share/textos';
 import { useFotosRace } from './fotos';
+import { partidoENumero } from '@/shared/anon';
 
 /** Formatos do cartão do placar (= `FormatoCartao` do kit; 'x' é o 16:9 do X/WhatsApp). */
 export type ShareFormato = FormatoCartao;
@@ -189,7 +190,7 @@ function Coluna({ race, resumo, i, foto, direita }: { race: Race; resumo: Summar
         {c.nomeUrna}
       </div>
       <div className="num truncate text-fg-muted" style={{ fontSize: (x ? 17 : 19) * k, marginTop: 4 * k }}>
-        {c.partido} · {c.numero}
+        {partidoENumero(c)}
       </div>
     </div>
   );
@@ -232,7 +233,7 @@ function LinhaStory({ race, resumo, i, foto }: { race: Race; resumo: Summary; i:
             {c.nomeUrna}
           </div>
           <div className="num text-fg-muted" style={{ fontSize: 20 * k, marginTop: 4 * k }}>
-            {c.partido} · {c.numero}
+            {partidoENumero(c)}
           </div>
         </div>
       </div>

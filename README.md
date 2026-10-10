@@ -1,8 +1,11 @@
 # Sintonia
 
-Apuração ao vivo do 2º turno das eleições de 25/10/2026 (estado, município, zona e seção), **Teste Cego** de
-propostas e um **simulador administrável** da noite da apuração. Apartidário por construção: cores neutras por
-ordem do número na urna, textos descritivos, sem enquetes e sem dados pessoais do Teste Cego no servidor.
+Apuração ao vivo do 2º turno das eleições de 25/10/2026 (estado, município, zona e seção), **Teste Cego** (concordar ou
+discordar de afirmações dos planos de governo sem saber de quem são), **Curiosidades** do 1º turno, a calculadora
+**"E se…? Monte seu cenário"**, widgets para incorporar e um **simulador administrável** da noite da apuração. Tudo gera
+imagem + texto + link para postar no X. Apartidário por construção: textos descritivos e simétricos, sem enquetes e sem
+dados pessoais do Teste Cego no servidor. Cores: Presidente com cores de identificação (Lula vermelho, Flávio Bolsonaro
+azul, decisão do dono); governadores e simulação com nomes ocultos em cores neutras pela ordem da urna.
 
 Arquitetura e regras: [`ARCHITECTURE.md`](./ARCHITECTURE.md) · guia para agentes: [`CLAUDE.md`](./CLAUDE.md) ·
 adaptador do TSE: [`src/tse/README.md`](./src/tse/README.md).
@@ -31,6 +34,14 @@ mantida; `SIM_AUTOSTART=force` reinicia sempre. O painel fica em `/admin` (senha
 | `npm run build` | `dist/` (SPA, Vite) + `dist-server/` (servidor, esbuild) |
 | `npm start` | produção: um processo serve SPA + API na porta `PORT` |
 | `npm run build:demo` | site 100% estático (`dist-demo/`) com o motor no navegador |
+| `npm run data:curiosidades` | regenera `public/data/curiosidades.json` (ver "Curiosidades e calculadora de cenários") |
+| `npm run data:presidente-t1` | regenera `public/data/presidente-t1.json` (base da calculadora `/cenarios`) |
+
+### Variáveis do build (app)
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `VITE_SITE_URL` | — (usa o endereço da página) | URL pública do site (`https://sintonia.app`). Links compartilhados ("Postar no X", WhatsApp, copiar link, Web Share), o código de incorporação dos widgets e o domínio no rodapé das imagens passam a apontar para ela. **Defina no build demo** (`VITE_SITE_URL=https://sintonia.app npm run build:demo`): publicado como Artifact, o demo roda num iframe de outra origem cujo endereço não abre fora do claude.ai. Termine com `#` se o site público usar HashRouter (`https://exemplo.org/sintonia/#` → `…/sintonia/#/teste`). Só `http(s)`; valor inválido é ignorado |
 
 ### Variáveis de ambiente do servidor
 
@@ -48,6 +59,7 @@ mantida; `SIM_AUTOSTART=force` reinicia sempre. O painel fica em `/admin` (senha
 | `SIM_AUTOSTART` | — | `1`: sobe simulando a 20× (se não houver simulação/TSE em curso) · `force`: sempre |
 | `SERVE_STATIC` | só em produção | `1`/`0` força servir (ou não) o `DIST_DIR` |
 | `FONTS_DIR` | `dist-server/assets/fonts` | fontes TTF das imagens de compartilhamento |
+| `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`); inválido = ignorado com aviso no log |
 
 ---
 
@@ -96,10 +108,13 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`).
 | `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | logo do patrocínio enviada em data URI (o `/api/status` leva só esta URL) |
 | 404 de `/api/apuracao/…` | `public, max-age=30, s-maxage=60` | evita martelar a origem com URLs inexistentes |
 | `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630 |
-| `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego |
+| `GET /api/og/{municipio,secao,governadores}.png` | ao vivo: como `apuracao.png`; 1º turno oficial (antes da apuração): `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | município, boletim de urna e as 7 disputas de governador |
+| `GET /api/og/{candidato,senado,camara,assembleia,curiosidade,cenario}.png` | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | dado oficial (ou cenário recalculado do `?c=`); o `&v=` das meta tags é a versão do dataset |
+| `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego (o código de um Duelo nunca é lido) |
 | `/assets/*` | `public, max-age=31536000, immutable` | nomes com hash do Vite |
 | demais arquivos (`/geo`, `/data`, favicon) | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400` | com ETag |
-| páginas (SPA) | `no-cache` | `index.html` com meta tags OG/Twitter da rota |
+| páginas (SPA) | `no-cache` | `index.html` com meta tags OG/Twitter da rota (`summary_large_image`, imagem da própria página) |
+| `/embed/placar`, `/embed/mapa`, `/embed/uf` | `no-cache` | widgets: `frame-ancestors *` (podem ser incorporados em qualquer site), `noindex` |
 | `/api/admin/*`, `/healthz` | `no-store` | nunca cachear |
 
 O "balde" do ETag só muda quando os números podem mudar: fixo com a fonte `pre`, no 1º turno, com o relógio
@@ -154,8 +169,10 @@ intervalo as requisições esperam (a CDN continua servindo o conteúdo anterior
   `SameSite=Strict`, `Path=/api/admin`, `Secure` em produção, validade de 12 h, revogado no logout; 10 tentativas de
   login por minuto por cliente (300/min no total) → 429 com `Retry-After`; `POST` só com `application/json` (sem
   CSRF por formulário); corpo ≤ 64 KB; comandos validados com zod (`src/server/validation.ts`).
-- Cabeçalhos: `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` nas páginas,
-  HSTS em produção, `X-Robots-Tag: noindex` em `/admin` e `/duelo/*`.
+- Cabeçalhos: `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` e
+  `frame-ancestors 'self'` nas páginas (exceto `/embed/*`, com `frame-ancestors *`), HSTS em produção,
+  `X-Robots-Tag: noindex` em `/admin`, `/duelo/*`, `/embed/*` e `/cenarios?c=`. `robots.txt` libera `/api/og/` (o robô
+  do X respeita o robots.txt também para a imagem do cartão).
 - Imagens OG: geradas uma por vez (no máximo 16 na fila; excesso → 503 com `Retry-After`), com a imagem anterior da
   mesma fonte servida enquanto a nova é gerada.
 
@@ -288,6 +305,29 @@ eleitores em trânsito: São Paulo −9.717, Brasília −5.188), e o total naci
 Σ `QT_ELEITOR_SECAO` e fase 1 == Σ `QT_ELEITOR_ELEICAO_FEDERAL` em todos os 5.757 municípios (para com erro se não).
 Também para com erro se surgir código/rótulo do TSE não previsto, mais de uma data de geração, ou se os municípios
 não forem os de `public/data/uf/*.json`.
+
+### Curiosidades e calculadora de cenários (fase 3)
+
+```bash
+npm run data:presidente-t1     # = npx tsx scripts/data/presidente-t1.ts → public/data/presidente-t1.json (~1 s)
+npm run data:curiosidades      # = npx tsx scripts/data/curiosidades.ts  → public/data/curiosidades.json (~2 s)
+npx tsx scripts/data/curiosidades.ts --stdout    # só confere e imprime (não grava); idem presidente-t1.ts --stdout
+npx vitest run scripts/data/curiosidades.test.ts src/shared/cenarios.test.ts   # recálculo independente e regras
+```
+
+- **`presidente-t1.json`** (`PresidenteT1Dataset`, `src/shared/cenarios.ts`): os 12 candidatos a Presidente no 1º turno,
+  votos por UF + exterior. Soma os municípios de `public/data/uf/*.json` e tira número, nome de urna e partido do arquivo
+  nacional do feed (`data-raw/tse/ele2026/6257/dados/br/br-c0001-e006257-u.json`; baixa só esse arquivo se faltar).
+  Aborta se qualquer UF não bater com o arquivo da UF no TSE, se a soma não bater com o Brasil e com `meta.json`, ou se
+  os finalistas/"Outros" não baterem com a race `pres-t1`.
+- **`curiosidades.json`** (`CuriosidadesDataset`, `src/shared/curiosidades.ts`): os fatos do 1º turno. Lê **só** o
+  dataset compilado (`public/data/**`: `uf/`, `secao/`, `locais/`, `perfil/`, `cargos/`, `candidatos/`, `meta.json`) —
+  rode depois de qualquer pipeline acima que mude esses arquivos (por exemplo, quando o TSE divulgar os eleitos do AM ou
+  o `perfil_build.py` passar a gravar os totais sem gênero/idade). Aborta se os totais não baterem com
+  `meta.totaisPrimeiroTurno`, se faltar número num fato, se título > 48 ou texto > 200 caracteres, ou se aparecer NaN.
+  Regras editoriais (pares simétricos, pisos, nenhuma seção unânime) no topo do script e em `ARCHITECTURE.md` §11.3.
+- Os dois arquivos são estáticos e vão para `dist/data` e `dist-demo/data` no build; o servidor lê o mesmo
+  `curiosidades.json` para as meta tags e a imagem de `/curiosidades?fato=`.
 
 ## Fontes de dados
 

@@ -14,6 +14,7 @@ import { CartaoBase, SeloOficial, brilhoDe, useCartao } from '../CartaoBase';
 import { hashtags, textoMunicipioT1 } from '../textos';
 import type { FormatoCartao } from '../tipos';
 import { AvatarCartao, PctGigante, RotuloCartao } from './partes';
+import { partidoENumero } from '@/shared/anon';
 
 export interface ResultadoLocalT1 {
   votos: number[];
@@ -92,7 +93,7 @@ function Miolo({ nome, uf, race, t, fotos }: Omit<CartaoMunicipioT1Props, 'forma
                       {c.agregado ? 'Demais candidatos' : c.nomeUrna}
                     </div>
                     <div className="num truncate text-fg-muted" style={{ fontSize: 16 * k }}>
-                      {c.agregado ? '' : `${c.partido} · ${c.numero} · `}
+                      {c.agregado ? '' : `${partidoENumero(c)} · `}
                       {fmtInt(t.votos[i] ?? 0)} votos
                     </div>
                   </div>

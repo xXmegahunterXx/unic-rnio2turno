@@ -1,6 +1,10 @@
 /**
  * Barra dividida A | B (| Outros) com marcador de 50%, larguras animadas.
  * Opcionalmente mostra o % apurado como um trilho fino abaixo.
+ *
+ * Desempenho: na apuração ao vivo os números mudam a cada segundo. Os segmentos são posicionados e dimensionados com
+ * transform (translateX + scaleX, origem à esquerda), que o navegador anima na GPU — animar `flex-grow`/`width` fazia
+ * layout da página a cada quadro e pesava em celular fraco. Visual idêntico: segmentos retos, cantos pelo contêiner.
  */
 import type { CorCandidato } from '@/shared/types';
 import { pctValidos, validos } from '@/shared/calc';
@@ -60,14 +64,14 @@ export function VoteSplitBar({
         </div>
       ) : null}
       <div role="img" aria-label={label} className="relative">
-        <div className={cn('relative flex w-full gap-[2px] overflow-hidden', alturas[size], raio)}>
+        <div className={cn('relative w-full overflow-hidden', alturas[size], raio)}>
           {total > 0 ? (
             // Outros (se houver) fica no meio para A e B tocarem as pontas.
-            ordemVisual(slots).map((i) => (
+            segmentos(ordemVisual(slots), pcts).map(({ i, transform, largura }) => (
               <div
                 key={i}
-                className={cn('h-full min-w-0 transition-[flex-grow] duration-700 ease-[cubic-bezier(.22,.9,.24,1)]', corSlot(slots[i]).bg)}
-                style={{ flexGrow: Math.max(pcts[i], 0.0001), flexBasis: 0 }}
+                className={cn('absolute inset-y-0 left-0 origin-left transition-transform duration-700 ease-[cubic-bezier(.22,.9,.24,1)]', corSlot(slots[i]).bg)}
+                style={{ width: largura, transform }}
               />
             ))
           ) : (
@@ -82,11 +86,33 @@ export function VoteSplitBar({
       </div>
       {apurado !== undefined ? (
         <div className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-surface-3" aria-hidden>
-          <div className="h-full rounded-full bg-brand/80 transition-[width] duration-700 ease-out" style={{ width: `${Math.max(0, Math.min(100, apurado))}%` }} />
+          <div className="h-full w-full rounded-full bg-brand/80 transition-transform duration-700 ease-out" style={{ transform: `translateX(${Math.max(0, Math.min(100, apurado)) - 100}%)` }} />
         </div>
       ) : null}
     </div>
   );
+}
+
+/** Espaço entre segmentos (px), o mesmo `gap-[2px]` de antes. */
+const VAO = 2;
+
+/**
+ * Posição de cada segmento só com transform: todos têm a largura útil (100% menos os vãos) e começam na esquerda;
+ * `translateX(acumulado% + vãos)` leva ao início e `scaleX(fração)` dá o tamanho. Frações sobre a soma (100% de válidos).
+ * Pura (testada).
+ */
+export function segmentos(ordem: number[], pcts: number[]): { i: number; transform: string; largura: string }[] {
+  const soma = ordem.reduce((s, i) => s + Math.max(0, pcts[i] ?? 0), 0);
+  const n = ordem.length;
+  const largura = n > 1 ? `calc(100% - ${(n - 1) * VAO}px)` : '100%';
+  let acumulado = 0;
+  return ordem.map((i, k) => {
+    const f = soma > 0 ? Math.max(0, pcts[i] ?? 0) / soma : 1 / n;
+    const inicio = acumulado;
+    acumulado += f;
+    const r = (x: number) => Math.round(x * 1e5) / 1e5;
+    return { i, largura, transform: `translateX(calc(${r(inicio * 100)}% + ${k * VAO}px)) scaleX(${r(f)})` };
+  });
 }
 
 function ordemVisual(slots: CorCandidato[]): number[] {

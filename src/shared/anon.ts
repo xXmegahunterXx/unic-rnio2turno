@@ -8,14 +8,26 @@
  * quem é. Rótulos, número e cor saem da POSIÇÃO do candidato (nunca da cor).
  */
 import { corNeutra } from './cores';
-import type { Race } from './types';
+import type { Candidate, Race } from './types';
+
+/** Partido exibido no 2º turno simulado com os nomes ocultos. */
+export const PARTIDO_SIMULACAO = 'Simulação';
+/**
+ * Partido exibido nas corridas de 1º turno (resultado OFICIAL do TSE) com os nomes ocultos: nada de "Simulação" ao
+ * lado de um número real — só se avisa que o nome está oculto.
+ */
+export const PARTIDO_OCULTO = 'nome oculto';
 
 /** "A", "B"… pela posição entre os candidatos reais (ordem do número na urna). */
 const rotulo = (indice: number) => String.fromCharCode(65 + indice);
 
-/** Versão anônima de uma corrida: "Candidato A/B", cores neutras, sem partido, vice, número, foto ou ficha reais. */
+/**
+ * Versão anônima de uma corrida: "Candidato A/B", cores neutras, sem partido, vice, número, foto ou ficha reais.
+ * No 1º turno (dado oficial) o partido vira "nome oculto" em vez de "Simulação" (ver `partidoENumero`).
+ */
 export function anonimizarRace(r: Race): Race {
   let k = 0;
+  const oficial = r.turno === 1;
   return {
     ...r,
     candidatos: r.candidatos.map((c) => {
@@ -24,8 +36,8 @@ export function anonimizarRace(r: Race): Race {
       return {
         ...c,
         nomeUrna: `Candidato ${rotulo(i)}`,
-        nome: `Candidato ${rotulo(i)} (simulação)`,
-        partido: 'Simulação',
+        nome: `Candidato ${rotulo(i)} (${oficial ? 'nome oculto' : 'simulação'})`,
+        partido: oficial ? PARTIDO_OCULTO : PARTIDO_SIMULACAO,
         coligacao: undefined,
         composicao: undefined,
         vice: undefined,
@@ -37,6 +49,14 @@ export function anonimizarRace(r: Race): Race {
       };
     }),
   };
+}
+
+/**
+ * Linha "partido · número" de um candidato ("PT · 13"). Com o nome oculto no 1º turno oficial, só "nome oculto": o
+ * número da anonimização (1, 2) é fictício e não deve aparecer ao lado de um resultado real.
+ */
+export function partidoENumero(c: Pick<Candidate, 'partido' | 'numero'>): string {
+  return c.partido === PARTIDO_OCULTO ? PARTIDO_OCULTO : `${c.partido} · ${c.numero}`;
 }
 
 /** Troca nomes reais por "Candidato A/B" num texto (ex.: títulos de eventos). Nomes mais longos primeiro. */

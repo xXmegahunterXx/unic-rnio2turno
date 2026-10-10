@@ -20,6 +20,8 @@
     "test": "vitest run",
     "data:fetch": "tsx scripts/data/fetch-tse.ts && tsx scripts/data/fetch-ibge.ts",
     "data:build": "tsx scripts/data/build-data.ts && tsx scripts/data/build-geo.ts",
+    "data:presidente-t1": "tsx scripts/data/presidente-t1.ts",
+    "data:curiosidades": "tsx scripts/data/curiosidades.ts",
     "shots": "tsx scripts/preview/screenshots.ts"
   },
   "dependencies": {

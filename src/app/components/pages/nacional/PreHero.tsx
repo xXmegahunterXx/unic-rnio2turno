@@ -11,6 +11,7 @@ import { Countdown } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
+import { partidoENumero } from '@/shared/anon';
 
 export interface PreHeroProps {
   /** Instante do início da divulgação (epoch ms). */
@@ -91,7 +92,7 @@ export function PreHero({
                     <span className="min-w-0">
                       <span className="block truncate text-[14px] font-semibold leading-tight text-fg">{c.nomeUrna}</span>
                       <span className={cn('num block text-[11.5px] font-medium leading-tight', corSlot(c.cor).text)}>
-                        {c.partido} · {c.numero}
+                        {partidoENumero(c)}
                       </span>
                     </span>
                   </span>

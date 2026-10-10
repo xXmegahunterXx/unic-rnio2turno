@@ -148,8 +148,9 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
             )}
             <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface-3" aria-hidden>
               <div
-                className={cn('h-full rounded-full transition-[width] duration-700 ease-out', it.barra)}
-                style={{ width: `${it.pct ?? (temDados && t.eleitorado > 0 ? (t.eleitoradoTotalizado / t.eleitorado) * 100 : 0)}%` }}
+                // largura toda deslizando com translateX (GPU, sem layout por quadro; ponta arredondada intacta)
+                className={cn('h-full w-full rounded-full transition-transform duration-700 ease-out', it.barra)}
+                style={{ transform: `translateX(${Math.max(0, Math.min(100, it.pct ?? (temDados && t.eleitorado > 0 ? (t.eleitoradoTotalizado / t.eleitorado) * 100 : 0))) - 100}%)` }}
               />
             </div>
           </dd>

@@ -36,12 +36,15 @@ export function ApuracaoProgress({ resumo, variant = 'default', className }: Apu
       aria-valuetext={`${fmtPct(pct)} das seções totalizadas`}
       className={cn('relative w-full overflow-hidden rounded-full bg-surface-3', variant === 'compact' ? 'h-1' : 'h-1.5')}
     >
+      {/* Desempenho (celular fraco, apuração ao vivo): o preenchimento tem a largura toda e DESLIZA com translateX (composição
+          na GPU, sem layout a cada quadro como animar `width` fazia; a ponta arredondada não deforma, ao contrário de
+          scaleX); o trilho corta o que sobra. O brilho também atravessa com translateX (sem repintar). */}
       <div
-        className={cn('relative h-full rounded-full transition-[width] duration-700 ease-out', encerrada ? 'bg-brand' : 'bg-brand-grad')}
-        style={{ width: `${pct}%` }}
+        className={cn('relative h-full w-full overflow-hidden rounded-full transition-transform duration-700 ease-out', encerrada ? 'bg-brand' : 'bg-brand-grad')}
+        style={{ transform: `translateX(${Math.max(0, Math.min(100, pct)) - 100}%)` }}
       >
         {!encerrada && !aguardando ? (
-          <span className="absolute inset-0 animate-shimmer rounded-full bg-[linear-gradient(90deg,transparent_0%,rgb(var(--brand-ink)/0.35)_50%,transparent_100%)] bg-[length:200%_100%]" />
+          <span className="absolute inset-0 animate-varrer motion-reduce:hidden bg-[linear-gradient(90deg,transparent_0%,rgb(var(--brand-ink)/0.35)_50%,transparent_100%)]" />
         ) : null}
       </div>
     </div>

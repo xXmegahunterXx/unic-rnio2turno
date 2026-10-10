@@ -183,7 +183,14 @@ function Header() {
           </Container>
         </header>
         {simulacao && comNumeros(pathname) ? (
-          <SimulationRibbon detalhe={paginaT1 ? 'a simulação é do 2º turno; esta página mostra o resultado oficial do 1º turno, com os nomes ocultos.' : undefined} />
+          <SimulationRibbon
+            titulo={paginaT1 ? '1º turno oficial · simulação só no 2º' : undefined}
+            detalhe={
+              paginaT1
+                ? `os números desta página são o resultado oficial do TSE${status.data?.anonimizado ? ', com os nomes ocultos durante a simulação' : ''}.`
+                : undefined
+            }
+          />
         ) : null}
       </div>
       <AvisoBanner aviso={status.data?.aviso ?? null} />
@@ -323,8 +330,8 @@ function Footer() {
           <div className="col-span-2 max-w-sm md:col-span-4 lg:col-span-1">
             <Logo size={26} />
             <p className="mt-3 text-[14px] leading-relaxed text-fg-muted">
-              Apuração do 2º turno de 2026 estado por estado, cidade por cidade, seção por seção. E o Teste Cego de
-              propostas.
+              Apuração do 2º turno de 2026 estado por estado, cidade por cidade, seção por seção. E o Teste Cego: ideias
+              antes de nomes.
             </p>
             <p className="mt-4 flex items-start gap-2 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5 text-[12.5px] leading-snug text-fg-muted">
               <Icon name="info" size={16} className="mt-px shrink-0 text-brand-fg" />

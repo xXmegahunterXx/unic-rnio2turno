@@ -16,12 +16,51 @@ export interface ShareInput {
 
 export type ShareResultado = 'compartilhado' | 'whatsapp' | 'cancelado' | 'copiado' | 'erro';
 
-/** URL absoluta de uma rota do app (funciona com BrowserRouter e com o HashRouter do build demo). */
+/**
+ * Normaliza a URL pública do site (`VITE_SITE_URL`): só http(s), sem barra final. Um "#" final é mantido de propósito
+ * (site publicado com HashRouter: "https://exemplo.org/sintonia/#" → rotas "…/sintonia/#/cenarios"). '' se ausente ou inválida.
+ * Puro (testado).
+ */
+export function normalizarSitePublico(bruto: unknown): string {
+  if (typeof bruto !== 'string') return '';
+  const s = bruto.trim();
+  if (!/^https?:\/\/[^\s/?#]+/i.test(s)) return '';
+  return s.endsWith('#') ? s : s.replace(/\/+$/, '');
+}
+
+/** URL pública de uma rota ("/cenarios?c=…") num site normalizado por `normalizarSitePublico`. Puro (testado). */
+export function urlNoSite(site: string, rota: string): string {
+  const r = rota.startsWith('/') ? rota : `/${rota}`;
+  if (site.endsWith('#')) return `${site}${r}`;
+  return r === '/' ? `${site}/` : `${site}${r}`;
+}
+
+/**
+ * URL pública do site definida no build (`VITE_SITE_URL`, ex.: "https://sintonia.app"). No build demo — publicado num
+ * iframe de outra origem (Artifact) — o endereço da página não abre fora dali; com ela, os links compartilhados, o
+ * código de incorporação e o rodapé das imagens apontam para o site público. Vazio = usa o endereço da página.
+ */
+export function sitePublico(): string {
+  return normalizarSitePublico(import.meta.env?.VITE_SITE_URL);
+}
+
+/** Rota atual do app ("/apuracao/sp?race=pres"), com o BrowserRouter ou o HashRouter do build demo. */
+function rotaAtual(): string {
+  if (__DEMO__) return window.location.hash.replace(/^#/, '') || '/';
+  return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+}
+
+/**
+ * URL absoluta de uma rota do app (funciona com BrowserRouter e com o HashRouter do build demo). Com `VITE_SITE_URL`,
+ * aponta para o site público (ver `sitePublico`).
+ */
 export function urlAbsoluta(caminho = ''): string {
   if (typeof window === 'undefined') return caminho;
-  if (!caminho) return window.location.href;
   if (/^https?:\/\//.test(caminho)) return caminho;
+  const site = sitePublico();
+  if (!caminho) return site ? urlNoSite(site, rotaAtual()) : window.location.href;
   const path = caminho.startsWith('/') ? caminho : `/${caminho}`;
+  if (site) return urlNoSite(site, path);
   if (__DEMO__) {
     const base = window.location.href.split('#')[0];
     return `${base}#${path}`;
@@ -29,8 +68,16 @@ export function urlAbsoluta(caminho = ''): string {
   return `${window.location.origin}${path}`;
 }
 
-/** Host curto para exibir em imagens ("sintonia.app"). */
+/** Host curto para exibir em imagens ("sintonia.app"): o do site público, se definido, ou o da página. */
 export function hostExibicao(): string {
+  const site = sitePublico();
+  if (site) {
+    try {
+      return new URL(site.replace(/#$/, '')).host.replace(/^www\./, '');
+    } catch {
+      /* cai no endereço da página */
+    }
+  }
   if (typeof window === 'undefined') return '';
   return window.location.host.replace(/^www\./, '');
 }

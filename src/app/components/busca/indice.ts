@@ -48,7 +48,9 @@ export const PAGINAS: ItemBusca[] = [
   { id: 'p-camara', tipo: 'pagina', rotulo: 'Câmara dos Deputados', sub: '513 deputados federais', to: '/camara', icone: 'usuarios', chave: 'camara deputados federais deputado federal bancadas hemiciclo' },
   { id: 'p-assembleias', tipo: 'pagina', rotulo: 'Assembleias Legislativas', sub: 'Deputados estaduais e distritais', to: '/assembleias', icone: 'usuarios', chave: 'assembleias assembleia legislativa deputados estaduais distritais camara legislativa' },
   { id: 'p-consulta', tipo: 'pagina', rotulo: 'Consulte sua seção', sub: 'Boletim de urna e local de votação', to: '/apuracao/consulta', icone: 'urna', chave: 'consulte sua secao zona titulo boletim urna local de votacao' },
-  { id: 'p-teste', tipo: 'pagina', rotulo: 'Teste Cego', sub: 'Escolha propostas sem saber de quem são', to: '/teste', icone: 'olho-fechado', chave: 'teste cego propostas quiz' },
+  { id: 'p-teste', tipo: 'pagina', rotulo: 'Teste Cego', sub: 'Concorde ou discorde de ideias sem saber de quem são', to: '/teste', icone: 'olho-fechado', chave: 'teste cego afirmacoes ideias propostas quiz' },
+  { id: 'p-curiosidades', tipo: 'pagina', rotulo: 'Curiosidades', sub: 'Recordes e fatos do 1º turno', to: '/curiosidades', icone: 'grafico', chave: 'curiosidades fatos recordes empate primeiro turno' },
+  { id: 'p-cenarios', tipo: 'pagina', rotulo: 'E se…? Monte seu cenário', sub: 'Calculadora do 2º turno, não é previsão', to: '/cenarios', icone: 'troca', chave: 'e se cenario cenarios calculadora simulador transferencia votos' },
   { id: 'p-metodologia', tipo: 'pagina', rotulo: 'Metodologia', sub: 'Fontes e como calculamos', to: '/metodologia', icone: 'info', chave: 'metodologia fontes como funciona tse ibge' },
 ];
 

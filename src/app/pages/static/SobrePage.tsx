@@ -38,7 +38,7 @@ export default function SobrePage() {
       eyebrow="Sobre o Sintonia"
       icone="info"
       titulo="Informar bem, sem torcer"
-      lead="O Sintonia é um projeto independente para acompanhar a apuração do 2º turno de 2026 com precisão e clareza, do Brasil inteiro até a sua seção. E para conhecer as propostas pelo que elas dizem, não por quem as assina."
+      lead="O Sintonia é um projeto independente para acompanhar a apuração do 2º turno de 2026 com precisão e clareza, do Brasil inteiro até a sua seção. E para conhecer as ideias dos candidatos pelo que elas dizem, não por quem as assina."
       sumario={SUMARIO}
       destaque={
         <Resumo
@@ -57,8 +57,8 @@ export default function SobrePage() {
           eleitorais, com os números conferidos e explicados.
         </p>
         <p>
-          Antes da eleição, o <LinkInterno to="/teste">Teste Cego</LinkInterno> convida a comparar propostas sem saber de quem são, uma forma de
-          olhar para ideias antes de nomes. Depois, você pode <strong>desafiar alguém</strong> e ver em quantos temas vocês concordam.
+          Antes da eleição, o <LinkInterno to="/teste">Teste Cego</LinkInterno> convida a concordar ou discordar de afirmações tiradas dos
+          planos de governo sem saber de quem são, uma forma de olhar para ideias antes de nomes. Depois, você pode <strong>desafiar alguém</strong> e ver em quantos temas vocês concordam.
         </p>
       </Secao>
 

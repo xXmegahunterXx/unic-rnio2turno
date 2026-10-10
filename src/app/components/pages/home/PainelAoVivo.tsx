@@ -24,6 +24,7 @@ import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { NotaNomesOcultos } from './NotaNomesOcultos';
 import { useRelogioApuracao } from './relogio';
+import { partidoENumero } from '@/shared/anon';
 
 const vidro =
   'relative isolate overflow-hidden rounded-[28px] border border-line/[1.6] bg-surface/75 p-4 shadow-card backdrop-blur-xl min-[400px]:p-5 sm:p-7';
@@ -127,7 +128,7 @@ function Disputante({ c }: { c: Candidate }) {
       <CandidateAvatar candidato={c} size="md" className="sm:h-12 sm:w-12" />
       <div className="mt-2 text-balance font-display text-[16px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[18px]">{c.nomeUrna}</div>
       <div className="num mt-0.5 text-[12px] text-fg-muted">
-        {c.partido} · {c.numero}
+        {partidoENumero(c)}
       </div>
     </div>
   );
@@ -235,7 +236,7 @@ function LadoVivo({
         <div className="min-w-0">
           <div className="truncate font-display text-[15px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[17px]">{c.nomeUrna}</div>
           <div className="num truncate text-[11.5px] text-fg-muted sm:text-[12px]">
-            {c.partido} · {c.numero}
+            {partidoENumero(c)}
           </div>
         </div>
       </div>
