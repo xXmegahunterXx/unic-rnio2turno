@@ -17,6 +17,8 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useIsFetching, useQueryClient, type Query } from '@tanstack/react-query';
+import { instanteChave } from '@/app/data/hooks';
 import type { CorCandidato, FeedEvent, LiveStatus, SeriePoint } from '@/shared/types';
 import { BRT_OFFSET_MS, INICIO_APURACAO } from '@/shared/constants';
 import { fmtHora, fmtPct } from '@/shared/format';
@@ -115,6 +117,36 @@ export function useInstanteParam(status: LiveStatus | undefined, recebidoEm: num
 }
 
 // =============================================================================================
+// Cache dos instantes (React Query)
+// =============================================================================================
+
+/** Tamanho da chave COM instante, por consulta (hooks.ts: `[...base, t]`). */
+const CHAVE_COM_T: Record<string, number> = { nacional: 3, brmun: 3, uf: 4, mun: 5, zona: 6, secao: 7 };
+const ehConsultaDeInstante = (q: Pick<Query, 'queryKey'>) => {
+  const k = q.queryKey;
+  return typeof k[0] === 'string' && CHAVE_COM_T[k[0]] === k.length && typeof k[k.length - 1] === 'number';
+};
+
+/**
+ * Reprise sem acumular memória: descarta os snapshots de instantes passados que ninguém mais observa (uma noite
+ * inteira em passos de 1 min seriam centenas de snapshots nacionais + mapas por município).
+ */
+function useLimparInstantes(t: number | undefined) {
+  const qc = useQueryClient();
+  useEffect(() => {
+    const atual = instanteChave(t);
+    const id = window.setTimeout(
+      () =>
+        qc.removeQueries({
+          predicate: (q) => ehConsultaDeInstante(q) && q.queryKey[q.queryKey.length - 1] !== atual && q.getObserversCount() === 0,
+        }),
+      1500,
+    );
+    return () => window.clearTimeout(id);
+  }, [t, qc]);
+}
+
+// =============================================================================================
 // Componente
 // =============================================================================================
 
@@ -201,6 +233,9 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
 
   const [tocando, setTocando] = useState(false);
   const [arrasto, setArrasto] = useState<number | null>(null);
+  useLimparInstantes(t);
+  // O play só avança quando nada do instante atual está a caminho (placar, mapa por município, UF…).
+  const buscando = useIsFetching({ predicate: ehConsultaDeInstante }) > 0;
   const exibido = arrasto ?? (vivo ? fim : Math.min(t!, fim));
   const pos = (exibido - ini) / Math.max(1, fim - ini);
 
@@ -224,8 +259,8 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
   const faixa = useMemo(() => faixaDaNoite(serie, cores, ini, fimQ), [serie, cores, ini, fimQ]);
 
   // ---------------------------------------------------------------- play
-  const ref = useRef({ t, carregando, ultimo, onChange });
-  ref.current = { t, carregando, ultimo, onChange };
+  const ref = useRef({ t, carregando: carregando || buscando, ultimo, onChange });
+  ref.current = { t, carregando: carregando || buscando, ultimo, onChange };
   useEffect(() => {
     if (!tocando) return;
     const id = window.setInterval(() => {
