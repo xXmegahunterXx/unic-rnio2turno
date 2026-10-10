@@ -41,7 +41,9 @@ export default {
         'brand-grad': 'linear-gradient(135deg, rgb(var(--brand)) 0%, rgb(var(--brand-2)) 100%)',
         // Botões/CTAs com texto branco: violeta → púrpura, contraste ≥ 4,5:1 em todo o gradiente.
         'brand-cta': 'linear-gradient(135deg, rgb(var(--brand)) 0%, rgb(var(--brand-deep)) 100%)',
-        noise: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.035'/%3E%3C/svg%3E\")",
+        // parênteses do url(#n) interno codificados (%28/%29): o html-to-image (imagens de compartilhar) lia o url(%23n) de
+        // dentro do data URI como recurso externo e pedia "/%23n" ao servidor (404 no console). O SVG decodificado é idêntico.
+        noise: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url%28%23n%29' opacity='.035'/%3E%3C/svg%3E\")",
       },
       keyframes: {
         'pulse-dot': { '0%,100%': { opacity: '1', transform: 'scale(1)' }, '50%': { opacity: '.45', transform: 'scale(.82)' } },

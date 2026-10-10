@@ -3,7 +3,8 @@
  * influencie a resposta), a escala de concordância e o selo "?" de autoria oculta. Só decoração; movimento
  * lento e respeitoso (desligado com movimento reduzido).
  */
-import { motion, useReducedMotion } from 'framer-motion';
+import { useRef } from 'react';
+import { motion, useInView, useReducedMotion } from 'framer-motion';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 
@@ -11,11 +12,14 @@ const PONTOS = [2, 1, 0, 1, 2] as const;
 const TAM = ['h-7 w-7 sm:h-8 sm:w-8', 'h-[22px] w-[22px] sm:h-6 sm:w-6', 'h-[18px] w-[18px] sm:h-5 sm:w-5'] as const;
 
 export function IlustracaoAfirmacao({ className, compacta }: { className?: string; compacta?: boolean }) {
-  const reduzir = useReducedMotion();
+  // Flutua só quando está na tela (a animação infinita é movida a JS e mantinha a página "ocupada" fora dela).
+  const ref = useRef<HTMLDivElement>(null);
+  const visivel = useInView(ref, { margin: '80px 0px' });
+  const reduzir = useReducedMotion() || !visivel;
   const flutuar = (d: number, amp = 6) =>
     reduzir ? {} : { animate: { y: [0, -amp, 0] }, transition: { duration: 6 + d, repeat: Infinity, ease: 'easeInOut' as const, delay: d } };
   return (
-    <div aria-hidden className={cn('relative select-none', compacta ? 'h-[210px]' : 'h-[300px] sm:h-[380px]', className)}>
+    <div ref={ref} aria-hidden className={cn('relative select-none', compacta ? 'h-[210px]' : 'h-[300px] sm:h-[380px]', className)}>
       <div className="absolute left-1/2 top-1/2 h-[70%] w-[80%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand/20 blur-[60px]" />
 
       {/* cartas de trás: a pilha das próximas afirmações */}

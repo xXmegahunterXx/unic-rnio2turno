@@ -355,6 +355,9 @@ export async function nodeToPngBlob(node: HTMLElement, opts: PngOpcoes = {}): Pr
     cacheBust: false,
     fontEmbedCSS: opts.fontEmbedCSS,
     style: { transform: 'none', margin: '0' },
+    // Camadas marcadas com `data-sem-png` (ex.: a textura de ruído dos cartões) ficam só na prévia: no PNG o ruído
+    // dobrava o tamanho do arquivo (~0,4 → ~0,85 MB no 16:9), ruim para enviar pelo celular e para o WhatsApp.
+    filter: (n: Node) => !(n instanceof HTMLElement && n.dataset.semPng !== undefined),
   };
   if (ehWebKit()) await toBlob(node, config).catch(() => null);
   const blob = await toBlob(node, config);

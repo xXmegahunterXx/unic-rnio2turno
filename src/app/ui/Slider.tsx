@@ -4,6 +4,7 @@
  */
 import { useId, useRef, type PointerEvent, type ReactNode } from 'react';
 import { cn } from '@/app/lib/cn';
+import { valorNoTrilho } from '@/app/lib/trilho';
 
 export interface SliderMark {
   value: number;
@@ -53,10 +54,7 @@ export function Slider({
   const dedo = useRef<number | null>(null);
   const valorNoPonto = (x: number) => {
     const r = trilho.current?.getBoundingClientRect();
-    if (!r || r.width === 0) return value;
-    const f = Math.min(1, Math.max(0, (x - r.left) / r.width));
-    const passos = Math.round((f * (max - min)) / (step || 1));
-    return Math.min(max, Math.max(min, min + passos * (step || 1)));
+    return r && r.width > 0 ? valorNoTrilho(x, r.left, r.width, min, max, step) : value;
   };
   const aoTocar = (e: PointerEvent<HTMLDivElement>) => {
     if (disabled || e.pointerType === 'mouse') return;

@@ -11,6 +11,7 @@ import type { PartesDivisao } from '@/shared/cenarios';
 import { partesPct } from '@/shared/cenarios';
 import { fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
+import { valorNoTrilho } from '@/app/lib/trilho';
 
 export type CorLado = 'a' | 'b' | 'bn' | 'abs';
 
@@ -65,8 +66,7 @@ export function SliderDivisao({
   const dedo = useRef<number | null>(null);
   const valorNoPonto = (x: number) => {
     const r = trilho.current?.getBoundingClientRect();
-    if (!r || r.width === 0) return v;
-    return Math.round(Math.min(1, Math.max(0, (x - r.left) / r.width)) * 100);
+    return r && r.width > 0 ? valorNoTrilho(x, r.left, r.width) : v;
   };
   const aoTocar = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') return;

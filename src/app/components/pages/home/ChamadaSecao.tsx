@@ -3,8 +3,8 @@
  * (seções, municípios e eleitorado do dataset) e um mosaico decorativo de "seções sendo totalizadas"
  * (só a cor da marca — nunca a de um candidato).
  */
-import { useMemo } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useMemo, useRef } from 'react';
+import { motion, useInView, useReducedMotion } from 'framer-motion';
 import { fmtInt } from '@/shared/format';
 
 const nfMi = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -74,7 +74,11 @@ const ROWS = 7;
 
 /** Grade de "seções" acendendo em onda diagonal, com um cartão de boletim por cima. */
 function MosaicoDecorativo() {
-  const reduzir = useReducedMotion();
+  // Fora da tela, o mosaico para: são 84 animações infinitas movidas a JS (opacidade com `times`), que mantinham o
+  // processador ocupado a página toda — e um backdrop-blur por cima recalculado a cada quadro.
+  const ref = useRef<HTMLDivElement>(null);
+  const visivel = useInView(ref, { margin: '80px 0px' });
+  const reduzir = useReducedMotion() || !visivel;
   const cells = useMemo(() => {
     const out: { k: number; d: number; forte: boolean }[] = [];
     for (let r = 0; r < ROWS; r++)
@@ -87,7 +91,7 @@ function MosaicoDecorativo() {
     return out;
   }, []);
   return (
-    <div aria-hidden className="relative mx-auto w-full max-w-[460px]">
+    <div ref={ref} aria-hidden className="relative mx-auto w-full max-w-[460px]">
       <div className="grid gap-1.5 sm:gap-2" style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}>
         {cells.map((c) => (
           <span key={c.k} className="relative aspect-square overflow-hidden rounded-[5px] bg-surface-3 sm:rounded-md">

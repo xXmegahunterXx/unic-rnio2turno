@@ -60,7 +60,7 @@ function Recibo({ titulo, race, votos, brancos, nulos, aptos, comparecimento, to
         className="relative flex flex-col overflow-hidden bg-surface font-mono text-fg dark:bg-fg dark:text-bg"
         style={{ ...SERRILHA, padding: `${30 * k}px ${26 * k}px ${28 * k}px`, fontSize: fs, lineHeight: 1.45 }}
       >
-        <div className="pointer-events-none absolute inset-0 bg-noise opacity-60" />
+        <div className="pointer-events-none absolute inset-0 bg-noise opacity-60" data-sem-png />
         <div className="relative flex items-start justify-between" style={{ gap: 10 * k }}>
           <div className="min-w-0">
             <div className="inline-flex items-center uppercase tracking-[0.2em]" style={{ gap: 8 * k, fontSize: 12 * k }}>

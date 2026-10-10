@@ -105,7 +105,7 @@ function Fundo({ brilho, simulado }: { brilho: BrilhoCartao; simulado?: boolean 
       ) : (
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgb(var(--fg)/0.06),transparent_70%)]" />
       )}
-      <div className="absolute inset-0 bg-noise" />
+      <div className="absolute inset-0 bg-noise" data-sem-png />
       {simulado ? (
         // Marca-d'água: sobrevive a um recorte que tire o selo e a faixa.
         <div className="absolute inset-0 flex items-center justify-center">
