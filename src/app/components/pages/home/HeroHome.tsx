@@ -59,7 +59,7 @@ export function HeroHome({ status, recebidoEm, race, resumo, anonimizado }: Hero
               <br />
               <span className="text-grad">
                 {fase === 'encerrada' ? 'Explore' : 'Acompanhe'}
-                <br className="sm:hidden" /> cada voto.
+                <br /> cada voto.
               </span>
             </motion.h1>
             <motion.p {...entrar(0.12)} className="mt-4 max-w-[36rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:mt-6 sm:text-[19px]">

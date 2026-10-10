@@ -96,7 +96,7 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
             ) : (
               <Skeleton className="aspect-[6/8] w-full" rounded="lg" />
             )}
-            {race ? <LegendaMapa race={race} t1={t1} /> : null}
+            {race ? <LegendaMapa race={race} t1={t1} pendentes={!!data && UFS.some((uf) => !data.ufs[uf] || data.ufs[uf]!.secoesTotalizadas <= 0)} /> : null}
           </div>
         </div>
 
@@ -138,7 +138,7 @@ function Linha({ c, pct, votos, semVotos }: { c: Candidate; pct: number; votos: 
           <CandidateAvatar candidato={c} size="sm" />
         )}
         <div className="min-w-0 flex-1">
-          <div className={cn('truncate text-[14.5px] leading-tight', agregado ? 'font-medium text-fg-muted' : 'font-semibold text-fg')}>
+          <div className={cn('text-[14.5px] leading-tight', agregado ? 'font-medium text-fg-muted' : 'truncate font-semibold text-fg')}>
             {agregado ? 'Demais candidatos' : c.nomeUrna}
           </div>
           {!agregado ? (
@@ -223,7 +223,7 @@ function LinhasEsqueleto() {
   );
 }
 
-function LegendaMapa({ race, t1 }: { race: Race; t1: boolean }) {
+function LegendaMapa({ race, t1, pendentes }: { race: Race; t1: boolean; pendentes: boolean }) {
   const finalistas = race.candidatos.filter((c) => !c.agregado);
   return (
     <div className="mt-3">
@@ -235,7 +235,7 @@ function LegendaMapa({ race, t1 }: { race: Race; t1: boolean }) {
             <span className="truncate">{c.nomeUrna}</span>
           </li>
         ))}
-        {!t1 ? (
+        {!t1 && pendentes ? (
           <li className="inline-flex items-center gap-1.5">
             <span aria-hidden className="h-2.5 w-2.5 rounded-[3px] bg-pending" />
             Aguardando

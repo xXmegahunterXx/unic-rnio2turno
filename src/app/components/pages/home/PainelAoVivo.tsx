@@ -26,7 +26,7 @@ import { NotaNomesOcultos } from './NotaNomesOcultos';
 import { useRelogioApuracao } from './relogio';
 
 const vidro =
-  'relative isolate overflow-hidden rounded-[28px] border border-line/[1.6] bg-surface/75 p-5 shadow-card backdrop-blur-xl sm:p-7';
+  'relative isolate overflow-hidden rounded-[28px] border border-line/[1.6] bg-surface/75 p-4 shadow-card backdrop-blur-xl min-[400px]:p-5 sm:p-7';
 
 export interface PainelAoVivoProps {
   status: LiveStatus | undefined;
@@ -95,13 +95,15 @@ function Contagem({ status, recebidoEm, race }: { status: LiveStatus; recebidoEm
     <div>
       <div className="flex items-center justify-between gap-3">
         <Rotulo className="inline-flex items-center gap-2">
-          <Icon name="relogio" size={15} className="text-brand-fg" />A apuração começa em
+          <Icon name="relogio" size={15} className="text-brand-fg" />
+          <span className="min-[400px]:hidden">Começa em</span>
+          <span className="hidden min-[400px]:inline">A apuração começa em</span>
         </Rotulo>
         <span className="num shrink-0 text-[12px] font-medium text-fg-muted">
           25/10 · {fmtHora(alvo)} <span className="hidden sm:inline">(Brasília)</span>
         </span>
       </div>
-      <Countdown target={alvo} now={relogio} size="lg" hideZeroDays doneLabel="Começando…" className="mt-4 w-full" />
+      <Countdown target={alvo} now={relogio} size="lg" hideZeroDays doneLabel="Começando…" className="mt-4 w-full [&>div]:min-w-0" />
 
       {finalistas.length === 2 ? (
         <div className="mt-6 border-t border-line pt-5">
@@ -155,7 +157,7 @@ function Vivo({ status, race, resumo, anonimizado }: { status: LiveStatus; race:
           <div className="mt-5 grid grid-cols-2 gap-4 sm:gap-6">
             {finalistas.map((c) => {
               const i = race!.candidatos.indexOf(c);
-              return <LadoVivo key={c.numero} c={c} pct={pctValidos(resumo!, i)} votos={resumo!.votos[i] ?? 0} semVotos={validos(resumo!) === 0} eleito={eleito === c} lider={resumo!.lider === i} dir={i === 1} resumo={resumo!} />;
+              return <LadoVivo key={c.numero} c={c} pct={pctValidos(resumo!, i)} votos={resumo!.votos[i] ?? 0} semVotos={validos(resumo!) === 0} eleito={eleito === c} lider={resumo!.lider === i} dir={i === 1} />;
             })}
           </div>
           <VoteSplitBar votos={resumo!.votos} cores={race!.candidatos.map((c) => c.cor)} nomes={race!.candidatos.map((c) => c.nomeUrna)} size="md" className="mt-5" />
@@ -216,7 +218,6 @@ function LadoVivo({
   eleito,
   lider,
   dir,
-  resumo,
 }: {
   c: Candidate;
   pct: number;
@@ -225,7 +226,6 @@ function LadoVivo({
   eleito: boolean;
   lider: boolean;
   dir: boolean;
-  resumo: Summary;
 }) {
   const s = corSlot(c.cor);
   return (

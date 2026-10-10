@@ -23,15 +23,25 @@ export function frasesConcordancia(iguais: number, total: number): string {
   return 'Vocês pensam diferente na maioria dos temas — assunto não falta para uma boa conversa.';
 }
 
-export function PlacarConcordancia({ comp, revelado }: { comp: Comparacao; revelado: boolean }) {
+/**
+ * Placar do Duelo: "Vocês concordaram em N de 12 temas" como título (h1) com o número em destaque, e uma
+ * fileira de marcadores (igual/diferente) na ordem em que os temas apareceram.
+ */
+export function PlacarConcordancia({ comp, revelado, id }: { comp: Comparacao; revelado: boolean; id?: string }) {
   const reduzir = useReducedMotion();
   return (
     <div className="flex flex-col items-center text-center">
-      <div className="flex items-baseline gap-2 font-display font-semibold tracking-[-0.045em] text-fg">
-        <NumberRoll value={revelado ? comp.iguais : 0} className="text-[76px] leading-none sm:text-[112px]" duration={900} ariaLabel={`${comp.iguais} de ${comp.total}`} />
-        <span className="num text-[28px] text-fg-muted sm:text-[40px]">/ {fmtInt(comp.total)}</span>
-      </div>
-      <p className="mt-2 text-[15px] font-medium text-fg sm:text-[17px]">temas em que vocês escolheram igual</p>
+      <h1 id={id} className="flex flex-col items-center font-display font-semibold text-fg">
+        <span className="text-balance text-[22px] leading-tight tracking-[-0.025em] sm:text-[30px]">Vocês concordaram em</span>
+        <span className="mt-1 flex items-baseline gap-2 tracking-[-0.05em] sm:mt-2">
+          <NumberRoll value={revelado ? comp.iguais : 0} className="text-[88px] leading-[0.9] sm:text-[128px]" duration={900} ariaLabel={String(comp.iguais)} />
+          <span className="num text-[30px] tracking-[-0.03em] text-fg-muted sm:text-[44px]">
+            <span className="sr-only">de</span>
+            <span aria-hidden>/</span> {fmtInt(comp.total)}
+          </span>
+        </span>
+        <span className="mt-1 text-[22px] leading-tight tracking-[-0.025em] sm:mt-2 sm:text-[30px]">{comp.total === 1 ? 'tema' : 'temas'}</span>
+      </h1>
       <ol className="mt-5 flex flex-wrap justify-center gap-1.5" aria-hidden>
         {comp.temas.map((t, i) => (
           <motion.li
@@ -105,10 +115,11 @@ export function SintoniaEmBarras({
 function Chip({ quem, opcao, porNumero }: { quem: string; opcao: Opcao; porNumero: Record<Autor, Candidate> }) {
   const nome = opcao === 'nenhuma' ? 'Nenhuma' : opcao === 'tanto-faz' ? 'Tanto faz' : porNumero[opcao].nomeUrna;
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
-      <Ladrilho opcao={opcao} porNumero={porNumero} className="h-3 w-3 shrink-0 rounded-[4px]" />
-      <span className="shrink-0 text-fg-subtle">{quem}:</span>
-      <span className="truncate font-medium text-fg">{nome}</span>
+    <span className="inline-flex min-w-0 items-start gap-1.5">
+      <Ladrilho opcao={opcao} porNumero={porNumero} className="mt-[3px] h-3 w-3 shrink-0 rounded-[4px]" />
+      <span className="min-w-0">
+        <span className="text-fg-subtle">{quem}:</span> <span className="font-medium text-fg">{nome}</span>
+      </span>
     </span>
   );
 }
@@ -135,7 +146,7 @@ export function DueloTemaATema({
         return (
           <span className="mt-1 flex flex-col gap-0.5 text-[12.5px] sm:flex-row sm:flex-wrap sm:gap-x-4">
             <Chip quem="Você" opcao={t.opcao} porNumero={porNumero} />
-            {c ? <Chip quem="Quem te desafiou" opcao={c.outra} porNumero={porNumero} /> : null}
+            {c ? <Chip quem="Desafiante" opcao={c.outra} porNumero={porNumero} /> : null}
           </span>
         );
       }}
@@ -143,18 +154,18 @@ export function DueloTemaATema({
         const c = igualPorTema.get(t.rodada.tema.id);
         return c?.igual ? (
           <Badge tone="brand" size="xs" icon="check" className="shrink-0">
-            Igual
+            <span className="sr-only sm:not-sr-only">Igual</span>
           </Badge>
         ) : (
-          <Badge tone="neutral" size="xs" className="shrink-0">
-            Diferente
+          <Badge tone="neutral" size="xs" icon="menos" className="shrink-0">
+            <span className="sr-only sm:not-sr-only">Diferente</span>
           </Badge>
         );
       }}
       marcas={(p) =>
         escolhaDaOutra.get(p.tema) === p.id ? (
           <Badge tone="neutral" size="xs" caps icon="usuarios">
-            Quem te desafiou
+            Desafiante
           </Badge>
         ) : null
       }

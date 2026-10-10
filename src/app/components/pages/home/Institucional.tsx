@@ -33,7 +33,10 @@ export function useRolarParaHash(pronto = true) {
         return;
       }
       const header = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 64;
-      const y = el.getBoundingClientRect().top + window.scrollY - header - 16;
+      // No celular, o sumário fixo (chips) também cobre o topo.
+      const chips = document.querySelector<HTMLElement>('[data-sumario-celular]');
+      const extra = chips && chips.offsetParent !== null ? chips.offsetHeight : 0;
+      const y = el.getBoundingClientRect().top + window.scrollY - header - extra - 16;
       window.scrollTo({ top: Math.max(0, y), behavior: reduzir ? 'auto' : 'smooth' });
     };
     // Depois do ScrollRestoration (que leva ao topo em navegações novas).
@@ -159,8 +162,16 @@ export function PaginaInstitucional({ tituloAba, eyebrow, icone, titulo, lead, a
 
 function SumarioCelular({ itens, ativa }: { itens: ItemSumario[]; ativa: string | null }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Mantém o chip da seção atual visível na trilha (rolagem só horizontal, dentro da trilha).
+  useEffect(() => {
+    const box = ref.current;
+    const chip = box?.querySelector<HTMLElement>('[aria-current="location"]');
+    if (!box || !chip) return;
+    const alvo = chip.offsetLeft - (box.clientWidth - chip.offsetWidth) / 2;
+    box.scrollTo({ left: Math.max(0, alvo), behavior: 'smooth' });
+  }, [ativa]);
   return (
-    <nav aria-label="Nesta página" className="sticky top-[var(--app-header-h,56px)] z-20 -mx-4 mt-8 border-b border-line bg-bg/85 backdrop-blur-xl sm:-mx-6 lg:hidden">
+    <nav data-sumario-celular aria-label="Nesta página" className="sticky top-[var(--app-header-h,56px)] z-20 -mx-4 mt-8 border-b border-line bg-bg/85 backdrop-blur-xl sm:-mx-6 lg:hidden">
       <div ref={ref} className="flex gap-1.5 overflow-x-auto px-4 py-2.5 scrollbar-none sm:px-6">
         {itens.map((s) => (
           <Link

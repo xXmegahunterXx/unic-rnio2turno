@@ -169,11 +169,8 @@ function Comparacao({ seed, minhas, delas, onRefazer }: { seed: number; minhas: 
               Duelo · resultado
             </Badge>
           </div>
-          <h1 id="titulo-duelo" className="mx-auto mt-4 max-w-[24ch] text-balance text-center font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.035em] text-fg sm:text-[44px]">
-            Vocês concordaram em {comp.iguais} de {comp.total} temas
-          </h1>
-          <div className="mt-6 sm:mt-8">
-            <PlacarConcordancia comp={comp} revelado={revelado} />
+          <div className="mt-5 sm:mt-7">
+            <PlacarConcordancia id="titulo-duelo" comp={comp} revelado={revelado} />
           </div>
           <motion.p
             initial={reduzir ? false : { opacity: 0 }}

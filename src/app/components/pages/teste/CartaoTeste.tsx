@@ -9,8 +9,8 @@ import type { Candidate } from '@/shared/types';
 import { fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { hostExibicao } from '@/app/lib/share';
+import { useTheme } from '@/app/lib/useTheme';
 import { corSlot } from '@/app/lib/raceUi';
-import { LogoMark } from '@/app/components/layout/Logo';
 import { iniciais } from '@/app/components/apuracao/CandidateAvatar';
 import { Icon } from '@/app/ui/Icon';
 import { Ladrilho } from './Fita';
@@ -39,7 +39,7 @@ export const CartaoTeste = forwardRef<HTMLDivElement, CartaoTesteProps>(function
       </div>
 
       <div className="relative flex items-center gap-6">
-        <LogoMark size={84} />
+        <MarcaExport size={84} />
         <div>
           <div className="font-display text-[50px] font-semibold leading-none tracking-[-0.03em]">Sintonia</div>
           <div className="mt-2.5 text-[26px] font-semibold uppercase tracking-[0.18em] text-brand-fg">Teste Cego</div>
@@ -111,9 +111,19 @@ function BlocoCandidato({ c, pct }: { c: Candidate; pct: number }) {
   return (
     <div className="flex flex-col items-center rounded-[40px] border-2 border-line bg-surface/70 px-8 pb-12 pt-12 text-center">
       <div className="relative h-[240px] w-[240px]">
-        <svg viewBox="0 0 240 240" className="absolute inset-0 h-full w-full -rotate-90" aria-hidden>
-          <circle cx="120" cy="120" r={R} fill="none" strokeWidth="16" className="stroke-surface-3" />
-          <circle cx="120" cy="120" r={R} fill="none" strokeWidth="16" strokeLinecap="round" className={s.stroke} strokeDasharray={`${(C * Math.max(0, Math.min(100, pct))) / 100} ${C}`} />
+        {/* Estilos INLINE de propósito: o html-to-image não copia as classes dos filhos de <svg>. */}
+        <svg viewBox="0 0 240 240" width={240} height={240} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }} aria-hidden>
+          <circle cx="120" cy="120" r={R} fill="none" strokeWidth="16" style={{ stroke: 'rgb(var(--surface-3))' }} />
+          <circle
+            cx="120"
+            cy="120"
+            r={R}
+            fill="none"
+            strokeWidth="16"
+            strokeLinecap="round"
+            style={{ stroke: s.css }}
+            strokeDasharray={`${(C * Math.max(0, Math.min(100, pct))) / 100} ${C}`}
+          />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
           <div className={cn('flex h-[150px] w-[150px] items-center justify-center rounded-full font-display text-[56px] font-semibold ring-[6px] ring-inset', s.bgSoft, s.ring, s.text)}>
@@ -164,5 +174,27 @@ function CartasGrandes() {
         ?
       </div>
     </div>
+  );
+}
+
+/**
+ * Símbolo do Sintonia para a imagem exportada. Igual ao LogoMark do kit, mas com cores em estilo INLINE:
+ * o html-to-image não aplica classes a filhos de <svg> (o LogoMark sai sem o fundo e sem o ponto no PNG).
+ */
+function MarcaExport({ size }: { size: number }) {
+  const { tema } = useTheme();
+  return (
+    <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden style={{ flexShrink: 0 }}>
+      <defs>
+        <linearGradient id="marca-export-g" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" style={{ stopColor: 'rgb(var(--brand))' }} />
+          <stop offset="1" style={{ stopColor: 'rgb(var(--brand-2))' }} />
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="16" style={{ fill: tema === 'light' ? 'rgb(var(--fg))' : 'rgb(var(--surface-3))' }} />
+      <rect x=".75" y=".75" width="62.5" height="62.5" rx="15.25" fill="none" strokeWidth="1.5" style={{ stroke: tema === 'light' ? 'transparent' : 'rgb(var(--line) / calc(var(--line-alpha) * 1.5))' }} />
+      <path d="M14 38c6-14 12-14 18 0s12 14 18 0" fill="none" stroke="url(#marca-export-g)" strokeWidth="6" strokeLinecap="round" />
+      <circle cx="32" cy="22" r="4" style={{ fill: 'rgb(var(--brand-ink))' }} />
+    </svg>
   );
 }
