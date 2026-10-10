@@ -115,6 +115,8 @@ export function createHttpClient(opts: HttpClientOptions = {}): ApuracaoClient {
   return {
     status: () => req<LiveStatus>('/status', { timeout: to.status }),
     meta: () => req<PublicMeta>('/meta', { timeout: to.dados }),
+    // TODO(fase 2): implementado pelo agente do servidor (rota /br/municipios e ?t=).
+    municipiosBr: () => Promise.reject(new Error('municipiosBr ainda não implementado')),
     nacional: (race) => req<NationalSnapshot>(`${ap(race)}/br`, { timeout: to.dados }),
     uf: (race, uf: UF) => req<UfSnapshot>(`${ap(race)}/uf/${lower(uf)}`, { timeout: to.dados }),
     municipio: (race, uf, cod) => req<MunicipioSnapshot>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}`, { timeout: to.dados }),

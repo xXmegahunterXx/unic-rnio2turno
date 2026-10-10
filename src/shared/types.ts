@@ -38,6 +38,10 @@ export interface Candidate {
   primeiroTurno?: { votos: number; pct: number };
   /** true para o pseudo-candidato "Outros" agregado (só em corridas de 1º turno). */
   agregado?: boolean;
+  /** Sequencial do candidato no TSE (ex.: "280002542548"): chave da foto oficial e da ficha (/candidato/:sqcand). */
+  sqcand?: string;
+  /** Grupo do pacote de fotos em public/data/fotos/{grupo}.json (ver FotoPacote em dataset.ts). */
+  fotoGrupo?: string;
 }
 
 export interface Race {
@@ -265,6 +269,19 @@ export interface LiveStatus {
    * para que prints de números fictícios nunca circulem associados a candidatos reais. Ver `useRace()`.
    */
   anonimizado?: boolean;
+  /** Visitantes ativos estimados agora (só no servidor; ausente no demo — nunca inventar número). */
+  pessoasAgora?: number;
+  /** Patrocínio exibido no site (anunciante NÃO político), configurado no admin. */
+  patrocinio?: Patrocinio | null;
+}
+
+/** Patrocínio/anúncio institucional (nunca político — ARCHITECTURE §1.5). */
+export interface Patrocinio {
+  marca: string;
+  texto: string;
+  url: string;
+  /** data URI ou URL https da logo (opcional) */
+  imagem?: string;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -329,6 +346,30 @@ export interface AdminState {
   tse: TseConfig;
   /** Mostrar os nomes reais dos candidatos durante a SIMULAÇÃO (padrão false = "Candidato A/B"). Uso interno. */
   nomesReais?: boolean;
+  /** Patrocínio ativo (null/ausente = nenhum). */
+  patrocinio?: Patrocinio | null;
+}
+
+/**
+ * Mapa nacional por município (5.571 municípios) — arrays alinhados com `MunicipiosBr.ordem`
+ * (public/data/municipios-br.json). Inteiros para payload compacto.
+ */
+export interface MunicipiosNacionalSnapshot {
+  race: RaceId;
+  geradoEm: number;
+  simNow: number;
+  /** -1 sem votos válidos · 0/1 índice do candidato à frente · 2 empate */
+  lider: number[];
+  /** diferença entre os dois primeiros em p.p. × 10 */
+  margem: number[];
+  /** % de seções totalizadas × 10 */
+  apurado: number[];
+  /** % de comparecimento (sobre o eleitorado apurado) × 10 */
+  comparecimento: number[];
+  /** % de votos válidos do candidato 0 × 100 */
+  pct0: number[];
+  /** nº de municípios em que cada candidato está à frente (índice = candidato) */
+  municipiosLiderados: number[];
 }
 
 export interface PresetInfo {

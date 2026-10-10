@@ -17,7 +17,8 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
      maior número = slot `b` (âmbar). Nunca use vermelho, verde-amarelo ou azul partidário.
    - Textos de eventos são descritivos ("Com 63,2% das seções, X passa à frente"). Nada de adjetivos,
      torcida, "vitória esmagadora" etc.
-   - Fotos: não usamos foto de candidato. Use monograma (iniciais) com a cor do slot.
+   - Fotos: só as fotos oficiais do TSE, com o mesmo tamanho e tratamento para todos, sem edição.
+     Na simulação anonimizada, nunca mostre foto; use o monograma (iniciais) com a cor do slot.
 2. **Sem enquetes.** Nunca exiba números agregados de preferência de usuários (Lei 9.504/97, art. 33,
    §5º). O Teste Cego é individual e o Duelo compara só duas pessoas.
 3. **LGPD.** Opinião política é dado sensível. As respostas do Teste Cego **nunca** saem do navegador:
@@ -322,3 +323,55 @@ a contagem regressiva. Esse conteúdo já gera tráfego antes da eleição.
   - soma dos municípios = UF;
   - soma das UFs + ZZ = Brasil;
   - % válidos dos dois somam 100,00.
+
+
+---
+
+## 10. Fase 2: dados completos do TSE e recursos inspirados no mercado
+
+### 10.1 Fontes adicionais
+
+| Fonte | Arquivo |
+|---|---|
+| Dados abertos (`https://cdn.tse.jus.br/estatistica/sead/odsele/`) | `votacao_secao/votacao_secao_2026_{BR,UF}.zip` (votos por seção, 1º turno), `detalhe_votacao_secao/detalhe_votacao_secao_2026.zip`, `eleitorado_locais_votacao/eleitorado_local_votacao_2026.zip`, `perfil_eleitorado/perfil_eleitorado_2026.zip`, `consulta_cand/consulta_cand_2026.zip`, `bem_candidato/bem_candidato_2026.zip`, `votacao_partido_munzona/…`, `votacao_candidato_munzona/…` |
+| Feed de resultados | `ele2026/{ele}/fotos/{uf\|br}/{sqcand}.jpeg` (fotos oficiais) e `ele2026/6259/dados/{uf}/{uf}-c000{3,5,6,7,8}-e006259-u.json` (governador, senador e deputados no 1º turno) |
+
+Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
+- `SecaoUfDataset`, com colunas Uint16 em base64 (`src/shared/u16.ts`);
+- `LocaisUfDataset`, `PerfilUfDataset`, `MunicipiosBr` e `GeoBrasilMunicipios`;
+- `FotoPacote`, `CandidatoFicha` e `CargoDataset`.
+
+### 10.2 Recursos
+
+1. **1º turno real por seção.**
+   - Mosaico e Boletim de Urna do 1º turno com números reais.
+   - A simulação do 2º turno passa a partir da preferência REAL de cada seção no 1º turno, em vez do município
+     com ruído. A transferência dos demais e a calibragem continuam as mesmas.
+2. **Locais de votação.**
+   - "Consulte sua seção" mostra a escola e o endereço, com link para mapa (OpenStreetMap ou Google Maps em
+     nova aba).
+   - O município mostra os seções agrupados por local de votação.
+3. **Mapa nacional por município.**
+   - Toggle "Estados | Municípios" no mapa do Brasil, com os 5.571 municípios.
+   - Desenho em `<canvas>` para performance.
+   - `GET /api/apuracao/:race/br/municipios` (`MunicipiosNacionalSnapshot`).
+   - Mostra "à frente em N municípios".
+4. **Fotos oficiais.**
+   - Aparecem no Placar, nos eventos, nas regiões, nos cartões de governador e na ficha do candidato.
+   - Nunca aparecem quando anonimizado.
+5. **Reveja a noite.** Régua do tempo pública (play/pause/arrastar) para ver o mapa e o placar em qualquer
+   instante passado. Todas as rotas de apuração aceitam `?t=` (contrato `Instante`); nunca há instante futuro.
+6. **Busca rápida** (Ctrl+K / ícone de busca): municípios, UFs, candidatos e "zona/seção".
+7. **Modo TV** (`/tv`): tela cheia com mapa grande, placar e ticker, rodando por UFs; feito para transmissão.
+8. **Pessoas agora:** `LiveStatus.pessoasAgora`, só no servidor. No demo fica oculto; nunca inventamos número.
+9. **1º turno de todos os cargos:**
+   - `/senado` (2 vagas por UF em 2026);
+   - `/camara` (513 cadeiras, com hemiciclo por partido em cores neutras por bancada — sem associar cor a
+     lado político);
+   - `/assembleias/:uf`;
+   - governadores eleitos no 1º turno;
+   - ficha `/candidato/:sqcand`: dados públicos do TSE, patrimônio declarado e resultado.
+10. **Patrocínio:**
+    - slot discreto "Oferecido por", só para anunciante não político;
+    - configurado no admin (`AdminCommand 'patrocinio'`, `LiveStatus.patrocinio`);
+    - desligado por padrão.

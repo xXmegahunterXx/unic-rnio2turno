@@ -3,7 +3,8 @@
 Leia `ARCHITECTURE.md` antes de codar. Contratos em `src/shared/*` (types, dataset, api, calc, format, constants) são a fonte da verdade; não os altere sem necessidade real — se alterar, mantenha compatibilidade e diga no relatório.
 
 - Idioma da interface e dos comentários: **português do Brasil**. Identificadores podem ser pt ou en, siga o arquivo.
-- Neutralidade é regra: cores por slot (`cand-a` turquesa = menor número na urna; `cand-b` âmbar), textos descritivos, nunca cores partidárias, nunca foto de candidato.
+- Neutralidade é regra: cores por slot (`cand-a` turquesa = menor número na urna; `cand-b` âmbar), textos descritivos, nunca cores partidárias.
+- Fotos: só as fotos OFICIAIS do TSE (pacotes em public/data/fotos), mesmo tamanho e tratamento para todos, nunca editadas (só redimensionar/recortar). Na simulação anonimizada (`status.anonimizado`) NÃO mostre foto (use o monograma).
 - Nunca use cor hex solta em componente — só tokens Tailwind (`bg-surface`, `text-fg-muted`, `bg-cand-a`, `border-line`…).
 - Todo número exibido usa a classe `.num` e os formatadores de `src/shared/format.ts`; percentuais derivam de `src/shared/calc.ts`.
 - Não instale dependências novas. Não rode `npm install`.

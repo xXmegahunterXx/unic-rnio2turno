@@ -359,6 +359,8 @@ export function createLocalClient(): ApuracaoClient {
   return {
     status: () => ponte.call<LiveStatus>('status'),
     meta: () => ponte.call<PublicMeta>('meta'),
+    // TODO(fase 2): implementado pelo agente do motor (municipiosBr e instante t).
+    municipiosBr: () => Promise.reject(new Error('municipiosBr ainda não implementado')),
     nacional: (race: RaceId) => ponte.call<NationalSnapshot>('nacional', [race]),
     uf: (race: RaceId, uf: UF) => ponte.call<UfSnapshot>('uf', [race, uf]),
     municipio: (race: RaceId, uf: UF, cod: string) => ponte.call<MunicipioSnapshot>('municipio', [race, uf, cod]),

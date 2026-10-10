@@ -10,6 +10,8 @@
  *   GET  /api/apuracao/:race/uf/:uf/mun/:cod                → MunicipioSnapshot
  *   GET  /api/apuracao/:race/uf/:uf/mun/:cod/zona/:zona     → ZonaSnapshot
  *   GET  /api/apuracao/:race/uf/:uf/mun/:cod/zona/:zona/secao/:secao → SecaoDetalhe
+ *   GET  /api/apuracao/:race/br/municipios                  → MunicipiosNacionalSnapshot (mapa nacional por município)
+ *   (todas as rotas de apuração aceitam ?t=<epoch> para "reveja a noite" — ver Instante)
  *   GET  /api/og/apuracao.png?race=pres                     → imagem 1200×630 para link preview
  *
  *   POST /api/admin/login            { senha }                → { ok: true } + cookie httpOnly
@@ -27,6 +29,8 @@ import type {
   Aviso,
   ClockState,
   FonteDados,
+  MunicipiosNacionalSnapshot,
+  Patrocinio,
   LiveStatus,
   MunicipioSnapshot,
   NationalSnapshot,
@@ -62,7 +66,9 @@ export type AdminCommand =
   | { tipo: 'congelar'; congelado: boolean }
   | { tipo: 'tse'; tse: Partial<TseConfig> }
   /** Mostra (true) ou oculta (false, padrão) os nomes reais dos candidatos na fonte 'simulacao'. */
-  | { tipo: 'nomes-reais'; ativo: boolean };
+  | { tipo: 'nomes-reais'; ativo: boolean }
+  /** Define (ou remove, com null) o patrocínio exibido no site. */
+  | { tipo: 'patrocinio'; patrocinio: Patrocinio | null };
 
 export interface AdminSnapshot {
   state: AdminState;
@@ -78,11 +84,13 @@ export interface AdminSnapshot {
 export interface ApuracaoClient {
   status(): Promise<LiveStatus>;
   meta(): Promise<PublicMeta>;
-  nacional(race: RaceId): Promise<NationalSnapshot>;
-  uf(race: RaceId, uf: UF): Promise<UfSnapshot>;
-  municipio(race: RaceId, uf: UF, cod: string): Promise<MunicipioSnapshot>;
-  zona(race: RaceId, uf: UF, cod: string, zona: number): Promise<ZonaSnapshot>;
-  secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number): Promise<SecaoDetalhe | null>;
+  nacional(race: RaceId, opts?: Instante): Promise<NationalSnapshot>;
+  uf(race: RaceId, uf: UF, opts?: Instante): Promise<UfSnapshot>;
+  municipio(race: RaceId, uf: UF, cod: string, opts?: Instante): Promise<MunicipioSnapshot>;
+  zona(race: RaceId, uf: UF, cod: string, zona: number, opts?: Instante): Promise<ZonaSnapshot>;
+  secao(race: RaceId, uf: UF, cod: string, zona: number, secao: number, opts?: Instante): Promise<SecaoDetalhe | null>;
+  /** Mapa nacional por município (5.571), alinhado com public/data/municipios-br.json. */
+  municipiosBr(race: RaceId, opts?: Instante): Promise<MunicipiosNacionalSnapshot>;
   admin: {
     login(senha: string): Promise<boolean>;
     logout(): Promise<void>;
@@ -91,6 +99,15 @@ export interface ApuracaoClient {
     presets(): Promise<PresetInfo[]>;
     testarTse(): Promise<{ ok: boolean; detalhe: string; amostra?: unknown }>;
   };
+}
+
+/**
+ * "Reveja a noite": pedir o estado da apuração num instante PASSADO (epoch ms, ≤ simNow atual).
+ * Ausente = agora. Instantes futuros são limitados ao agora (nunca adiantar resultado).
+ * HTTP: query `?t=<epoch>`. Na fonte TSE, só nacional/UF têm histórico; demais níveis respondem o agora.
+ */
+export interface Instante {
+  t?: number;
 }
 
 export type { ClockState };
