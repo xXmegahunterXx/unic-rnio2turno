@@ -207,7 +207,7 @@ export function BuscaInline({ className, placeholder = 'Digite sua cidade' }: { 
       ) : null}
 
       <p id={`${id}-dica`} className="mt-2 text-[12.5px] leading-snug text-fg-muted">
-        Ou cidade + zona + seção (ex.: <span className="num text-fg">Campinas 33 120</span>) ·{' '}
+        Ex.: <span className="num text-fg">Campinas 33 120</span> (zona e seção) ·{' '}
         <Link to="/apuracao/consulta" {...propsPreCarregar('/apuracao/consulta')} className="font-medium text-brand-fg underline-offset-2 hover:underline">
           passo a passo
         </Link>

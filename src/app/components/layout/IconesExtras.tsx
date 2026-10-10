@@ -3,7 +3,7 @@
  * aceita tanto os do kit quanto estes.
  */
 import { Icon, type IconName } from '@/app/ui/Icon';
-import type { IconeExtra } from './nav';
+import type { IconeExtra } from './mais';
 
 const EXTRAS: Record<IconeExtra, React.ReactNode> = {
   tv: (

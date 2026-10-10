@@ -45,53 +45,69 @@ export function HeroHome({ status, recebidoEm, race, resumo, anonimizado }: Hero
     </div>
   );
 
+  const titulo = (
+    <>
+      <Eyebrow fase={fase} simulacao={!!status?.simulacao} />
+      <h1
+        id="home-titulo"
+        className="mt-3 text-balance font-display text-[clamp(2rem,9.4vw,2.6rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-fg sm:mt-5 sm:text-[60px] lg:text-[60px] xl:text-[68px]"
+      >
+        25 de outubro. <span className="text-grad">{fase === 'encerrada' ? 'Explore cada voto.' : 'Acompanhe cada voto.'}</span>
+      </h1>
+      <p className="mt-2.5 max-w-[36rem] text-pretty text-[14.5px] leading-snug text-fg-muted sm:mt-5 sm:text-[18px] sm:leading-relaxed">
+        A apuração do 2º turno ao vivo, do Brasil inteiro até a urna da sua seção.{' '}
+        <span className="text-fg">Apartidária, com os dados oficiais do TSE.</span>
+      </p>
+    </>
+  );
+  const selos = (
+    <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[12.5px] text-fg-muted sm:text-[13.5px]">
+      <Selo icone="selo">Apartidário</Selo>
+      <Selo icone="urna">Dados oficiais do TSE</Selo>
+      <Selo icone="olho-fechado">Sem enquetes</Selo>
+    </ul>
+  );
+
   return (
     <section aria-labelledby="home-titulo" className="relative isolate overflow-hidden">
       <FundoHero />
-      <Container className="relative pb-8 pt-4 sm:pb-14 sm:pt-10 lg:pb-16 lg:pt-14">
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,0.94fr)] lg:gap-12 xl:gap-16">
-          <div className="min-w-0">
-            <Eyebrow fase={fase} simulacao={!!status?.simulacao} />
-            <h1
-              id="home-titulo"
-              className="mt-3 text-balance font-display text-[clamp(2rem,9.4vw,2.6rem)] font-semibold leading-[0.98] tracking-[-0.04em] text-fg sm:mt-5 sm:text-[60px] lg:text-[62px] xl:text-[70px]"
-            >
-              25 de outubro. <span className="text-grad">{fase === 'encerrada' ? 'Explore cada voto.' : 'Acompanhe cada voto.'}</span>
-            </h1>
-            <p className="mt-2.5 max-w-[36rem] text-pretty text-[14.5px] leading-snug text-fg-muted sm:mt-5 sm:text-[18px] sm:leading-relaxed">
-              A apuração do 2º turno ao vivo, do Brasil inteiro até a urna da sua seção.{' '}
-              <span className="text-fg">Apartidária, com os dados oficiais do TSE.</span>
-            </p>
-
-            {/* Celular e tablet: faixa compacta da fase logo abaixo do título. */}
-            {!desktop ? <FaixaFase status={status} recebidoEm={recebidoEm} race={race} resumo={resumo} className="mt-4 sm:mt-7" /> : null}
-
-            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:mt-5 sm:grid-cols-2 sm:gap-3 lg:mt-8">
-              <CtaTeste />
-              <CtaApuracao fase={fase} className="order-last sm:order-none" />
-              <CtaBusca fase={fase} className="sm:col-span-2" />
+      <Container className="relative pb-8 pt-4 sm:pb-14 sm:pt-10 lg:pb-16 lg:pt-12">
+        {desktop ? (
+          // Desktop: texto, Teste e Apuração à esquerda; painel da fase + busca da cidade/seção à direita.
+          <div className="grid grid-cols-[minmax(0,1.04fr)_minmax(0,0.96fr)] items-start gap-12 xl:gap-16">
+            <div className="min-w-0 pt-2">
+              {titulo}
+              <div className="mt-8 grid grid-cols-1 gap-3">
+                <CtaTeste />
+                <CtaApuracao fase={fase} />
+              </div>
+              <div className="mt-5">{acoes}</div>
+              {selos}
             </div>
-
-            <div className="mt-4 sm:mt-5">{acoes}</div>
-
-            <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[12.5px] text-fg-muted sm:text-[13.5px]">
-              <Selo icone="selo">Apartidário</Selo>
-              <Selo icone="urna">Dados oficiais do TSE</Selo>
-              <Selo icone="olho-fechado">Sem enquetes</Selo>
-            </ul>
-          </div>
-
-          {desktop ? (
             <motion.div
               initial={reduzir ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.22, 0.9, 0.24, 1] }}
-              className="min-w-0 lg:sticky lg:top-[calc(var(--app-header-h)+24px)] lg:mt-2"
+              className="min-w-0 space-y-4"
             >
               <PainelAoVivo status={status} recebidoEm={recebidoEm} race={race} resumo={resumo} anonimizado={anonimizado} />
+              <CtaBusca fase={fase} />
             </motion.div>
-          ) : null}
-        </div>
+          </div>
+        ) : (
+          // Celular e tablet: título → fase compacta → Teste → cidade/seção → Apuração → ações.
+          <div className="min-w-0">
+            {titulo}
+            <FaixaFase status={status} recebidoEm={recebidoEm} race={race} resumo={resumo} className="mt-4 sm:mt-7" />
+            <div className="mt-3 grid grid-cols-1 gap-2.5 sm:mt-5 sm:grid-cols-2 sm:gap-3">
+              <CtaTeste />
+              <CtaApuracao fase={fase} className="order-last sm:order-none" />
+              <CtaBusca fase={fase} className="sm:col-span-2" />
+            </div>
+            <div className="mt-4 sm:mt-5">{acoes}</div>
+            {selos}
+          </div>
+        )}
       </Container>
     </section>
   );

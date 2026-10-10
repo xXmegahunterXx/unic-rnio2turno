@@ -51,7 +51,7 @@ export function CtaBusca({ fase, className }: { fase: Fase | undefined; classNam
         </span>
         <div className="min-w-0">
           <h2 className="text-balance font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[18px]">{titulo}</h2>
-          <p className="text-[12.5px] leading-snug text-fg-muted">{fase === 'apurando' ? 'Boletim de cada urna assim que for totalizada' : 'Resultado oficial do TSE, até o boletim da sua urna'}</p>
+          <p className="text-[12.5px] leading-snug text-fg-muted">{fase === 'apurando' ? 'Boletim de cada urna assim que for totalizada' : 'Resultado oficial do TSE, até a sua urna'}</p>
         </div>
       </div>
       <BuscaInline />

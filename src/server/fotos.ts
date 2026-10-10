@@ -4,18 +4,23 @@
  *
  *  - Leitura preguiçosa, com cache; o arquivo é reconferido (mtime) no máximo a cada 60 s, então um pacote
  *    publicado depois da subida passa a valer sem reiniciar.
- *  - Só JPEG e PNG: o satori (layout → SVG) e o resvg (SVG → PNG) não decodificam WebP/AVIF. Foto em outro
- *    formato conta como ausente (o OG mantém o monograma).
+ *  - O satori (layout → SVG) e o resvg (SVG → PNG) só leem JPEG e PNG. `foto()` devolve só esses formatos;
+ *    `fotoOg()` também converte os retratos em WebP (a maioria dos pacotes) para PNG com o decodificador próprio de
+ *    webp.ts — os mesmos pixels decodificados (idênticos aos da libwebp), sem edição; resultado em cache (LRU).
  *  - Quem decide SE mostra é o chamador (nunca na simulação anonimizada; só com foto dos dois finalistas).
  */
 import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { FotoPacote } from '../shared/dataset';
+import { webpParaPngDataUri } from './webp';
 
 const RECHECAR_MS = 60_000;
 /** Retrato ~120×160: bem abaixo disso. Acima, ignora (protege a renderização). */
 const MAX_FOTO_CHARS = 400_000;
 const RE_FOTO = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/;
+const RE_WEBP = /^data:image\/webp;base64,[A-Za-z0-9+/]+={0,2}$/;
+/** Retratos WebP já convertidos (~40–60 KB cada em base64). */
+const MAX_CONVERTIDAS = 192;
 const RE_GRUPO = /^[a-z0-9][a-z0-9-]{0,47}$/;
 
 interface Entrada {
@@ -26,6 +31,7 @@ interface Entrada {
 
 export class PacotesFotos {
   private cache = new Map<string, Entrada>();
+  private convertidas = new Map<string, string | null>();
 
   constructor(
     private readonly dir: string,
@@ -67,8 +73,22 @@ export class PacotesFotos {
     return typeof f === 'string' && f.length <= MAX_FOTO_CHARS && RE_FOTO.test(f) ? f : null;
   }
 
-  /** Foto para as imagens OG (JPEG/PNG), ou null. */
+  /** Foto para as imagens OG: JPEG/PNG como vier; WebP convertida para PNG (mesmos pixels). null se não houver. */
   fotoOg(grupo: string, sqcand: string): string | null {
-    return this.foto(grupo, sqcand);
+    const direta = this.foto(grupo, sqcand);
+    if (direta) return direta;
+    const f = this.pacote(grupo)?.[sqcand];
+    if (typeof f !== 'string' || f.length > MAX_FOTO_CHARS || !RE_WEBP.test(f)) return null;
+    const chave = `${grupo}|${sqcand}|${this.cache.get(grupo)?.mtimeMs ?? 0}`;
+    if (this.convertidas.has(chave)) {
+      const v = this.convertidas.get(chave) ?? null;
+      this.convertidas.delete(chave); // LRU: reinsere no fim
+      this.convertidas.set(chave, v);
+      return v;
+    }
+    const png = webpParaPngDataUri(f);
+    this.convertidas.set(chave, png);
+    while (this.convertidas.size > MAX_CONVERTIDAS) this.convertidas.delete(this.convertidas.keys().next().value as string);
+    return png;
   }
 }

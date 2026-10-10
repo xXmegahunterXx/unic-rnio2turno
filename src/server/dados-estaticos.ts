@@ -220,7 +220,7 @@ export function situacaoCurta(s: string | undefined, genero?: string): string | 
 export function situacaoTexto(s: string | undefined, genero?: string): string | null {
   const a = feminino(genero) ? 'a' : 'o';
   if (ehEleito(s)) return `eleit${a}`;
-  if (s === 'segundo-turno') return 'no 2º turno';
+  if (s === 'segundo-turno') return 'foi ao 2º turno';
   if (s === 'suplente') return 'suplente';
   if (s === 'nao-eleito') return `não eleit${a}`;
   return null;

@@ -41,7 +41,7 @@ beforeAll(async () => {
   writeFileSync(join(dist, 'data/locais/sp.json'), JSON.stringify(locais));
   writeFileSync(join(dist, 'data/secao/sp.json'), JSON.stringify({ n: 3, aptos: 'AAAA'.repeat(2000) }));
   writeFileSync(join(dist, 'geo/br-mun.json'), JSON.stringify({ viewBox: '0 0 1 1', municipios: { '3550308': 'M0 0L1 1'.repeat(400) }, ufs: {} }));
-  m = await montar({ env: { SERVE_STATIC: '1', DIST_DIR: dist, PUBLIC_URL: 'https://sintonia.exemplo.br' } });
+  m = await montar({ env: { SERVE_STATIC: '1', DIST_DIR: dist, PUBLIC_URL: 'https://sintonia.exemplo.br', TWITTER_SITE: 'https://x.com/sintonia' } });
 });
 
 const get = (p: string, h: Record<string, string> = {}) => m.app.request(p, { headers: h });
@@ -177,11 +177,56 @@ describe('SPA com meta tags por rota', () => {
     const r = await get('/governadores', { 'accept-encoding': 'br' });
     expect(r.headers.get('content-encoding')).toBe('br');
     expect(r.headers.get('x-frame-options')).toBe('SAMEORIGIN');
+    expect(r.headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
     expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+  });
+
+  it('embeds (/embed/*): podem ir em iframe de qualquer site; o resto continua protegido', async () => {
+    const e = await get('/embed/placar');
+    expect(e.status).toBe(200);
+    expect(e.headers.get('x-frame-options')).toBeNull();
+    expect(e.headers.get('content-security-policy')).toBe('frame-ancestors *');
+    expect(e.headers.get('x-robots-tag')).toBe('noindex');
+    expect(await e.text()).toContain('<meta name="robots" content="noindex, nofollow" />');
+    for (const p of ['/', '/apuracao', '/teste', '/admin']) {
+      const r = await get(p);
+      expect(r.headers.get('x-frame-options')).toBe('SAMEORIGIN');
+      expect(r.headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    }
+  });
+
+  it('fase 3: imagem específica por página, twitter:site e chave de cache com os parâmetros da página', async () => {
+    const mun = await (await get('/apuracao/sp/71072')).text();
+    expect(mun).toContain('/api/og/municipio.png?race=pres&amp;uf=sp&amp;cod=71072&amp;v=');
+    expect(mun).toContain('<meta name="twitter:site" content="@sintonia" />');
+    expect(mun).toContain('<meta property="og:image:secure_url"');
+    const a = await (await get('/curiosidades?fato=brasil-eleitorado&utm_source=x')).text();
+    const b = await (await get('/curiosidades?fato=finalistas-menor-diferenca')).text();
+    expect(a).toContain('curiosidade.png?f=brasil-eleitorado');
+    expect(a).toContain('<link rel="canonical" href="https://sintonia.exemplo.br/curiosidades?fato=brasil-eleitorado" />');
+    expect(b).toContain('curiosidade.png?f=finalistas-menor-diferenca');
+    expect(await (await get('/senado?uf=sp')).text()).toContain('/api/og/senado.png?uf=sp');
+    expect(await (await get('/cenarios')).text()).toContain('/api/og/cenario.png?v=');
+    // código de cenário gigante: página normal com o cartão genérico (nada de 5xx)
+    const g = await get(`/cenarios?c=${'A'.repeat(4_000)}`);
+    expect(g.status).toBe(200);
+    expect(await g.text()).toContain('/api/og/cenario.png?v=');
+    // duelo: nenhum pedaço do código no HTML
+    const d = await (await get('/duelo/RESPOSTAS-DO-TESTE')).text();
+    expect(d).not.toContain('RESPOSTAS-DO-TESTE');
   });
 
   it('textos são escapados (sem injeção de HTML)', () => {
     expect(escapeHtml('<script>"x"&\'y\'</script>')).toBe('&lt;script&gt;&quot;x&quot;&amp;&#39;y&#39;&lt;/script&gt;');
+  });
+
+  it('robots.txt padrão: imagens OG liberadas (o robô do X respeita o robots.txt), API e admin fora', async () => {
+    const r = await get('/robots.txt');
+    expect(r.status).toBe(200);
+    const t = await r.text();
+    expect(t).toContain('Allow: /api/og/');
+    expect(t).toContain('Disallow: /api/');
+    expect(t).not.toContain('/duelo'); // o robô precisa ler a página do Duelo para montar o cartão
   });
 
   it('a API continua respondendo JSON (não cai na SPA)', async () => {

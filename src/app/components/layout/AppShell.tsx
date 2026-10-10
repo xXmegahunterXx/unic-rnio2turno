@@ -1,7 +1,9 @@
 /**
- * Moldura pública do app: header de vidro fixo (logo, navegação, status ao vivo, tema), faixa de
- * SIMULAÇÃO, banner de aviso do admin, rodapé institucional e tab bar inferior no celular.
+ * Moldura pública do app: header de vidro fixo (logo, navegação + menu "Mais", status ao vivo, tema), faixa de
+ * SIMULAÇÃO, banner de aviso do admin, rodapé institucional e tab bar inferior no celular (com a aba "Mais").
  * Funciona sem API: se useStatus() falhar ou estiver carregando, nada quebra (só some o que depende dele).
+ * Os links pré-carregam a página ao apontar/tocar (prefetch.ts). "Compartilhar o Sintonia" e "Incorporar" ficam
+ * montados aqui (acoesGlobais.tsx), carregados só na 1ª abertura.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
@@ -15,9 +17,12 @@ import type { Aviso } from '@/shared/types';
 import { SimulationRibbon } from '../apuracao/SimulationRibbon';
 import { Container } from './Container';
 import { Logo } from './Logo';
-import { NAV, NAV_TAB } from './nav';
+import { NAV, NAV_TAB, ativoNoMais } from './nav';
 import { StatusPill } from './StatusPill';
 import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/BuscaRapida';
+import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompartilharSite, preCarregarIncorporar } from './acoesGlobais';
+import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
+import { propsPreCarregar } from './prefetch';
 
 export function AppShell({ children }: { children?: ReactNode }) {
   return (
@@ -31,6 +36,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <Footer />
       <TabBar />
       <BuscaRapida />
+      <AcoesGlobais />
       <Toaster />
       <ScrollRestoration />
     </div>
@@ -135,10 +141,12 @@ function Header() {
                   <Link
                     key={n.to}
                     to={n.to}
+                    {...propsPreCarregar(n.to)}
                     aria-current={ativo ? 'page' : undefined}
                     className={cn(
                       'relative whitespace-nowrap rounded-[10px] px-2.5 py-2 text-[14px] font-medium transition-colors lg:px-3',
                       ativo ? 'text-fg' : 'text-fg-muted hover:text-fg',
+                      n.header === 'xxl' && 'hidden min-[1400px]:block',
                       n.header === 'xl' && 'hidden xl:block',
                       n.header === 'lg' && 'hidden lg:block',
                     )}
@@ -150,12 +158,13 @@ function Header() {
                         transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                       />
                     ) : null}
-                    {/* Entre 768 e 1023 px, rótulos curtos (os mesmos da tab bar) para caber com a pílula de status. */}
-                    <span className="lg:hidden">{n.short}</span>
-                    <span className="hidden lg:inline">{n.label}</span>
+                    {/* Entre 768 e 1279 px, rótulos curtos (os mesmos da tab bar) para caber com a pílula de status e o "Mais". */}
+                    <span className="xl:hidden">{n.short}</span>
+                    <span className="hidden xl:inline">{n.label}</span>
                   </Link>
                 );
               })}
+              <BotaoMaisDesktop />
             </nav>
             <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
               {/* Busca rápida (Ctrl/⌘ K): botão com o atalho a partir de 1360 px; só a lupa entre 768 e 1359 px.
@@ -226,57 +235,76 @@ function AvisoBanner({ aviso }: { aviso: Aviso | null }) {
 
 function TabBar() {
   const { pathname } = useLocation();
+  const [mais, setMais] = useState(false);
+  usePreCarregarMenuMais();
   const meio = Math.ceil(NAV_TAB.length / 2);
+  const classeItem = (ativo: boolean) =>
+    cn(
+      'relative flex h-full w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
+      ativo ? 'text-fg' : 'text-fg-muted active:text-fg',
+    );
+  const marca = (
+    <motion.span
+      layoutId="tab-ativa"
+      aria-hidden
+      className="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-brand-grad"
+      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+    />
+  );
   const item = (n: (typeof NAV_TAB)[number]) => {
     const ativo = n.match(pathname);
     return (
       <li key={n.to} className="relative">
-        <Link
-          to={n.to}
-          aria-current={ativo ? 'page' : undefined}
-          className={cn(
-            'flex h-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] transition-colors',
-            ativo ? 'text-fg' : 'text-fg-muted active:text-fg',
-          )}
-        >
-          {ativo ? (
-            <motion.span
-              layoutId="tab-ativa"
-              aria-hidden
-              className="absolute top-0 h-[2.5px] w-8 rounded-b-full bg-brand-grad"
-              transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-            />
-          ) : null}
+        <Link to={n.to} {...propsPreCarregar(n.to)} aria-current={ativo ? 'page' : undefined} className={classeItem(ativo)}>
+          {ativo ? marca : null}
           <Icon name={n.icon} size={22} className={cn(ativo && 'text-brand-fg')} />
           <span>{n.short}</span>
         </Link>
       </li>
     );
   };
+  const maisAtivo = ativoNoMais(pathname);
   return (
-    <nav
-      aria-label="Principal"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
-    >
-      <ul className="mx-auto grid h-[60px] max-w-md grid-cols-5">
-        {NAV_TAB.slice(0, meio).map(item)}
-        <li className="relative">
-          <button
-            type="button"
-            onClick={abrirBusca}
-            onPointerDown={preCarregarBusca}
-            aria-label="Buscar município, estado, candidato ou seção"
-            className="flex h-full w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] text-fg-muted transition-colors active:text-fg"
-          >
-            <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand/15 text-brand-fg ring-1 ring-inset ring-brand/30">
-              <Icon name="busca" size={18} />
-            </span>
-            <span className="-mt-0.5">Buscar</span>
-          </button>
-        </li>
-        {NAV_TAB.slice(meio).map(item)}
-      </ul>
-    </nav>
+    <>
+      <nav
+        aria-label="Principal"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 md:hidden"
+      >
+        <ul className="mx-auto grid h-[60px] max-w-md grid-cols-5">
+          {NAV_TAB.slice(0, meio).map(item)}
+          <li className="relative">
+            <button
+              type="button"
+              onClick={abrirBusca}
+              onPointerDown={preCarregarBusca}
+              aria-label="Buscar município, estado, candidato ou seção"
+              className="flex h-full w-full flex-col items-center justify-center gap-1 text-[10.5px] font-medium tracking-[0.01em] text-fg-muted transition-colors active:text-fg"
+            >
+              <span className="inline-flex h-[30px] w-[30px] items-center justify-center rounded-full bg-brand/15 text-brand-fg ring-1 ring-inset ring-brand/30">
+                <Icon name="busca" size={18} />
+              </span>
+              <span className="-mt-0.5">Buscar</span>
+            </button>
+          </li>
+          {NAV_TAB.slice(meio).map(item)}
+          <li className="relative">
+            <button
+              type="button"
+              onClick={() => setMais(true)}
+              onPointerDown={preCarregarMenuMais}
+              aria-haspopup="dialog"
+              aria-expanded={mais}
+              className={classeItem(maisAtivo || mais)}
+            >
+              {maisAtivo ? marca : null}
+              <Icon name="menu" size={22} className={cn(maisAtivo && 'text-brand-fg')} />
+              <span>Mais</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+      <FolhaMaisPreguicosa aberto={mais} onFechar={() => setMais(false)} />
+    </>
   );
 }
 
@@ -284,8 +312,8 @@ function Footer() {
   return (
     <footer className="relative mt-12 border-t border-line bg-surface/40 pb-[calc(84px+env(safe-area-inset-bottom))] pt-10 md:mt-20 md:pb-12">
       <Container wide>
-        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
-          <div className="max-w-sm">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-9 md:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] lg:gap-10">
+          <div className="col-span-2 max-w-sm md:col-span-4 lg:col-span-1">
             <Logo size={26} />
             <p className="mt-3 text-[14px] leading-relaxed text-fg-muted">
               Apuração do 2º turno de 2026 estado por estado, cidade por cidade, seção por seção. E o Teste Cego de
@@ -301,36 +329,62 @@ function Footer() {
             </p>
           </div>
           <FooterCol
-            titulo="Navegar"
+            titulo="2º turno"
             links={[
               { to: '/apuracao', label: 'Apuração' },
               { to: '/governadores', label: 'Governadores' },
-              { to: '/senado', label: 'Senado' },
-              { to: '/camara', label: 'Câmara dos Deputados' },
-              { to: '/assembleias', label: 'Assembleias' },
-              { to: '/teste', label: 'Teste Cego' },
               { to: '/apuracao/consulta', label: 'Consulte sua seção' },
+              { to: '/teste', label: 'Teste Cego' },
+              { to: '/cenarios', label: 'E se…? Monte seu cenário' },
             ]}
           />
           <FooterCol
-            titulo="Sobre"
+            titulo="1º turno"
             links={[
-              { to: '/metodologia', label: 'Metodologia' },
-              { to: '/privacidade', label: 'Privacidade' },
-              { to: '/sobre', label: 'Sobre o Sintonia' },
+              { to: '/curiosidades', label: 'Curiosidades' },
+              { to: '/apuracao?race=pres-t1', label: 'Presidente' },
+              { to: '/senado', label: 'Senado' },
+              { to: '/camara', label: 'Câmara dos Deputados' },
+              { to: '/assembleias', label: 'Assembleias' },
             ]}
           />
           <div>
-            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Fontes</h2>
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Leve o Sintonia</h2>
             <ul className="mt-3 space-y-2.5 text-[14px]">
               <li>
-                <a
-                  href="https://resultados.tse.jus.br"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg"
-                >
-                  TSE · Resultados
+                <button type="button" onClick={abrirCompartilharSite} onPointerEnter={preCarregarCompartilharSite} aria-haspopup="dialog" className="text-left text-fg transition-colors hover:text-brand-fg">
+                  Compartilhar o site
+                </button>
+              </li>
+              <li>
+                <button type="button" onClick={() => abrirIncorporar()} onPointerEnter={preCarregarIncorporar} aria-haspopup="dialog" className="text-left text-fg transition-colors hover:text-brand-fg">
+                  Incorporar no seu site
+                </button>
+              </li>
+              <li>
+                <Link to="/tv" className="text-fg transition-colors hover:text-brand-fg">
+                  Modo TV
+                </Link>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Sobre</h2>
+            <ul className="mt-3 space-y-2.5 text-[14px]">
+              {[
+                { to: '/metodologia', label: 'Metodologia' },
+                { to: '/privacidade', label: 'Privacidade' },
+                { to: '/sobre', label: 'Sobre o Sintonia' },
+              ].map((l) => (
+                <li key={l.to}>
+                  <Link to={l.to} className="text-fg transition-colors hover:text-brand-fg">
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg">
+                  Fonte: TSE
                   <Icon name="externo" size={14} className="text-fg-muted" />
                 </a>
               </li>
@@ -341,7 +395,7 @@ function Footer() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg"
                 >
-                  IBGE · Malhas territoriais
+                  Mapas: IBGE
                   <Icon name="externo" size={14} className="text-fg-muted" />
                 </a>
               </li>
@@ -364,7 +418,7 @@ function FooterCol({ titulo, links }: { titulo: string; links: { to: string; lab
       <ul className="mt-3 space-y-2.5 text-[14px]">
         {links.map((l) => (
           <li key={l.to}>
-            <Link to={l.to} className="text-fg transition-colors hover:text-brand-fg">
+            <Link to={l.to} {...propsPreCarregar(l.to)} className="text-fg transition-colors hover:text-brand-fg">
               {l.label}
             </Link>
           </li>

@@ -280,10 +280,14 @@ describe('OG com fotos oficiais', () => {
     const r = await com.app.request('/api/og/apuracao.png?race=pres');
     expect(r.status).toBe(200);
     expect(r.headers.get('x-og-fotos')).toBe('0');
-    // nomes reais ligados na simulação → fotos de novo (a troca de modo espera a imagem nova)
+    // nomes reais ligados na simulação: ainda sem foto — foto oficial nunca acompanha número fictício (fase 3)
     await comando(com, cookie, { tipo: 'nomes-reais', ativo: true });
     const r2 = await com.app.request('/api/og/apuracao.png?race=pres');
-    expect(r2.headers.get('x-og-fotos')).toBe('1');
+    expect(r2.status).toBe(200);
+    expect(r2.headers.get('x-og-fotos')).toBe('0');
+    // …mas o 1º turno (número real) continua com as fotos, mesmo durante a simulação
+    const t1 = await com.app.request('/api/og/apuracao.png?race=pres-t1');
+    expect(t1.headers.get('x-og-fotos')).toBe('1');
     await comando(com, cookie, { tipo: 'nomes-reais', ativo: false });
     const r3 = await com.app.request('/api/og/apuracao.png?race=pres');
     expect(r3.headers.get('x-og-fotos')).toBe('0');

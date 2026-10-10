@@ -9,6 +9,7 @@ import type { LiveStatus, Summary } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { NomesOcultos } from '@/app/components/apuracao/NomesOcultos';
+import { BotaoIncorporar } from '@/app/components/embed/BotaoIncorporar';
 import { Badge } from '@/app/ui/Badge';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
@@ -46,6 +47,8 @@ export function Topo({ eyebrow, titulo, contexto, selos, seletor, acoes, classNa
         {seletor || acoes ? (
           <div className="flex shrink-0 items-center gap-2.5">
             {seletor ? <div className="hidden lg:block">{seletor}</div> : null}
+            {/* "Incorporar no seu site" (frente home/embeds): no celular fica no menu "Mais" e no rodapé. */}
+            <BotaoIncorporar compacto className="hidden sm:inline-flex" />
             {acoes}
           </div>
         ) : null}

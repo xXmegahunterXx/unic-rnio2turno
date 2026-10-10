@@ -17,6 +17,12 @@ import type { CandidatoFicha, CargoDataset } from '../shared/dataset';
 import type { Curiosidade } from '../shared/curiosidades';
 import type { Fase, Race, Summary, UF } from '../shared/types';
 import { UFS } from '../shared/types';
+import { emUf } from '../engine/events';
+import { cargoExibicao, ehEleito, situacaoTexto } from './dados-estaticos';
+
+export { emUf };
+/** "de São Paulo" · "do Amazonas" · "da Bahia" (mesma regra de artigo de `emUf`). */
+export const deUf = (uf: UF) => emUf(uf, UF_NOMES[uf]).replace(/^em /, 'de ').replace(/^no /, 'do ').replace(/^na /, 'da ');
 
 export interface MetaPagina {
   titulo: string;
@@ -76,21 +82,6 @@ const ufBrDe = (s: string | null | undefined): UF | null => {
   const u = ufDe(s);
   return u && u !== 'ZZ' ? u : null;
 };
-
-const feminino = (g?: string) => !!g && /^fem/i.test(g.trim());
-const cargoExib = (cargo: string, genero?: string) =>
-  feminino(genero)
-    ? cargo.replace(/^Senador$/, 'Senadora').replace(/^Deputado/, 'Deputada').replace(/^Governador$/, 'Governadora').replace(/^Vice-Governador$/, 'Vice-Governadora')
-    : cargo;
-const ehEleito = (s?: string) => s === 'eleito' || s === 'eleito-qp' || s === 'eleito-media';
-function situacaoTexto(s: string | undefined, genero?: string): string | null {
-  const a = feminino(genero) ? 'a' : 'o';
-  if (ehEleito(s)) return `eleit${a}`;
-  if (s === 'segundo-turno') return 'foi ao 2º turno';
-  if (s === 'suplente') return 'suplente';
-  if (s === 'nao-eleito') return `não eleit${a}`;
-  return null;
-}
 
 /** "Com 62,3% das seções totalizadas: A 51,2% · B 48,8% dos votos válidos." (+ marca de simulação) */
 export function textoPlacar(p: { resumo: Summary; simulacao: boolean; race: Race }): string | null {
@@ -196,7 +187,7 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       const nomeUf = UF_NOMES[uf];
       if (seg.length === 2) {
         return pagina({
-          titulo: `Apuração em ${nomeUf} · ${tituloRace} · ${APP_NAME}`,
+          titulo: `Apuração em ${nomeUf} · ${ctx.races.get(raceNaUf(uf))?.titulo ?? tituloRace} · ${APP_NAME}`,
           descricao: comPlacar(`Resultado por município em ${nomeUf}, com mapa, gráfico da apuração e eventos da noite.`, uf),
           imagem: ogApuracao(uf),
           imagemAlt: altPlacar(nomeUf),
@@ -207,6 +198,7 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       if (nomeMun && cod) {
         const onde = `${nomeMun} (${uf === 'ZZ' ? 'Exterior' : uf})`;
         const raceMun = raceNaUf(uf);
+        const tituloMun = ctx.races.get(raceMun)?.titulo ?? tituloRace;
         const qsMun = `race=${encodeURIComponent(raceMun)}&uf=${uf.toLowerCase()}&cod=${cod}`;
         if (seg.length === 3) {
           // a página mostra o 1º turno quando pedido (-t1) ou antes da apuração; a imagem segue a mesma regra
@@ -217,11 +209,12 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
           });
           const t = p ? textoPlacar(p) : null;
           const resto = `Resultado em ${onde}: zonas eleitorais, mosaico de seções e comparação com o 1º turno.`;
+          const cauda = p?.race.turno === 1 ? 'Zonas, mosaico de seções e, em 25/10, o 2º turno ao vivo.' : 'Zonas eleitorais e mosaico de seções, ao vivo.';
           return pagina({
-            titulo: `Apuração em ${onde} · ${tituloRace} · ${APP_NAME}`,
-            descricao: t ? `${onde} · ${t} Zonas, mosaico de seções e o 2º turno ao vivo em 25/10.` : resto,
+            titulo: `Apuração em ${onde} · ${tituloMun} · ${APP_NAME}`,
+            descricao: t ? `${onde} · ${t} ${cauda}` : resto,
             imagem: `/api/og/municipio.png?${qsMun}`,
-            imagemAlt: `Placar em ${onde} · ${tituloRace}`,
+            imagemAlt: `Placar em ${onde} · ${tituloMun}`,
           });
         }
         if (/^\d{1,4}$/.test(s3) && /^\d{1,4}$/.test(s4) && Number(s3) > 0 && Number(s4) > 0) {
@@ -263,6 +256,8 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       imagem: ogTeste,
       imagemAlt: 'Teste Cego · Sintonia',
       noindex: true,
+      // og:url/canônico sem o código (respostas do Teste Cego): o cartão é o do Teste Cego
+      canonico: '/teste',
     });
   }
   // ---- fase 2: modo TV, 1º turno de todos os cargos e ficha do candidato -------------------------
@@ -284,10 +279,10 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       return pagina({
         titulo: `Senado · ${UF_NOMES[uf]} · Eleitos em 2026 · ${APP_NAME}`,
         descricao: nomes.length
-          ? `Eleitos para o Senado em ${UF_NOMES[uf]} no 1º turno de 2026: ${nomes.join(' e ')}. Resultado oficial do TSE.`
-          : `Senadores eleitos em ${UF_NOMES[uf]} em 2026, com votação e dados públicos do TSE.`,
+          ? `Eleitos para o Senado ${emUf(uf, UF_NOMES[uf])} no 1º turno de 2026: ${nomes.join(' e ')}. Resultado oficial do TSE.`
+          : `Senadores eleitos ${emUf(uf, UF_NOMES[uf])} em 2026, com votação e dados públicos do TSE.`,
         imagem: `/api/og/senado.png?uf=${uf.toLowerCase()}`,
-        imagemAlt: `Senadores eleitos em ${UF_NOMES[uf]} em 2026`,
+        imagemAlt: `Senadores eleitos ${emUf(uf, UF_NOMES[uf])} em 2026`,
         imagemVersao: lido?.versao,
         canonico: `/senado?uf=${uf.toLowerCase()}`,
       });
@@ -311,12 +306,12 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       const u = lido?.valor.ufs.find((x) => x.uf === uf);
       const b = (u?.partidos ?? []).map((p) => ({ sigla: p.sigla, eleitos: p.eleitos }));
       return pagina({
-        titulo: `Câmara dos Deputados · Bancada de ${UF_NOMES[uf]} · Eleitos em 2026 · ${APP_NAME}`,
+        titulo: `Câmara dos Deputados · Bancada ${deUf(uf)} · Eleitos em 2026 · ${APP_NAME}`,
         descricao: b.length && u
-          ? `As ${fmtInt(u.vagas)} cadeiras de ${UF_NOMES[uf]} na Câmara por partido: ${bancadasTexto(b, 5)}. Os eleitos, com votação (fonte: TSE).`
-          : `Deputados federais eleitos em ${UF_NOMES[uf]} em 2026, por partido (fonte: TSE).`,
+          ? `As ${fmtInt(u.vagas)} cadeiras ${deUf(uf)} na Câmara por partido: ${bancadasTexto(b, 5)}. Os eleitos, com votação (fonte: TSE).`
+          : `Deputados federais eleitos ${emUf(uf, UF_NOMES[uf])} em 2026, por partido (fonte: TSE).`,
         imagem: `/api/og/camara.png?uf=${uf.toLowerCase()}`,
-        imagemAlt: `Bancada de ${UF_NOMES[uf]} na Câmara dos Deputados`,
+        imagemAlt: `Bancada ${deUf(uf)} na Câmara dos Deputados`,
         imagemVersao: lido?.versao,
         canonico: `/camara?uf=${uf.toLowerCase()}`,
       });
@@ -354,10 +349,10 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       return pagina({
         titulo: `${casa} · ${nomeUf} · Eleitos em 2026 · ${APP_NAME}`,
         descricao: b.length && u
-          ? `As ${fmtInt(u.vagas)} cadeiras da ${casa} de ${nomeUf} por partido: ${bancadasTexto(b, 5)}. Os eleitos, com votação (fonte: TSE).`
-          : `Deputados estaduais eleitos em ${nomeUf} em 2026, por partido, com votação (fonte: TSE).`,
+          ? `As ${fmtInt(u.vagas)} cadeiras da ${casa} ${deUf(uf)} por partido: ${bancadasTexto(b, 5)}. Os eleitos, com votação (fonte: TSE).`
+          : `Deputados ${uf === 'DF' ? 'distritais' : 'estaduais'} eleitos ${emUf(uf, nomeUf)} em 2026, por partido, com votação (fonte: TSE).`,
         imagem: `/api/og/assembleia.png?uf=${uf.toLowerCase()}`,
-        imagemAlt: `${casa} de ${nomeUf} por partido`,
+        imagemAlt: `${casa} ${deUf(uf)} por partido`,
         imagemVersao: lido?.versao,
         canonico: `/assembleias/${uf.toLowerCase()}`,
       });
@@ -370,7 +365,7 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
     if (fx?.existe === 'nao-existe') return naoEncontrada(ogApuracao());
     const f = fx?.lida?.valor;
     if (f) {
-      const cargo = cargoExib(f.cargo, f.genero);
+      const cargo = cargoExibicao(f.cargo, f.genero);
       const onde = f.uf === 'BR' ? 'Brasil' : (UF_NOMES as Record<string, string>)[f.uf] ?? f.uf;
       const r = f.resultado;
       const sit = situacaoTexto(r?.situacao, f.genero);
@@ -450,11 +445,13 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
     });
   }
   if (s0 === 'embed' && seg.length === 2 && /^[a-z0-9-]{1,32}$/.test(s1)) {
+    // widgets (placar ?race=, mapa, uf ?uf=sp): fora dos buscadores; a imagem segue a corrida/UF do widget
+    const ufE = ufDe(q.get('uf')) ?? undefined;
     return pagina({
       titulo: `Widget da apuração · ${APP_NAME}`,
-      descricao: comPlacar('Placar da apuração do 2º turno para incorporar em sites e blogs.'),
-      imagem: ogApuracao(),
-      imagemAlt: altPlacar('Brasil'),
+      descricao: comPlacar('Placar da apuração do 2º turno para incorporar em sites e blogs.', ufE),
+      imagem: ogApuracao(ufE),
+      imagemAlt: altPlacar(ufE ? UF_NOMES[ufE] : 'Brasil'),
       noindex: true,
     });
   }

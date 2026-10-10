@@ -52,6 +52,7 @@ import {
 } from './og-cartoes';
 import type { Bancada } from './og-hemiciclo';
 import { ServicoOg, type OgPronta, type OgServida } from './og-servico';
+import { deUf } from './meta-tags';
 import { ErroValidacao, parseCodMunicipio, parseNumero, parseRace, parseUf } from './validation';
 
 /** Cache-Control das imagens (o app reexporta em CC). */
@@ -168,7 +169,8 @@ export function registrarOg(app: App, d: DepsOg): void {
   };
 
   /**
-   * Fotos oficiais para o placar: nunca na simulação anonimizada; só quando há foto de TODOS os finalistas.
+   * Fotos oficiais para o placar: nunca com nomes ocultos; só quando há foto de TODOS os finalistas. Quem chama
+   * também nunca pede foto para números simulados.
    */
   const fotosOg = (race: Race, anonimizado: boolean): string[] | undefined => {
     if (anonimizado) return undefined;
@@ -198,7 +200,8 @@ export function registrarOg(app: App, d: DepsOg): void {
       const anon = !!st.anonimizado;
       const fonteTse = dados.fonteDe(r.id) === 'tse';
       const raceOg = races.get(snap.race) ?? r;
-      const fotosPlacar = fotosOg(raceOg, anon);
+      // foto oficial só com número real: nunca na simulação (nem com os nomes reais ligados no admin)
+      const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
       const png = await renderPng(
         layoutPlacar({
           // simulação anônima: nada de nome nem foto real em imagem com números fictícios
@@ -239,7 +242,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       const anon = !!stM.anonimizado;
       const simulacao = stM.simulacao && exib.turno === 2;
       const raceOg = races.get(snap.race) ?? exib;
-      const fotosPlacar = fotosOg(raceOg, anon);
+      const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
       return gerar(
         chave,
         () =>
@@ -400,7 +403,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       vagas = u.vagas;
       if (arquivo === 'camara') {
         kicker = `CÂMARA DOS DEPUTADOS · ${uf} · ELEITOS EM 2026`;
-        titulo = `A bancada de ${UF_NOMES[uf]} na Câmara`;
+        titulo = `A bancada ${deUf(uf)} na Câmara`;
       } else {
         kicker = `${uf === 'DF' ? 'CÂMARA LEGISLATIVA' : 'ASSEMBLEIA LEGISLATIVA'} · ${uf} · ELEITOS EM 2026`;
         titulo = uf === 'DF' ? 'Câmara Legislativa do Distrito Federal' : `Assembleia Legislativa · ${UF_NOMES[uf]}`;
@@ -444,7 +447,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       );
       return gerar(
         chave,
-        () => layoutGovernadores({ disputas, primeiroTurno: pre, simulacao: !pre && stM.simulacao, aoVivo: stM.fase !== 'encerrada', dominio }),
+        () => layoutGovernadores({ disputas, primeiroTurno: pre, simulacao: !pre && stM.simulacao, aoVivo: stM.fase !== 'encerrada', anonimizado: anon, dominio }),
         sub,
       );
     };

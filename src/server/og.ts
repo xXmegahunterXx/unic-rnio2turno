@@ -18,6 +18,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import satori from 'satori';
 import { renderAsync } from '@resvg/resvg-js';
+import { pngDeRgba } from './png';
 import { pctTotalizadas, pctValidos } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
 import { fmtHora, fmtInt, fmtPct } from '../shared/format';
@@ -458,5 +459,7 @@ export function layoutTeste(): No {
 export async function renderPng(no: No): Promise<Buffer> {
   const svg = await satori(no as unknown as Parameters<typeof satori>[0], { width: OG_W, height: OG_H, fonts: carregarFontes() });
   const img = await renderAsync(svg, { fitTo: { mode: 'width', value: OG_W }, font: { loadSystemFonts: false } });
+  // PNG RGB próprio (sem alfa, filtro Sub, deflate 9 fora da thread principal): ~30% menor que o do resvg
+  if (img.width === OG_W && img.height === OG_H && img.pixels.length === OG_W * OG_H * 4) return pngDeRgba(img.pixels, OG_W, OG_H);
   return Buffer.from(img.asPng());
 }

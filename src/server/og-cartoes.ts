@@ -187,17 +187,17 @@ function blocoTurno(rotulo: string, t: TurnoSecao, fs: number, carimbo: string |
           'div',
           {
             position: 'absolute',
-            right: 6,
-            top: -6,
+            right: 4,
+            top: -17,
             border: `3px solid ${C.brand}`,
             color: C.brand,
             borderRadius: 8,
-            padding: '2px 12px',
-            fontSize: fs + 2,
+            padding: '1px 10px',
+            fontSize: fs,
             fontWeight: 700,
             letterSpacing: 3,
-            transform: 'rotate(-7deg)',
-            background: 'rgba(244,244,250,0.85)',
+            transform: 'rotate(-6deg)',
+            background: 'rgba(244,244,250,0.92)',
           },
           carimbo,
         )
@@ -225,7 +225,7 @@ function recibo(inp: OgSecaoInput, w: number, alt: number): No {
     h('div', { fontSize: fs - 1, color: TINTA_SUAVE, marginTop: 2, letterSpacing: 1 }, `ELEIÇÕES 2026 · ${cargo}`),
     h('div', { fontSize: fs, marginTop: 6, letterSpacing: 1, fontWeight: 700 }, `ZONA ${f4(inp.zona)} · SEÇÃO ${f4(inp.secao)}`),
     regua(),
-    inp.t2 ? blocoTurno(`2º TURNO · 25/10/2026${inp.simulacao ? ' · SIMULAÇÃO' : ''}`, inp.t2, fs, inp.simulacao ? 'SIMULAÇÃO' : null) : null,
+    inp.t2 ? blocoTurno('2º TURNO · 25/10/2026', inp.t2, fs, inp.simulacao ? 'SIMULAÇÃO' : null) : null,
     inp.t2 ? regua() : null,
     inp.t1 ? blocoTurno('1º TURNO · 04/10/2026 · OFICIAL', inp.t1, fs, null) : null,
     regua(),
@@ -296,7 +296,7 @@ export function layoutSecao(inp: OgSecaoInput): No {
   );
   return fundo(
     inp.simulacao && inp.t2 ? barraSimulacao() : null,
-    h('div', { width: OG_W, height: OG_H, alignItems: 'center' }, esquerda, h('div', { flexGrow: 1, justifyContent: 'center', alignItems: 'center', height: OG_H }, recibo(inp, 520, 566))),
+    h('div', { width: OG_W, height: OG_H, alignItems: 'center' }, esquerda, h('div', { flexGrow: 1, justifyContent: 'center', alignItems: 'center', height: OG_H }, recibo(inp, 520, inp.t2 ? 566 : 416))),
   );
 }
 
@@ -439,7 +439,9 @@ export function layoutComposicao(inp: OgComposicaoInput): No {
     h(
       'div',
       { flexDirection: 'column', width: 470 },
-      h('div', { fontSize: 18, fontWeight: 600, color: C.muted, letterSpacing: 2, marginBottom: 6 }, 'MAIORES BANCADAS'),
+      top.length
+        ? h('div', { fontSize: 18, fontWeight: 600, color: C.muted, letterSpacing: 2, marginBottom: 6 }, 'MAIORES BANCADAS')
+        : h('div', { fontFamily: 'Bricolage', fontWeight: 700, fontSize: 34, color: C.fg, lineHeight: 1.15, marginBottom: 10 }, 'Resultado ainda não divulgado pelo TSE'),
       ...linhas,
       resto > 0 ? h('div', { fontSize: 20, color: C.muted, marginTop: 8 }, `Demais partidos: ${fmtInt(resto)} ${resto === 1 ? 'cadeira' : 'cadeiras'}`) : null,
       inp.pendentes > 0 ? h('div', { alignItems: 'center', gap: 10, marginTop: 6 }, h('div', { width: 16, height: 16, borderRadius: 8, background: COR_PENDENTE, border: '1px solid rgba(244,244,250,0.3)' }), h('div', { fontSize: 20, color: C.muted }, inp.nota ?? `${fmtInt(inp.pendentes)} aguardando o TSE`)) : null,
@@ -518,10 +520,12 @@ export interface OgGovernadoresInput {
   primeiroTurno: boolean;
   simulacao: boolean;
   aoVivo: boolean;
+  /** Nomes ocultos na simulação: sem a linha "partido · número" (fictícia). */
+  anonimizado?: boolean;
   dominio?: string;
 }
 
-function linhaGov(d: DisputaGov): No {
+function linhaGov(d: DisputaGov, anonimizado: boolean): No {
   const idx = d.race.candidatos.map((c, i) => (c.agregado ? -1 : i)).filter((i) => i >= 0);
   const [ia, ib] = [idx[0] ?? 0, idx[1] ?? 1];
   const r = d.resumo;
@@ -535,17 +539,19 @@ function linhaGov(d: DisputaGov): No {
     const c = d.race.candidatos[i];
     return h(
       'div',
-      { flexDirection: 'column', alignItems: alinhar, width: 232 },
-      h('div', { fontSize: 22, fontWeight: 600, color: C.fg, ...umaLinha, maxWidth: 232 }, c.nomeUrna),
-      h('div', { fontSize: 15, color: eleito(i) ? C.brand2 : C.subtle, fontWeight: eleito(i) ? 700 : 400, letterSpacing: eleito(i) ? 1 : 0 }, eleito(i) ? (r.status === 'encerrada' ? 'ELEITO' : 'MATEMATICAMENTE ELEITO') : `${c.partido} · ${c.numero}`),
+      { flexDirection: 'column', alignItems: alinhar, width: 240 },
+      h('div', { fontSize: 21, fontWeight: 600, color: C.fg, lineHeight: 1.15, ...umaLinha, maxWidth: 240 }, c.nomeUrna),
+      eleito(i) || !anonimizado
+        ? h('div', { fontSize: 14, color: eleito(i) ? C.brand2 : C.subtle, fontWeight: eleito(i) ? 700 : 400, letterSpacing: eleito(i) ? 1 : 0 }, eleito(i) ? (r.status === 'encerrada' ? 'ELEITO' : 'MATEMATICAMENTE ELEITO') : `${c.partido} · ${c.numero}`)
+        : null,
     );
   };
   const pct = (i: number, cor: string, alinhar: 'flex-start' | 'flex-end') =>
-    h('div', { width: 136, justifyContent: alinhar, fontFamily: 'Bricolage', fontWeight: 800, fontSize: 34, color: cor, letterSpacing: -1 }, tem ? fmtPct(pctValidos(r, i)) : '—');
+    h('div', { width: 128, justifyContent: alinhar, fontFamily: 'Bricolage', fontWeight: 800, fontSize: 32, color: cor, letterSpacing: -1 }, tem ? fmtPct(pctValidos(r, i)) : '—');
   return h(
     'div',
-    { alignItems: 'center', height: 56, gap: 12 },
-    h('div', { width: 56, height: 42, borderRadius: 10, background: C.surface3, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 700, fontSize: 22, color: C.fg }, d.uf),
+    { alignItems: 'center', height: 48, gap: 12 },
+    h('div', { width: 50, height: 38, borderRadius: 9, background: C.surface3, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 700, fontSize: 20, color: C.fg, flexShrink: 0 }, d.uf),
     lado(ia, 'flex-end'),
     pct(ia, C.a, 'flex-end'),
     h(
@@ -554,7 +560,7 @@ function linhaGov(d: DisputaGov): No {
       tem
         ? h('div', { width: BW, height: 12, position: 'relative' }, h('div', { width: wa, height: 12, background: C.a, borderRadius: '6px 0 0 6px' }), h('div', { width: 4, height: 12 }), h('div', { width: BW - 4 - wa, height: 12, background: C.b, borderRadius: '0 6px 6px 0' }), h('div', { position: 'absolute', left: BW / 2 - 1, top: -4, width: 2, height: 20, background: 'rgba(244,244,250,0.8)' }))
         : h('div', { width: BW, height: 12, borderRadius: 6, background: C.pending }),
-      h('div', { fontSize: 14, color: C.subtle, marginTop: 4 }, d.race.turno === 1 ? '1º turno · oficial' : `${fmtPct(pctTotalizadas(r), 0)} das seções`),
+      d.race.turno === 1 ? null : h('div', { fontSize: 13, color: C.subtle, marginTop: 3 }, `${fmtPct(pctTotalizadas(r), 0)} das seções`),
     ),
     pct(ib, C.b, 'flex-start'),
     lado(ib, 'flex-start'),
@@ -568,8 +574,9 @@ export function layoutGovernadores(inp: OgGovernadoresInput): No {
     selo,
     kicker: inp.primeiroTurno ? 'GOVERNADORES · 1º TURNO 2026 · % DOS VÁLIDOS' : 'GOVERNADORES · 2º TURNO 2026 · % DOS VÁLIDOS',
     titulo: inp.primeiroTurno ? 'As 7 disputas de governador no 2º turno' : 'As 7 disputas de governador',
-    tamTitulo: 40,
-    corpo: h('div', { flexDirection: 'column', gap: 4, marginTop: -6 }, ...inp.disputas.slice(0, 7).map(linhaGov)),
+    tamTitulo: 38,
+    padTopo: 34,
+    corpo: h('div', { flexDirection: 'column', gap: 3, marginTop: -8 }, ...inp.disputas.slice(0, 7).map((d) => linhaGov(d, !!inp.anonimizado))),
     rodapeEsq: inp.simulacao ? 'SIMULAÇÃO · dados fictícios' : inp.primeiroTurno ? 'Resultado do 1º turno · 2º turno em 25/10, a partir das 17h' : 'Fonte: TSE',
     rodapeDir: inp.dominio ?? null,
   });
@@ -743,9 +750,9 @@ export function layoutCenario(inp: OgCenarioInput): No {
     .map((p) =>
       h(
         'div',
-        { alignItems: 'baseline', gap: 10, height: 30 },
-        h('div', { fontSize: 18, fontWeight: 700, color: C.brand2, flexShrink: 0, ...umaLinha, maxWidth: 420 }, cortar(p.rotulo, 46)),
-        h('div', { fontSize: 18, color: C.muted, ...umaLinha, maxWidth: 620 }, p.texto),
+        { alignItems: 'flex-start', gap: 10, marginTop: 6, width: W },
+        h('div', { fontSize: 18, fontWeight: 700, color: C.brand2, flexShrink: 0, lineHeight: 1.35, ...umaLinha, maxWidth: 420 }, cortar(p.rotulo, 46)),
+        h('div', { fontSize: 18, color: C.muted, lineHeight: 1.35, flexShrink: 1, minWidth: 0 }, cortar(p.texto, 200)),
       ),
     );
   return fundo(

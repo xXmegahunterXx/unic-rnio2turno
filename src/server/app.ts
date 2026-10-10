@@ -86,6 +86,8 @@ export const CC = {
 
 type Ctx = Context<{ Bindings: HttpBindings }>;
 
+export const ROBOTS_TXT = ['User-agent: *', 'Allow: /api/og/', 'Disallow: /api/', 'Disallow: /admin', ''].join('\n');
+
 /** Erro HTTP com corpo `{ erro }`. */
 class ErroHttp extends Error {
   constructor(
@@ -549,6 +551,9 @@ export function createApp(deps: AppDeps) {
         const body = arq.body ? await arq.body : null;
         return responder(c, body, arq.status, arq.headers);
       }
+      // robots.txt padrão (se o build não trouxer um): páginas e imagens de compartilhamento liberadas — o robô do X
+      // respeita o robots.txt também para a og:image —, JSON da API e o painel fora dos buscadores
+      if (path === '/robots.txt') return c.text(ROBOTS_TXT, 200, { 'cache-control': 'public, max-age=3600, s-maxage=86400' });
       if (pareceArquivo(path)) return c.text('Arquivo não encontrado', 404, { 'cache-control': 'public, max-age=60' });
       const tpl = estaticos.template();
       if (!tpl) return c.text('Build do app ausente (rode npm run build).', 503, { 'cache-control': CC.privado });
@@ -557,7 +562,8 @@ export function createApp(deps: AppDeps) {
       const st = dados.status();
       const versaoImg = `${st.versao}-${Math.floor(now() / 60_000).toString(36)}`;
       // só os parâmetros que mudam a página entram na chave (utm_* e afins não multiplicam o cache)
-      const chave = `html|${path}|${consultaNormalizada(url.searchParams)}|${versaoImg}`;
+      // o código do Duelo (respostas do Teste Cego) não entra nem na chave do cache: a página é a mesma para todos
+      const chave = `html|${path.startsWith('/duelo/') ? '/duelo/*' : path}|${consultaNormalizada(url.searchParams)}|${versaoImg}`;
       const { p } = respostas.obter(chave, () => {
         const m = metaDaRota(path, url.searchParams, ctxMeta);
         const origem = origemDe(c);
