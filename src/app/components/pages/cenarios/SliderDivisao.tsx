@@ -3,8 +3,12 @@
  * partes de uma divisão (finalista 1, finalista 2, branco/nulo, não vota). As cores dos finalistas vêm de ./cores.ts.
  *
  * O divisor é um <input type="range"> nativo (teclado: setas ±1, PageUp/PageDown ±10, Home/End; leitores de tela
- * com aria-valuetext completo) sobre uma trilha desenhada com tokens. O lado esquerdo cresce quando o divisor vai
- * para a direita: arrastar em direção a um lado DIMINUI esse lado, como empurrar a fronteira.
+ * com aria-valuetext completo) sobre uma trilha desenhada com tokens. Metáfora de "puxar": arrastar (ou teclar) NA
+ * DIREÇÃO de um lado AUMENTA a parte dele. Cada metade da trilha é o "território" de um lado (cor suave); o
+ * preenchimento sólido vai do meio até o divisor, na cor de quem está levando mais. No 50/50 o divisor fica no meio.
+ *
+ * Por isso o valor do <input> é a posição do divisor (0 = tudo para a esquerda… 100 = tudo para a direita), ou seja,
+ * a parte do lado DIREITO; a prop `valor` continua sendo a parte do lado esquerdo (`posicao = 100 − valor`).
  */
 import { useId, useRef, type PointerEvent, type ReactNode } from 'react';
 import type { PartesDivisao } from '@/shared/cenarios';
@@ -74,6 +78,8 @@ export function SliderDivisao({
 }: SliderDivisaoProps) {
   const id = useId();
   const v = Math.min(100, Math.max(0, Math.round(valor)));
+  /** Posição do divisor na trilha (0 = esquerda): perto de um lado = mais para esse lado. */
+  const pos = 100 - v;
   // Toque: o valor segue o dedo em qualquer ponto da trilha. O <input range> nativo do iOS (Safari e o navegador
   // embutido do app do X, ambos WebKit) só responde a quem arrasta o próprio polegar — que aqui tem 1 px —, então o
   // toque é tratado à mão. Mouse e teclado continuam com o input nativo. `touch-pan-y` deixa a página rolar na vertical.
@@ -81,7 +87,7 @@ export function SliderDivisao({
   const dedo = useRef<number | null>(null);
   const valorNoPonto = (x: number) => {
     const r = trilho.current?.getBoundingClientRect();
-    return r && r.width > 0 ? valorNoTrilho(x, r.left, r.width) : v;
+    return r && r.width > 0 ? 100 - valorNoTrilho(x, r.left, r.width) : v;
   };
   const aoTocar = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse') return;
@@ -119,7 +125,7 @@ export function SliderDivisao({
             type="range"
             min={0}
             max={100}
-            value={v}
+            value={pos}
             disabled
             aria-label={ariaLabel}
             aria-valuetext={texto}
@@ -139,9 +145,14 @@ export function SliderDivisao({
           onPointerUp={aoSoltar}
           onPointerCancel={aoSoltar}
         >
-          <div className="absolute inset-x-0 top-1/2 flex h-3 -translate-y-1/2 overflow-hidden rounded-full">
-            <div className={cn('h-full transition-[width] duration-150 ease-out', TRILHA[esquerda.cor])} style={{ width: `${v}%` }} />
-            <div className={cn('h-full flex-1', TRILHA[direita.cor])} />
+          {/* metades = "território" de cada lado (cor suave); preenchimento sólido do meio até o divisor */}
+          <div className="absolute inset-x-0 top-1/2 flex h-3 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3">
+            <div className={cn('h-full w-1/2 opacity-30', TRILHA[esquerda.cor])} />
+            <div className={cn('h-full w-1/2 opacity-30', TRILHA[direita.cor])} />
+            <div
+              className={cn('absolute inset-y-0 transition-[left,right] duration-150 ease-out', TRILHA[pos <= 50 ? esquerda.cor : direita.cor])}
+              style={pos <= 50 ? { left: `${pos}%`, right: '50%' } : { left: '50%', right: `${100 - pos}%` }}
+            />
           </div>
           {marcaMeio ? <span aria-hidden className="absolute left-1/2 top-1/2 h-5 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg/50" /> : null}
           <input
@@ -150,10 +161,10 @@ export function SliderDivisao({
             min={0}
             max={100}
             step={1}
-            value={v}
+            value={pos}
             aria-label={ariaLabel}
             aria-valuetext={texto}
-            onChange={(e) => onChange(Number(e.target.value))}
+            onChange={(e) => onChange(100 - Number(e.target.value))}
             className={cn(
               'peer absolute inset-0 z-10 h-full w-full cursor-pointer appearance-none bg-transparent opacity-0',
               // polegar nativo fininho: o valor acompanha o dedo em toda a largura (o desenhado fica por cima)
@@ -168,7 +179,7 @@ export function SliderDivisao({
               'shadow-[0_2px_10px_rgb(0_0_0/0.35)] transition-transform duration-150',
               'peer-hover:scale-110 peer-active:scale-110 peer-focus-visible:ring-4 peer-focus-visible:ring-brand/50',
             )}
-            style={{ left: `${v}%` }}
+            style={{ left: `${pos}%` }}
           >
             <span className="h-3 w-px rounded-full bg-bg/60" />
             <span className="h-3 w-px rounded-full bg-bg/60" />

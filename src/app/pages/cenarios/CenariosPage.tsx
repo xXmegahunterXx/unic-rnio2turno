@@ -148,8 +148,8 @@ function Calculadora({ ds }: { ds: PresidenteT1Dataset }) {
                 Para onde vão os eleitores dos demais candidatos
               </h2>
               <p className="mt-1 text-[13.5px] leading-snug text-fg-muted">
-                Arraste o divisor: quanto mais para a direita, mais votos para {nomes.a}; para a esquerda, mais para {nomes.b}. A mesma divisão vale
-                em todos os estados.
+                Arraste o divisor na direção de um candidato para dar mais votos a ele: para a esquerda, mais para {nomes.a}; para a direita, mais
+                para {nomes.b}. No meio, metade para cada. A mesma divisão vale em todos os estados.
               </p>
             </div>
             <ControleTodos ds={ds} cenario={cenario} nomes={nomes} onChange={set} />
