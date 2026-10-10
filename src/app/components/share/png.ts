@@ -1,8 +1,8 @@
 /**
  * Geração do PNG de um cartão (html-to-image), pensada para o celular:
- *  - fontes: embute SÓ os subconjuntos latinos das famílias que o cartão usa (Inter, Bricolage, JetBrains Mono),
- *    convertidos para data URL uma única vez por sessão — o padrão do html-to-image baixaria todos os
- *    subconjuntos (cirílico, grego, vietnamita…) a cada imagem;
+ *  - fontes: embute SÓ os subconjuntos (unicode-range) que cobrem os caracteres do cartão, das famílias que ele usa
+ *    (Inter, Bricolage, JetBrains Mono), convertidos para data URL uma única vez por sessão — o padrão do
+ *    html-to-image baixaria todos os subconjuntos (cirílico, grego, vietnamita…) a cada imagem;
  *  - espera as imagens (fotos oficiais em data URI) e as fontes ficarem prontas antes de desenhar;
  *  - resolução 1× (o cartão já é desenhado em px reais: 1200×675, 1080×1350 ou 1080×1920).
  */
@@ -22,11 +22,39 @@ function familiasUsadas(node: HTMLElement): Set<string> {
   return out;
 }
 
-/** Subconjuntos que interessam ao português (latin e latin-ext) ou sem unicode-range. */
-function cobreLatim(unicodeRange: string): boolean {
-  const r = unicodeRange.replace(/\s+/g, '').toUpperCase();
-  if (!r) return true;
-  return r.includes('U+0000-00FF') || r.startsWith('U+0100-');
+/**
+ * Faixas de um `unicode-range` ("U+0-FF, U+131, U+4??" — o Chrome normaliza sem zeros à esquerda). Pura (testada).
+ */
+export function faixasUnicode(unicodeRange: string): [number, number][] {
+  const out: [number, number][] = [];
+  for (const parte of unicodeRange.split(',')) {
+    const t = parte.trim().toUpperCase().replace(/^U\+/, '');
+    if (!t) continue;
+    if (t.includes('?')) {
+      out.push([parseInt(t.replace(/\?/g, '0'), 16), parseInt(t.replace(/\?/g, 'F'), 16)]);
+      continue;
+    }
+    const [a, b] = t.split('-');
+    const ini = parseInt(a, 16);
+    const fim = b ? parseInt(b, 16) : ini;
+    if (Number.isFinite(ini) && Number.isFinite(fim)) out.push([ini, fim]);
+  }
+  return out;
+}
+
+/** true se o subconjunto (`unicode-range`) cobre algum caractere usado (sem faixa = cobre tudo). Pura (testada). */
+export function subconjuntoNecessario(unicodeRange: string, usados: Iterable<number>): boolean {
+  const faixas = faixasUnicode(unicodeRange);
+  if (!faixas.length) return true;
+  for (const cp of usados) if (faixas.some(([a, b]) => cp >= a && cp <= b)) return true;
+  return false;
+}
+
+/** Caracteres do texto do cartão (+ dígitos e "%", sempre presentes nos números). */
+function caracteresUsados(node: HTMLElement): Set<number> {
+  const out = new Set<number>();
+  for (const ch of `${node.textContent ?? ''}0123456789%`) out.add(ch.codePointAt(0)!);
+  return out;
 }
 
 const dataUrls = new Map<string, Promise<string>>();
@@ -61,7 +89,7 @@ interface RegraFonte {
   url: string;
 }
 
-function regrasDeFonte(familias: Set<string>): RegraFonte[] {
+function regrasDeFonte(familias: Set<string>, usados: Set<number>): RegraFonte[] {
   const out: RegraFonte[] = [];
   for (const sheet of Array.from(document.styleSheets)) {
     let regras: CSSRuleList;
@@ -77,7 +105,7 @@ function regrasDeFonte(familias: Set<string>): RegraFonte[] {
       const familia = normFamilia(s.getPropertyValue('font-family'));
       if (!familias.has(familia)) continue;
       const faixa = s.getPropertyValue('unicode-range');
-      if (!cobreLatim(faixa)) continue;
+      if (!subconjuntoNecessario(faixa, usados)) continue;
       const m = /url\(\s*["']?([^"')]+)["']?\s*\)/.exec(s.getPropertyValue('src'));
       if (!m) continue;
       let url: string;
@@ -105,10 +133,12 @@ const cssPorFamilias = new Map<string, Promise<string>>();
 /** CSS com as fontes do cartão embutidas (cache por conjunto de famílias). */
 export function cssFontesEmbutidas(node: HTMLElement): Promise<string> {
   const familias = familiasUsadas(node);
-  const chave = [...familias].sort().join('|');
+  const usados = caracteresUsados(node);
+  const regras = regrasDeFonte(familias, usados);
+  // Cache pelo conjunto de arquivos (o mesmo cartão com outros números reaproveita tudo).
+  const chave = regras.map((r) => r.url).sort().join('|');
   let p = cssPorFamilias.get(chave);
   if (!p) {
-    const regras = regrasDeFonte(familias);
     p = Promise.all(regras.map((r) => paraDataUrl(r.url).then((d) => r.css(d)))).then((css) => css.join('\n'));
     p.catch(() => cssPorFamilias.delete(chave));
     cssPorFamilias.set(chave, p);

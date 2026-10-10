@@ -118,14 +118,15 @@ function Miolo({ ficha: f, cargo, situacao, semResultado }: Omit<CartaoCandidato
   if (retrato) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center" style={{ gap: 40 * k }}>
-        <Retrato ficha={f} w={Math.round((formato === 'story' ? 300 : 230) * k)} />
+        {/* foto oficial tem 120×160: tamanho contido para não ampliar demais */}
+        <Retrato ficha={f} w={formato === 'story' ? 300 : 260} />
         {texto}
       </div>
     );
   }
   return (
     <div className="flex flex-1 items-center" style={{ gap: 44 }}>
-      <Retrato ficha={f} w={270} />
+      <Retrato ficha={f} w={240} />
       {texto}
     </div>
   );

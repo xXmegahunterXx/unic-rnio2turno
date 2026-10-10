@@ -51,39 +51,40 @@ export function CartaoGovernadores({ formato, itens, simulado, t1, caminho }: Ca
 }
 
 function Celula({ d, t1 }: { d: DisputaGov; t1?: boolean }) {
-  const { k, formato } = useCartao();
-  const x = formato === 'x';
+  const { k: kBase, formato } = useCartao();
+  // Mesma grade de tamanhos nos 3 formatos (escala do cartão); o story ganha um pouco mais.
+  const k = kBase * (formato === 'story' ? 1.18 : formato === 'feed' ? 0.94 : 1);
   const tem = validos(d.resumo) > 0;
   const fin = d.race.candidatos.map((c, i) => ({ c, i })).filter(({ c }) => !c.agregado);
   const m = margem(d.resumo);
   const eleito = !t1 && d.resumo.eleito !== null ? d.race.candidatos[d.resumo.eleito] : null;
   return (
-    <div className="flex min-w-0 flex-col rounded-[0.9em] border border-line/[2] bg-surface/75" style={{ padding: `${(x ? 12 : 18) * k}px ${(x ? 14 : 20) * k}px`, fontSize: 16 * k }}>
+    <div className="flex min-w-0 flex-col rounded-[0.9em] border border-line/[2] bg-surface/75" style={{ padding: `${12 * k}px ${14 * k}px`, fontSize: 16 * k }}>
       <div className="flex items-baseline justify-between" style={{ gap: 8 * k }}>
-        <div className="min-w-0 truncate font-display font-semibold leading-tight tracking-[-0.02em]" style={{ fontSize: (x ? 19 : 25) * k }}>
+        <div className="min-w-0 truncate font-display font-semibold leading-tight tracking-[-0.02em]" style={{ fontSize: 19 * k }}>
           {UF_NOMES[d.uf]}
         </div>
-        <div className="shrink-0 font-mono font-semibold text-fg-subtle" style={{ fontSize: (x ? 13 : 16) * k }}>
+        <div className="shrink-0 font-mono font-semibold text-fg-subtle" style={{ fontSize: 13 * k }}>
           {d.uf}
         </div>
       </div>
-      <div className="flex flex-col" style={{ gap: (x ? 3 : 6) * k, marginTop: (x ? 8 : 12) * k }}>
+      <div className="flex flex-col" style={{ gap: 3 * k, marginTop: 8 * k }}>
         {fin.map(({ c, i }) => (
           <div key={i} className="flex items-baseline justify-between" style={{ gap: 10 * k }}>
-            <span className={cn('min-w-0 truncate', m.lider === i && tem ? 'font-semibold text-fg' : 'text-fg-muted')} style={{ fontSize: (x ? 14.5 : 19) * k }}>
+            <span className={cn('min-w-0 truncate', m.lider === i && tem ? 'font-semibold text-fg' : 'text-fg-muted')} style={{ fontSize: 14.5 * k }}>
               {c.nomeUrna}
-              {eleito === c ? <Icon name="check-circulo" size={(x ? 14 : 18) * k} strokeWidth={2.4} className={cn('ml-[0.3em] inline align-[-0.12em]', corSlot(c.cor).text)} /> : null}
+              {eleito === c ? <Icon name="check-circulo" size={14 * k} strokeWidth={2.4} className={cn('ml-[0.3em] inline align-[-0.12em]', corSlot(c.cor).text)} /> : null}
             </span>
-            <span className={cn('num shrink-0 font-display font-semibold leading-none', tem ? corSlot(c.cor).textDisplay : 'text-fg-subtle')} style={{ fontSize: (x ? 24 : 34) * k }}>
+            <span className={cn('num shrink-0 font-display font-semibold leading-none', tem ? corSlot(c.cor).textDisplay : 'text-fg-subtle')} style={{ fontSize: 24 * k }}>
               {fmtPct(pctValidos(d.resumo, i), 1)}
             </span>
           </div>
         ))}
       </div>
-      <div style={{ marginTop: (x ? 9 : 14) * k }}>
-        <BarraDuelo race={d.race} votos={d.resumo.votos} alto={(x ? 8 : 11) * k} rotulo={false} />
+      <div style={{ marginTop: 9 * k }}>
+        <BarraDuelo race={d.race} votos={d.resumo.votos} alto={8 * k} rotulo={false} />
       </div>
-      <div className="num text-fg-muted" style={{ fontSize: (x ? 12.5 : 15) * k, marginTop: (x ? 8 : 12) * k }}>
+      <div className="num text-fg-muted" style={{ fontSize: 12.5 * k, marginTop: 8 * k }}>
         {t1 ? 'Resultado final' : eleito ? 'Resultado definido' : `${fmtPct(pctTotalizadas(d.resumo))} das seções`}
       </div>
     </div>
@@ -104,7 +105,7 @@ function Miolo({ itens, t1 }: { itens: DisputaGov[]; t1?: boolean }) {
         </div>
         <RotuloCartao style={{ marginTop: x ? 0 : 12 * k }}>{t1 ? 'Como foi o 1º turno' : '2º turno · 25 de outubro'}</RotuloCartao>
       </div>
-      <div className={cn('grid', x ? 'grid-cols-4' : 'grid-cols-2')} style={{ gap: (x ? 10 : 18) * k }}>
+      <div className={cn('grid', x ? 'grid-cols-4' : formato === 'feed' ? 'grid-cols-3' : 'grid-cols-2')} style={{ gap: (x ? 10 : 16) * k }}>
         {itens.map((d) => (
           <Celula key={d.uf} d={d} t1={t1} />
         ))}
@@ -121,7 +122,17 @@ function Miolo({ itens, t1 }: { itens: DisputaGov[]; t1?: boolean }) {
               {definidas} de {itens.length} definidas
             </div>
           </div>
-        ) : null}
+        ) : (
+          <div className="flex min-w-0 flex-col justify-center rounded-[0.9em] bg-brand/10" style={{ padding: `${(x ? 12 : 18) * k}px ${(x ? 14 : 20) * k}px` }}>
+            <RotuloCartao>2º turno</RotuloCartao>
+            <div className="font-display font-semibold leading-tight tracking-[-0.02em]" style={{ fontSize: (x ? 26 : 34) * k, marginTop: 10 * k }}>
+              25 de outubro
+            </div>
+            <div className="text-fg-muted" style={{ fontSize: (x ? 13 : 16) * k, marginTop: 6 * k }}>
+              Apuração ao vivo a partir das 17h (Brasília)
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

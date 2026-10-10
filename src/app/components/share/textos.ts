@@ -218,7 +218,8 @@ export function textoCandidato(d: CandidatoTextoDados): string {
   const onde = d.uf === 'BR' ? '' : ` · ${UF_NOMES[d.uf as UF] ?? d.uf}`;
   const cab = `${d.nomeUrna} (${d.partido} ${d.numero}) · ${d.cargo}${onde}`;
   if (!d.resultado) return finalizar(`${cab}: ficha com os dados públicos do TSE.`, false);
-  const sit = d.situacao ? `, ${d.situacao.charAt(0).toLowerCase()}${d.situacao.slice(1)}` : '';
+  const sitBruta = d.situacao && !/apura/i.test(d.situacao) ? d.situacao : '';
+  const sit = !sitBruta ? '' : /2º turno/.test(sitBruta) ? ', disputa o 2º turno' : `, ${sitBruta.charAt(0).toLowerCase()}${sitBruta.slice(1)}`;
   return finalizar(
     `${cab} · 1º turno: ${fmtInt(d.resultado.votos)} votos (${fmtPct(d.resultado.pct)} dos válidos)${sit}. Ficha com os dados públicos do TSE.`,
     false,

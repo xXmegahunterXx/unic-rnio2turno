@@ -156,7 +156,7 @@ function Hero({ ds }: { ds: CuriosidadesDataset | undefined }) {
                 onClick={irParaMetodo}
                 className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-[16px] border border-line px-4 text-[15px] font-medium sm:px-5 text-fg transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
-                <Icon name="info" size={18} />
+                <Icon name="info" size={18} className="hidden min-[400px]:block" />
                 Como calculamos
               </button>
             </div>

@@ -162,6 +162,9 @@ describe('outros cartões', () => {
     conferir(t);
     expect(t).toContain('3.038.438 votos (25,31% dos válidos), eleita');
     expect(textoCandidato({ nomeUrna: 'X', partido: 'Y', numero: 1, cargo: 'Presidente', uf: 'BR' })).toContain('ficha com os dados públicos');
+    const t2 = textoCandidato({ nomeUrna: 'Y', partido: 'Z', numero: 22, cargo: 'Presidente', uf: 'BR', resultado: { votos: 56104503, pct: 47.03 }, situacao: '2º turno' });
+    conferir(t2);
+    expect(t2).toContain('47,03% dos válidos), disputa o 2º turno.');
   });
   it('composição e Senado por UF', () => {
     const b = [

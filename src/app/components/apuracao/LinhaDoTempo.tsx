@@ -422,6 +422,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
                 </>
               )}
             </p>
+            <div className="flex shrink-0 items-center gap-1">
             {revendo && !tocando && arrasto === null && t !== undefined && compartilhar !== false ? (
               <CompartilharInstante t={t} simulacao={status.simulacao} dados={compartilhar} />
             ) : null}
@@ -444,6 +445,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
                 <span className="num">{fmtHora(simNow)}</span>
               </span>
             )}
+            </div>
           </div>
 
           {/* trilho */}

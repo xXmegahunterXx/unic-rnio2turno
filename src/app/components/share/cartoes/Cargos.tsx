@@ -285,7 +285,10 @@ export function CartaoSenadoUf({ formato, uf, eleitos, fotoGrupo, caminho }: Car
 
 function MioloSenado({ uf, eleitos, fotoGrupo }: Omit<CartaoSenadoUfProps, 'formato' | 'caminho'>) {
   const { k, retrato, formato } = useCartao();
-  const w = formato === 'x' ? 150 : formato === 'feed' ? 270 : 300;
+  // As fotos oficiais têm 120×160: tamanhos contidos para não ampliar demais (mesmo tamanho para os dois).
+  const w = formato === 'x' ? 150 : formato === 'feed' ? 240 : 250;
+  // Mesmo corpo de letra para os dois nomes (tratamento igual), pelo nome mais longo.
+  const fatorNome = Math.max(...eleitos.slice(0, 2).map((e) => e.nomeUrna.length)) > 16 ? 0.82 : 1;
   return (
     <div className="flex flex-1 flex-col justify-center" style={{ gap: (retrato ? 44 : 18) * k, paddingTop: 10 * k }}>
       <div>
@@ -299,7 +302,7 @@ function MioloSenado({ uf, eleitos, fotoGrupo }: Omit<CartaoSenadoUfProps, 'form
           <div key={e.sqcand} className={cn('flex min-w-0', formato === 'feed' ? 'flex-col' : 'items-center')} style={{ gap: (formato === 'feed' ? 22 : 26) * k }}>
             <RetratoSenador e={e} fotoGrupo={fotoGrupo} w={w} />
             <div className="min-w-0">
-              <div className="text-balance font-display font-semibold leading-[1.02] tracking-[-0.03em]" style={{ fontSize: (formato === 'x' ? 34 : 44) * k * (e.nomeUrna.length > 16 ? 0.82 : 1) }}>
+              <div className="text-balance font-display font-semibold leading-[1.02] tracking-[-0.03em]" style={{ fontSize: (formato === 'x' ? 34 : 44) * k * fatorNome }}>
                 {e.nomeUrna}
               </div>
               <div className="inline-flex items-center rounded-full border border-line/[2.5] bg-surface/80 font-semibold" style={{ gap: 9 * k, fontSize: 18 * k, padding: `${4 * k}px ${14 * k}px`, marginTop: 12 * k }}>

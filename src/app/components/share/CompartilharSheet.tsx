@@ -222,11 +222,11 @@ export function CompartilharSheet({
     if (!snap) return;
     const textoCompleto = textoComLink(snap.texto, snap.url, snap.tags);
     if (imagem && podeCompartilharArquivo(imagem.file)) {
-      const r = await compartilharArquivo(imagem.file, { titulo, texto: textoCompleto });
+      const r = await compartilharArquivo(imagem.file, { titulo: 'Sintonia', texto: textoCompleto });
       if (r === 'bloqueado' || r === 'indisponivel') await abrirModal(imagem);
       return;
     }
-    const r = await compartilharLink({ titulo, texto: textoComLink(snap.texto, undefined, snap.tags), url: snap.url });
+    const r = await compartilharLink({ titulo: 'Sintonia', texto: textoComLink(snap.texto, undefined, snap.tags), url: snap.url });
     if (r === 'bloqueado' || r === 'indisponivel') {
       if (imagem) await abrirModal(imagem);
       else copiar('tudo');

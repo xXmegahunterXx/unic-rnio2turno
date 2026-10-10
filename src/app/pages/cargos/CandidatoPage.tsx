@@ -9,10 +9,8 @@ import type { CandidatoFicha } from '@/shared/dataset';
 import type { UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt, fmtPct } from '@/shared/format';
-import { compartilhar, urlAbsoluta } from '@/app/lib/share';
 import { Button, ButtonLink } from '@/app/ui/Button';
 import { Icon, type IconName } from '@/app/ui/Icon';
-import { toast } from '@/app/ui/Toast';
 import { Container } from '@/app/components/layout/Container';
 import { Breadcrumbs } from '@/app/components/layout/Breadcrumbs';
 import { ErrorState, LoadingState } from '@/app/components/apuracao/States';
@@ -22,6 +20,7 @@ import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { FotoOficial } from '@/app/components/pages/cargos/FotoOficial';
 import { PartidoChip, SituacaoSelo, FonteTse } from '@/app/components/pages/cargos/ui';
 import { cargoExibicao, ehEleito, fmtBens, fmtReais, rotuloSituacao, rotuloSituacaoCurto, useFicha, useFichasGrupo, useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
+import { BotaoCompartilharCandidato } from '@/app/components/share/cartoes/Candidato';
 
 /** Página do cargo (para a trilha e o "ver todos"). */
 function rotaCargo(f: CandidatoFicha): { to: string; label: string } {
@@ -96,16 +95,6 @@ export default function CandidatoPage() {
   const viceTem = f.vice?.sqcand && indice.porSq.has(f.vice.sqcand);
   const ehVice = /^Vice/.test(f.cargo);
 
-  async function compartilharFicha() {
-    const res = await compartilhar({
-      titulo: `${f!.nomeUrna} · ficha`,
-      texto: `${f!.nomeUrna} (${f!.partido}) · ${cargo}${f!.uf !== 'BR' ? ` · ${f!.uf}` : ''}: ficha com os dados públicos do TSE.`,
-      url: urlAbsoluta(`/candidato/${f!.sqcand}`),
-    });
-    if (res === 'copiado') toast('Link copiado', { tone: 'ok', icon: 'link' });
-    else if (res === 'erro') toast('Não foi possível compartilhar', { tone: 'alert' });
-  }
-
   return (
     <Container>
       <div className="pb-4 pt-5 sm:pb-5 sm:pt-8">
@@ -150,9 +139,13 @@ export default function CandidatoPage() {
             ) : null}
           </div>
           <div className="flex shrink-0 gap-2 sm:flex-col">
-            <Button variant="secondary" size="sm" icon="compartilhar" onClick={compartilharFicha}>
-              Compartilhar
-            </Button>
+            <BotaoCompartilharCandidato
+              ficha={f}
+              cargo={cargo}
+              situacao={r && !ehVice ? rotuloSituacaoCurto(r.situacao, f.genero) : undefined}
+              semResultado={ehVice}
+              size="sm"
+            />
           </div>
         </div>
       </section>

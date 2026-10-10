@@ -52,7 +52,7 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 | `useNow(ms = 1000)` | relógio local que avança alinhado ao segundo; pausa com a aba oculta. |
 | `estimarSimNow(status, recebidoEm, agora)` / `useSimNow(status, recebidoEm)` | interpola o relógio da apuração entre polls (`recebidoEm` = `query.dataUpdatedAt`). |
 | `useRaceParam(padrao = 'pres')` | `[race, setRace(id, { replace? })]` em `?race=` (omitido quando `'pres'`; preserva os outros params). |
-| `share.ts` | `compartilhar({ titulo?, texto, url? })` (Web Share → WhatsApp), `whatsappUrl(texto, url?)`, `abrirWhatsapp`, `copiarTexto`, `copiarLink(url?)`, `urlAbsoluta(caminho)` (funciona no HashRouter do demo), `hostExibicao()`, `nodeToPngBlob(node, opts)`, `downloadNodeAsPng(node, nome, opts)`, `compartilharNodeComoImagem(node, nome, input)` (html-to-image carregado sob demanda). |
+| `share.ts` | (Fase 3: veja "kit de compartilhamento" no fim) `compartilhar({ titulo?, texto, url? })` (Web Share → WhatsApp), `whatsappUrl(texto, url?)`, `abrirWhatsapp`, `copiarTexto`, `copiarLink(url?)`, `urlAbsoluta(caminho)` (funciona no HashRouter do demo), `hostExibicao()`, `nodeToPngBlob(node, opts)`, `downloadNodeAsPng(node, nome, opts)`, `compartilharNodeComoImagem(node, nome, input)` (html-to-image carregado sob demanda). |
 | `tokens.ts` | Cores em tempo de execução (fonte única): `tokenCss(token, α)` (único construtor de `rgb(var(--x) / α)`), `useTokenColors()`/`getTokens()` (RGB do tema atual, re-renderiza na troca), `resolveFill(css, tokens)`, `inkToken(fill, tokens)`, `contraste(a, b)`, `rgbCss`. Usado pelo canvas do mosaico e pelos rótulos dos mapas. |
 | `raceUi.ts` (**contrato com mapas**) | `corSlot(cor)` → `{ bg, bgSoft, bgFaint, text, textDisplay, ink, fill, stroke, border, ring, glow, css, cssVar, token }` (`text` = AA, `textDisplay` = cor pura para números grandes); `slotDe(race, i)`; `rgbSlot(cor, α)`; `fillMargem(cor, bucket 0–3)` → `rgb(var(--cand-a) / α)`; `MARGEM_ALPHA`, `MARGEM_ROTULOS`; `fillTally(race, tally)`; `fillApurado(pct)` / `fillApuradoTally(t)`; `fillMosaico(ch, cores?)`; `FILL_PENDENTE`, `FILL_EMPATE`, `FILL_NEUTRO`, `STROKE_DIVISA`. `text` tem contraste AA (≥ 4,5:1) nos dois temas; `textDisplay` é para números ≥ 24 px. |
 
@@ -115,8 +115,8 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 | `SecaoTable` | `race`, `secoes: SecaoResumo[]`, `onSelect?(secao)`, `selected?`, `pageSize=30`, `filtros=true` (status + nº). |
 | `BoletimUrna` | `secao: SecaoDetalhe`, `race`. Recibo térmico; “aguardando totalização”; carimbo SIMULAÇÃO se `secao.simulado`. |
 | `RaceSwitcher` | `races: Race[]`, `value?` (padrão `?race=`), `onChange?` (padrão grava `?race=`), `uf?` (contexto de estado), `incluirPrimeiroTurno?`, `size`. |
-| `ShareCard` | `race`, `resumo`, `formato: 'feed'(1080×1350) \| 'story'(1080×1920)`, `simulado?`, `local?`, `caminho='/apuracao'` + `ref` (nó a exportar). `ShareCardPreview({ formato, children })` escala a prévia. `textoCompartilhamento(race, resumo, simulado)`. |
-| `ShareButton` | `race`, `resumo`, `simulado?`, `local?`, `caminho?`, `texto?`, `label`, `variant`, `size`, `iconOnly?`. Abre Sheet com prévia, formato e ações (imagem, PNG, WhatsApp, copiar link). |
+| `ShareCard` | `race`, `resumo`, `formato: 'x'(1200×675) \| 'feed'(1080×1350) \| 'story'(1080×1920)`, `simulado?`, `local?`, `caminho='/apuracao'` + `ref` (nó a exportar). Moldura = `CartaoBase` do kit (Fase 3). `ShareCardPreview({ formato, children })` escala a prévia. `textoCompartilhamento(race, resumo, simulado, local?)`. |
+| `ShareButton` | `race`, `resumo`, `simulado?`, `local?`, `caminho?`, `texto?`, `label`, `variant`, `size`, `iconOnly?`. Abre o `CompartilharSheet` do kit (X, Web Share com PNG, WhatsApp, baixar/salvar, copiar link/texto). |
 | `SimulationRibbon` | `variant: 'bar'\|'badge'\|'stamp'`, `detalhe?`. |
 | `EmptyState` / `ErrorState` / `LoadingState` | `EmptyState({ icon?, title, description?, action?, compact? })`; `ErrorState({ title?, message?, onRetry?, compact? })`; `LoadingState({ variant: 'placar'\|'placar-compacto'\|'tabela'\|'lista'\|'stats'\|'boletim'\|'pagina', rows? })`. |
 | `cells.tsx` | `PctCell`, `MargemCell`, `ApuradoCell`, `CandHeader`, `margemAssinada`, `W` (larguras) — para montar outras tabelas no mesmo padrão. |
@@ -312,3 +312,70 @@ Meta de < 120 ms por desenho: cumprida em todos os casos no desktop e nas atuali
 - `MunicipioPage` e `ZonasExplorer` (prop `t`) leem `?t=`; a UfPage leva o instante ao abrir um município.
 - Paleta: `--partido-2` (PT) e `--partido-3` (MDB) trocaram de valor para separar os dois maiores partidos (PL rosa × PT anil).
 
+<!-- fase3-kit:start -->
+## Fase 3 · kit de compartilhamento
+
+Tudo em `src/app/components/share/` (importe de `@/app/components/share`) + `src/app/lib/share.ts`. Objetivo: toda tela
+importante vira **imagem + texto + link** bonitos e neutros para o X, inclusive no navegador embutido do app do X.
+
+### Contrato
+
+| Export | Uso |
+|---|---|
+| `type FormatoCartao = 'x' \| 'feed' \| 'story'` · `DIMENSOES_CARTAO` | `x` 1200×675 (16:9: X, WhatsApp, LinkedIn) · `feed` 1080×1350 (4:5) · `story` 1080×1920 (9:16). `FORMATOS_PADRAO = ['x','feed','story']`. |
+| `interface ConteudoCompartilhavel` | `titulo` (do sheet) · `texto` (neutro, **sem url**, ≤ 220 de peso do X) · `caminho` (rota do app; vira URL absoluta, funciona no HashRouter do demo) · `hashtags?` (sem `#`) · `nomeArquivo` (sem extensão) · `cartao?(formato)` (desenha o cartão em px reais) · `formatos?` (o 1º é o inicial) · `simulado?` (prefixa "[SIMULAÇÃO]" no texto, sem duplicar). |
+| `BotaoCompartilhar` | `ConteudoCompartilhavel` + `label?` (padrão "Compartilhar"), `variant?`, `size?`, `className?`, `soIcone?`, `icone?`, `descricao?` (linha do sheet), `carregando?` (dados do cartão chegando: as ações de imagem esperam). O cartão só é montado com o sheet aberto. |
+| `CompartilharSheet` | o mesmo + `aberto`, `onFechar`. Prévia escalada, seletor de formato, "Postar no X" (link de verdade para `x.com/intent/post`), "Compartilhar…" (Web Share com o PNG quando `canShare({files})`, senão texto+link), WhatsApp, Baixar/Salvar imagem, Copiar link, Copiar texto, contador de caracteres do X. |
+| `CartaoBase` | `formato`, `simulado?`, `titulo?`, `rodape?`, `children` (o miolo), `className?` + extras: `sobrancelha?`, `caminho?` (mostrado após o domínio), `instante?` (epoch; `null` esconde; padrão agora), `rotuloInstante?` ("Dados de"), `fonte?`, `selo?` (ex.: `<SeloOficial>Resultado oficial</SeloOficial>`), `brilho?` (`'duelo'` A×B, `'marca'`, `'neutro'` ou um par de slots). Moldura: fundo com brilho em gradiente (sem blur), logo, URL apresentável (`siteExibicao()`; em prévia/localhost vira "Apuração ao vivo"), data/hora de Brasília. **Simulado** = selo no topo + faixa "SIMULAÇÃO · dados fictícios · não são resultados reais" no rodapé + marca-d'água diagonal (sobrevive a recortes). |
+| `useCartao()` | `{ formato, w, h, k, retrato }` dentro do cartão: `k` = escala em relação ao 16:9 (x 1 · feed 1,3 · story 1,42). Escreva o miolo com `style={{ fontSize: 40 * k }}`. |
+| `PreviaCartao` | `formato`, `children`, `ref` → nó em tamanho real (é dele que sai o PNG). `ShareCardPreview` (antigo) continua funcionando. |
+| Peças | `AvatarCartao` (foto oficial ou monograma, mesmo recorte), `PctGigante`, `BarraDuelo` (marca dos 50%), `PilulaApurado`, `RotuloCartao`, `SeloSimulacao`, `SeloOficial`. |
+| `gerarPngCartao(no, w, h)` | PNG 1× via html-to-image, esperando fotos e fontes; embute **só os subconjuntos latinos** das fontes usadas (cache por sessão). No WebKit desenha duas vezes (bug do 1º desenho sem fontes). |
+
+### Textos (`textos.ts`, testados em `textos.test.ts`)
+
+`textoPlacar(race, resumo, { simulado, local })`, `textoInstante`, `textoMomento(evento, simulado)`, `textoSecao`, `textoMunicipioT1`,
+`textoGovernadores`, `textoCandidato`, `textoComposicao`, `textoSenadoUf`. Regras: só fatos e números, nada de "vai ganhar"/adjetivos,
+"[SIMULAÇÃO]" quando houver número simulado, ≤ `LIMITE_TEXTO` (220) — sobra espaço para o link (23) e até ~34 de hashtags nos 280 do X.
+Hashtags neutras em `HASHTAGS` / `hashtags('apuracao' | 'governador' | 'primeiroTurno' | 'senado' | 'camara' | 'assembleia' | 'candidato')`
+(no máximo duas). Helpers: `comPrefixoSimulacao`, `limitarTexto`, `finalizar`, `placarEmTexto`.
+
+### `src/app/lib/share.ts` (novidades; as funções antigas continuam)
+
+| Export | Uso |
+|---|---|
+| `xIntentUrl(texto, url, hashtags?)` · `abrirX(...)` | `https://x.com/intent/post?text=…&url=…&hashtags=a,b` (encodeURIComponent; tira a URL do texto — nunca duplica; corta o texto com "…" se o post passar de 280). |
+| `navegadorEmbutido()` / `detectarNavegadorEmbutido(ua)` | `'x' \| 'instagram' \| 'facebook' \| 'tiktok' \| 'linkedin' \| 'outro' \| null` (WebView genérica Android `; wv)` e iOS sem "Safari" = `'outro'`). `NOME_APP_EMBUTIDO`. |
+| `podeCompartilharArquivo(file)` · `compartilharArquivo(file, { titulo, texto })` · `compartilharLink(...)` | Web Share; resultado `'compartilhado' \| 'cancelado' \| 'bloqueado' \| 'indisponivel'` (`bloqueado` = gesto expirou/iframe sem permissão → mostre a imagem para salvar). |
+| `emIframe()`, `telaDeToque()`, `baixarArquivo(blob, nome)`, `blobParaDataUrl`, `abrirExterno(href)` | apoio do fallback (download silenciosamente bloqueado em WebViews/iframes → modal com `<img src=data:…>` "toque e segure para salvar"). |
+| `pesoTextoX`, `pesoPostX`, `textoParaX`, `normalizarHashtags`, `textoComLink`, `LIMITE_X`, `PESO_LINK_X` | contagem ponderada do X (link = 23; fora das faixas latinas = 2). |
+| `hostBonito(host)` / `siteExibicao()` | domínio apresentável nas imagens (esconde localhost, IP, portas e domínios de prévia). |
+
+Comportamento do sheet: o PNG do formato atual é gerado **em segundo plano** assim que o sheet abre (e refeito se o cartão mudar —
+`MutationObserver`); assim o `navigator.share` sai dentro do gesto do usuário (o Safari recusa se houver espera). Texto e imagem ficam
+congelados do momento em que o sheet abriu. No navegador embutido aparece um aviso e "Baixar" vira "Salvar imagem" (modal).
+
+### Cartões prontos (miolo + botão)
+
+| Botão (`share/cartoes/…`) | Onde | Conteúdo |
+|---|---|---|
+| `ShareButton` (`apuracao/ShareCard.tsx`, API antiga) | Nacional, UF, município | Placar nos 3 formatos: local, % apurado, números gigantes, diferença, barra com 50%, selo "eleito". 1º turno = "Resultado oficial". |
+| `BotaoCompartilharSecao` (`Secao.tsx`) | SecaoPage (topo e sob o BU) | "Como votou a minha seção": recibos do 2º turno (carimbo SIMULAÇÃO) e do 1º turno **oficial**, + resumo grande no feed. Antes do dia 25 só o 1º turno. Nunca foto. |
+| `BotaoCompartilharMunicipioT1` (`MunicipioT1.tsx`) | MunicipioPage (cartão "1º × 2º turno"; no 1º turno vira o botão do topo) | "Minha cidade no 1º turno": finalistas + demais, comparecimento, brancos e nulos (oficial; fotos se a corrida tiver). |
+| `BotaoCompartilharCandidato` (`Candidato.tsx`) | CandidatoPage | Ficha: foto oficial 3:4, nome de urna, número, partido (cor neutra + sigla), cargo, votos e % no 1º turno, situação. |
+| `BotaoCompartilharComposicao` (`Cargos.tsx`) | Senado, Câmara (BR/UF), Assembleias (BR/UF) | Mini hemiciclo estático (`posicionar` do Hemiciclo) + maiores bancadas com sigla; cadeiras aguardando o TSE em cinza. |
+| `BotaoCompartilharSenadoUf` (`Cargos.tsx`) | Senado com `?uf=` (painel da UF) | Os 2 eleitos com foto oficial (mesmo tamanho e corpo de letra para os dois). |
+| `BotaoCompartilharGovernadores` (`Governadores.tsx`) | /governadores | As 7 disputas (placar, barra, % apurado, selo de definida) + resumo dos 7 estados; antes do dia 25, o 1º turno oficial. |
+| `BotaoMomento` (`Momento.tsx`) | FeedPanel (nacional) e eventos da UF, via `EventFeed acao` | Evento (virada, liderança, marco, eleito, UF encerrada) + placar daquele instante; link com `?t=` no minuto seguinte (`rotaMomento`). |
+| `BotaoInstante` (`Momento.tsx`) | `LinhaDoTempo` enquanto revendo | "Compartilhar este momento": placar do instante + link `?t=18h42`. A régua aceita `compartilhar={{ race, uf, simulado }}` (sem a prop deduz da rota; `false` esconde). |
+
+`EventFeed` ganhou `acao?: (e) => ReactNode` (ação discreta por evento). Para um cartão novo: escreva o miolo com `useCartao()` dentro de
+`<CartaoBase formato={f} …>` e passe `cartao={(f) => <MeuCartao formato={f} … />}` a um `BotaoCompartilhar`. Regras: nada de animação
+nem `blur` no cartão; números com `.num` e `format.ts`; percentuais de `calc.ts`; **nunca foto real numa imagem com números simulados**.
+
+### Verificação (Playwright, Chromium)
+
+PNG real (download) nos 3 formatos em todos os cartões (≈ 290–470 KB no 16:9, 0,5–0,8 MB no feed, 0,7–1 MB no story), com as fontes da
+marca embutidas. UA do app do X + `navigator.share` removido → sem botão "Compartilhar…", "Salvar imagem" abre o modal com a imagem.
+Web Share mockado: recebe 1 PNG + texto com link; recusa `NotAllowedError` → modal. Intenção do X: texto sem a URL, `url` à parte.
+<!-- fase3-kit:end -->

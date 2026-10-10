@@ -170,8 +170,14 @@ const qsRace = (id: RaceId) => (id && id !== 'pres' ? `?race=${id}` : '');
 /** Rota da apuração para uma abrangência ('BR' ou UF), já com a corrida e o instante. */
 export function rotaMomento(raceId: RaceId, abrangencia: 'BR' | UF, t: number): string {
   const base = abrangencia === 'BR' ? `/apuracao${qsRace(raceId)}` : `/apuracao/${abrangencia.toLowerCase()}${qsRace(raceId)}`;
-  return comInstante(base, t);
+  return comInstante(base, minutoSeguinte(t));
 }
+
+/**
+ * Instante do link de um evento: o minuto cheio seguinte (o evento já aconteceu nele e a URL fica legível,
+ * `?t=19h36`, além de cacheável). Instantes já cheios ficam como estão.
+ */
+export const minutoSeguinte = (t: number) => Math.ceil(t / 60_000) * 60_000;
 
 const localDe = (abr: 'BR' | UF) => (abr === 'BR' ? 'Brasil' : abr === 'ZZ' ? 'Exterior' : UF_NOMES[abr]);
 
@@ -182,6 +188,7 @@ function CartaoEvento({ formato, e, race, simulado, caminho }: { formato: Format
 }
 
 function ComResumoBr(p: Omit<CartaoMomentoProps, 'resumo'>) {
+  // Placar no instante do evento (bate com o texto do evento); o link abre no minuto seguinte.
   const q = useNacional(p.race.id, p.t);
   const r = q.data && q.data.race === p.race.id ? q.data.resumo : q.isError ? null : undefined;
   return <CartaoMomento {...p} resumo={r} />;

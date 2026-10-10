@@ -209,7 +209,7 @@ export default function AssembleiaPage() {
               subtitulo="Deputados estaduais e distritais eleitos nas 27 casas"
               bancadas={compBr}
               total={totalBr}
-              rotuloCentro="deputados estaduais e distritais"
+              rotuloCentro="deputados"
               caminho="/assembleias"
               tags={hashtags('assembleia')}
               nomeArquivo="sintonia-assembleias-2026"

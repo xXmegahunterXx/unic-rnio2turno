@@ -88,9 +88,9 @@ function ItemDestaque({ fato, hero, indice }: { fato: Curiosidade; hero: boolean
     >
       <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-brand-grad opacity-80" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-muted">
-          <Icon name={ICONE_TEMA[fato.tema]} size={13} className="shrink-0 text-brand-fg" />
-          <span className="truncate">{fato.titulo}</span>
+        <div className="flex items-start gap-1.5 text-[11px] font-semibold uppercase leading-snug tracking-[0.14em] text-fg-muted">
+          <Icon name={ICONE_TEMA[fato.tema]} size={13} className="mt-px shrink-0 text-brand-fg" />
+          <span className="min-w-0">{fato.titulo}</span>
         </div>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <span className={cn('num whitespace-nowrap font-display font-semibold leading-none tracking-[-0.03em] text-brand-fg', (hero ? TAM_HERO : TAM)[n])}>{valor}</span>

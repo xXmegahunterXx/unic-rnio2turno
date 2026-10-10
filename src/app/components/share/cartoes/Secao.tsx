@@ -287,7 +287,7 @@ function Miolo({ bu, race, t1, mostrarT2, simulado, exterior }: Omit<CartaoSecao
       </div>
       {!mostrarT2 ? (
         <div className="text-center text-fg-muted" style={{ fontSize: 17 * k }}>
-          2º turno em 25 de outubro: o boletim desta seção aparece no Sintonia assim que for totalizado.
+          2º turno em 25/10: o boletim desta seção aparece aqui ao vivo.
         </div>
       ) : null}
     </div>
