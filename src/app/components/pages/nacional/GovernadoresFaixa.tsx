@@ -11,8 +11,12 @@ import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { Placar } from '@/app/components/apuracao/Placar';
 import { LoadingState } from '@/app/components/apuracao/States';
-import { linkUf } from './fase';
+import { cartaoFinal } from './cartaoFinal';
+import { GOV_RACES, linkUf } from './fase';
 import { useGovernadoresNacional } from './useGovernadores';
+
+/** Cartão final: completa a última linha da grade (2 colunas no sm, 3 no lg, 4 a partir de 1360 px). */
+const FINAL = cartaoFinal(GOV_RACES.length, { sm: 2, lg: 3, xl: 4 });
 
 export interface GovernadoresFaixaProps {
   races: Race[];
@@ -71,19 +75,22 @@ export function GovernadoresFaixa({ races, t1, linkT1, className }: Governadores
             </li>
           );
         })}
-        <li className="w-[84%] max-w-[340px] shrink-0 snap-start sm:w-auto sm:max-w-none">
+        <li className={cn('w-[84%] max-w-[340px] shrink-0 snap-start sm:w-auto sm:max-w-none', FINAL.item)}>
           <Link
             to="/governadores"
-            className="group flex h-full min-h-[180px] flex-col justify-between rounded-2xl border border-dashed border-line bg-surface-2/50 p-5 transition-colors hover:border-brand/40 hover:bg-brand/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className={cn(
+              'group flex h-full min-h-[176px] flex-col justify-between rounded-2xl border border-dashed border-line bg-surface-2/50 p-5 transition-colors hover:border-brand/40 hover:bg-brand/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              FINAL.cartao,
+            )}
           >
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-brand/15 text-brand-fg">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand-fg">
               <Icon name="grade" size={20} />
             </span>
-            <span>
+            <span className={cn('min-w-0', FINAL.texto)}>
               <span className="block font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">As {nDisputasGov()} lado a lado</span>
               <span className="mt-1 block text-[13px] leading-snug text-fg-muted">Ordene pelas mais apertadas e veja o mapa de cada estado.</span>
             </span>
-            <span className="inline-flex items-center gap-1 text-[13.5px] font-medium text-brand-fg">
+            <span className="inline-flex shrink-0 items-center gap-1 text-[13.5px] font-medium text-brand-fg">
               Ver governadores
               <Icon name="seta" size={16} className="transition-transform group-hover:translate-x-0.5" />
             </span>

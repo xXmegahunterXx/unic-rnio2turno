@@ -243,7 +243,12 @@ export default function GovernadoresPage() {
             )}
           </motion.li>
         ))}
-        <motion.li layout={reduzir ? false : 'position'} className="min-w-0">
+        {/* Presidente fecha a grade: com um número par de disputas ele sobraria sozinho na última linha, então fica
+            centralizado com a mesma largura dos outros cartões. */}
+        <motion.li
+          layout={reduzir ? false : 'position'}
+          className={cn('min-w-0', itens.length % 2 === 0 && 'md:col-span-2 md:mx-auto md:w-[calc((100%_-_1rem)/2)] lg:w-[calc((100%_-_1.25rem)/2)]')}
+        >
           {presRace && presData ? (
             <PresidenteCard
               race={presRace}

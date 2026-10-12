@@ -31,6 +31,13 @@ export function ufDaRace(id: RaceId): UF | null {
   return m ? (m[1].toUpperCase() as UF) : null;
 }
 
+/**
+ * Quantas colunas o cartão final de uma grade ocupa para fechar a última linha, com `n` itens antes dele numa grade de
+ * `cols` colunas (a linha inteira se os itens já fecharam a grade). Assim a grade fica sem buraco com qualquer número
+ * de disputas de governador (UFS_GOV_2T).
+ */
+export const spanFinal = (n: number, cols: number) => cols - (n % cols);
+
 /** As disputas de governador no 2º turno (uma por UF de `UFS_GOV_2T`), na ordem alfabética da sigla. */
 export const GOV_RACES: { uf: UF; id: RaceId }[] = UFS_GOV_2T.map((uf) => ({ uf, id: `gov-${uf.toLowerCase()}` }));
 

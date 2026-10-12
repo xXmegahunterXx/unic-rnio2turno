@@ -512,6 +512,13 @@ export function layoutEleitosUf(inp: { uf: UF; titulo: string; kicker: string; e
 
 /** Quantas linhas de disputa cabem na imagem 1200×630 (capacidade do layout, não o número de disputas). */
 const MAX_LINHAS_GOV = 7;
+/** Altura de cada linha e o vão mínimo entre elas; com menos linhas o vão cresce (até 16) para ocupar o mesmo bloco. */
+const ALT_LINHA_GOV = 48;
+const VAO_LINHA_GOV = 3;
+const vaoLinhasGov = (n: number) => {
+  const bloco = MAX_LINHAS_GOV * ALT_LINHA_GOV + (MAX_LINHAS_GOV - 1) * VAO_LINHA_GOV;
+  return n > 1 ? Math.max(VAO_LINHA_GOV, Math.min(16, (bloco - n * ALT_LINHA_GOV) / (n - 1))) : 0;
+};
 
 export interface DisputaGov {
   uf: UF;
@@ -558,7 +565,7 @@ function linhaGov(d: DisputaGov, anonimizado: boolean): No {
     h('div', { width: 128, justifyContent: alinhar, fontFamily: 'Bricolage', fontWeight: 800, fontSize: 32, color: cor, letterSpacing: -1 }, tem ? fmtPct(pctValidos(r, i)) : '—');
   return h(
     'div',
-    { alignItems: 'center', height: 48, gap: 12 },
+    { alignItems: 'center', height: ALT_LINHA_GOV, gap: 12 },
     h('div', { width: 50, height: 38, borderRadius: 9, background: C.surface3, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 700, fontSize: 20, color: C.fg, flexShrink: 0 }, d.uf),
     lado(ia, 'flex-end'),
     pct(ia, corA, 'flex-end'),
@@ -584,7 +591,11 @@ export function layoutGovernadores(inp: OgGovernadoresInput): No {
     titulo: inp.primeiroTurno ? `${asDisputasGov(inp.disputas.length)} no 2º turno` : asDisputasGov(inp.disputas.length),
     tamTitulo: 38,
     padTopo: 34,
-    corpo: h('div', { flexDirection: 'column', gap: 3, marginTop: -8 }, ...inp.disputas.slice(0, MAX_LINHAS_GOV).map((d) => linhaGov(d, !!inp.anonimizado))),
+    corpo: h(
+      'div',
+      { flexDirection: 'column', gap: vaoLinhasGov(Math.min(inp.disputas.length, MAX_LINHAS_GOV)), marginTop: -8 },
+      ...inp.disputas.slice(0, MAX_LINHAS_GOV).map((d) => linhaGov(d, !!inp.anonimizado)),
+    ),
     rodapeEsq: inp.simulacao ? 'SIMULAÇÃO · dados fictícios' : inp.primeiroTurno ? 'Resultado do 1º turno · 2º turno em 25/10, a partir das 17h' : 'Fonte: TSE',
     rodapeDir: inp.dominio ?? null,
   });

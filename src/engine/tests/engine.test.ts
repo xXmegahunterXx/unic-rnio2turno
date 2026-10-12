@@ -614,6 +614,6 @@ const FINGERPRINT = 261226385;
 /** Impressão digital do cenário padrão com os arquivos REAIS de seção, por resumo (hash) dos arquivos. */
 const FINGERPRINT_SECAO: Record<number, number> = {
   // public/data/secao de 10/10/2026 (28 UFs). Resumo e impressão usam só as colunas de Presidente: não mudaram quando o
-  // RJ saiu do 2º turno de governador (12/10/2026, retotalização do TSE).
+  // RJ saiu do 2º turno de governador (retotalização do TSE de 10/10/2026, aplicada aqui em 12/10/2026).
   1918870254: 485363866,
 };
