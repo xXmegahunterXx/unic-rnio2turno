@@ -92,7 +92,10 @@ export default function SobrePage() {
               <strong>Não exibimos propaganda política.</strong> Espaços de anúncio, quando houver, aceitam apenas anunciantes não políticos.
             </>,
             <>Não fazemos enquetes nem mostramos preferência de usuários.</>,
-            <>Não usamos fotos de candidatos nem imagens geradas por inteligência artificial.</>,
+            <>
+              Fotos de candidatos, só as oficiais do TSE, com o mesmo tamanho e tratamento para todos e sem edição. Nunca usamos imagens geradas
+              por inteligência artificial.
+            </>,
           ]}
         />
         <Destaque icone="info">

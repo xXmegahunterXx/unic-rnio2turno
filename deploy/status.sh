@@ -30,7 +30,10 @@ if app_rodando; then
     Promise.all([pega("/healthz"), pega("/api/status").catch(() => null)]).then(([h, s]) => {
       const min = Math.floor(h.uptimeSeg / 60);
       console.log("   saúde:          " + (h.ok ? "ok" : "PROBLEMA"));
-      console.log("   fonte de dados: " + (FONTES[h.fonte] || h.fonte) + " · fase " + h.fase);
+      // fase pública (a do /api/status: vira "encerrada" quando o TSE conclui); o /healthz traz a do motor
+      const FASES = { pre: "antes da apuração", apurando: "apurando", encerrada: "encerrada" };
+      const fase = (s && s.fase) || h.fase;
+      console.log("   fonte de dados: " + (FONTES[h.fonte] || h.fonte) + " · fase no site: " + (FASES[fase] || fase));
       console.log("   versão admin:   " + h.versao + "  (sobe a cada comando do painel)");
       console.log("   no ar há:       " + (min >= 60 ? Math.floor(min / 60) + " h " + (min % 60) + " min" : min + " min"));
       console.log("   memória (RSS):  " + h.memoriaMb + " MB");
@@ -41,6 +44,7 @@ if app_rodando; then
   ' || erro "O app não respondeu ao /healthz."
   est="$(docker inspect -f '{{.State.Health.Status}}' "$(ids_app | head -n 1)" 2>/dev/null || echo '?')"
   echo "   healthcheck:    $est"
+  fraco "   troca automática, aviso e TSE por disputa: $DIR_DEPLOY/painel.sh estado"
 else
   erro "O app NÃO está rodando. Suba com: cd $RAIZ && docker compose up -d   (e veja os logs abaixo)"
 fi

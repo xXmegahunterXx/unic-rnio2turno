@@ -411,10 +411,11 @@ fi
 cat <<FIM
 
   Situação:   sudo $INSTALL_DIR/deploy/status.sh
+  Painel:     sudo $INSTALL_DIR/deploy/painel.sh estado     (fonte, troca para o TSE às 17h, avisos)
   Atualizar:  sudo $INSTALL_DIR/deploy/update.sh
   Backup:     sudo $INSTALL_DIR/deploy/backup.sh     (automático de hora em hora)
   Logs:       cd $INSTALL_DIR && sudo docker compose logs -f app
 
-  Próximos passos (DEPLOY.md): Cloudflare na frente (proxy laranja + SSL "Full (strict)") e o
-  ensaio da noite da eleição no painel.
+  Próximos passos (DEPLOY.md): Cloudflare na frente (proxy laranja + SSL "Full (strict)"), o
+  CHECKLIST-LANCAMENTO.md antes de divulgar e o RUNBOOK-ELEICAO.md para 24 a 26/10.
 FIM

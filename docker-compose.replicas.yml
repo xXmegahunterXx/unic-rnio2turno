@@ -1,7 +1,7 @@
 # Várias instâncias do app atrás do Caddy (PLANO B — leia "Escalar" no DEPLOY.md antes de usar).
 #
 # Recomendado para a noite da eleição: 1 instância + Cloudflare na frente (a CDN absorve o tráfego; 1 processo
-# aguenta ~13 mil req/s por núcleo). Use réplicas só se NÃO houver CDN e a CPU de 1 processo saturar.
+# aguenta ~7–12 mil req/s num núcleo). Use réplicas só se NÃO houver CDN e a CPU de 1 processo saturar.
 #
 # Ativar (todos os scripts de deploy/ passam a usar):
 #   echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.replicas.yml' >> .env

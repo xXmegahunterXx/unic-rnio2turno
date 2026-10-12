@@ -214,7 +214,10 @@ export default function MetodologiaPage() {
               Nos cargos do 1º turno (Senado, Câmara e Assembleias), cada partido tem uma cor fixa: PT no mesmo vermelho de Lula, PL no mesmo azul
               de Flávio Bolsonaro e os demais em tons que não se confundem com eles. A sigla aparece sempre ao lado.
             </>,
-            <>Usamos monogramas (iniciais) em vez de fotos. Não usamos imagens geradas de candidatos.</>,
+            <>
+              Fotos, só as oficiais do TSE, com o mesmo tamanho e tratamento para todos e sem edição. Ao lado de números simulados ou com os nomes
+              ocultos, nunca há foto: usamos monogramas (iniciais). Não usamos imagens geradas de candidatos.
+            </>,
             <>Os textos são descritivos (“passa à frente”, “matematicamente eleito”), sem adjetivos nem torcida.</>,
             <>
               <strong>Não fazemos enquetes</strong> e nunca mostramos números somados de preferência de usuários (Lei 9.504/97, art. 33, §5º).

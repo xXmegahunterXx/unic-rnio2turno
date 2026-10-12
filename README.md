@@ -8,7 +8,9 @@ dados pessoais do Teste Cego no servidor. Cores: Presidente com cores de identif
 azul, decisão do dono); governadores e simulação com nomes ocultos em cores neutras pela ordem da urna.
 
 Arquitetura e regras: [`ARCHITECTURE.md`](./ARCHITECTURE.md) · guia para agentes: [`CLAUDE.md`](./CLAUDE.md) ·
-adaptador do TSE: [`src/tse/README.md`](./src/tse/README.md).
+adaptador do TSE: [`src/tse/README.md`](./src/tse/README.md). Produção: [`DEPLOY.md`](./DEPLOY.md) (VPS) ·
+[`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md) (antes de divulgar) ·
+[`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md) (roteiro de 24 a 26/10).
 
 ---
 
@@ -66,28 +68,13 @@ ignorados com aviso no log da subida.
 | `STATE_DIR` | `.server-state` | estado do admin (`admin.json`) e histórico do TSE (`tse-historico.json`) |
 | `SERVE_STATIC` | só em produção | `1`/`0` força servir (ou não) o `DIST_DIR` |
 | `FONTS_DIR` | `dist-server/assets/fonts` | fontes TTF das imagens de compartilhamento |
-| `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`) |
+| `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`); inválido = ignorado com aviso no log |
 | `OG_LIMITE_MIN` | `30` | imagens de compartilhamento **novas** (renderizações) por cliente por minuto (`0` = sem limite; excesso → 429). Imagem já pronta nunca conta: uma CDN pedindo de novo não é barrada |
 | `ENCERRAMENTO_SEG` | `8` | `SIGTERM`: segundos para terminar as requisições em andamento antes de fechar (1–60) |
 | `LOG_FORMAT` | produção: `json` · dev: `texto` | formato do log (JSON = um objeto por linha) |
 | `LOG_AMOSTRA` | `0.01` | fração das requisições "quentes" registradas (`/api/status`, apuração, estáticos). 5xx, 429, lentas (≥ 1 s) e o painel: sempre |
 | `LOG_AMOSTRA_PAGINAS` | `0.1` | fração das páginas (HTML) e imagens OG registradas |
 | `SINTONIA_COMMIT` / `SINTONIA_BUILD_DATE` | `.git` local ou `dev` | versão do build mostrada em `x-sintonia-versao`, `/api/versao`, `/healthz` e no painel (a imagem Docker grava o commit a partir do build-arg `GIT_COMMIT`; `GIT_COMMIT`/`BUILD_DATE` também valem) |
-
----|---|---|
-| `PORT` / `HOST` | `8787` / `0.0.0.0` | porta e interface HTTP |
-| `NODE_ENV` | — | `production`: serve `dist/`, cookie `Secure`, HSTS, exige `ADMIN_PASSWORD` |
-| `ADMIN_PASSWORD` | dev: `sintonia` | senha do painel. **Produção sem ela = admin desabilitado (503)** |
-| `ADMIN_SECRET` | aleatório por processo | segredo HMAC-SHA256 do cookie de sessão (≥ 16 caracteres). Defina para as sessões sobreviverem a reinícios e valerem em todas as instâncias |
-| `PUBLIC_URL` | Host da requisição | origem pública (`https://sintonia.app`) usada em `og:image`/`og:url` |
-| `TRUST_PROXY` | desligado | `1` atrás de CDN/balanceador: IP do cliente por `CF-Connecting-IP`/`X-Forwarded-For` (limite de login e contagem de clientes) |
-| `DATA_DIR` | `public/data` (dev) · `dist/data` (produção) | dataset (`meta.json`, `uf/*.json`) |
-| `DIST_DIR` | `dist` | build do app servido em produção |
-| `STATE_DIR` | `.server-state` | estado do admin (`admin.json`) e histórico do TSE (`tse-historico.json`) |
-| `SIM_AUTOSTART` | — | `1`: sobe simulando a 20× (se não houver simulação/TSE em curso) · `force`: sempre |
-| `SERVE_STATIC` | só em produção | `1`/`0` força servir (ou não) o `DIST_DIR` |
-| `FONTS_DIR` | `dist-server/assets/fonts` | fontes TTF das imagens de compartilhamento |
-| `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`); inválido = ignorado com aviso no log |
 
 ---
 
@@ -96,8 +83,10 @@ ignorados com aviso no log da subida.
 **Produção numa VPS: siga o [`DEPLOY.md`](./DEPLOY.md).** Docker + Caddy (HTTPS automático com Let's Encrypt,
 HTTP/3) com poucos comandos: `deploy/install.sh` (Ubuntu 22.04/24.04: Docker, firewall, `.env` com senha e segredos,
 build, subida e backup de hora em hora), `deploy/update.sh` (atualiza com o site no ar: ensaio da imagem nova,
-troca sem erro para o visitante e volta automática se falhar), `deploy/backup.sh`/`restore.sh` e
-`deploy/status.sh`, além da configuração da Cloudflare. Imagem: `Dockerfile` (Node 22 Debian slim, usuário sem
+troca sem erro para o visitante e volta automática se falhar), `deploy/backup.sh`/`restore.sh`,
+`deploy/status.sh` e `deploy/painel.sh` (comandos do painel pelo terminal: estado, troca para o TSE, avisos), além
+da configuração da Cloudflare. Antes de divulgar o site: [`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md); na
+semana da eleição: [`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md). Imagem: `Dockerfile` (Node 22 Debian slim, usuário sem
 privilégios, `HEALTHCHECK` em `/healthz`); configuração: `.env.example`. As seções abaixo são a referência técnica
 (execução sem Docker, cache para CDN, capacidade, várias instâncias).
 
@@ -248,7 +237,7 @@ O motor é determinístico: mesma configuração ⇒ mesmos números **e mesmos 
 com duas instâncias lado a lado). Instâncias que compartilham o `STATE_DIR` (mesma máquina ou volume compartilhado:
 PM2, `docker compose --scale`) convergem para o `admin.json` mais recente em ≤ ~1 s; com o mesmo `ADMIN_SECRET`, a
 sessão do admin vale em todas. Em máquinas sem volume compartilhado, use uma única origem atrás da CDN (a CDN
-absorve o tráfego; a origem aguenta ~13 mil req/s por núcleo). Com Docker: `docker-compose.replicas.yml` (N réplicas
+absorve o tráfego; a origem aguenta ~7–12 mil req/s num núcleo). Com Docker: `docker-compose.replicas.yml` (N réplicas
 atrás do Caddy, distribuídas por visitante; testado com 3 — limitações e recomendação em `DEPLOY.md`, seção 10).
 
 Limitação conhecida: trocar o **cenário/preset** reconstrói o modelo na thread principal (~0,7–1,3 s); nesse
@@ -313,6 +302,9 @@ Comandos: `relogio` (iniciar · pausar · retomar · reiniciar), `velocidade`, `
 comando incrementa a `versao`, que invalida o cache dos clientes e da CDN, e é gravado em `STATE_DIR/admin.json`
 (escrita atômica).
 
+Na VPS, os mesmos comandos sem navegador: `deploy/painel.sh` (estado, `trocar-agora`, `adiar`, `marcar`, `fonte pre`,
+`aviso`/`alerta`/`sem-aviso`, `tse`, `testar-tse`; recusa a simulação). Com `curl`, em desenvolvimento:
+
 ```bash
 curl -c jar -H 'content-type: application/json' -d '{"senha":"sintonia"}' localhost:8787/api/admin/login
 curl -b jar -H 'content-type: application/json' -d '{"tipo":"saltar-pct","pct":50}' localhost:8787/api/admin/command
@@ -320,6 +312,9 @@ curl -b jar localhost:8787/api/admin/tse/test
 ```
 
 ### Noite da eleição (25/10)
+
+Roteiro operacional completo (horários, comandos, contingência): [`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md). Resumo
+do comportamento do servidor:
 
 1. **Antes das 17h**: deixe a fonte em `pre` (padrão; as páginas mostram o 1º turno real com a contagem regressiva).
    No painel → Fonte, use "Testar conexão": além de ler o feed, ele confere os códigos do 2º turno contra o

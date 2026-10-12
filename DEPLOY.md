@@ -14,7 +14,9 @@ certificado HTTPS automático, atualização com um comando, backup de hora em h
 
 Arquivos envolvidos: `Dockerfile`, `docker-compose.yml`, `.env` (criado a partir de `.env.example`) e a pasta
 `deploy/` (scripts e a configuração do Caddy). Detalhes técnicos do servidor (cache, rotas, segurança) estão no
-[README](./README.md#deploy).
+[README](./README.md#deploy). Antes de divulgar o site, passe pelo
+[`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md); para a semana da eleição (24 a 26/10), o roteiro com horários,
+comandos e plano de contingência é o [`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md).
 
 ---
 
@@ -28,10 +30,11 @@ Arquivos envolvidos: `Dockerfile`, `docker-compose.yml`, `.env` (criado a partir
 | Portas | 22 (SSH), 80 e 443 liberadas também no firewall do **provedor**, se ele tiver um ("security group", "firewall de rede") |
 | Repositório | O endereço do repositório no GitHub. Se for privado, um token de leitura ou uma "deploy key" (seção 3.2) |
 
-Por que esses tamanhos (medidos): o app usa ~250 MB parado, ~350 MB com 100 conexões simultâneas e ~450 MB na
-noite com 1.500–2.500 conexões; o Caddy, ~30 MB parado, mas ~220 MB com 1.500 e ~380 MB com 2.500 conexões HTTPS
-simultâneas sem CDN na frente (limite no compose: 512 MB); montar a imagem (build) usa ~1 GB por alguns minutos. Um processo do app responde ~13 mil requisições
-por segundo em 1 núcleo, e as imagens de compartilhamento (cartões do X) usam CPU. Com 4 vCPU/8 GB sobra folga
+Por que esses tamanhos (medidos): o app usa ~250 MB parado, ~350 MB com 100 conexões simultâneas e ~450–570 MB
+sob carga (1.500–2.500 conexões; limite no compose: 1,5 GB); o Caddy, ~30 MB parado, mas ~220 MB com 1.500 e
+~380 MB com 2.500 conexões HTTPS simultâneas sem CDN na frente (limite no compose: 512 MB); montar a imagem (build)
+usa ~1 GB por alguns minutos. Um processo do app responde ~7–12 mil requisições por segundo em 1 núcleo, e as
+imagens de compartilhamento (cartões do X) usam CPU. Com 4 vCPU/8 GB sobra folga
 para picos, para um build no meio da noite e para o plano B de várias instâncias (seção 10).
 
 ## 2. DNS
@@ -62,7 +65,9 @@ git clone https://github.com/xXmegahunterXx/unic-rnio2turno.git /opt/sintonia
 /opt/sintonia/deploy/install.sh
 ```
 
-Se o código de produção estiver num branch específico, clone com `--branch nome-do-branch`.
+Se o código de produção estiver num branch específico, clone com `--branch nome-do-branch`. **O branch que a VPS
+clona é o que ela vai atualizar** (`update.sh` faz `git pull` dele): junte o código final nele (ex.: `main`) antes de
+instalar, e use o mesmo nome no `BRANCH=` dos exemplos abaixo.
 
 ### 3.2 Repositório privado
 
@@ -126,7 +131,8 @@ Sem perguntas (automação): `DOMINIO=sintonia.app ACME_EMAIL=voce@exemplo.com N
 ```
 
 Mostra contêineres, saúde, **fonte de dados** (pré-apuração, simulação ou TSE), versão no ar, CPU/memória,
-validade do certificado, último backup e os últimos logs. Depois:
+validade do certificado, último backup e os últimos logs. `deploy/painel.sh estado` mostra o painel pelo terminal: deve
+dizer "Pré-eleição", **"agendada para 25/10 17:00:00"**, nenhum aviso e "simulação bloqueada". Depois:
 
 - abra `https://seu-dominio` e `https://seu-dominio/admin` (entre com a senha);
 - veja a imagem de compartilhamento: `https://seu-dominio/api/og/apuracao.png`;
@@ -243,6 +249,7 @@ Os certificados ficam no volume `caddy_data`; não precisam de backup (o Caddy p
 | Uso de CPU/memória ao vivo | `docker stats` |
 | Saúde do app | `docker compose ps` (coluna STATUS: `healthy`) |
 | Reiniciar o app | `docker compose restart app` |
+| Painel pelo terminal (fonte, troca automática, aviso, TSE por disputa) | `deploy/painel.sh estado` (`deploy/painel.sh --help` lista os comandos) |
 
 O app escreve uma linha por evento e, a cada minuto com tráfego, um resumo (requisições, latência, cache,
 erros, clientes estimados). Nunca registra IP, senha, cookie nem código de Duelo; o Caddy não tem log de acesso
@@ -271,7 +278,7 @@ Outras mudanças no `.env` seguem o mesmo caminho. Exceções: `VITE_SITE_URL` (
 
 ## 10. Escalar
 
-**Recomendado: 1 instância do app + Cloudflare.** Um processo responde ~13 mil req/s por núcleo (README,
+**Recomendado: 1 instância do app + Cloudflare.** Um processo responde ~7–12 mil req/s num núcleo (README,
 "Capacidade medida"); com a Cloudflare, cada ponto de presença busca cada endereço da API no máximo 1 vez por
 1–2 s, então a VPS recebe algumas centenas de requisições por segundo mesmo com milhões de visitantes. É o
 arranjo mais simples, com números idênticos para todo mundo e "pessoas agora" consistente.
@@ -299,6 +306,9 @@ réplica.** Para voltar a 1, apague as duas linhas do `.env` e rode `docker comp
 
 ## 11. Noite da eleição — checklist
 
+Roteiro completo, hora a hora, com os comandos e o plano de contingência: [`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md).
+Resumo:
+
 - **Na véspera:** `deploy/update.sh` (versão final), `deploy/status.sh` (tudo `healthy`, relógio certo, disco
   com folga), backup copiado para fora da VPS, cache da Cloudflare conferido (seção 5), ensaio do feed do TSE pelo
   painel (README, seção "Admin").
@@ -313,6 +323,8 @@ réplica.** Para voltar a 1, apague as duas linhas do `.env` e rode `docker comp
   mostrando o último dado bom (com o horário da última seção totalizada), mas **não** avisa sozinho: publique um
   aviso no painel se a queda demorar. Evite atualizar o código durante a apuração (é seguro, mas não é hora de
   mudança); se precisar, o `update.sh` faz o ensaio e não derruba o site.
+- **Se a VPS ficar lenta:** confira `docker stats`; com Cloudflare ligada isso é raro. Aumentar a VPS exige
+  reiniciá-la (≈ 1–2 min fora do ar; com a Cloudflare, quem já carregou continua vendo o último dado guardado).
 
 **Ensaio da troca antes do dia 25** (opcional): ponha `TSE_INICIO=2026-10-20T15:00:00-03:00` (o horário do ensaio)
 no `.env` e rode `docker compose up -d` — ou use "Marcar para" no painel. No horário, a fonte vira `tse` e a API
@@ -320,9 +332,9 @@ passa a servir o feed. **As páginas continuam mostrando o 1º turno e a contage
 fase "apurando" depende da data da eleição): o ensaio confere a troca, o feed e o painel, não as telas da apuração.
 **Depois do ensaio:** apague a linha `TSE_INICIO` do `.env`, rode `docker compose up -d`, volte a fonte para
 "Pré-eleição" no painel (se usou "Marcar para", clique em "horário padrão") e confira "agendada para 17:00:00 de
-25/10". Uma troca feita no ensaio não impede a troca do dia 25.
-- **Se a VPS ficar lenta:** confira `docker stats`; com Cloudflare ligada isso é raro. Aumentar a VPS exige
-  reiniciá-la (≈ 1–2 min fora do ar; com a Cloudflare, quem já carregou continua vendo o último dado guardado).
+25/10". Uma troca feita no ensaio não impede a troca do dia 25. Pelo terminal: `deploy/painel.sh marcar 15:00`
+(hoje, Brasília) para o ensaio e, depois, `deploy/painel.sh fonte pre` + `deploy/painel.sh horario-padrao` +
+`deploy/painel.sh estado`.
 
 ## 12. Solução de problemas
 
@@ -382,4 +394,7 @@ Teste local sem domínio: no `.env`, `SITE_ADDRESS=':80'`, `HTTP_PORT=8080`, `HT
 | `deploy/update.sh` | atualização com ensaio, troca sem erro e volta automática |
 | `deploy/backup.sh` / `deploy/restore.sh` | backup e restauração do estado e do `.env` |
 | `deploy/status.sh` | situação num relance |
+| `deploy/painel.sh` | comandos do painel pelo terminal (estado, troca para o TSE, avisos), sem abrir o navegador |
+| `CHECKLIST-LANCAMENTO.md` | o que conferir e decidir antes de divulgar o site (técnico e humano) |
+| `RUNBOOK-ELEICAO.md` | roteiro de 24 a 26/10: horários, comandos, contingência e o que nunca fazer |
 | `deploy/lib.sh` | funções comuns dos scripts |

@@ -11,3 +11,5 @@ playwright-report/
 preview-out/
 .env
 .env.local
+__pycache__/
+*.pyc

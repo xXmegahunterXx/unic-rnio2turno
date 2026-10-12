@@ -63,7 +63,8 @@ LABEL org.opencontainers.image.title="Sintonia" \
       org.opencontainers.image.description="Apuração do 2º turno de 2026, Teste Cego e imagens de compartilhamento" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.created="${BUILD_DATE}"
-ENV SINTONIA_COMMIT=${GIT_COMMIT}
+ENV SINTONIA_COMMIT=${GIT_COMMIT} \
+    SINTONIA_BUILD_DATE=${BUILD_DATE}
 
 # usuário "node" da imagem base (uid/gid 1000), numérico para qualquer orquestrador conferir que não é root
 USER 1000:1000

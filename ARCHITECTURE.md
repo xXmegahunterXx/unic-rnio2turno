@@ -284,7 +284,11 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
   curiosidades, cenários, Teste): ver §11.7.
 - **Meta tags**: ao servir `index.html`, injeta `og:title`, `og:description` e `og:image` conforme a
   rota (`<!--app-meta-->`).
-- `GET /healthz`.
+- **Operação**: `GET /healthz` (vivo; usado pelo healthcheck do Docker), `GET /readyz` (pronto: dataset, modelo e build
+  do app presentes; 503 durante o encerramento), `GET /api/versao` (commit/data do build, também no cabeçalho
+  `x-sintonia-versao`), `GET /sitemap.xml` e `GET /robots.txt` (gerados com `PUBLIC_URL`).
+- **Produção** (`NODE_ENV=production`): troca automática `pre` → `tse` às 17h de 25/10 (`troca-auto.ts`), simulação
+  travada sem `ALLOW_SIMULACAO=1`, CSP/HSTS, CSRF no admin, logs em JSON e `/kit` = 404. Ver §12.
 
 ---
 
@@ -340,7 +344,7 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 | `/candidato/:sqcand`, `/senado`, `/camara`, `/assembleias/:uf` | Cargos do 1º turno e fichas (§10.2) |
 | `/tv` | Modo TV (fora do AppShell) |
 | `/embed/placar`, `/embed/mapa`, `/embed/uf` | Widgets para incorporar em outros sites (§11.6) |
-| `/kit` | Vitrine do design system (QA visual) |
+| `/kit` | Vitrine do design system (QA visual): só no `npm run dev` e no build demo; em produção, 404 |
 
 Antes de 25/10 17h, com fonte `pre`, as páginas de apuração mostram o **1º turno real** (`pres-t1`) com
 a contagem regressiva. Esse conteúdo já gera tráfego antes da eleição.
@@ -564,3 +568,113 @@ nos cartões, nas imagens de prévia, na TV e nos widgets.
   e é isso que garante números idênticos aos do servidor; montar sem ela e trocar depois faria o placar "pular". Caminho
   futuro: um pacote compacto pré-computado do modelo.
 - No Artifact, "Postar no X" e "WhatsApp" abrem em nova aba: dependem de o iframe permitir pop-ups.
+
+---
+
+## 12. Produção
+
+Guia de instalação para leigos: [`DEPLOY.md`](./DEPLOY.md). Antes de divulgar: [`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md).
+Semana da eleição: [`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md). Referência das variáveis e rotas: README ("Variáveis de
+ambiente do servidor", "CDN", "Segurança", "Admin").
+
+### 12.1 Topologia e deploy
+
+```
+visitante ──HTTPS──▶ Cloudflare (opcional, recomendada: cache de borda de 1–2 s na API, dias nos dados)
+                        │  (só IPs da Cloudflare são aceitos como CF-Connecting-IP)
+                        ▼
+VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; segura 20 s durante reinícios)
+                        │  rede interna do Docker (porta do app não publicada)
+                        ▼
+               app: 1 processo Node 22 (dist/ + dist-server/main.js): SPA, API, motor, adaptador do TSE, imagens OG
+                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json
+```
+
+- **Imagem** (`Dockerfile`): multi-stage em `node:22-bookworm-slim` (glibc, por causa do binário do resvg); a final leva
+  só `dist/`, `dist-server/`, o `node_modules` de produção e o `package.json`. Usuário 1000, sistema de arquivos
+  somente leitura (grava só no volume e em `/tmp`), sem capacidades extras, `init: true`, `HEALTHCHECK` em `/healthz`
+  com vigia que reinicia o processo travado (`deploy/healthcheck.mjs`). Commit e data do build entram por build-arg
+  (`GIT_COMMIT`, `BUILD_DATE` → `SINTONIA_COMMIT`, `SINTONIA_BUILD_DATE`). `VITE_SITE_URL` também é build-arg (fica no JS).
+- **Compose** (`docker-compose.yml`): `app` + `caddy`; variáveis fixas no compose (`NODE_ENV=production`,
+  `TRUST_PROXY=1`, `STATE_DIR`, pastas) valem mais que o `.env`; limites de memória (app 1,5 GB, Caddy 512 MB com
+  `GOMEMLIMIT`), logs com rotação. Plano B de réplicas: `docker-compose.replicas.yml`.
+- **Scripts** (`deploy/`, bash, mensagens em pt-BR): `install.sh` (Docker, ufw, swap, `.env` com segredos gerados,
+  build, subida, HTTPS, backup de hora em hora), `update.sh` (build com o site no ar → **ensaio** da imagem nova ao lado
+  da atual, sem visitantes → backup → troca → volta sozinho se não ficar saudável; `--rollback` para a imagem
+  `sintonia-app:anterior`), `backup.sh`/`restore.sh` (estado + `.env`; a versão do estado restaurado continua subindo),
+  `status.sh` (situação num relance) e `painel.sh` (comandos do painel pelo terminal, por dentro do contêiner).
+- **Configuração**: `.env.example` comentado; `src/server/config.ts` documenta todas as variáveis que o servidor lê e
+  avisa no log sobre valores inválidos.
+
+### 12.2 Troca automática para o TSE (`src/server/troca-auto.ts`)
+
+- Ligada em produção (`TSE_AUTO`); horário padrão `INICIO_APURACAO` (17h de 25/10), mudável por `TSE_INICIO` (ensaio)
+  ou pelo painel (comando `troca-auto`: ligar, desligar, adiar/marcar, agora). As escolhas do admin ficam em
+  `AdminState.trocaAuto` (todas as instâncias, sobrevive a reinícios).
+- No horário, com a fonte `pre`: confere o feed (`TseManager.testar`: arquivo Brasil da eleição de Presidente do 2º
+  turno; o `ele-c.json` só gera "Atenção") com tempo-limite de 20 s. Respondeu → fonte `tse` e polling ligado. Não
+  respondeu → continua `pre`, aviso público discreto "Aguardando os primeiros dados do TSE" (só sem aviso do admin) e
+  novas tentativas em 15 s, 30 s, 60 s e depois a cada 2 min (±20%).
+- "Feita" vale para o horário em vigor: uma troca registrada **antes** dele (ensaio) não conta. Depois de feita, não se
+  repete; voltar a fonte para `pre` à mão depois do horário não dispara outra troca.
+- A **fase pública** depende da data, não da fonte: até 17h de 25/10 as páginas ficam em `pre` mesmo com a fonte `tse`
+  (ensaios não mudam o que o público vê). Na fonte `tse`, o `/api/status` passa a `encerrada` quando o TSE conclui
+  Presidente e nenhuma disputa de governador segue apurando (`tseTudoEncerrado`).
+- Na noite, o adaptador mantém o último dado bom quando o feed falha (sem aviso automático ao público; o operador
+  publica um, `RUNBOOK-ELEICAO.md` §3.1).
+
+### 12.3 Segurança
+
+- **Simulação travada em produção**: sem `ALLOW_SIMULACAO=1`, comando de simulação → 403, `SIM_AUTOSTART` ignorado,
+  estado salvo em simulação volta para `pre` na subida. `deploy/painel.sh` também recusa.
+- **Admin**: senha comparada em tempo constante; cookie HMAC (chave derivada de `ADMIN_SECRET` e da senha: trocar a
+  senha derruba as sessões), `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/admin`, 12 h; 10 logins/min por
+  cliente e 300/min no total; CSRF por `Sec-Fetch-Site` + `Origin`/`Referer` (`PUBLIC_URL`); comandos validados com zod.
+- **IP do visitante**: o Caddy só aceita `CF-Connecting-IP` de IPs da Cloudflare e manda ao app um `X-Real-IP`
+  calculado; o app usa o último salto do `X-Forwarded-For` como reserva (forjar o começo não escapa do limite).
+- **Cabeçalhos**: CSP com hash dos 2 scripts inline, HSTS de 1 ano com `includeSubDomains`, `nosniff`,
+  `frame-ancestors 'self'` + `SAMEORIGIN` (exceto `/embed/*`, `*`), Permissions-Policy, COOP.
+- **Limites**: URL ≤ 8 KB (414), corpo ≤ 512 KB (413), imagens OG novas ≤ `OG_LIMITE_MIN`/min por cliente (429) e fila
+  de geração limitada (503); estáticos nunca servem arquivos ocultos; erros sem pilha para o cliente.
+- **Privacidade**: nenhum log de IP, cookie, senha, query string ou código de Duelo (o Caddy não tem log de acesso);
+  respostas do Teste Cego nunca chegam ao servidor (§1.3). Ver `CHECKLIST-LANCAMENTO.md` B1.7 sobre o Marco Civil.
+
+### 12.4 Operação
+
+- **Saúde**: `/healthz` (vivo, usado pelo Docker e pelo monitor externo), `/readyz` (pronto; 503 encerrando),
+  `/api/versao` e o cabeçalho `x-sintonia-versao`.
+- **Log**: JSON por linha no stdout do contêiner, com id de requisição; rotas quentes por amostragem (1%), e sempre:
+  5xx, 429, respostas ≥ 1 s, admin e a troca automática; um resumo por minuto (`reqPorSeg`, p50/p95/p99, cache, 5xx,
+  429, clientes, memória). Rotação pelo Docker (5 × 20 MB).
+- **Encerramento**: `SIGTERM` → `/readyz` 503, `Connection: close`, drenagem de até `ENCERRAMENTO_SEG` (8 s), estado
+  gravado, saída 0 (o Docker espera 30 s). Reinício do app: ~2–4 s, com o Caddy segurando as requisições.
+- **Backups**: de hora em hora (72 guardados) do volume de estado e do `.env`, com permissão 600; cópia para fora da
+  VPS é tarefa humana (checklist A5).
+- **Painel**: Fonte (troca automática, feed, teste de conexão), Comunicação (aviso global) e Monitor (req/s, p50/p99,
+  5xx/429, event loop, memória, imagens OG). Pelo terminal: `deploy/painel.sh`.
+
+### 12.5 Capacidade (medida em 12/10/2026)
+
+- **Um processo** (1 núcleo): ~7–12 mil req/s conforme a rota, p99 < 0,25 s até 500 conexões, zero erros; mistura
+  realista a 200 conexões: 8,4 mil req/s, p99 68 ms. Saturado (1.000 conexões), conexões novas esperam segundos: é o
+  teto de um processo Node, não um defeito. Da ordem de 20–30 mil pessoas simultâneas na origem **sem CDN**.
+- **Pelo Caddy em HTTPS** (500 conexões × 5 rotas, gerador na mesma máquina de 4 vCPU): 2,4–4,3 mil req/s, zero erros,
+  app até 482 MB; Caddy até 381 MB com 2.500 conexões (por isso 512 MB + `GOMEMLIMIT`).
+- **Com a Cloudflare**, cada ponto de presença busca cada URL da API no máximo 1× por 1–2 s: a VPS recebe algumas
+  centenas de req/s mesmo com milhões de visitantes. Recomendação: **1 instância + Cloudflare**; réplicas só sem CDN
+  ("pessoas agora" passa a contar ≈ 1/N e cada réplica lê o TSE sozinha).
+- **Atualização sob carga**: `update.sh` em 12–47 s, 0 erros (~121 mil requisições durante as trocas no ensaio
+  geral); `--rollback` em 4–6 s.
+- **Limites conhecidos**: (1) o `tse-historico.json` é serializado no processo principal a cada 30 s; estimado
+  ~26 MB numa noite real, ~270 ms de pausa a cada gravação no fim da noite (os clientes e a CDN absorvem; mover para
+  gravação incremental é melhoria futura); (2) robôs de prévia que pedem muitas imagens novas do mesmo IP podem
+  receber 429 (`OG_LIMITE_MIN`, ajustável sem rebuild); (3) "pessoas agora" conta só quem chega à origem; (4) trocar o
+  cenário reconstrói o modelo na thread principal (~1 s; só na simulação).
+
+### 12.6 Dados depois do lançamento
+
+- Quadro de Governador: `UFS_GOV_2T` é a fonte única (§4.1); mudança = uma linha + pipeline (README › Dados). Depois do
+  deploy, limpar o cache da CDN em `/data/` e `/geo/` (servidos com `s-maxage` de 1 dia); as imagens OG mudam de
+  endereço sozinhas (versão do dataset no `&v=`).
+- Retotalizações do TSE no 1º turno: `cargos_build.ts --refresh` e o pipeline; os scripts param com a explicação quando
+  o feed e o quadro divergem.
