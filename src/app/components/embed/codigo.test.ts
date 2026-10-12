@@ -43,7 +43,7 @@ describe('caminhos e títulos', () => {
     expect(caminhoPaginaCompleta({ tipo: 'uf', race: 'pres', uf: 'BA' })).toBe('/apuracao/ba');
     expect(caminhoPaginaCompleta({ tipo: 'mapa', race: 'pres', uf: 'SP' })).toBe('/apuracao');
     expect(tituloEmbed({ tipo: 'placar', race: 'gov-am', uf: 'SP' })).toBe('Governador · Amazonas · Sintonia');
-    expect(tituloEmbed({ tipo: 'uf', race: 'pres', uf: 'BA' })).toBe('Apuração em Bahia · Sintonia');
+    expect(tituloEmbed({ tipo: 'uf', race: 'pres', uf: 'BA' })).toBe('Apuração na Bahia · Sintonia');
   });
 });
 

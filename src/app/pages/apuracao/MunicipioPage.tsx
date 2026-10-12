@@ -142,7 +142,9 @@ export default function MunicipioPage() {
   const simulado = ctx.simulado && !t1;
   const pais = exterior ? paisesQ.data?.[snap.cod] : undefined;
   const local = exterior ? `${snap.nome}${pais ? ` (${pais})` : ''}` : `${snap.nome} (${uf})`;
-  const nZonas = snap.mosaico.length;
+  // fonte TSE sem a lista de seções (cs) publicada para a UF: o mosaico vem vazio, mas as zonas do município são
+  // conhecidas (ensaio geral 12/10/2026: aparecia "0 zonas eleitorais")
+  const nZonas = snap.mosaico.length || snap.zonas.filter((z) => z.zona > 0).length;
   const nSecoes = r.secoes;
   const unidade = exterior ? 'cidade' : 'município';
   // "Minha cidade no 1º turno" (resultado oficial): imagem e texto prontos para postar.

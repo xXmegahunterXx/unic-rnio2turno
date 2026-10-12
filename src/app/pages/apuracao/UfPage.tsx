@@ -115,7 +115,7 @@ export default function UfPage() {
 
   const ufMeta = ctx.meta?.ufs.find((u) => u.uf === uf);
   const nomeUf = uf ? UF_NOMES[uf] : '';
-  useTitulo(uf ? (uf === 'ZZ' ? 'Apuração no exterior' : `Apuração em ${nomeUf}`) : null);
+  useTitulo(uf ? `Apuração ${emUf(uf, nomeUf)}` : null);
   // UF de um município só (DF): no lugar do mapa, as seções do município.
   const codUnico = ufMeta && ufMeta.uf !== 'ZZ' && ufMeta.municipios === 1 && ufMeta.capitalCod ? ufMeta.capitalCod : undefined;
   const qUnico = useMunicipio(ctx.id, uf ?? undefined, codUnico, t);

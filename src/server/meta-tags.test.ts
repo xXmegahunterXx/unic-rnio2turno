@@ -57,7 +57,7 @@ describe('imagem específica por página', () => {
 
   it('UF: título e alt com a corrida mostrada na UF, sem repetir o estado (ensaio geral 12/10/2026)', () => {
     const am = metaDaRota('/apuracao/am', q('race=gov-am'), ctx);
-    expect(am.titulo).toBe('Apuração em Amazonas · Governador · Sintonia');
+    expect(am.titulo).toBe('Apuração no Amazonas · Governador · Sintonia');
     expect(am.imagemAlt).toBe('Placar da apuração · Governador · Amazonas');
     // governador de outra UF: título, alt e imagem seguem Presidente, como a página
     const sp = metaDaRota('/apuracao/sp', q('race=gov-am'), ctx);

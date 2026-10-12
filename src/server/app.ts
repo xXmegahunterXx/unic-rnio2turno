@@ -42,6 +42,7 @@ import { DadosEstaticos } from './dados-estaticos';
 import { anonimizarRace } from '../shared/anon';
 import { Estaticos, pareceArquivo } from './static';
 import type { TseManager } from './tse';
+import type { TseHealth } from '../tse';
 import {
   ErroValidacao,
   loginSchema,
@@ -199,6 +200,18 @@ const u8 = (b: Buffer) => new Uint8Array(b.buffer as ArrayBuffer, b.byteOffset, 
 /** Resposta com corpo binário opcional (HEAD/304 → null). */
 function responder(c: Context, body: Buffer | null, status: number, headers: Record<string, string>): Response {
   return body === null ? c.body(null, status as 200, headers) : c.body(u8(body), status as 200, headers);
+}
+
+/**
+ * Fonte TSE: o motor deixa a fase em 'apurando' depois das 17h (não sabe dos números do feed). Quando o TSE dá como
+ * concluída a totalização de Presidente e nenhuma outra disputa do 2º turno segue apurando (as sem arquivo publicado
+ * ficam de fora), o status PÚBLICO passa a 'encerrada' — cabeçalho, widgets e TV deixam de dizer "ao vivo", como na
+ * simulação (ensaio geral 12/10/2026: "AO VIVO" ao lado de "Apuração encerrada · eleito").
+ */
+export function tseTudoEncerrado(health: Pick<TseHealth, 'corridas'> | null, turnoDe: (race: string) => number | undefined): boolean {
+  const c2 = (health?.corridas ?? []).filter((c) => turnoDe(c.race) === 2);
+  if (!c2.some((c) => c.race === 'pres' && c.status === 'encerrada')) return false;
+  return c2.every((c) => c.status === 'encerrada' || (c.status !== 'apurando' && c.secoesTotalizadas === 0));
 }
 
 export function createApp(deps: AppDeps) {
@@ -536,10 +549,19 @@ export function createApp(deps: AppDeps) {
     return logoMemo;
   };
 
-  /** LiveStatus público: + pessoas agora (estimativa arredondada) e logo do patrocínio por URL. */
+  /** Fonte TSE com todas as disputas concluídas (ver tseTudoEncerrado), conferido no máximo a cada 2 s. */
+  let encerradoTse = { em: -Infinity, v: false };
+  const tseEncerrado = (): boolean => {
+    const t = now();
+    if (t - encerradoTse.em >= 2000) encerradoTse = { em: t, v: tseTudoEncerrado(deps.tse.health(), (r) => races.get(r)?.turno) };
+    return encerradoTse.v;
+  };
+
+  /** LiveStatus público: + pessoas agora (estimativa arredondada), logo do patrocínio por URL e fase 'encerrada' no TSE. */
   const statusPublico = (c: Ctx): LiveStatus => {
     const st = dados.status();
     const out: LiveStatus = { ...st, pessoasAgora: metricas.pessoasAgora() };
+    if (st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado()) out.fase = 'encerrada';
     // troca automática esperando o TSE responder: aviso discreto (só se o admin não publicou um aviso próprio)
     if (!st.aviso && agendador.avisoPublico()) out.aviso = { nivel: 'info', texto: AVISO_AGUARDANDO_TSE };
     const p = st.patrocinio;

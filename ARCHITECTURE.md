@@ -241,7 +241,9 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 - guarda o `AdminState` (relógio, cenário, fonte, aviso, congelado, versão) e aplica `AdminCommand`;
 - `status(wallNow): LiveStatus` e `simNow(wallNow)` segundo `ClockState`;
 - quando `congelado`, os números param em `congeladoEm`;
-- fase: `pre` se `simNow` < `INICIO_APURACAO` (ou fonte `pre`), `apurando`, `encerrada` (100% + 5 min);
+- fase: `pre` se `simNow` < `INICIO_APURACAO` (ou fonte `pre`), `apurando`, `encerrada` (100% + 5 min); na fonte `tse`
+  o motor diz `apurando` depois das 17h e o servidor publica `encerrada` no `/api/status` quando o TSE conclui
+  Presidente e nenhuma disputa de governador segue apurando (`tseTudoEncerrado`, ensaio geral de 12/10/2026);
 - expõe `nacional/uf/municipio/zona/secao(race, …, wallNow)` delegando ao motor com cache;
 - expõe `presets()`, `marcos()` e `fimPrevisto()`;
 - serializa e restaura o estado (`toJSON` / `fromJSON`); o servidor persiste em `.server-state/admin.json`.

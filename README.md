@@ -331,11 +331,22 @@ curl -b jar localhost:8787/api/admin/tse/test
    próxima tentativa). No painel dá para **desligar**, **adiar** (+5 min, +15 min, +1 h ou um horário de Brasília) e
    **trocar agora**. Trocar a fonte à mão continua valendo a qualquer momento; depois de feita (automática ou à mão,
    após o horário) a troca não se repete — "ligar" de novo rearma.
-3. **Durante a apuração**: se o TSE ficar instável, o adaptador mantém o último dado bom; publique um `aviso` se
-   precisar. A simulação não pode ir ao ar por engano em produção (`ALLOW_SIMULACAO`).
+3. **Durante a apuração**: se o TSE ficar instável, o adaptador mantém o último dado bom (as páginas mostram o horário
+   da última seção totalizada, mas não avisam da queda sozinhas); publique um `aviso` se precisar. A simulação não pode
+   ir ao ar por engano em produção (`ALLOW_SIMULACAO`). As imagens de compartilhamento ao vivo se renovam a cada 30 s
+   (uma imagem parada há mais de 90 s espera a nova, em vez de sair vencida para o robô do X).
+4. **Fim**: quando o TSE conclui Presidente e nenhuma disputa de governador segue apurando, o `/api/status` público
+   passa à fase `encerrada` (cabeçalho, home, widgets e TV deixam de dizer "ao vivo"; `tseTudoEncerrado` em
+   `src/server/app.ts`). O `/healthz` e o painel continuam mostrando a fase do motor (`apurando`).
 
 **Ensaio**: `TSE_INICIO=2026-10-20T15:00:00-03:00` (ou "Marcar para" no painel) faz a troca acontecer nesse horário.
-Com os códigos do 1º turno (`{"tipo":"tse","tse":{"eleicaoPres":"6257","eleicaoGov":"6259","pleito":"3220"}}`) o
+A troca, o feed, a API e o painel funcionam como na noite, mas as **páginas** continuam na fase `pre` (1º turno e
+contagem regressiva) até `INICIO_APURACAO` (17h de 25/10): a fase de `fonte: 'tse'` depende da data da eleição, não do
+`TSE_INICIO` (ensaio geral de 12/10/2026). Para ver as telas da noite num ensaio é preciso adiantar o relógio do
+processo (o ensaio geral usou um `--import` que desloca o `Date` do Node e do navegador). Depois do ensaio: apague o
+`TSE_INICIO`, volte a fonte para `pre` e confira "agendada para 17:00:00 de 25/10" — uma troca registrada **antes** do
+horário em vigor não conta, então não é preciso "rearmar" (antes desta correção, o `feitaEm` do ensaio impedia a
+troca do dia 25). Com os códigos do 1º turno (`{"tipo":"tse","tse":{"eleicaoPres":"6257","eleicaoGov":"6259","pleito":"3220"}}`) o
 servidor serve o 1º turno real pelo caminho ao vivo (Brasil, UF, município, zona e boletim de urna decodificado);
 volte depois para `6258`/`6260`/`3221` e para o horário padrão.
 

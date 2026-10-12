@@ -66,8 +66,13 @@ export const CC_OG = {
 } as const;
 
 const OG_TTL_MS = 30_000;
-/** Imagem vencida da mesma fonte ainda serve (enquanto a nova é gerada) por até 5 min. */
-const OG_STALE_MS = 5 * 60_000;
+/**
+ * Imagem vencida da mesma fonte ainda serve (enquanto a nova é gerada) por até 90 s. Na fonte TSE (e na simulação) a
+ * versão do admin não muda com os números: quem pede uma imagem parada há mais tempo que isso espera a nova (~0,4 s).
+ * Ensaio geral 12/10/2026: com 5 min, o robô do X (um pedido só por cartão) recebia o placar de "88% · AO VIVO"
+ * minutos depois de a apuração ter terminado.
+ */
+const OG_STALE_MS = 90_000;
 /** Grupo padrão do pacote de fotos oficiais (public/data/fotos/{grupo}.json) quando o candidato não diz. */
 const GRUPO_FOTOS_PADRAO = 'segundo-turno';
 

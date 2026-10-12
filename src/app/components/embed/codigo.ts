@@ -12,6 +12,7 @@
  */
 import { UFS, type UF, type UFBr } from '@/shared/types';
 import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
+import { emUf } from '@/engine/events';
 
 export type TipoEmbed = 'placar' | 'mapa' | 'uf';
 export type TemaEmbed = 'auto' | 'escuro' | 'claro';
@@ -80,7 +81,7 @@ export function caminhoPaginaCompleta(o: Pick<OpcoesEmbed, 'tipo' | 'race' | 'uf
 /** Título acessível do iframe. */
 export function tituloEmbed(o: Pick<OpcoesEmbed, 'tipo' | 'race' | 'uf'>): string {
   if (o.tipo === 'mapa') return 'Mapa da apuração do 2º turno · Sintonia';
-  if (o.tipo === 'uf') return `Apuração em ${UF_NOMES[o.uf]} · Sintonia`;
+  if (o.tipo === 'uf') return `Apuração ${emUf(o.uf, UF_NOMES[o.uf])} · Sintonia`;
   if (o.race.startsWith('gov-')) return `Governador · ${UF_NOMES[o.race.slice(4).toUpperCase() as UF] ?? ''} · Sintonia`;
   return 'Placar do 2º turno para Presidente · Sintonia';
 }

@@ -11,7 +11,7 @@ import type { AdminSnapshot } from '../shared/api';
 import type { AdminState } from '../shared/types';
 import { INICIO_APURACAO, UFS_GOV_2T } from '../shared/constants';
 import { UFS } from '../shared/types';
-import { cspPagina, rotasSitemap } from './app';
+import { cspPagina, rotasSitemap, tseTudoEncerrado } from './app';
 import { loadConfig } from './config';
 import { createLogger, type Nivel } from './log';
 import { injetarMeta } from './meta-tags';
@@ -233,6 +233,20 @@ describe('troca automática pre → tse', () => {
     expect(m.controller.state().trocaAuto).toEqual({ ligada: true, adiadaPara: null, feitaEm: null });
     const v = await montar({ estadoInicial: { trocaAuto: { ligada: false, adiadaPara: INI, feitaEm: null } } as unknown as AdminState });
     expect(v.controller.state().trocaAuto).toEqual({ ligada: false, adiadaPara: INI, feitaEm: null });
+  });
+});
+
+describe('fonte TSE: fase pública "encerrada" quando o TSE conclui as disputas', () => {
+  const turno = (r: string) => (r.endsWith('-t1') ? 1 : 2);
+  const c = (race: string, status: string | null, secoesTotalizadas = 10) => ({ race, status, secoesTotalizadas }) as never;
+  it('Presidente encerrada e nenhuma disputa do 2º turno apurando → encerrada; senão não', () => {
+    expect(tseTudoEncerrado(null, turno)).toBe(false);
+    expect(tseTudoEncerrado({ corridas: [c('pres', 'apurando'), c('gov-am', 'encerrada')] }, turno)).toBe(false);
+    expect(tseTudoEncerrado({ corridas: [c('pres', 'encerrada'), c('gov-am', 'apurando')] }, turno)).toBe(false);
+    expect(tseTudoEncerrado({ corridas: [c('pres', 'encerrada'), c('gov-am', 'encerrada'), c('pres-t1', 'apurando')] }, turno)).toBe(true);
+    // disputa sem arquivo publicado (ex.: TO com 404) não segura o "encerrada"
+    expect(tseTudoEncerrado({ corridas: [c('pres', 'encerrada'), c('gov-to', 'aguardando', 0), c('gov-am', null, 0)] }, turno)).toBe(true);
+    expect(tseTudoEncerrado({ corridas: [c('gov-am', 'encerrada')] }, turno)).toBe(false);
   });
 });
 

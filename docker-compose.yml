@@ -78,6 +78,9 @@ services:
       SITE_ADDRESS: ${SITE_ADDRESS:-${DOMINIO:?defina DOMINIO (ou SITE_ADDRESS) no .env}}
       ACME_EMAIL: ${ACME_EMAIL:?defina ACME_EMAIL no .env}
       APP_PORT: ${PORT:-8787}
+      # o Go devolve memória antes de bater no limite do contêiner (abaixo): sem isso, um pico de conexões pode
+      # levar o Caddy ao limite e o Docker o mata (site fora do ar por alguns segundos)
+      GOMEMLIMIT: ${CADDY_GOMEMLIMIT:-400MiB}
     volumes:
       - ./deploy/caddy:/etc/caddy:ro
       - caddy_data:/data # certificados: guarde (evita pedir de novo ao Let's Encrypt)
@@ -96,7 +99,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          # medido no ensaio geral (12/10/2026): ~220 MB com 1.500 conexões HTTPS simultâneas sem CDN na frente
+          memory: ${CADDY_MEMORIA:-512M}
     logging: *logs
 
 volumes:

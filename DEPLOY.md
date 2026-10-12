@@ -28,8 +28,9 @@ Arquivos envolvidos: `Dockerfile`, `docker-compose.yml`, `.env` (criado a partir
 | Portas | 22 (SSH), 80 e 443 liberadas também no firewall do **provedor**, se ele tiver um ("security group", "firewall de rede") |
 | Repositório | O endereço do repositório no GitHub. Se for privado, um token de leitura ou uma "deploy key" (seção 3.2) |
 
-Por que esses tamanhos (medidos): o app usa ~250 MB parado e ~350 MB com 100 conexões simultâneas; o Caddy,
-~30 MB; montar a imagem (build) usa ~1 GB por alguns minutos. Um processo do app responde ~13 mil requisições
+Por que esses tamanhos (medidos): o app usa ~250 MB parado, ~350 MB com 100 conexões simultâneas e ~450 MB na
+noite com 1.500–2.500 conexões; o Caddy, ~30 MB parado, mas ~220 MB com 1.500 e ~380 MB com 2.500 conexões HTTPS
+simultâneas sem CDN na frente (limite no compose: 512 MB); montar a imagem (build) usa ~1 GB por alguns minutos. Um processo do app responde ~13 mil requisições
 por segundo em 1 núcleo, e as imagens de compartilhamento (cartões do X) usam CPU. Com 4 vCPU/8 GB sobra folga
 para picos, para um build no meio da noite e para o plano B de várias instâncias (seção 10).
 
@@ -261,8 +262,8 @@ nano .env                    # mude a linha ADMIN_PASSWORD='nova-senha-longa' (e
 docker compose up -d         # recria o app com a senha nova (~3 s)
 ```
 
-Gerar uma senha forte: `openssl rand -base64 32 | tr -dc 'A-Za-z0-9'`. As sessões abertas continuam valendo
-até expirarem (12 h); para derrubar todas na hora, troque também o `ADMIN_SECRET` (mesmo comando de geração).
+Gerar uma senha forte: `openssl rand -base64 32 | tr -dc 'A-Za-z0-9'`. Trocar a senha **derruba todas as sessões
+abertas** do painel (quem estava logado entra de novo com a senha nova). Trocar o `ADMIN_SECRET` tem o mesmo efeito.
 
 Outras mudanças no `.env` seguem o mesmo caminho. Exceções: `VITE_SITE_URL` (vai para dentro do JavaScript) e
 `DOMINIO`/`SITE_ADDRESS`/`PUBLIC_URL` (mude os quatro juntos ao trocar de domínio) pedem
@@ -301,10 +302,25 @@ réplica.** Para voltar a 1, apague as duas linhas do `.env` e rode `docker comp
 - **Na véspera:** `deploy/update.sh` (versão final), `deploy/status.sh` (tudo `healthy`, relógio certo, disco
   com folga), backup copiado para fora da VPS, cache da Cloudflare conferido (seção 5), ensaio do feed do TSE pelo
   painel (README, seção "Admin").
-- **Antes das 17h:** fonte `pre` no painel; "testar conexão" do TSE.
-- **17h:** troque a fonte para `tse` no painel.
-- **Durante:** `deploy/status.sh` e `docker stats` de vez em quando. Evite atualizar o código durante a apuração
-  (é seguro, mas não é hora de mudança); se precisar, o `update.sh` faz o ensaio e não derruba o site.
+- **Antes das 17h:** fonte `pre` no painel; "testar conexão" do TSE; em *Fonte → Troca automática para o TSE* deve
+  aparecer **"agendada para 17:00:00 de 25/10"**. Entre no painel antes das 17h: a sessão vale 12 h e, se alguém
+  ficar errando a senha de muitos lugares ao mesmo tempo, o login pode ficar bloqueado por alguns minutos.
+- **17h — sozinho:** o servidor confere o feed do TSE e troca a fonte para `tse` (não precisa fazer nada). Se o TSE
+  ainda não responder, o site mostra o aviso "Aguardando os primeiros dados do TSE" e o servidor tenta de novo
+  (15 s, 30 s, 60 s e depois a cada 2 min). No painel dá para **trocar agora**, **adiar** ou **desligar**; trocar a
+  fonte à mão continua valendo.
+- **Durante:** `deploy/status.sh` e `docker stats` de vez em quando. Se o TSE cair no meio da noite, o site continua
+  mostrando o último dado bom (com o horário da última seção totalizada), mas **não** avisa sozinho: publique um
+  aviso no painel se a queda demorar. Evite atualizar o código durante a apuração (é seguro, mas não é hora de
+  mudança); se precisar, o `update.sh` faz o ensaio e não derruba o site.
+
+**Ensaio da troca antes do dia 25** (opcional): ponha `TSE_INICIO=2026-10-20T15:00:00-03:00` (o horário do ensaio)
+no `.env` e rode `docker compose up -d` — ou use "Marcar para" no painel. No horário, a fonte vira `tse` e a API
+passa a servir o feed. **As páginas continuam mostrando o 1º turno e a contagem regressiva** até as 17h do dia 25 (a
+fase "apurando" depende da data da eleição): o ensaio confere a troca, o feed e o painel, não as telas da apuração.
+**Depois do ensaio:** apague a linha `TSE_INICIO` do `.env`, rode `docker compose up -d`, volte a fonte para
+"Pré-eleição" no painel (se usou "Marcar para", clique em "horário padrão") e confira "agendada para 17:00:00 de
+25/10". Uma troca feita no ensaio não impede a troca do dia 25.
 - **Se a VPS ficar lenta:** confira `docker stats`; com Cloudflare ligada isso é raro. Aumentar a VPS exige
   reiniciá-la (≈ 1–2 min fora do ar; com a Cloudflare, quem já carregou continua vendo o último dado guardado).
 
@@ -346,7 +362,7 @@ Teste local sem domínio: no `.env`, `SITE_ADDRESS=':80'`, `HTTP_PORT=8080`, `HT
 - `.env` com permissão 600 e fora da imagem; backups com permissão 600.
 - O Docker publica portas por fora do `ufw`: por isso só 80 e 443 são publicadas.
 - O app envia HSTS com `includeSubDomains`: depois do primeiro acesso, os navegadores só aceitam HTTPS no domínio
-  **e em todos os subdomínios** dele por 6 meses. Se algum subdomínio seu ainda for só HTTP, publique o site num
+  **e em todos os subdomínios** dele por 1 ano. Se algum subdomínio seu ainda for só HTTP, publique o site num
   domínio próprio ou num subdomínio dedicado (ex.: `apuracao.seudominio.com.br`).
 - Recomendado na VPS: login SSH só por chave (`PasswordAuthentication no` em `/etc/ssh/sshd_config`) e as
   atualizações automáticas de segurança do Ubuntu (já vêm ligadas).

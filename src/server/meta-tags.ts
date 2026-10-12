@@ -192,8 +192,8 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
         // corrida que a página mostra nesta UF; "Governador · Amazonas" vira "Governador" (o estado já está no título)
         const tituloUf = (ctx.races.get(raceNaUf(uf))?.titulo ?? 'Presidente').replace(` · ${nomeUf}`, '');
         return pagina({
-          titulo: `Apuração em ${nomeUf} · ${tituloUf} · ${APP_NAME}`,
-          descricao: comPlacar(`Resultado por município em ${nomeUf}, com mapa, gráfico da apuração e eventos da noite.`, uf),
+          titulo: `Apuração ${emUf(uf, nomeUf)} · ${tituloUf} · ${APP_NAME}`,
+          descricao: comPlacar(`Resultado por município ${emUf(uf, nomeUf)}, com mapa, gráfico da apuração e eventos da noite.`, uf),
           imagem: ogApuracao(uf),
           imagemAlt: `Placar da apuração · ${tituloUf} · ${nomeUf}`,
         });
