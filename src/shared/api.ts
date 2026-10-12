@@ -23,6 +23,8 @@
  *   GET  /api/admin/presets                                   → PresetInfo[]
  *   GET  /api/admin/tse/test                                  → { ok, detalhe, amostra }
  *
+ *   GET  /healthz (vivo) · /readyz (pronto para receber tráfego) · /api/versao → BuildInfo · /sitemap.xml · /robots.txt
+ *
  * `:race` = RaceId ('pres', 'gov-rj', 'pres-t1', 'gov-rj-t1', ...). UF e race em minúsculas na URL.
  */
 import type {
@@ -70,7 +72,17 @@ export type AdminCommand =
   /** Mostra (true) ou oculta (false, padrão) os nomes reais dos candidatos na fonte 'simulacao'. */
   | { tipo: 'nomes-reais'; ativo: boolean }
   /** Define (ou remove, com null) o patrocínio exibido no site. */
-  | { tipo: 'patrocinio'; patrocinio: Patrocinio | null };
+  | { tipo: 'patrocinio'; patrocinio: Patrocinio | null }
+  /**
+   * Troca automática 'pre' → 'tse' (executada pelo servidor; ver `TrocaAutoEstado`):
+   *  - 'ligar' (rearma: vale de novo mesmo se já foi feita) · 'desligar';
+   *  - 'adiar' para `para` (epoch ms; null = volta ao horário padrão do servidor; rearma);
+   *  - 'agora': tenta já (com a mesma conferência do feed do TSE);
+   *  - 'executar' (fonte 'pre' → 'tse' e marca como feita) e 'concluir' (só marca): uso INTERNO do servidor, nunca
+   *    aceitos pela rota HTTP do admin.
+   */
+  | { tipo: 'troca-auto'; acao: 'ligar' | 'desligar' | 'agora' | 'executar' | 'concluir' }
+  | { tipo: 'troca-auto'; acao: 'adiar'; para: number | null };
 
 export interface AdminSnapshot {
   state: AdminState;
@@ -80,6 +92,80 @@ export interface AdminSnapshot {
   marcos: { pct: number; t: number }[];
   /** Instante (simNow) do fim previsto da apuração simulada (100%). */
   fimPrevisto: number | null;
+  /** Só no servidor (ausente no demo): build, travas de produção, troca automática e métricas do processo. */
+  servidor?: ServidorInfo;
+}
+
+/** Versão do build em execução (GET /api/versao, /healthz e cabeçalho `x-sintonia-versao`). */
+export interface BuildInfo {
+  /** commit (curto) do build, ou 'dev' */
+  commit: string;
+  /** data do build (ISO) se informada no build */
+  data: string | null;
+  /** versão do package.json */
+  versao: string;
+  node: string;
+}
+
+/** Estado da troca automática 'pre' → 'tse' calculado pelo servidor. */
+export interface TrocaAutoInfo {
+  /** TSE_AUTO ligado no servidor (padrão: só em produção). Desligado = o painel só mostra. */
+  habilitada: boolean;
+  /** Escolha do admin (TrocaAutoEstado.ligada). */
+  ligada: boolean;
+  /**
+   * 'desabilitada' (TSE_AUTO=0) · 'desligada' (pelo admin) · 'agendada' (antes do horário) · 'verificando' (conferindo o
+   * feed) · 'aguardando-tse' (feed sem resposta: tenta de novo com espera crescente) · 'feita' · 'nao-aplicavel' (no
+   * horário a fonte não era 'pre', ex.: simulação).
+   */
+  estado: 'desabilitada' | 'desligada' | 'agendada' | 'verificando' | 'aguardando-tse' | 'feita' | 'nao-aplicavel';
+  /** Horário efetivo da troca (epoch ms). */
+  inicio: number;
+  /** Horário padrão do servidor (TSE_INICIO ou 17h de 25/10/2026). */
+  inicioPadrao: number;
+  /** O horário foi mudado no admin. */
+  adiada: boolean;
+  feitaEm: number | null;
+  /** Tentativas desde que o horário chegou. */
+  tentativas: number;
+  ultimaTentativa: number | null;
+  proximaTentativa: number | null;
+  ultimoErro: string | null;
+  /** Aviso público "aguardando os primeiros dados do TSE" no ar. */
+  avisoPublico: boolean;
+}
+
+/** Métricas do processo (monitor do admin). */
+export interface MetricasServidor {
+  /** requisições por segundo (média do último minuto) */
+  reqPorSeg: number;
+  /** tempo de processamento no último minuto fechado (ms) */
+  p50Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  /** 5xx e 429 no último minuto fechado */
+  erros5xx: number;
+  respostas429: number;
+  /** acerto do cache de respostas montadas no último minuto fechado (0–1) */
+  cacheHit: number;
+  /** requisições em andamento agora */
+  emAndamento: number;
+  /** atraso do event loop (p99, ms) nos últimos ~10 s */
+  eventLoopP99Ms: number;
+  heapMb: number;
+  rssMb: number;
+  og: { emMemoria: number; mb: number; naFila: number };
+  /** cache de respostas (rotas montadas no segundo atual) */
+  respostasEmCache: number;
+}
+
+export interface ServidorInfo {
+  producao: boolean;
+  build: BuildInfo;
+  /** A fonte 'simulacao' pode ir ao ar? Em produção, só com ALLOW_SIMULACAO=1. */
+  simulacao: { permitida: boolean; motivo: string | null };
+  trocaAuto: TrocaAutoInfo;
+  metricas: MetricasServidor;
 }
 
 /** Interface única de acesso a dados no app (HTTP em produção, Worker local no demo). */

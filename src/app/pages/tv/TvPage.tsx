@@ -275,7 +275,7 @@ function BarraTopo({
                 simulacao ? 'border-brand/40 bg-brand/15 text-brand-fg' : 'border-line bg-surface-2 text-fg',
               )}
             >
-              <span className={cn('h-[calc(var(--u)*0.9)] w-[calc(var(--u)*0.9)] rounded-full', simulacao ? 'bg-brand-2' : 'bg-alert', ao_vivo && 'animate-pulse-dot')} />
+              <span className={cn('h-[calc(var(--u)*0.9)] w-[calc(var(--u)*0.9)] rounded-full', simulacao ? 'bg-brand-2' : 'bg-brand', ao_vivo && 'motion-safe:animate-pulse-dot')} />
               {t1 ? 'Oficial' : simulacao ? 'Simulação' : ao_vivo ? 'Ao vivo' : 'Apuração'}
             </span>
             <div className="text-right">

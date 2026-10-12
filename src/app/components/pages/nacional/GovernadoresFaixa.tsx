@@ -40,7 +40,7 @@ export function GovernadoresFaixa({ races, t1, linkT1, className }: Governadores
         </div>
         <Link
           to="/governadores"
-          className="inline-flex shrink-0 items-center gap-1 rounded-lg px-1 py-1 text-[13.5px] font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="toque relative inline-flex shrink-0 items-center gap-1 rounded-lg px-1 py-1 text-[13.5px] font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           Ver todos
           <Icon name="chevron-direita" size={16} />

@@ -15,7 +15,7 @@ export type CargoNav = (typeof ITENS)[number]['id'];
 
 export function NavCargos({ atual, className }: { atual: CargoNav; className?: string }) {
   return (
-    <nav aria-label="Outros cargos do 1º turno" className={cn('-mx-4 overflow-x-auto px-4 scrollbar-none sm:mx-0 sm:px-0', className)}>
+    <nav aria-label="Outros cargos do 1º turno" className={cn('-mx-4 -my-1 overflow-x-auto px-4 py-1 scrollbar-none sm:mx-0 sm:px-0', className)}>
       <ul className="flex w-max gap-1.5">
         {ITENS.map((it) => {
           const ativo = it.id === atual;
@@ -25,7 +25,7 @@ export function NavCargos({ atual, className }: { atual: CargoNav; className?: s
                 to={it.to}
                 aria-current={ativo ? 'page' : undefined}
                 className={cn(
-                  'inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                  'toque relative inline-flex h-9 items-center whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                   ativo ? 'border-transparent bg-fg text-bg' : 'border-line bg-surface-2 text-fg-muted hover:border-line/[2.5] hover:text-fg',
                 )}
               >

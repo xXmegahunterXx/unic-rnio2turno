@@ -27,8 +27,14 @@ export interface ComparacaoT1Props {
   className?: string;
 }
 
-export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, anonimizado, className }: ComparacaoT1Props) {
-  if (anonimizado) return <ComparacaoOculta className={className} />;
+export const ComparacaoT1 = memo(function ComparacaoT1({ anonimizado, ...props }: ComparacaoT1Props) {
+  // Dois componentes (e não um `return` antecipado): o bloco com números chama hooks (useFotosRace), e ligar/desligar
+  // os nomes reais no admin mudaria o número de hooks do MESMO componente — React: "Expected static flag was missing".
+  if (anonimizado) return <ComparacaoOculta className={props.className} />;
+  return <ComparacaoNumeros {...props} />;
+});
+
+function ComparacaoNumeros({ race, resumo, raceT1, className }: Omit<ComparacaoT1Props, 'anonimizado'>) {
   const tem = validos(resumo) > 0;
   const fotos = useFotosRace(race);
   const outros = raceT1?.candidatos.find((c) => c.agregado)?.primeiroTurno;
@@ -96,7 +102,7 @@ export const ComparacaoT1 = memo(function ComparacaoT1({ race, resumo, raceT1, a
       </p>
     </section>
   );
-});
+}
 
 function Linha({
   rotulo,

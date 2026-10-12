@@ -65,7 +65,8 @@ LABEL org.opencontainers.image.title="Sintonia" \
       org.opencontainers.image.created="${BUILD_DATE}"
 ENV SINTONIA_COMMIT=${GIT_COMMIT}
 
-USER node
+# usuário "node" da imagem base (uid/gid 1000), numérico para qualquer orquestrador conferir que não é root
+USER 1000:1000
 EXPOSE 8787
 VOLUME ["/var/lib/sintonia"]
 # /healthz em até 5 s; 5 falhas seguidas depois de já ter respondido = processo travado → reinício (healthcheck.mjs)

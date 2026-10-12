@@ -52,7 +52,7 @@ import {
   type OgEleitoInput,
 } from './og-cartoes';
 import type { Bancada } from './og-hemiciclo';
-import type { OgPronta, OgServida, ServicoOg } from './og-servico';
+import { LimiteOgExcedido, type OgPronta, type OgServida, type PedidoOg, type ServicoOg } from './og-servico';
 import { deUf } from './meta-tags';
 import { ErroValidacao, parseCodMunicipio, parseNumero, parseRace, parseUf } from './validation';
 
@@ -88,6 +88,11 @@ export interface DepsOg {
   servico: ServicoOg;
   /** Versão do dataset carregado na subida (1º turno do motor). */
   versaoDataset: string;
+  /**
+   * Limite de renderizações por cliente (OG_LIMITE_MIN): chamado só quando a imagem PRECISA ser gerada para atender o
+   * pedido; devolve 0 (pode) ou os segundos de espera (→ 429). Imagem já em memória nunca passa por aqui.
+   */
+  limitarRender?: (c: Ctx) => number;
 }
 
 /**
@@ -162,10 +167,19 @@ export function registrarOg(app: App, d: DepsOg): void {
     return { png, sub, headers };
   };
 
+  /** Pedido que vai gerar imagem nova para este cliente → conta no limite por cliente (429 se passou). */
+  const obterLimitado = (c: Ctx, pd: PedidoOg) => {
+    if (d.limitarRender && !servico.servivel(pd)) {
+      const espera = d.limitarRender(c);
+      if (espera > 0) throw new LimiteOgExcedido(espera);
+    }
+    return servico.obter(pd);
+  };
+
   /** Imagem ao vivo (depende do estado da apuração). */
   const vivo = async (c: Ctx, chave: string, montar: (st: LiveStatus) => Promise<OgPronta>) => {
     const st = dados.status();
-    const s = await servico.obter({
+    const s = await obterLimitado(c, {
       chave,
       sub: `${st.versao}|${modoOg(st)}`,
       ttlMs: OG_TTL_MS,
@@ -179,7 +193,7 @@ export function registrarOg(app: App, d: DepsOg): void {
   /** Imagem estática (dado oficial): vale enquanto a versão dos dados (e o modo, se houver) não mudar. */
   const estatica = async (c: Ctx, chave: string, versao: string, modo: string, montar: (sub: string) => Promise<OgPronta>, modoAtual?: () => string) => {
     const sub = `${versao}|${modo}`;
-    const s = await servico.obter({ chave, sub, ttlMs: Infinity, staleMs: Infinity, montar: () => montar(sub), modoAtual });
+    const s = await obterLimitado(c, { chave, sub, ttlMs: Infinity, staleMs: Infinity, montar: () => montar(sub), modoAtual });
     return enviarPng(c, chave, s, CC_OG.estatica);
   };
 

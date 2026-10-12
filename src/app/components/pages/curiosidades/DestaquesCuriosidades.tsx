@@ -58,7 +58,7 @@ export function DestaquesCuriosidades({ ids = DESTAQUES_PADRAO, variante = 'comp
         </div>
         <Link
           to="/curiosidades"
-          className="inline-flex items-center gap-1 text-[14px] font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="toque relative inline-flex items-center gap-1 text-[14px] font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           Ver {q.data ? <span className="num">{q.data.fatos.length}</span> : 'todas as'} curiosidades
           <Icon name="seta" size={16} />

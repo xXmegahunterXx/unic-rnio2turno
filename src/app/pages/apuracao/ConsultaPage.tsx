@@ -27,6 +27,7 @@ import { usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela
 import { fmt4 } from '@/app/components/pages/detalhe/fmt';
 import { LocalVotacaoCartao } from '@/app/components/pages/detalhe/LocalVotacao';
 import { PrimeiroTurnoSecao } from '@/app/components/pages/detalhe/PrimeiroTurnoSecao';
+import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
 /** A partir de quantas zonas o passo 3 ganha o filtro por número. */
 const ZONAS_COM_FILTRO = 12;
@@ -35,6 +36,7 @@ const E_TITULO = 'https://www.tse.jus.br/servicos-eleitorais/titulo-de-eleitor/e
 const RACE = 'pres';
 
 export default function ConsultaPage() {
+  useTitulo('Consulte sua seção');
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const uf = parseUf(params.get('uf') ?? undefined);
@@ -479,7 +481,7 @@ function Passo({
       className={cn(
         'scroll-mt-[calc(var(--app-header-h,64px)+12px)] rounded-2xl border bg-surface transition-[border-color,box-shadow]',
         ativo ? 'border-brand/40 p-4 shadow-glow sm:p-6' : 'border-line px-4 py-3 shadow-card sm:px-6',
-        bloqueado && !ativo && 'opacity-55',
+        bloqueado && !ativo && 'opacity-60',
       )}
     >
       <div className="flex items-center gap-3">
@@ -595,7 +597,7 @@ function AjudaTitulo() {
         href={E_TITULO}
         target="_blank"
         rel="noopener noreferrer"
-        className="mt-4 inline-flex items-center gap-1.5 rounded-lg text-[14px] font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+        className="toque relative mt-4 inline-flex items-center gap-1.5 rounded-lg text-[14px] font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       >
         Saiba mais sobre o e-Título (TSE)
         <Icon name="externo" size={15} />

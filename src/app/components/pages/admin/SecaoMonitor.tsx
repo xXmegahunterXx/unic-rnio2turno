@@ -3,7 +3,8 @@
  * log operacional rolável e o estado bruto (JSON) para conferência.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { fmtHora, fmtHoraSeg, fmtInt, normalize } from '@/shared/format';
+import type { ServidorInfo } from '@/shared/api';
+import { fmtDataHora, fmtDecimal, fmtHora, fmtHoraSeg, fmtInt, fmtPct, normalize } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { copiarTexto } from '@/app/lib/share';
 import { Badge, Button, Icon, SearchBox, toast, type IconName } from '@/app/ui';
@@ -105,6 +106,8 @@ export function SecaoMonitor() {
         />
       </div>
 
+      {snap.servidor ? <PainelServidor s={snap.servidor} /> : null}
+
       <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Painel
           titulo="Log operacional"
@@ -168,5 +171,55 @@ export function SecaoMonitor() {
         </Painel>
       </div>
     </div>
+  );
+}
+
+/** Processo do servidor: build, ambiente e as métricas do último minuto fechado (AdminSnapshot.servidor). */
+function PainelServidor({ s }: { s: ServidorInfo }) {
+  const m = s.metricas;
+  const itens: [string, ReactNode, ReactNode?][] = [
+    ['Requisições/s', fmtDecimal(m.reqPorSeg, 1), 'média do último minuto'],
+    ['Processamento', `${fmtMs(m.p50Ms)} · ${fmtMs(m.p99Ms)}`, 'p50 · p99 (minuto fechado)'],
+    ['Erros 5xx · 429', `${fmtInt(m.erros5xx)} · ${fmtInt(m.respostas429)}`, 'minuto fechado'],
+    ['Cache de respostas', m.cacheHit ? fmtPct(m.cacheHit * 100, 0) : '—', `${fmtInt(m.respostasEmCache)} rotas montadas agora`],
+    ['Em andamento', fmtInt(m.emAndamento), 'requisições abertas agora'],
+    ['Event loop', fmtMs(m.eventLoopP99Ms), 'atraso p99 (~10 s)'],
+    ['Memória', `${fmtInt(m.rssMb)} MB`, `heap ${fmtInt(m.heapMb)} MB`],
+    ['Imagens de prévia', `${fmtInt(m.og.emMemoria)} em memória`, `${fmtDecimal(m.og.mb, 1)} MB · ${fmtInt(m.og.naFila)} na fila`],
+  ];
+  return (
+    <Painel
+      className="mt-4 lg:mt-5"
+      titulo="Servidor"
+      icone="configuracoes"
+      subtitulo={
+        <>
+          Build <span className="num font-mono text-[12px] text-fg">{s.build.commit}</span>
+          {s.build.data ? <> de {fmtDataHora(Date.parse(s.build.data))}</> : null} · versão {s.build.versao} · Node {s.build.node}
+        </>
+      }
+      acoes={
+        <>
+          <Badge tone={s.producao ? 'brand' : 'neutral'} size="sm" caps>
+            {s.producao ? 'Produção' : 'Desenvolvimento'}
+          </Badge>
+          <Badge tone={s.simulacao.permitida ? 'alert' : 'ok'} size="sm" icon={s.simulacao.permitida ? 'play' : 'olho-fechado'}>
+            {s.simulacao.permitida ? 'Simulação permitida' : 'Simulação bloqueada'}
+          </Badge>
+        </>
+      }
+    >
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4">
+        {itens.map(([rot, val, sub]) => (
+          <div key={rot} className="min-w-0">
+            <dt>
+              <Rotulo>{rot}</Rotulo>
+            </dt>
+            <dd className="num mt-1.5 truncate font-display text-[19px] font-semibold leading-none tracking-[-0.01em] text-fg">{val}</dd>
+            {sub ? <dd className="num mt-1 truncate text-[12px] text-fg-muted">{sub}</dd> : null}
+          </div>
+        ))}
+      </dl>
+    </Painel>
   );
 }

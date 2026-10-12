@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { AdminCommand } from '../shared/api';
 import { UFS, type UF } from '../shared/types';
+import { TROCA_AUTO_MAX, TROCA_AUTO_MIN } from '../engine/state';
 
 export class ErroValidacao extends Error {
   readonly status = 400;
@@ -166,6 +167,14 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('nomes-reais'), ativo: z.boolean() }).strict(),
   z.object({ tipo: z.literal('tse'), tse }).strict(),
   z.object({ tipo: z.literal('patrocinio'), patrocinio: patrocinio.nullable() }).strict(),
+  // 'executar' e 'concluir' são internos do servidor (troca-auto.ts): nunca entram pela rota HTTP
+  z
+    .object({
+      tipo: z.literal('troca-auto'),
+      acao: z.enum(['ligar', 'desligar', 'agora', 'adiar']),
+      para: z.number().int().min(TROCA_AUTO_MIN).max(TROCA_AUTO_MAX).nullable().optional(),
+    })
+    .strict(),
 ]);
 
 /** Valida um comando do admin (lança ErroValidacao com a primeira mensagem legível). */
@@ -175,6 +184,10 @@ export function parseAdminCommand(body: unknown): AdminCommand {
     const i = r.error.issues[0];
     const onde = i.path.length ? `${i.path.join('.')}: ` : '';
     throw new ErroValidacao(`Comando inválido — ${onde}${i.message}`);
+  }
+  // troca-auto: "para" (epoch ms ou null) só com "adiar", e obrigatório nela
+  if (r.data.tipo === 'troca-auto' && (r.data.acao === 'adiar') !== (r.data.para !== undefined)) {
+    throw new ErroValidacao('Comando inválido — para: informe "para" (epoch ms ou null) só com a ação "adiar".');
   }
   return r.data as AdminCommand;
 }

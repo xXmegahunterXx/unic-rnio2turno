@@ -74,6 +74,8 @@ export class Estaticos {
       return null;
     }
     if (p.includes('\0') || p.includes('\\')) return null;
+    // arquivos/pastas ocultos (.env, .git, .DS_Store…) nunca saem, exceto /.well-known/ (validações de domínio)
+    if (/(^|\/)\.(?!well-known(\/|$))/.test(p)) return null;
     const abs = resolve(this.raiz, `.${normalize(`/${p}`)}`);
     if (abs !== this.raiz && !abs.startsWith(this.raiz + sep)) return null;
     return abs;

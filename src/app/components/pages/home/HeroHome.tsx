@@ -117,7 +117,7 @@ function Eyebrow({ fase, simulacao }: { fase: LiveStatus['fase'] | undefined; si
   const base = 'inline-flex h-[30px] items-center gap-2 rounded-full border px-3 text-[11.5px] font-semibold uppercase tracking-[0.14em] sm:h-8 sm:px-3.5 sm:text-[12px]';
   if (fase === 'apurando') {
     return (
-      <span className={cn(base, 'border-alert/30 bg-alert/10 text-fg')}>
+      <span className={cn(base, 'border-brand/30 bg-brand/10 text-fg')}>
         <LiveDot tone={simulacao ? 'brand' : 'live'} />
         {simulacao ? 'Simulação · apuração do 2º turno' : 'Ao vivo · apuração do 2º turno'}
       </span>

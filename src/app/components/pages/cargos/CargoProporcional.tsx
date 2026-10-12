@@ -267,7 +267,7 @@ function MaisVotadosNaoEleitos({ lista }: { lista: CandUf[] }) {
         <button
           type="button"
           onClick={() => setAberto((v) => !v)}
-          className="mt-2 inline-flex items-center gap-1 rounded-lg px-1 text-[13px] font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="toque relative mt-2 inline-flex items-center gap-1 rounded-lg px-1 text-[13px] font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           {aberto ? 'Mostrar menos' : `Ver os ${fmtInt(lista.length)}`}
           <Icon name={aberto ? 'chevron-cima' : 'chevron'} size={14} />

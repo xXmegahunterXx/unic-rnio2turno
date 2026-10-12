@@ -367,6 +367,22 @@ export interface AdminState {
   nomesReais?: boolean;
   /** Patrocínio ativo (null/ausente = nenhum). */
   patrocinio?: Patrocinio | null;
+  /** Troca automática 'pre' → 'tse' no início da apuração (ausente = padrão: ligada, horário do servidor). */
+  trocaAuto?: TrocaAutoEstado;
+}
+
+/**
+ * Troca automática da fonte 'pre' → 'tse' no início da apuração. O SERVIDOR executa (TSE_AUTO, TSE_INICIO; ver
+ * src/server/troca-auto.ts); o estado guarda só as escolhas do admin, para valer em todas as instâncias e depois de
+ * reinícios. O demo ignora.
+ */
+export interface TrocaAutoEstado {
+  /** false = desligada pelo admin. */
+  ligada: boolean;
+  /** Horário escolhido no admin (epoch ms) no lugar do padrão do servidor; null = padrão (TSE_INICIO ou 17h de 25/10). */
+  adiadaPara: number | null;
+  /** Quando a troca foi feita (automática, ou a fonte mudada à mão depois do horário); null = ainda não. */
+  feitaEm: number | null;
 }
 
 /**

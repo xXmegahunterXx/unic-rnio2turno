@@ -92,7 +92,7 @@ export const LiderancaCard = memo(function LiderancaCard({
                 </span>
               </div>
               {lista.length ? (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                <div className="mt-2.5 flex flex-wrap gap-x-1.5 gap-y-2">
                   {lista.map((uf) => (
                     <Link
                       key={uf}
@@ -100,7 +100,8 @@ export const LiderancaCard = memo(function LiderancaCard({
                       title={UF_NOMES[uf]}
                       aria-label={`${UF_NOMES[uf]}: ver resultado`}
                       className={cn(
-                        'inline-flex h-7 min-w-[2.5rem] items-center justify-center rounded-lg px-2 font-mono text-[12px] font-semibold transition-transform hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                        // 32 px + área invisível (`.toque`): 40 px de toque por linha sem invadir a vizinha
+                        'toque relative inline-flex h-8 min-w-[2.5rem] items-center justify-center rounded-lg px-2 font-mono text-[12px] font-semibold transition-transform hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                         s.bgSoft,
                         s.text,
                       )}

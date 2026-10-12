@@ -45,9 +45,10 @@ export function BotaoCompartilhar({
           title={label}
           aria-haspopup="dialog"
           className={cn(
-            'inline-flex shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg',
+            'relative inline-flex shrink-0 items-center justify-center rounded-xl text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-            size === 'sm' ? 'h-8 w-8' : size === 'lg' ? 'h-12 w-12' : 'h-9 w-9',
+            // sm/md: área de toque invisível de 44 px (`.toque`)
+            size === 'sm' ? 'toque h-8 w-8' : size === 'lg' ? 'h-12 w-12' : 'toque h-9 w-9',
             className,
           )}
         >

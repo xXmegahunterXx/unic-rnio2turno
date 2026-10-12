@@ -341,7 +341,7 @@ function NomeFicha({ c }: { c: Candidate }) {
   return (
     <Link
       to={`/candidato/${c.sqcand}`}
-      className="rounded-sm underline decoration-transparent decoration-1 underline-offset-[5px] transition-colors hover:decoration-line/[4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+      className="toque relative rounded-sm underline decoration-transparent decoration-1 underline-offset-[5px] transition-colors hover:decoration-line/[4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
       title={`Ficha de ${c.nomeUrna}`}
     >
       {c.nomeUrna}

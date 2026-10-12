@@ -46,11 +46,12 @@ else
 fi
 
 info "Versão"
-rev="$(revisao_imagem)"
-criada="$(docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.created"}}' "$IMAGEM:latest" 2>/dev/null || true)"
+rev="$(revisao_rodando)"
+id_app="$(ids_app | head -n 1 || true)"
+criada="$([[ -n $id_app ]] && docker inspect -f '{{index .Config.Labels "org.opencontainers.image.created"}}' "$id_app" 2>/dev/null || true)"
 echo "   imagem no ar:   commit ${rev:-?}${criada:+ (build $criada)}"
-echo "   código local:   $(git -C "$RAIZ" log -1 --format='%h · %cd · %s' --date=format:'%d/%m %H:%M' 2>/dev/null || echo '?')"
-echo "   branch:         $(git -C "$RAIZ" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
+echo "   código local:   $(gitr log -1 --format='%h · %cd · %s' --date=format:'%d/%m %H:%M' 2>/dev/null || echo '?')"
+echo "   branch:         $(gitr rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
 if [[ -n $rev && $rev != "$(commit_atual)" ]]; then
   aviso "   O código local ($(commit_atual)) é diferente da imagem no ar ($rev): rode deploy/update.sh --sem-pull"
 fi

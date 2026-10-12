@@ -238,7 +238,7 @@ export function ControleGrupo({ titulo, subtitulo, votos, pct, rotuloPct, divisa
           aria-expanded={aberto}
           aria-controls={painel}
           onClick={() => setAberto((x) => !x)}
-          className="mt-1 inline-flex h-9 items-center gap-1.5 rounded-lg px-1 text-[13px] font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="toque relative mt-1 inline-flex h-9 items-center gap-1.5 rounded-lg px-1 text-[13px] font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           <Icon name={aberto ? 'chevron-cima' : 'chevron'} size={16} />
           {divisao.escolhe === 100 ? 'Abstenção e voto branco/nulo' : (

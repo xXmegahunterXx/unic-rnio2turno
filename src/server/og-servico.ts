@@ -29,6 +29,16 @@ interface Entrada {
   pendente: Promise<OgPronta> | null;
 }
 
+/** Cliente passou do limite de imagens NOVAS por minuto (o app responde 429 com Retry-After). */
+export class LimiteOgExcedido extends Error {
+  readonly status = 429;
+  readonly headers: Record<string, string>;
+  constructor(esperaSeg: number) {
+    super('Muitas imagens novas pedidas em pouco tempo; tente de novo em instantes.');
+    this.headers = { 'retry-after': String(Math.max(1, Math.ceil(esperaSeg))) };
+  }
+}
+
 /** Fila cheia (o app responde 503 com Retry-After). */
 export class FilaOgCheia extends Error {
   readonly status = 503;
@@ -160,6 +170,18 @@ export class ServicoOg {
     });
     this.podar();
     return p;
+  }
+
+  /**
+   * O pedido sai da memória sem renderizar NADA para quem pediu (fresca, ou vencida do mesmo modo servida na hora)?
+   * Usado pelo limite de renderizações por cliente: imagem pronta nunca conta.
+   */
+  servivel(pd: Pick<PedidoOg, 'chave' | 'sub' | 'ttlMs' | 'staleMs'>): boolean {
+    const e = this.lru.get(pd.chave);
+    if (!e?.png) return false;
+    const idade = this.now() - e.em;
+    if (e.sub === pd.sub && idade < pd.ttlMs) return true;
+    return modoDoSub(e.sub) === modoDoSub(pd.sub) && idade < pd.staleMs;
   }
 
   /** Imagem para o pedido conforme as regras de frescor (ver o cabeçalho do arquivo). */

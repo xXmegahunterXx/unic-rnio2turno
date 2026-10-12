@@ -50,7 +50,7 @@ export function FaixaGovernadores({ fase, className }: { fase: Fase; className?:
         </div>
         <Link
           to="/governadores"
-          className="hidden shrink-0 items-center gap-1 rounded-lg px-1 py-1 text-[14px] font-semibold text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:inline-flex"
+          className="toque relative hidden shrink-0 items-center gap-1 rounded-lg px-1 py-1 text-[14px] font-semibold text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:inline-flex"
         >
           Ver todos
           <Icon name="chevron-direita" size={16} />

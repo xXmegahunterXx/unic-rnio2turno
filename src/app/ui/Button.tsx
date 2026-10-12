@@ -25,8 +25,9 @@ const variants: Record<ButtonVariant, string> = {
   outline: 'border border-line bg-transparent text-fg hover:border-line/[2.5] hover:bg-surface-2',
 };
 
+// `sm` (32 px) ganha área de toque invisível de 44 px (`.toque`, styles.css) sem mudar o desenho.
 const sizes: Record<ButtonSize, string> = {
-  sm: 'h-8 rounded-[10px] px-3 text-[13px]',
+  sm: 'toque h-8 rounded-[10px] px-3 text-[13px]',
   md: 'h-10 rounded-xl px-4 text-sm',
   lg: 'h-12 rounded-[16px] px-6 text-[15px]',
 };
@@ -116,7 +117,7 @@ export interface IconButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonEle
 }
 
 const iconBtnSizes: Record<ButtonSize, string> = {
-  sm: 'h-8 w-8 rounded-[10px]',
+  sm: 'toque h-8 w-8 rounded-[10px]',
   md: 'h-10 w-10 rounded-xl',
   lg: 'h-12 w-12 rounded-[16px]',
 };

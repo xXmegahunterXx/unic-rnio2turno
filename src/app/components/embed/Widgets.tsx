@@ -279,7 +279,7 @@ function WidgetMapa({ opcoes, className }: { opcoes: OpcoesEmbed; className?: st
                 <li key={c.numero} className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-surface-2/60 px-2.5 py-2">
                   <span aria-hidden className={cn('h-3 w-3 shrink-0 rounded-[4px]', corSlot(c.cor).bg)} />
                   <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{c.nomeUrna}</span>
-                  <span className={cn('num font-display text-[20px] font-semibold leading-none', corSlot(c.cor).textDisplay)}>{fmtInt(cont.get(i) ?? 0)}</span>
+                  <span className={cn('num font-display text-[20px] font-semibold leading-none', corSlot(c.cor).text)}>{fmtInt(cont.get(i) ?? 0)}</span>
                 </li>
               );
             })}
@@ -374,7 +374,7 @@ function LinhasT1({ race, resumo }: { race: Race; resumo: Summary }) {
           <li key={`${c.numero}-${i}`}>
             <div className="flex items-baseline justify-between gap-3 text-[13.5px]">
               <span className={cn('min-w-0 truncate', c.agregado ? 'text-fg-muted' : 'font-semibold')}>{c.agregado ? 'Demais candidatos' : c.nomeUrna}</span>
-              <span className={cn('num shrink-0 font-display text-[18px] font-semibold', c.agregado ? 'text-fg-muted' : corSlot(c.cor).textDisplay)}>{fmtPct(pct)}</span>
+              <span className={cn('num shrink-0 font-display text-[18px] font-semibold', c.agregado ? 'text-fg-muted' : corSlot(c.cor).text)}>{fmtPct(pct)}</span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-3">
               <div className={cn('h-full rounded-full', c.agregado ? 'bg-cand-outros/60' : corSlot(c.cor).bg)} style={{ width: `${Math.min(100, pct)}%` }} />
@@ -403,7 +403,7 @@ function GovCompacto({ uf }: { uf: UF }) {
           <li key={c.numero} className="flex items-center gap-2 text-[13px]">
             <span aria-hidden className={cn('h-2.5 w-2.5 shrink-0 rounded-[3px]', corSlot(c.cor).bg)} />
             <span className="min-w-0 flex-1 truncate font-medium">{c.nomeUrna}</span>
-            <span className={cn('num font-display text-[16px] font-semibold', validos(resumo) === 0 ? 'text-fg-subtle' : corSlot(c.cor).textDisplay)}>{fmtPct(pctValidos(resumo, i))}</span>
+            <span className={cn('num font-display text-[16px] font-semibold', validos(resumo) === 0 ? 'text-fg-subtle' : corSlot(c.cor).text)}>{fmtPct(pctValidos(resumo, i))}</span>
           </li>
         ))}
       </ul>

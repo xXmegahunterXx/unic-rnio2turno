@@ -177,21 +177,27 @@ describe('SPA com meta tags por rota', () => {
     const r = await get('/governadores', { 'accept-encoding': 'br' });
     expect(r.headers.get('content-encoding')).toBe('br');
     expect(r.headers.get('x-frame-options')).toBe('SAMEORIGIN');
-    expect(r.headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+    const csp = r.headers.get('content-security-policy')!;
+    expect(csp).toMatch(/frame-ancestors 'self'$/);
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("base-uri 'self'");
     expect(r.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(r.headers.get('permissions-policy')).toContain('camera=()');
+    expect(r.headers.get('cross-origin-opener-policy')).toBe('same-origin-allow-popups');
   });
 
   it('embeds (/embed/*): podem ir em iframe de qualquer site; o resto continua protegido', async () => {
     const e = await get('/embed/placar');
     expect(e.status).toBe(200);
     expect(e.headers.get('x-frame-options')).toBeNull();
-    expect(e.headers.get('content-security-policy')).toBe('frame-ancestors *');
+    expect(e.headers.get('content-security-policy')).toMatch(/frame-ancestors \*$/);
     expect(e.headers.get('x-robots-tag')).toBe('noindex');
     expect(await e.text()).toContain('<meta name="robots" content="noindex, nofollow" />');
     for (const p of ['/', '/apuracao', '/teste', '/admin']) {
       const r = await get(p);
       expect(r.headers.get('x-frame-options')).toBe('SAMEORIGIN');
-      expect(r.headers.get('content-security-policy')).toBe("frame-ancestors 'self'");
+      expect(r.headers.get('content-security-policy')).toMatch(/frame-ancestors 'self'$/);
     }
   });
 

@@ -789,7 +789,7 @@ function BotaoMapa({ label, onClick, disabled, ativo, children }: { label: strin
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'glass flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3 disabled:opacity-40',
+        'toque glass relative flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3 disabled:opacity-40',
         ativo && 'border-brand/50 bg-brand/15',
       )}
     >

@@ -528,7 +528,9 @@ export function injetarMeta(html: string, m: MetaPagina, origem: string, urlPagi
   ]
     .filter(Boolean)
     .join('\n    ');
-  let out = html.replace(/<title>[\s\S]*?<\/title>/, `<title>${t}</title>`);
-  out = out.replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/, `<meta name="description" content="${d}" />`);
-  return out.includes('<!--app-meta-->') ? out.replace('<!--app-meta-->', tags) : out.replace('</head>', `    ${tags}\n  </head>`);
+  // substituições por FUNÇÃO: num texto de substituição, "$&", "$`" e "$'" seriam expandidos (um título ou URL com
+  // esses padrões copiaria pedaços do template para dentro de um atributo)
+  let out = html.replace(/<title>[\s\S]*?<\/title>/, () => `<title>${t}</title>`);
+  out = out.replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/?>/, () => `<meta name="description" content="${d}" />`);
+  return out.includes('<!--app-meta-->') ? out.replace('<!--app-meta-->', () => tags) : out.replace('</head>', () => `    ${tags}\n  </head>`);
 }

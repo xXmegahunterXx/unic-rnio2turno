@@ -463,7 +463,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerUp}
             onKeyDown={onKeyDown}
-            className="group relative mt-1.5 h-7 cursor-pointer touch-none rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="toque group relative mt-1.5 h-7 cursor-pointer touch-none rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <div className="absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3" title="Quem estava à frente em cada momento da noite">
               <svg viewBox="0 0 1000 1" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
@@ -508,7 +508,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
             ) : null}
           </div>
           {/* rótulos dos marcos */}
-          <div aria-hidden className="relative h-3.5">
+          <div aria-hidden className="pointer-events-none relative h-3.5">
             {rotulos
               .filter((r) => r.mostra)
               .map(({ m, x }) => (

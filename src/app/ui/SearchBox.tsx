@@ -17,7 +17,8 @@ export interface SearchBoxProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   trailing?: ReactNode;
 }
 
-const alturas = { sm: 'h-9 text-[13px] rounded-[10px] pl-9', md: 'h-11 text-[15px] rounded-xl pl-10', lg: 'h-14 text-base rounded-2xl pl-12' };
+// sm: 40 px no celular (alvo de toque), 36 px a partir de 640 px
+const alturas = { sm: 'h-10 sm:h-9 text-[13px] rounded-[10px] pl-9', md: 'h-11 text-[15px] rounded-xl pl-10', lg: 'h-14 text-base rounded-2xl pl-12' };
 const iconePos = { sm: 'left-2.5', md: 'left-3', lg: 'left-4' };
 
 export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function SearchBox(
@@ -52,7 +53,7 @@ export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function S
             type="button"
             onClick={() => onChange('')}
             aria-label="Limpar busca"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-3 hover:text-fg"
+            className="toque relative inline-flex h-7 w-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-3 hover:text-fg"
           >
             <Icon name="fechar" size={15} />
           </button>

@@ -237,6 +237,20 @@
   .pb-safe {
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
   }
+  /*
+   * Área de toque mínima de 44×44 px sem mudar o desenho: um pseudo-elemento invisível, centrado no alvo, que recebe
+   * o toque/clique por ele. O alvo precisa estar posicionado (`relative`, `absolute`…) e NÃO pode ter `overflow-hidden`
+   * (cortaria a área extra). Usa ::before; o ::after fica livre para outros usos.
+   */
+  .toque::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

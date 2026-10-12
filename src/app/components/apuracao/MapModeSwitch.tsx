@@ -19,7 +19,9 @@ export function MapModeSwitch({ value, onChange, modos, size = 'sm', className }
   const lista = MAP_MODES.filter((m) => !modos || modos.includes(m.id));
   return (
     <div
-      className={cn('-mx-1 max-w-full overflow-x-auto px-1 pb-0.5 scrollbar-none', className)}
+      // respiro vertical (em cima, compensado): a rolagem horizontal corta o que vaza, e sem ele a área de toque dos
+      // botões (42 px, o ::after do Segmented) ficava em 38 px
+      className={cn('-mx-1 -mt-1 max-w-full overflow-x-auto px-1 pb-1.5 pt-1 scrollbar-none', className)}
       // Esmaece a borda direita quando há rolagem (dica de que há mais modos).
       style={{
         maskImage: 'linear-gradient(90deg, black calc(100% - 20px), transparent)',

@@ -2,10 +2,15 @@
  * Entrada do servidor Sintonia (Hono + @hono/node-server).
  *
  *   dev:      tsx watch src/server/main.ts            (npm run dev:server; SIM_AUTOSTART=1)
- *   produção: node dist-server/main.js                 (npm run build && npm start)
+ *   produção: node dist-server/main.js                 (npm run build && npm start; ou a imagem Docker)
  *
  * Sobe em ~1 s: lê o dataset do disco, constrói o motor (modelo de ~499 mil seções), restaura o AdminState
- * salvo em STATE_DIR e começa a servir. Variáveis de ambiente: ver src/server/config.ts e README.md.
+ * salvo em STATE_DIR, aplica as travas de produção (simulação só com ALLOW_SIMULACAO), liga o agendador da troca
+ * automática para o TSE (TSE_AUTO) e começa a servir. Variáveis de ambiente: ver src/server/config.ts e README.md.
+ *
+ * Encerramento (SIGTERM/SIGINT): /readyz passa a 503, o servidor para de aceitar conexões, as respostas em andamento
+ * terminam com `Connection: close` (até ENCERRAMENTO_SEG, padrão 8 s), as que sobrarem são fechadas, o polling do TSE
+ * para e o estado pendente é gravado. Sai com código 0 (ou 1 se passar de ENCERRAMENTO_SEG + 5 s).
  */
 import { unwatchFile, watchFile } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -23,8 +28,9 @@ import { TseManager } from './tse';
 async function main() {
   const t0 = performance.now();
   const config = loadConfig();
-  const log = createLogger();
+  const log = createLogger({ formato: config.logFormato });
   for (const a of config.avisos) log.aviso(a);
+  log.info(`Sintonia ${config.build.versao} (build ${config.build.commit}${config.build.data ? ` de ${config.build.data}` : ''}, Node ${config.build.node})`);
 
   // ---- dataset + motor ---------------------------------------------------------------------------
   // loadDataset pede 'data/meta.json', 'data/uf/sp.json' → resolvidos dentro de DATA_DIR
@@ -42,7 +48,8 @@ async function main() {
   });
   if (salvo) log.info(`Estado do admin restaurado de ${store.caminho} (versão ${controller.state().versao}, fonte ${controller.state().fonte})`);
 
-  // SIM_AUTOSTART: simulação a 20× (dev / demonstrações). 'auto' respeita uma simulação ou TSE em curso.
+  // SIM_AUTOSTART: simulação a 20× (dev / demonstrações; em produção só com ALLOW_SIMULACAO — config.ts zera).
+  // 'auto' respeita uma simulação ou TSE em curso.
   if (config.simAutostart !== 'nao') {
     const st = controller.status();
     if (config.simAutostart === 'force' || st.fonte === 'pre' || (st.fonte === 'simulacao' && st.fase === 'encerrada')) {
@@ -64,8 +71,13 @@ async function main() {
     log: (m) => log.info(m),
     historico: createJsonStore(config.stateDir, 'tse-historico.json', { debounceMs: 1000, onErro: (e) => log.erro('Falha ao salvar o histórico do TSE', e) }),
   });
+
+  // ---- HTTP ----------------------------------------------------------------------------------------
+  // createApp aplica as travas (estado salvo em simulação sem ALLOW_SIMULACAO → 'pre') antes de ligar o TSE
+  const sintonia = createApp({ config, dataset: ds, controller, tse, log });
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
+  sintonia.agendador.iniciar();
 
   // Várias instâncias com o mesmo STATE_DIR (volume compartilhado, PM2/cluster) convergem para o admin.json
   // mais recente: quem não escreveu adota o estado (setState não regrava → sem laço). Atraso ≤ ~1 s.
@@ -75,6 +87,10 @@ async function main() {
     if (!v || typeof v !== 'object' || typeof v.versao !== 'number') return;
     const atual = controller.state();
     if (v.versao < atual.versao || JSON.stringify(v) === JSON.stringify(atual)) return;
+    if (!config.permitirSimulacao && v.fonte === 'simulacao') {
+      log.aviso(`Estado de outra instância IGNORADO: fonte "simulacao" sem ALLOW_SIMULACAO=1 (versão ${v.versao})`);
+      return;
+    }
     try {
       controller.setState(v);
       const s = controller.state();
@@ -85,13 +101,12 @@ async function main() {
     }
   });
 
-  // ---- HTTP ----------------------------------------------------------------------------------------
-  const sintonia = createApp({ config, dataset: ds, controller, tse, log });
   const server = serve({ fetch: sintonia.app.fetch, port: config.port, hostname: config.host }, (info) => {
     log.info(
       `Sintonia no ar em http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${info.port} ` +
         `(${config.producao ? 'produção' : 'desenvolvimento'}, fonte ${controller.status().fonte}, ` +
-        `${config.serveStatic ? `servindo ${config.distDir}` : 'só API'}; subida em ${Math.round(performance.now() - t0)} ms)`,
+        `${config.serveStatic ? `servindo ${config.distDir}` : 'só API'}, simulação ${config.permitirSimulacao ? 'permitida' : 'bloqueada'}; ` +
+        `subida em ${Math.round(performance.now() - t0)} ms)`,
     );
   });
   // pré-comprime data/ e geo/ (JSONs grandes) em segundo plano, um arquivo por vez
@@ -103,13 +118,23 @@ async function main() {
     log.erro(e.code === 'EADDRINUSE' ? `Porta ${config.port} já está em uso (defina PORT)` : 'Falha no servidor HTTP', e);
     process.exit(1);
   });
+  type ServidorNode = {
+    keepAliveTimeout: number;
+    headersTimeout: number;
+    requestTimeout: number;
+    closeIdleConnections?: () => void;
+    closeAllConnections?: () => void;
+  };
+  const srv = server as unknown as ServidorNode;
   // keep-alive maior que o do balanceador (evita 502 por conexão reaproveitada fechando)
-  (server as unknown as { keepAliveTimeout: number; headersTimeout: number }).keepAliveTimeout = 65_000;
-  (server as unknown as { keepAliveTimeout: number; headersTimeout: number }).headersTimeout = 66_000;
+  srv.keepAliveTimeout = 65_000;
+  srv.headersTimeout = 66_000;
+  // requisição inteira (cabeçalhos + corpo) em até 30 s: conexões lentas de propósito não prendem o processo
+  srv.requestTimeout = 30_000;
 
   const resumo = setInterval(() => {
-    const linha = sintonia.resumoMinuto();
-    if (linha) log.info(linha);
+    const r = sintonia.resumoMinuto();
+    if (r) log.info(r.msg, r.campos);
   }, 60_000);
   resumo.unref();
 
@@ -118,18 +143,29 @@ async function main() {
   const encerrar = async (sinal: string) => {
     if (encerrando) return;
     encerrando = true;
-    log.info(`${sinal}: encerrando (para de aceitar conexões, grava estado)…`);
+    const ini = Date.now();
+    log.info(`${sinal}: encerrando — /readyz em 503, sem novas conexões, drenando ${sintonia.metricas.emAndamento} requisição(ões) (até ${config.encerramentoMs / 1000} s)`);
     const forcar = setTimeout(() => {
-      log.aviso('Encerramento demorou mais de 10 s: saindo à força');
+      log.aviso(`Encerramento passou de ${config.encerramentoMs / 1000 + 5} s: saindo à força`);
       process.exit(1);
-    }, 10_000);
+    }, config.encerramentoMs + 5_000);
     forcar.unref();
+    sintonia.encerrar();
     clearInterval(resumo);
     unwatchFile(store.caminho);
     try {
       await new Promise<void>((res) => {
-        server.close(() => res());
-        (server as unknown as { closeIdleConnections?: () => void }).closeIdleConnections?.();
+        const prazo = setTimeout(() => {
+          log.aviso(`Drenagem: ${sintonia.metricas.emAndamento} requisição(ões) ainda em andamento depois de ${config.encerramentoMs / 1000} s; fechando`);
+          srv.closeAllConnections?.();
+          res();
+        }, config.encerramentoMs);
+        prazo.unref();
+        server.close(() => {
+          clearTimeout(prazo);
+          res();
+        });
+        srv.closeIdleConnections?.();
       });
     } catch (e) {
       log.erro('Erro ao fechar o servidor HTTP', e);
@@ -142,7 +178,7 @@ async function main() {
     } catch (e) {
       log.erro('Erro ao gravar o estado no encerramento', e);
     }
-    log.info('Encerrado.');
+    log.info(`Encerrado em ${Date.now() - ini} ms.`);
     process.exit(0);
   };
   process.on('SIGTERM', () => void encerrar('SIGTERM'));

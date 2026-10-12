@@ -9,11 +9,12 @@ import { fmtDataHora } from '@/shared/format';
 import { getClient } from '@/app/data/client';
 import { anonimizarRace } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
-import { Badge, Button, Countdown, Icon, Toggle } from '@/app/ui';
+import { Badge, Button, Countdown, Icon, Toggle, toast } from '@/app/ui';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { useAdmin } from './dados';
 import { CabecalhoSecao, Callout, Campo, Painel, Rotulo } from './kit';
 import { FONTE_ICONE, FONTE_ROTULO, fmtMs, mensagemErro } from './rotulos';
+import { TrocaAutomatica } from './TrocaAutomatica';
 
 const FONTES: FonteDados[] = ['pre', 'simulacao', 'tse'];
 
@@ -52,9 +53,15 @@ export function SecaoFonte() {
   const [ed, setEd] = useState<Partial<TseConfig>>({});
   const [teste, setTeste] = useState<{ ok: boolean; detalhe: string; amostra?: unknown; ms: number; em: number } | null>(null);
   const [testando, setTestando] = useState(false);
+  /** Produção sem ALLOW_SIMULACAO: o servidor recusa a simulação (o motivo vem do servidor). */
+  const simBloqueada = snap.servidor?.simulacao.permitida === false ? snap.servidor.simulacao.motivo : null;
 
   async function trocar(f: FonteDados) {
     if (f === atual) return;
+    if (f === 'simulacao' && simBloqueada) {
+      toast(simBloqueada, { tone: 'alert', duracao: 6000 });
+      return;
+    }
     const ok = await confirmar({
       titulo: `Trocar a fonte para “${FONTE_ROTULO[f]}”?`,
       descricao: `Hoje: ${FONTE_ROTULO[atual]}. A mudança vale na hora para todos os visitantes.`,
@@ -103,18 +110,25 @@ export function SecaoFonte() {
       <div role="radiogroup" aria-label="Fonte de dados" className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {FONTES.map((f) => {
           const ativo = f === atual;
+          const bloqueada = f === 'simulacao' && !!simBloqueada && !ativo;
           return (
             <button
               key={f}
               type="button"
               role="radio"
               aria-checked={ativo}
+              aria-disabled={bloqueada || undefined}
               onClick={() => void trocar(f)}
               disabled={pendente('fonte')}
+              title={bloqueada ? simBloqueada ?? undefined : undefined}
               className={cn(
                 'group relative flex min-w-0 flex-col rounded-2xl border p-4 text-left transition-[border-color,background-color,box-shadow] sm:p-5',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
-                ativo ? 'border-brand/50 bg-brand/[0.08] shadow-glow' : 'border-line bg-surface shadow-card hover:border-line/[2.5] hover:bg-surface-2/60',
+                ativo
+                  ? 'border-brand/50 bg-brand/[0.08] shadow-glow'
+                  : bloqueada
+                    ? 'cursor-not-allowed border-dashed border-line bg-surface/60'
+                    : 'border-line bg-surface shadow-card hover:border-line/[2.5] hover:bg-surface-2/60',
               )}
             >
               <div className="flex items-center justify-between gap-2">
@@ -130,6 +144,10 @@ export function SecaoFonte() {
                   <Badge tone="brand" size="sm" icon="check" caps>
                     Em uso
                   </Badge>
+                ) : bloqueada ? (
+                  <Badge tone="neutral" size="sm" icon="olho-fechado" caps>
+                    Bloqueada
+                  </Badge>
                 ) : (
                   <span className="text-[12.5px] font-medium text-fg-subtle group-hover:text-fg-muted">Usar esta fonte</span>
                 )}
@@ -141,6 +159,10 @@ export function SecaoFonte() {
                   <div className="rounded-xl border border-line bg-surface-2/70 px-3 py-2.5">
                     <Rotulo>Apuração começa em</Rotulo>
                     <Countdown target={INICIO_APURACAO} size="sm" className="mt-2" />
+                  </div>
+                ) : f === 'simulacao' && bloqueada ? (
+                  <div className="rounded-xl border border-line bg-surface-2/70 px-3 py-2.5 text-[12.5px] leading-snug text-fg-muted">
+                    Servidor em produção: a simulação só vai ao ar com <span className="font-mono text-[11.5px] text-fg">ALLOW_SIMULACAO=1</span>.
                   </div>
                 ) : f === 'simulacao' ? (
                   <div className="rounded-xl border border-line bg-surface-2/70 px-3 py-2.5 text-[12.5px] text-fg-muted">
@@ -157,6 +179,8 @@ export function SecaoFonte() {
           );
         })}
       </div>
+
+      <TrocaAutomatica className="mt-4 lg:mt-5" />
 
       <NomesNaSimulacao />
 

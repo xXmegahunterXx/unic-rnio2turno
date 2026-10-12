@@ -11,6 +11,8 @@ export const fmtInt = (n: number) => nf0.format(Math.round(n));
 /** 51,93% (2 casas, como o TSE) */
 export const fmtPct = (n: number, casas: 0 | 1 | 2 = 2) =>
   `${casas === 2 ? nf2.format(n) : casas === 1 ? nf1.format(n) : nf0.format(n)}%`;
+/** 12,5 (número com casas fixas, sem %) */
+export const fmtDecimal = (n: number, casas: 0 | 1 | 2 = 1) => (casas === 2 ? nf2 : casas === 1 ? nf1 : nf0).format(n);
 /** 2,3 mi / 12,9 mil */
 export const fmtCompact = (n: number) => compact.format(n);
 /** +3,2 p.p. */

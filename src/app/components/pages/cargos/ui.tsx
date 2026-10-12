@@ -69,18 +69,19 @@ export function NomeLink({
 }) {
   const corte = quebra ? 'line-clamp-2 break-words' : 'truncate';
   if (!sqcand || !comFicha) return <span className={cn('min-w-0', corte, className)} title={nome}>{nome}</span>;
+  // O corte (reticências/2 linhas) fica no miolo: com `overflow-hidden` no próprio link, a área de toque invisível
+  // (`.toque`, 44 px) seria cortada.
   return (
     <Link
       to={`/candidato/${sqcand}`}
       title={nome}
       className={cn(
-        'min-w-0 rounded-sm',
-        corte,
+        'toque relative block w-fit min-w-0 max-w-full rounded-sm',
         'underline decoration-line/[3] decoration-1 underline-offset-[3px] transition-colors hover:text-brand-fg hover:decoration-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         className,
       )}
     >
-      {nome}
+      <span className={cn(!quebra && 'block', corte)}>{nome}</span>
     </Link>
   );
 }

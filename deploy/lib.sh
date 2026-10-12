@@ -30,9 +30,10 @@ morrer() {
 }
 fraco() { printf '%s\n' "${C_FRACO}$*${C_FIM}"; }
 
-# docker compose sempre com a pasta do projeto e o .env certos (vale de qualquer diretório)
+# docker compose sempre com a pasta do projeto e o .env certos, de qualquer diretório (o COMPOSE_FILE do .env,
+# usado para as réplicas, é relativo à pasta atual: por isso o cd)
 dc() {
-  docker compose --project-directory "$RAIZ" --env-file "$ARQ_ENV" ${COMPOSE_EXTRA[@]+"${COMPOSE_EXTRA[@]}"} "$@"
+  (cd "$RAIZ" && docker compose --project-directory "$RAIZ" --env-file "$ARQ_ENV" ${COMPOSE_EXTRA[@]+"${COMPOSE_EXTRA[@]}"} "$@")
 }
 
 # env_valor CHAVE [padrão] → valor no .env (sem aspas em volta); padrão se ausente ou vazio
@@ -76,15 +77,21 @@ ids_app() { dc ps -q app 2>/dev/null || true; }
 
 app_rodando() { [[ -n "$(dc ps -q --status running app 2>/dev/null || true)" ]]; }
 
-# esperar_saude [segundos] → 0 quando TODAS as instâncias do app estão "healthy"
+# esperar_saude [segundos] → 0 quando TODAS as instâncias do app estão "healthy"; 1 no fim do prazo ou logo
+# que uma instância fica "unhealthy" ou entra em ciclo de reinícios (falha rápida)
 esperar_saude() {
-  local limite=$((SECONDS + ${1:-180})) id est todos ultimo='' ids
+  local limite=$((SECONDS + ${1:-180})) id est rc todos ultimo='' ids
   while ((SECONDS < limite)); do
     ids="$(ids_app)"
     if [[ -n $ids ]]; then
       todos=1
       for id in $ids; do
         est="$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$id" 2>/dev/null || echo ausente)"
+        rc="$(docker inspect -f '{{.RestartCount}}' "$id" 2>/dev/null || echo 0)"
+        if [[ $est == unhealthy ]] || [[ $est != healthy && $rc -ge 3 ]]; then
+          erro "   app em falha (estado: $est; reinícios: $rc)"
+          return 1
+        fi
         [[ $est == healthy ]] || todos=0
       done
       if ((todos)); then return 0; fi
@@ -139,9 +146,21 @@ verificar_publico() {
   return 1
 }
 
-commit_atual() { git -C "$RAIZ" rev-parse --short HEAD 2>/dev/null || echo desconhecido; }
+# git no repositório do deploy; safe.directory evita o erro "dubious ownership" quando a pasta foi clonada por
+# outro usuário e o script roda com sudo
+gitr() { git -C "$RAIZ" -c safe.directory="$RAIZ" "$@"; }
+
+commit_atual() { gitr rev-parse --short HEAD 2>/dev/null || echo desconhecido; }
 
 # revisão (commit) gravada na imagem
 revisao_imagem() {
   docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "${1:-$IMAGEM:latest}" 2>/dev/null || true
+}
+
+# revisão (commit) do contêiner do app que está rodando agora (vazio se parado)
+revisao_rodando() {
+  local id
+  id="$(dc ps -q --status running app 2>/dev/null | head -n 1 || true)"
+  [[ -n $id ]] || return 0
+  docker inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$id" 2>/dev/null || true
 }

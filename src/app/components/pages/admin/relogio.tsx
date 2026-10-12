@@ -8,7 +8,7 @@ import { pctTotalizadas } from '@/shared/calc';
 import { cn } from '@/app/lib/cn';
 import { useNow } from '@/app/lib/useNow';
 import { corSlot } from '@/app/lib/raceUi';
-import { Badge, Button, Icon, IconButton, LiveDot, Segmented, Select, toneFromCor } from '@/app/ui';
+import { Badge, Button, Icon, IconButton, LiveDot, Segmented, Select, toast, toneFromCor } from '@/app/ui';
 import { useAdmin } from './dados';
 import { FASE_ROTULO, fmtVel, INICIO_SIMULACAO, relogioAgora, VELOCIDADES } from './rotulos';
 
@@ -19,8 +19,14 @@ export function useAcoesRelogio() {
   const sim = st.fonte === 'simulacao';
   const rodando = sim && st.relogio.rodando;
   const zerado = sim && !st.relogio.rodando && st.relogio.ancoraSim <= INICIO_SIMULACAO;
+  /** Servidor em produção sem ALLOW_SIMULACAO: "Iniciar" (que poria a simulação no ar) fica bloqueado. */
+  const bloqueio = !sim && snap.servidor?.simulacao.permitida === false ? snap.servidor.simulacao.motivo : null;
 
   const iniciar = useCallback(async () => {
+    if (bloqueio) {
+      toast(bloqueio, { tone: 'alert', duracao: 6000 });
+      return;
+    }
     if (!sim || !zerado) {
       const ok = await confirmar({
         titulo: sim ? 'Recomeçar a noite?' : 'Iniciar a simulação?',
@@ -36,7 +42,7 @@ export function useAcoesRelogio() {
       if (!ok) return;
     }
     await run({ tipo: 'relogio', acao: 'iniciar' }, { chave: 'relogio', sucesso: 'Simulação iniciada às 16:59:30' });
-  }, [sim, zerado, confirmar, run, st.relogio.velocidade]);
+  }, [sim, zerado, bloqueio, confirmar, run, st.relogio.velocidade]);
 
   const alternar = useCallback(async () => {
     if (!sim) return;
@@ -71,7 +77,7 @@ export function useAcoesRelogio() {
     [snap, dados.recebidoEm, run],
   );
 
-  return { sim, rodando, zerado, iniciar, alternar, reiniciar, velocidade, avancar };
+  return { sim, rodando, zerado, bloqueio, iniciar, alternar, reiniciar, velocidade, avancar };
 }
 
 /** Relógio da apuração interpolado (horário de Brasília), com os segundos rolando. */
@@ -223,8 +229,9 @@ export function Transporte({ variante = 'barra', className }: { variante?: 'barr
         <button
           type="button"
           onClick={onPrincipal}
-          disabled={ocupado}
-          aria-label={a.sim ? (a.rodando ? 'Pausar relógio' : 'Retomar relógio') : 'Iniciar simulação'}
+          disabled={ocupado || !!a.bloqueio}
+          title={a.bloqueio ?? undefined}
+          aria-label={a.sim ? (a.rodando ? 'Pausar relógio' : 'Retomar relógio') : a.bloqueio ? 'Simulação bloqueada neste servidor' : 'Iniciar simulação'}
           className={cn(
             'inline-flex h-12 w-12 items-center justify-center rounded-full bg-brand-cta text-brand-ink shadow-[0_8px_24px_-10px_rgb(var(--brand)/0.8)]',
             'transition-transform active:scale-95 disabled:opacity-60',
@@ -245,15 +252,27 @@ export function Transporte({ variante = 'barra', className }: { variante?: 'barr
           icon={a.sim && a.rodando ? 'pause' : 'play'}
           onClick={onPrincipal}
           loading={ocupado}
+          disabled={!!a.bloqueio}
+          title={a.bloqueio ?? undefined}
           className="col-span-2"
         >
-          {a.sim ? (a.rodando ? 'Pausar relógio' : 'Retomar relógio') : 'Iniciar simulação'}
+          {a.sim ? (a.rodando ? 'Pausar relógio' : 'Retomar relógio') : a.bloqueio ? 'Simulação bloqueada' : 'Iniciar simulação'}
         </Button>
         <Button variant="outline" icon="play" onClick={a.iniciar} disabled={ocupado || !a.sim}>
           Iniciar
         </Button>
         <Button variant="outline" icon="reset" onClick={a.reiniciar} disabled={ocupado}>
           Reiniciar
+        </Button>
+      </div>
+    );
+  }
+  if (!a.sim && a.bloqueio) {
+    // produção sem ALLOW_SIMULACAO: nada de relógio (o motivo aparece ao passar o mouse e na seção Fonte)
+    return (
+      <div className={cn('flex items-center gap-1.5', className)}>
+        <Button variant="outline" icon="olho-fechado" disabled title={a.bloqueio}>
+          Simulação bloqueada
         </Button>
       </div>
     );

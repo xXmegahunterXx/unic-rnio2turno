@@ -11,7 +11,7 @@ import { Icon, type IconName } from '@/app/ui/Icon';
 
 const ATALHOS: { to: string; icone: IconName; titulo: string; texto: string }[] = [
   { to: '/apuracao', icone: 'ao-vivo', titulo: 'Apuração ao vivo', texto: 'Presidente, estado por estado' },
-  { to: '/teste', icone: 'olho-fechado', titulo: 'Teste Cego', texto: 'Propostas sem nome nem partido' },
+  { to: '/teste', icone: 'olho-fechado', titulo: 'Teste Cego', texto: 'Concorde ou discorde sem saber de quem é' },
   { to: '/apuracao/consulta', icone: 'busca', titulo: 'Consulte sua seção', texto: 'O boletim da sua urna' },
   { to: '/governadores', icone: 'grade', titulo: 'Governadores', texto: 'As 7 disputas do 2º turno' },
 ];

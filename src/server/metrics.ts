@@ -15,6 +15,7 @@
  *    "1.237" sugeriria uma precisão que ela não tem.
  */
 import { createHash, randomBytes } from 'node:crypto';
+import { monitorEventLoopDelay, type IntervalHistogram } from 'node:perf_hooks';
 
 const BITS = 1 << 20; // 1.048.576 bits = 128 KB por balde
 const BALDE_MS = 10_000;
@@ -100,6 +101,7 @@ export interface ResumoMinuto {
   erros5xx: number;
   cacheHit: number;
   respostas304: number;
+  respostas429: number;
 }
 
 export class Metricas {
@@ -111,6 +113,14 @@ export class Metricas {
   private hits = 0;
   private misses = 0;
   private n304 = 0;
+  private n429 = 0;
+  /** Requisições em andamento (para a drenagem no SIGTERM e o monitor). */
+  emAndamento = 0;
+  /** Último minuto fechado (o monitor do admin mostra sem fechar de novo). */
+  ultimoResumo: ResumoMinuto | null = null;
+  private loop: IntervalHistogram | null = null;
+  private loopP99 = 0;
+  private loopEm = 0;
   readonly clientes: ClientesAtivos;
   private pessoas: { em: number; v: number } | null = null;
   /** Tempo da última montagem de resposta não cacheada (snapshot + JSON + compressão), em ms. */
@@ -139,6 +149,38 @@ export class Metricas {
     }
     if (status >= 500) this.erros5xx++;
     if (status === 304) this.n304++;
+    if (status === 429) this.n429++;
+  }
+
+  /**
+   * Atraso do event loop (p99, ms) nos últimos ~10 s: mede se a thread principal está engasgada (imagens OG,
+   * reconstrução do modelo). Liga o histograma na primeira consulta.
+   */
+  eventLoopP99Ms(): number {
+    if (!this.loop) {
+      try {
+        this.loop = monitorEventLoopDelay({ resolution: 20 });
+        this.loop.enable();
+        this.loopEm = this.now();
+      } catch {
+        return 0;
+      }
+    }
+    const t = this.now();
+    if (t - this.loopEm >= 10_000 || this.loopP99 === 0) {
+      const p = this.loop.percentile(99);
+      if (Number.isFinite(p) && p > 0) this.loopP99 = Math.round((p / 1e6) * 10) / 10;
+      if (t - this.loopEm >= 10_000) {
+        this.loop.reset();
+        this.loopEm = t;
+      }
+    }
+    return this.loopP99;
+  }
+
+  pararEventLoop(): void {
+    this.loop?.disable();
+    this.loop = null;
   }
 
   cache(hit: boolean): void {
@@ -175,13 +217,16 @@ export class Metricas {
       erros5xx: this.erros5xx,
       cacheHit: this.hits + this.misses > 0 ? this.hits / (this.hits + this.misses) : 0,
       respostas304: this.n304,
+      respostas429: this.n429,
     };
+    this.ultimoResumo = r;
     this.latencias = [];
     this.nMinuto = 0;
     this.erros5xx = 0;
     this.hits = 0;
     this.misses = 0;
     this.n304 = 0;
+    this.n429 = 0;
     return r;
   }
 }

@@ -2,7 +2,7 @@
  * AdminState: padrão por modo, relógio, (de)serialização e validação de estados persistidos/recebidos.
  */
 import { INICIO_APURACAO } from '../shared/constants';
-import type { AdminState, Aviso, ClockState, FonteDados, Patrocinio, ScenarioConfig, TseConfig } from '../shared/types';
+import type { AdminState, Aviso, ClockState, FonteDados, Patrocinio, ScenarioConfig, TrocaAutoEstado, TseConfig } from '../shared/types';
 import { normalizaCenario } from './scenario';
 import type { Structure } from './structure';
 
@@ -52,6 +52,27 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     tse: tsePadrao(st),
     nomesReais: false,
     patrocinio: null,
+    trocaAuto: trocaAutoPadrao(),
+  };
+}
+
+/** Troca automática 'pre' → 'tse': ligada, no horário padrão do servidor, ainda não feita. */
+export const trocaAutoPadrao = (): TrocaAutoEstado => ({ ligada: true, adiadaPara: null, feitaEm: null });
+
+/** Faixa aceita para horários da troca automática (epoch ms): 2020–2040 (protege contra lixo no estado salvo). */
+export const TROCA_AUTO_MIN = Date.UTC(2020, 0, 1);
+export const TROCA_AUTO_MAX = Date.UTC(2040, 0, 1);
+
+const instanteValido = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v >= TROCA_AUTO_MIN && v <= TROCA_AUTO_MAX ? Math.floor(v) : null;
+
+/** Troca automática de um estado restaurado (ausente/inválida → padrão; nunca lança). */
+export function parseTrocaAuto(v: unknown, fallback: TrocaAutoEstado = trocaAutoPadrao()): TrocaAutoEstado {
+  if (!isObj(v)) return { ...fallback };
+  return {
+    ligada: typeof v.ligada === 'boolean' ? v.ligada : fallback.ligada,
+    adiadaPara: v.adiadaPara === null ? null : (instanteValido(v.adiadaPara) ?? fallback.adiadaPara),
+    feitaEm: v.feitaEm === null ? null : (instanteValido(v.feitaEm) ?? fallback.feitaEm),
   };
 }
 
@@ -178,6 +199,7 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     tse,
     nomesReais: typeof v.nomesReais === 'boolean' ? v.nomesReais : (fallback.nomesReais ?? false),
     patrocinio: parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null),
+    trocaAuto: parseTrocaAuto(v.trocaAuto, fallback.trocaAuto ?? trocaAutoPadrao()),
   };
 }
 

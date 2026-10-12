@@ -79,6 +79,9 @@ import {
   parseAviso,
   serializeAdminState,
   simNowDe,
+  TROCA_AUTO_MAX,
+  TROCA_AUTO_MIN,
+  trocaAutoPadrao,
   validaPatrocinio,
 } from './state';
 import { buildStructure, forEachFaixa, type RaceInfo, type Structure } from './structure';
@@ -471,6 +474,40 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         if ('erro' in v) throw new CommandError(v.erro);
         state = { ...state, patrocinio: v.ok };
         log(`Patrocínio publicado (${v.ok.marca})`);
+        break;
+      }
+      case 'troca-auto': {
+        // Só guarda as escolhas; quem executa no horário é o servidor (src/server/troca-auto.ts).
+        const ta = { ...trocaAutoPadrao(), ...state.trocaAuto };
+        const quandoTroca = (ms: number) => `${fmtHoraSeg(ms)} de ${fmtDataHora(ms).slice(0, 5)}`;
+        if (cmd.acao === 'ligar') {
+          ta.ligada = true;
+          ta.feitaEm = null;
+          log('Troca automática para o TSE: ligada');
+        } else if (cmd.acao === 'desligar') {
+          ta.ligada = false;
+          log('Troca automática para o TSE: desligada');
+        } else if (cmd.acao === 'adiar') {
+          const para = cmd.para;
+          if (para !== null && !(typeof para === 'number' && Number.isFinite(para) && para >= TROCA_AUTO_MIN && para <= TROCA_AUTO_MAX))
+            throw new CommandError('troca-auto: horário inválido.');
+          ta.adiadaPara = para === null ? null : Math.floor(para);
+          ta.feitaEm = null;
+          log(para === null ? 'Troca automática para o TSE: horário padrão' : `Troca automática para o TSE: marcada para ${quandoTroca(para)}`);
+        } else if (cmd.acao === 'agora') {
+          ta.ligada = true;
+          ta.adiadaPara = wall;
+          ta.feitaEm = null;
+          log('Troca automática para o TSE: tentar agora');
+        } else if (cmd.acao === 'executar') {
+          if (state.fonte !== 'tse') log(`Fonte: ${state.fonte} → tse (troca automática)`);
+          state = { ...state, fonte: 'tse' };
+          ta.feitaEm = wall;
+        } else if (cmd.acao === 'concluir') {
+          ta.feitaEm = wall;
+          log('Troca automática para o TSE: concluída (fonte já definida no painel)');
+        } else throw new CommandError(`troca-auto: ação inválida "${String((cmd as { acao?: unknown }).acao)}".`);
+        state = { ...state, trocaAuto: ta };
         break;
       }
       case 'tse': {

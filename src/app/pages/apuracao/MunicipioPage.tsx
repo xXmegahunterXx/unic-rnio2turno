@@ -50,6 +50,7 @@ import { Recolhivel } from '@/app/components/pages/detalhe/Recolhivel';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { LocaisVotacao } from '@/app/components/pages/detalhe/LocaisVotacao';
 import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
+import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
 type Agrupar = 'zona' | 'local';
 
@@ -83,6 +84,7 @@ export default function MunicipioPage() {
   const raceShown = snap ? ctx.races?.find((r) => r.id === snap.race) : undefined;
   const atualizando = !!snap && snap.race !== ctx.id;
   const erro = q.error ?? q.failureReason;
+  useTitulo(snap ? `Apuração em ${snap.nome} (${exterior ? 'Exterior' : uf})` : null);
 
   if (!uf || (ehNaoEncontrado(erro) && !snap)) {
     return (

@@ -175,7 +175,7 @@ SWAP_GB=${SWAP_GB:-2}
 if [[ -n "$(swapon --show --noheadings 2>/dev/null)" ]]; then
   ok "Swap já existe ($(swapon --show --noheadings --bytes | awk '{s+=$3} END {printf "%.1f GB", s/1073741824}'))"
 elif [[ $SWAP_GB == 0 ]]; then
-  aviso "SWAP_GB=0: sem swap (o build da imagem usa ~1,5 GB de RAM)."
+  aviso "SWAP_GB=0: sem swap (o build da imagem usa ~1 GB de RAM)."
 else
   if [[ ! -f /swapfile ]]; then
     fallocate -l "${SWAP_GB}G" /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=$((SWAP_GB * 1024)) status=none
@@ -232,6 +232,8 @@ if [[ -n ${DEPLOY_KEY:-} ]]; then
   fi
 fi
 
+# pasta clonada por outro usuário (sem sudo): o git do root precisa confiar nela
+git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$INSTALL_DIR" || git config --global --add safe.directory "$INSTALL_DIR"
 if [[ -d "$INSTALL_DIR/.git" ]]; then
   ok "Repositório já em $INSTALL_DIR (commit $(git -C "$INSTALL_DIR" rev-parse --short HEAD)); para atualizar use deploy/update.sh"
   if [[ -n ${GIT_TOKEN:-} ]]; then git -C "$INSTALL_DIR" config credential.helper "store --file=/root/.config/sintonia/git-credentials"; fi
@@ -357,7 +359,7 @@ source "$INSTALL_DIR/deploy/lib.sh"
 GIT_COMMIT="$(commit_atual)"
 BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 export GIT_COMMIT BUILD_DATE
-if app_rodando && [[ "$(revisao_imagem)" == "$GIT_COMMIT" ]] && esperar_saude 5; then
+if app_rodando && [[ "$(revisao_rodando)" == "$GIT_COMMIT" ]] && esperar_saude 5; then
   ok "A imagem do commit $GIT_COMMIT já está no ar: sem rebuild (para forçar: deploy/update.sh --forcar)"
   dc up -d --no-build --remove-orphans # aplica mudanças do .env, se houver
 else

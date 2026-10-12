@@ -29,11 +29,15 @@ export function parseUf(raw: string | undefined): UF | null {
   return (UFS as readonly string[]).includes(U) ? (U as UF) : null;
 }
 
-/** Erro de escopo inexistente (NotFoundError do motor/cliente HTTP, ou status 404). */
+/**
+ * Erro de escopo inexistente (NotFoundError do motor/cliente HTTP, ou status 404). Um 400 numa consulta de dados é um
+ * endereço malformado (ex.: código IBGE de 7 dígitos no lugar do código do TSE): para quem lê, também "não encontrado"
+ * — e não "falha de conexão", que mandaria tentar de novo.
+ */
 export function ehNaoEncontrado(e: unknown): boolean {
   if (!e || typeof e !== 'object') return false;
   const x = e as { name?: string; status?: number };
-  return x.name === 'NotFoundError' || x.status === 404;
+  return x.name === 'NotFoundError' || x.status === 404 || x.status === 400;
 }
 
 /** Monta `?race=` (omitido para 'pres') + outros parâmetros. */

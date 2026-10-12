@@ -176,10 +176,13 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
 
   it('composição: PT/PL nas cores de Lula/Flávio, demais partidos sem cor de candidato nem dos slots A/B, maior bancada primeiro', () => {
     const camara = json<{ composicao: { sigla: string; eleitos: number }[] }>('cargos/camara.json');
-    const txt = JSON.stringify(layoutComposicao({ kicker: 'K', titulo: 'T', bancadas: camara.composicao, pendentes: 8, rotuloTotal: 'cadeiras' }));
+    // vagas ainda sem eleito no TSE (0 desde 10/10/2026, quando o AM foi totalizado) — derivado do dado, não fixo
+    const pend = 513 - camara.composicao.reduce((s, b) => s + b.eleitos, 0);
+    expect(pend).toBeGreaterThanOrEqual(0);
+    const txt = JSON.stringify(layoutComposicao({ kicker: 'K', titulo: 'T', bancadas: camara.composicao, pendentes: pend, rotuloTotal: 'cadeiras' }));
     expect(txt).not.toContain('rgb(25,194,176)');
     expect(txt).not.toContain('rgb(245,165,36)');
-    const hem = svgHemiciclo(camara.composicao, 8, 560);
+    const hem = svgHemiciclo(camara.composicao, pend, 560);
     expect(hem.total).toBe(513);
     const svg = Buffer.from(hem.uri.split(',')[1], 'base64').toString();
     expect(svg.match(/<circle/g)).toHaveLength(513);

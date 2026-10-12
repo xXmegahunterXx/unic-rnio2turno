@@ -75,13 +75,14 @@ services:
       - "${HTTPS_PORT:-443}:443"
       - "${HTTPS_PORT:-443}:443/udp" # HTTP/3
     environment:
-      SITE_ADDRESS: ${SITE_ADDRESS:?defina SITE_ADDRESS (ou DOMINIO) no .env}
+      SITE_ADDRESS: ${SITE_ADDRESS:-${DOMINIO:?defina DOMINIO (ou SITE_ADDRESS) no .env}}
       ACME_EMAIL: ${ACME_EMAIL:?defina ACME_EMAIL no .env}
       APP_PORT: ${PORT:-8787}
     volumes:
       - ./deploy/caddy:/etc/caddy:ro
       - caddy_data:/data # certificados: guarde (evita pedir de novo ao Let's Encrypt)
       - caddy_config:/config
+    stop_grace_period: 15s # o Caddy espera até 10 s as requisições em andamento (grace_period)
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
       interval: 30s

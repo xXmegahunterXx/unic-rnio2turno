@@ -200,7 +200,7 @@ export function DataTable<R>({
                       'z-10 border-b border-line bg-surface align-middle font-medium text-fg-muted',
                       stickyHeader && 'sticky',
                       padX,
-                      'py-2 text-[11px] uppercase tracking-[0.06em] [@container(min-width:560px)]:py-2.5',
+                      'py-[9px] text-[11px] uppercase tracking-[0.06em] [@container(min-width:560px)]:py-2.5',
                       alinhar[c.align ?? 'left'],
                       largura(c),
                       c.grow ? 'overflow-hidden' : 'whitespace-nowrap',
@@ -217,6 +217,8 @@ export function DataTable<R>({
                         aria-label={c.headerLabel ? `Ordenar por ${c.headerLabel}` : undefined}
                         className={cn(
                           'group relative inline-flex h-[22px] max-w-full items-center rounded-md align-middle uppercase leading-none tracking-[inherit] transition-colors hover:text-fg',
+                          // área de toque invisível: a altura toda do cabeçalho (40 px) e ao menos 44 px de largura
+                          "before:absolute before:left-1/2 before:top-1/2 before:h-[calc(100%+18px)] before:w-[max(calc(100%+8px),44px)] before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']",
                           ativo && 'text-fg',
                         )}
                       >

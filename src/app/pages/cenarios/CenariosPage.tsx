@@ -224,7 +224,7 @@ function ComoFunciona({ ds }: { ds: PresidenteT1Dataset }) {
             href={assetUrl('data/presidente-t1.json')}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="toque relative inline-flex items-center gap-1.5 font-medium text-brand-fg underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             <Icon name="download" size={16} />
             Dados do 1º turno por estado (JSON)

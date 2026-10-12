@@ -4,14 +4,17 @@
  *  - Só as fotos dos pacotes oficiais (public/data/fotos/{grupo}.json), sem edição além do recorte circular.
  *  - Simulação anonimizada (`status.anonimizado`) → NUNCA foto (monograma), salvo `real` (dados reais do 1º turno).
  *    As corridas anônimas (`anonimizarRace`) também já chegam sem `sqcand`/`fotoGrupo`: dupla proteção.
+ *  - Números SIMULADOS (fonte 'simulacao', corrida do 2º turno, fora da fase 'pre') → NUNCA foto, mesmo com os nomes
+ *    reais ligados no admin: foto oficial ao lado de número fictício é o que um print levaria adiante (ARCHITECTURE
+ *    §11). Continuam com foto: 1º turno oficial, fase 'pre' (ainda sem números), fichas/cargos e a fonte 'tse'.
  *  - "Tudo ou nada": se faltar a foto de UM dos finalistas, nenhum aparece com foto — os dois recebem o mesmo
  *    tratamento (nunca um rosto contra um monograma).
  *
  * Devolve um array alinhado com `race.candidatos` (undefined = use o monograma). "Outros" nunca tem foto.
  */
 import { useMemo } from 'react';
-import type { Candidate, Race } from '@/shared/types';
-import { useAnonimizado } from '@/app/data/hooks';
+import type { Candidate, LiveStatus, Race } from '@/shared/types';
+import { useStatus } from '@/app/data/hooks';
 import { useFotos } from '@/app/data/estatico';
 
 const VAZIO: (string | undefined)[] = [];
@@ -23,10 +26,20 @@ export interface FotosOpts {
   desligado?: boolean;
 }
 
+/**
+ * true quando os números desta corrida são simulados e já existem (fonte 'simulacao', 2º turno, fora da fase 'pre').
+ * Corrida sem `turno` conhecido conta como simulada (na dúvida, sem foto).
+ */
+export function numerosSimulados(status: Pick<LiveStatus, 'simulacao' | 'fase'> | undefined, race: Partial<Pick<Race, 'turno'>> | undefined | null): boolean {
+  return !!status?.simulacao && status.fase !== 'pre' && race?.turno !== 1;
+}
+
 /** Fotos dos candidatos de uma corrida (mesma ordem de `race.candidatos`). */
-export function useFotosRace(race: Pick<Race, 'candidatos'> | undefined | null, opts: FotosOpts = {}): (string | undefined)[] {
-  const anonimizado = useAnonimizado();
-  const bloqueado = opts.desligado || (anonimizado && !opts.real) || !race;
+export function useFotosRace(race: (Pick<Race, 'candidatos'> & Partial<Pick<Race, 'turno'>>) | undefined | null, opts: FotosOpts = {}): (string | undefined)[] {
+  const { data: status } = useStatus();
+  const anonimizado = !!status?.anonimizado;
+  const simulado = !opts.real && numerosSimulados(status, race);
+  const bloqueado = opts.desligado || (anonimizado && !opts.real) || simulado || !race;
   const finalistas: Candidate[] = race ? race.candidatos.filter((c) => !c.agregado) : [];
   const grupos = bloqueado ? [] : [...new Set(finalistas.map((c) => c.fotoGrupo).filter((g): g is string => !!g))];
   // Número fixo de chamadas de hook (as corridas usam 1 grupo; até 2 cobre casos mistos).

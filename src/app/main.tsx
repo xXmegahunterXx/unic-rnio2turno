@@ -5,9 +5,15 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import './styles.css';
 
+/** 400/404 são respostas definitivas (endereço inexistente ou malformado): repetir só atrasaria a tela de "não encontrado". */
+const definitivo = (e: unknown) => {
+  const st = (e as { status?: unknown } | null)?.status;
+  return st === 400 || st === 404;
+};
+
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: 2, refetchOnWindowFocus: true, staleTime: 1000 },
+    queries: { retry: (n, e) => n < 2 && !definitivo(e), refetchOnWindowFocus: true, staleTime: 1000 },
   },
 });
 

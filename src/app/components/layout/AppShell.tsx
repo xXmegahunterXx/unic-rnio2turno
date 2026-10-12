@@ -31,7 +31,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <FundoNoite />
       <Header />
-      <main id="conteudo" className="relative flex-1">
+      <main id="conteudo" tabIndex={-1} className="relative flex-1 outline-none">
         {children ?? <Outlet />}
       </main>
       <Footer />
@@ -122,6 +122,14 @@ function Header() {
     <>
       <a
         href="#conteudo"
+        // Foca o <main> direto: no build demo (HashRouter) o "#conteudo" viraria uma rota inexistente.
+        onClick={(e) => {
+          const alvo = document.getElementById('conteudo');
+          if (!alvo) return;
+          e.preventDefault();
+          alvo.focus({ preventScroll: false });
+          alvo.scrollIntoView({ block: 'start' });
+        }}
         className="sr-only z-[100] rounded-lg bg-fg px-3 py-2 text-sm font-medium text-bg focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
       >
         Pular para o conteúdo
@@ -233,7 +241,7 @@ function AvisoBanner({ aviso }: { aviso: Aviso | null }) {
                 type="button"
                 onClick={() => setDispensado(aviso.texto)}
                 aria-label="Dispensar aviso"
-                className="-m-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-3 hover:text-fg"
+                className="toque relative -m-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-3 hover:text-fg"
               >
                 <Icon name="fechar" size={15} />
               </button>
@@ -363,19 +371,19 @@ function Footer() {
           />
           <div>
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Leve o Sintonia</h2>
-            <ul className="mt-3 space-y-2.5 text-[14px]">
+            <ul className={LISTA_RODAPE}>
               <li>
-                <button type="button" onClick={abrirCompartilharSite} onPointerEnter={preCarregarCompartilharSite} aria-haspopup="dialog" className="text-left text-fg transition-colors hover:text-brand-fg">
+                <button type="button" onClick={abrirCompartilharSite} onPointerEnter={preCarregarCompartilharSite} aria-haspopup="dialog" className={cn(LINK_RODAPE, 'text-left')}>
                   Compartilhar o site
                 </button>
               </li>
               <li>
-                <button type="button" onClick={() => abrirIncorporar()} onPointerEnter={preCarregarIncorporar} aria-haspopup="dialog" className="text-left text-fg transition-colors hover:text-brand-fg">
+                <button type="button" onClick={() => abrirIncorporar()} onPointerEnter={preCarregarIncorporar} aria-haspopup="dialog" className={cn(LINK_RODAPE, 'text-left')}>
                   Incorporar no seu site
                 </button>
               </li>
               <li>
-                <Link to="/tv" className="text-fg transition-colors hover:text-brand-fg">
+                <Link to="/tv" className={LINK_RODAPE}>
                   Modo TV
                 </Link>
               </li>
@@ -383,20 +391,20 @@ function Footer() {
           </div>
           <div>
             <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">Sobre</h2>
-            <ul className="mt-3 space-y-2.5 text-[14px]">
+            <ul className={LISTA_RODAPE}>
               {[
                 { to: '/metodologia', label: 'Metodologia' },
                 { to: '/privacidade', label: 'Privacidade' },
                 { to: '/sobre', label: 'Sobre o Sintonia' },
               ].map((l) => (
                 <li key={l.to}>
-                  <Link to={l.to} className="text-fg transition-colors hover:text-brand-fg">
+                  <Link to={l.to} className={LINK_RODAPE}>
                     {l.label}
                   </Link>
                 </li>
               ))}
               <li>
-                <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg">
+                <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener noreferrer" className={cn(LINK_RODAPE, 'gap-1.5')}>
                   Fonte: TSE
                   <Icon name="externo" size={14} className="text-fg-muted" />
                 </a>
@@ -406,7 +414,7 @@ function Footer() {
                   href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais.html"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-fg transition-colors hover:text-brand-fg"
+                  className={cn(LINK_RODAPE, 'gap-1.5')}
                 >
                   Mapas: IBGE
                   <Icon name="externo" size={14} className="text-fg-muted" />
@@ -424,14 +432,21 @@ function Footer() {
   );
 }
 
+/**
+ * Rodapé: no celular cada link tem 40 px de altura de toque (a lista perde o espaçamento entre itens, então o passo
+ * visual quase não muda); do tablet em diante volta ao desenho compacto.
+ */
+const LISTA_RODAPE = 'mt-1.5 text-[14px] md:mt-3 md:space-y-2.5';
+const LINK_RODAPE = 'flex w-fit min-h-[40px] items-center text-fg transition-colors hover:text-brand-fg md:min-h-0';
+
 function FooterCol({ titulo, links }: { titulo: string; links: { to: string; label: string }[] }) {
   return (
     <div>
       <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">{titulo}</h2>
-      <ul className="mt-3 space-y-2.5 text-[14px]">
+      <ul className={LISTA_RODAPE}>
         {links.map((l) => (
           <li key={l.to}>
-            <Link to={l.to} {...propsPreCarregar(l.to)} className="text-fg transition-colors hover:text-brand-fg">
+            <Link to={l.to} {...propsPreCarregar(l.to)} className={LINK_RODAPE}>
               {l.label}
             </Link>
           </li>

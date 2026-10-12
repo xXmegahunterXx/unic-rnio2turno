@@ -27,6 +27,7 @@ import { GOV_RACES, linkUf } from '@/app/components/pages/nacional/fase';
 import { GovernadoresEleitosT1 } from '@/app/components/pages/cargos/GovernadoresEleitosT1';
 import { cn } from '@/app/lib/cn';
 import { BotaoCompartilharGovernadores, type DisputaGov } from '@/app/components/share/cartoes/Governadores';
+import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
 type Ordem = 'apertadas' | 'apuradas' | 'az';
 const CHAVE_ORDEM = 'sintonia:governadores:ordem';
@@ -42,6 +43,7 @@ function ordemInicial(): Ordem {
 }
 
 export default function GovernadoresPage() {
+  useTitulo('Governadores · 2º turno nos estados');
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const reduzir = useReducedMotion();

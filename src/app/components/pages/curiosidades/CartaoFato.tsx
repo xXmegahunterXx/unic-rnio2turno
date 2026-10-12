@@ -95,12 +95,13 @@ export const CartaoFato = forwardRef<HTMLElement, CartaoFatoProps>(function Cart
       </p>
 
       {lugares.length ? (
-        <ul className="mt-3 flex flex-wrap gap-x-3.5 gap-y-1.5 text-[13px]">
+        <ul className="mt-1.5 flex flex-wrap gap-x-3.5 text-[13px] sm:mt-3 sm:gap-y-1.5">
+          {/* celular: cada lugar com 40 px de altura de toque (sem espaço extra entre linhas); do tablet em diante, compacto */}
           {lugares.slice(0, 3).map((l) => (
             <li key={l.rota} className="min-w-0 max-w-full">
               <Link
                 to={l.rota!}
-                className="inline-flex max-w-full items-center gap-1 text-fg underline decoration-line underline-offset-4 hover:decoration-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="inline-flex min-h-[40px] max-w-full items-center gap-1 text-fg underline decoration-line underline-offset-4 hover:decoration-fg-muted sm:min-h-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <Icon name="pin" size={14} className="shrink-0 text-brand-fg" />
                 <span className="truncate">{l.nome}</span>

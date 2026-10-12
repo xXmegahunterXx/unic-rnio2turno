@@ -51,7 +51,7 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
               25/10 · 17h
             </span>
           ) : fase === 'apurando' ? (
-            <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-alert/30 bg-alert/10 px-2.5 text-[11.5px] font-bold uppercase tracking-[0.12em] text-fg">
+            <span className="inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-brand/30 bg-brand/10 px-2.5 text-[11.5px] font-bold uppercase tracking-[0.12em] text-fg">
               <LiveDot size={7} />
               Ao vivo
             </span>

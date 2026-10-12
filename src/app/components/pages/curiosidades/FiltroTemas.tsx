@@ -26,7 +26,7 @@ export function FiltroTemas({ temas, total, atual, onEscolher, className }: Filt
                 aria-pressed={ativo}
                 onClick={() => onEscolher(t.id)}
                 className={cn(
-                  'inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-medium transition-colors',
+                  'toque relative inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 text-[13.5px] font-medium transition-colors',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
                   ativo ? 'border-transparent bg-fg text-bg' : 'border-line bg-surface/70 text-fg-muted hover:bg-surface-2 hover:text-fg',
                 )}

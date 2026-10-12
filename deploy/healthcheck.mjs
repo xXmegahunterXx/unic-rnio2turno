@@ -32,7 +32,8 @@ function servidor() {
     if (!/^\d+$/.test(d) || Number(d) === process.pid) continue;
     try {
       const args = readFileSync(`/proc/${d}/cmdline`, 'utf8').split('\0');
-      if (!args.some((a) => a.endsWith('dist-server/main.js'))) continue;
+      // o próprio node (não o init do contêiner, que também tem "dist-server/main.js" nos argumentos)
+      if (!/(^|\/)node$/.test(args[0] ?? '') || !args.some((a) => a.endsWith('dist-server/main.js'))) continue;
       const stat = readFileSync(`/proc/${d}/stat`, 'utf8');
       const campos = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
       return { pid: Number(d), id: `${d}:${campos[19] ?? '?'}` }; // campo 22 do stat = starttime

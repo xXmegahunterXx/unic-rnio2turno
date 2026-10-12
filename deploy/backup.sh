@@ -52,7 +52,7 @@ cp "$ARQ_ENV" "$TMP/env"
   echo "data: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
   echo "maquina: $(hostname)"
   echo "commit do codigo: $(commit_atual)"
-  echo "commit da imagem: $(revisao_imagem)"
+  echo "commit da imagem no ar: $(revisao_rodando)"
   echo "arquivos do estado: $(cd "$TMP/estado" && find . -type f | sed 's#^\./##' | tr '\n' ' ')"
   if app_rodando; then echo "healthz: $(healthz 2>/dev/null || echo '?')"; fi
 } >"$TMP/INFO.txt"

@@ -9,11 +9,11 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createController, loadDataset } from '../engine/controller';
 import type { LoadedDataset } from '../engine/api';
-import type { AdminState } from '../shared/types';
+import type { AdminState, TseConfig } from '../shared/types';
 import type { FetchLike } from '../tse';
 import { createApp } from './app';
 import { loadConfig } from './config';
-import { createLogger } from './log';
+import { createLogger, type Nivel } from './log';
 import { createJsonStore } from './state-store';
 import { TseManager } from './tse';
 
@@ -34,6 +34,10 @@ export interface MontarOpcoes {
   fetch?: FetchLike;
   estadoInicial?: AdminState;
   stateDir?: string;
+  /** Recebe cada linha do log já formatada (para conferir o formato/amostragem). */
+  escreverLog?: (linha: string, nivel: Nivel) => void;
+  /** Conferência do feed antes da troca automática (padrão: o TseManager com o `fetch` dado). */
+  verificarTse?: (tse: TseConfig) => Promise<{ ok: boolean; detalhe: string }>;
 }
 
 export async function montar(o: MontarOpcoes = {}) {
@@ -45,7 +49,7 @@ export async function montar(o: MontarOpcoes = {}) {
     { NODE_ENV: 'test', ADMIN_PASSWORD: SENHA, ADMIN_SECRET: 'segredo-de-teste-com-32-caracteres!!', STATE_DIR: stateDir, ...o.env },
     RAIZ,
   );
-  const log = createLogger({ saida: false, now });
+  const log = createLogger({ saida: false, now, formato: config.logFormato, escrever: o.escreverLog });
   const store = createJsonStore(stateDir, 'admin.json', { debounceMs: 0 });
   const controller = createController(ds, {
     modo: 'servidor',
@@ -61,7 +65,7 @@ export async function montar(o: MontarOpcoes = {}) {
     now,
     historico: createJsonStore(stateDir, 'tse-historico.json', { debounceMs: 0 }),
   });
-  const s = createApp({ config, dataset: ds, controller, tse, log, now });
+  const s = createApp({ config, dataset: ds, controller, tse, log, now, verificarTse: o.verificarTse });
   return { ...s, ds, controller, tse, relogio, store, config, log, stateDir };
 }
 

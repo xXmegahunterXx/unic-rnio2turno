@@ -157,7 +157,7 @@ export function CandidateName({
         {linkFicha && candidato.sqcand && !candidato.agregado ? (
           <Link
             to={`/candidato/${candidato.sqcand}`}
-            className="rounded-sm underline decoration-transparent decoration-1 underline-offset-[4px] transition-colors hover:decoration-line/[4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="toque relative rounded-sm underline decoration-transparent decoration-1 underline-offset-[4px] transition-colors hover:decoration-line/[4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             {candidato.nomeUrna}
           </Link>

@@ -180,7 +180,7 @@ function SumarioCelular({ itens, ativa }: { itens: ItemSumario[]; ativa: string 
             replace
             aria-current={ativa === s.id ? 'location' : undefined}
             className={cn(
-              'inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              'toque relative inline-flex h-8 shrink-0 items-center rounded-full border px-3 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
               ativa === s.id ? 'border-brand/40 bg-brand/15 text-fg' : 'border-line bg-surface text-fg-muted',
             )}
           >
@@ -198,7 +198,7 @@ export function Secao({ id, titulo, eyebrow, children }: { id: string; titulo: R
     <section id={id} aria-labelledby={`${id}-titulo`} className="scroll-mt-28">
       {eyebrow ? <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-fg-subtle">{eyebrow}</p> : null}
       <h2 id={`${id}-titulo`} className="mt-1 text-balance font-display text-[26px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[32px]">
-        <Link to={{ hash: id }} replace className="group inline rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+        <Link to={{ hash: id }} replace className="toque group relative inline rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
           {titulo}
           <span aria-hidden className="ml-2 inline-block text-fg-subtle opacity-0 transition-opacity group-hover:opacity-100">
             #
@@ -314,7 +314,7 @@ export function LinkExterno({ href, children, className }: { href: string; child
       target="_blank"
       rel="noopener noreferrer"
       className={cn(
-        'inline-flex items-baseline gap-1 font-medium text-fg underline decoration-line/[3] underline-offset-[3px] transition-colors hover:decoration-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+        'toque relative inline-flex items-baseline gap-1 font-medium text-fg underline decoration-line/[3] underline-offset-[3px] transition-colors hover:decoration-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
         className,
       )}
     >
@@ -364,7 +364,7 @@ export const CONTATO = {
 export function Email({ endereco }: { endereco: string }) {
   return (
     <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      <a href={`mailto:${endereco}`} className="break-all font-mono text-[0.92em] text-fg underline decoration-line/[3] underline-offset-[3px] hover:decoration-brand-fg">
+      <a href={`mailto:${endereco}`} className="toque relative break-all font-mono text-[0.92em] text-fg underline decoration-line/[3] underline-offset-[3px] hover:decoration-brand-fg">
         {endereco}
       </a>
       <span className="text-[12px] text-fg-subtle">(provisório)</span>

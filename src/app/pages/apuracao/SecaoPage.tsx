@@ -47,6 +47,7 @@ import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { LocalVotacaoCartao } from '@/app/components/pages/detalhe/LocalVotacao';
 import { PrimeiroTurnoSecao } from '@/app/components/pages/detalhe/PrimeiroTurnoSecao';
 import { BotaoCompartilharSecao } from '@/app/components/share/cartoes/Secao';
+import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
 /** SecaoDetalhe → Tally (para os cálculos de calc.ts). */
 function tallySecao(s: SecaoDetalhe): Tally {
@@ -105,6 +106,11 @@ export default function SecaoPage() {
   }, [ctx.races, ctx.idT1, uf]);
 
   const nomeUf = uf ? UF_NOMES[uf] : '';
+  useTitulo(
+    zona !== undefined && secao !== undefined
+      ? `Boletim de urna · Zona ${zona}, Seção ${secao}${mSnap ? ` · ${mSnap.nome} (${uf === 'ZZ' ? 'Exterior' : uf})` : ''}`
+      : null,
+  );
   const erroSec = qSec.error ?? qSec.failureReason;
   const erroMun = qMun.error ?? qMun.failureReason;
   const naoExiste =

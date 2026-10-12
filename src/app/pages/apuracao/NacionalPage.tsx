@@ -44,6 +44,7 @@ import { GovernadoresFaixa } from '@/app/components/pages/nacional/GovernadoresF
 import { EstadosSecao, LiderancaCard, ParticipacaoSecao, RegioesCard } from '@/app/components/pages/nacional/Blocos';
 import { NacionalEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
 import { ehSimulado, ehT1, raceExibida, semT1, ufDaRace } from '@/app/components/pages/nacional/fase';
+import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
 /** Coluna do desktop largo (≥ 1360 px); abaixo disso os filhos entram direto na grade (ordem por `order-*`). */
 const COLUNA = 'contents min-[1360px]:flex min-[1360px]:min-w-0 min-[1360px]:flex-col min-[1360px]:gap-6';
@@ -72,6 +73,8 @@ export default function NacionalPage() {
   const qVivo = useNacional(raceId);
   // 1º turno sempre à mão: modo "variação" do mapa, comparação e Sheet da UF (em t1 é a mesma consulta).
   const qT1 = useNacional(`${semT1(raceId)}-t1`);
+  // Título da aba na navegação do cliente (o servidor injeta o da 1ª carga).
+  useTitulo(race ? `${t1 ? 'Resultado' : 'Apuração ao vivo'} · ${race.titulo}` : 'Apuração ao vivo');
 
   const trocarDisputa = useCallback(
     (id: RaceId) => {

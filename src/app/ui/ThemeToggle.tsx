@@ -14,24 +14,27 @@ export function ThemeToggle({ className, size = 'md' }: { className?: string; si
       aria-label={escuro ? 'Usar tema claro' : 'Usar tema escuro'}
       title={escuro ? 'Tema claro' : 'Tema escuro'}
       className={cn(
-        'relative inline-flex items-center justify-center overflow-hidden text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg',
+        'relative inline-flex items-center justify-center text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-        size === 'sm' ? 'h-8 w-8 rounded-[10px]' : 'h-10 w-10 rounded-xl',
+        // sm: área de toque de 44 px (`.toque`); o corte da animação fica no miolo, não no botão (cortaria a área extra)
+        size === 'sm' ? 'toque h-8 w-8 rounded-[10px]' : 'h-10 w-10 rounded-xl',
         className,
       )}
     >
-      <AnimatePresence initial={false} mode="popLayout">
-        <motion.span
-          key={tema}
-          initial={{ y: 14, opacity: 0, rotate: -40 }}
-          animate={{ y: 0, opacity: 1, rotate: 0 }}
-          exit={{ y: -14, opacity: 0, rotate: 40 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-          className="inline-flex"
-        >
-          <Icon name={escuro ? 'lua' : 'sol'} size={size === 'sm' ? 17 : 19} />
-        </motion.span>
-      </AnimatePresence>
+      <span aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit]">
+        <AnimatePresence initial={false} mode="popLayout">
+          <motion.span
+            key={tema}
+            initial={{ y: 14, opacity: 0, rotate: -40 }}
+            animate={{ y: 0, opacity: 1, rotate: 0 }}
+            exit={{ y: -14, opacity: 0, rotate: 40 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            className="inline-flex"
+          >
+            <Icon name={escuro ? 'lua' : 'sol'} size={size === 'sm' ? 17 : 19} />
+          </motion.span>
+        </AnimatePresence>
+      </span>
     </button>
   );
 }

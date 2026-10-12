@@ -83,7 +83,7 @@ export function AfirmacaoEntrada({ afirmacao, numero, total, onResponder, chamad
           <button
             type="button"
             onClick={() => escolher('pular')}
-            className="inline-flex h-9 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            className="toque relative inline-flex h-9 shrink-0 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
           >
             Pular
             <Icon name="chevron-direita" size={15} />

@@ -459,7 +459,7 @@ function ZoomBtn({
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      className="glass flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3 disabled:opacity-40"
+      className="toque glass relative flex h-9 w-9 items-center justify-center rounded-xl border border-line text-fg shadow-card transition-colors hover:bg-surface-3 disabled:opacity-40"
     >
       <svg
         viewBox="0 0 24 24"

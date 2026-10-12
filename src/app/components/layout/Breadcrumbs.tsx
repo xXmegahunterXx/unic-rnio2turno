@@ -27,7 +27,8 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
       ref={ref}
       aria-label="Você está em"
       onScroll={(e) => setCortado(e.currentTarget.scrollLeft > 1)}
-      className={cn('-mx-1 overflow-x-auto scrollbar-none', className)}
+      // respiro vertical compensado: a rolagem horizontal cortaria a área de toque (44 px) dos links
+      className={cn('-mx-1 -my-2.5 overflow-x-auto py-2.5 scrollbar-none', className)}
       style={cortado ? { maskImage: fade, WebkitMaskImage: fade } : undefined}
     >
       <ol className="flex w-max items-center px-1 text-[13px] sm:gap-0.5">
@@ -39,7 +40,7 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
                 {c.to && !ultimo ? (
                   <Link
                     to={c.to}
-                    className="rounded-md px-1 py-0.5 font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                    className="toque relative rounded-md px-1 py-0.5 font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg"
                   >
                     {c.label}
                   </Link>

@@ -65,9 +65,14 @@ fi
 
 if [[ -n $COM_ENV ]]; then
   [[ -f $TMP/env ]] || morrer "O backup não tem .env."
-  if [[ -f $ARQ_ENV ]]; then cp -p "$ARQ_ENV" "$ARQ_ENV.antes-restauracao-$(date +%Y%m%d-%H%M%S)"; fi
+  ANTIGO=''
+  if [[ -f $ARQ_ENV ]]; then
+    ANTIGO="$DESTINO/env-antes-restauracao-$(date +%Y%m%d-%H%M%S)"
+    (umask 077 && mkdir -p "$DESTINO")
+    install -m 600 "$ARQ_ENV" "$ANTIGO"
+  fi
   install -m 600 "$TMP/env" "$ARQ_ENV"
-  ok ".env restaurado (o anterior ficou ao lado, com o sufixo .antes-restauracao-…)"
+  ok ".env restaurado${ANTIGO:+ (o anterior foi guardado em $ANTIGO)}"
 fi
 exigir_env
 

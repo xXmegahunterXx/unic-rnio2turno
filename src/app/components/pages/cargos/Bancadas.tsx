@@ -121,7 +121,7 @@ export function Bancadas({
                 <button
                   type="button"
                   onClick={() => setTodos(true)}
-                  className="inline-flex items-center gap-1 rounded-md text-left font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                  className="toque relative inline-flex items-center gap-1 rounded-md text-left font-medium text-brand-fg hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
                   Ver os outros {resto.length} partidos
                   <Icon name="chevron" size={14} />

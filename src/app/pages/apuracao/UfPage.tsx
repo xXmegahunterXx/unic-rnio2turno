@@ -59,6 +59,7 @@ import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoC
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
 import { emUf } from '@/app/components/pages/detalhe/fmt';
+import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
 const MODOS_2T: MapMode[] = ['vencedor', 'margem', 'apurado', 'comparecimento', 'variacao'];
 const MODOS_1T: MapMode[] = ['vencedor', 'margem', 'comparecimento'];
@@ -114,6 +115,7 @@ export default function UfPage() {
 
   const ufMeta = ctx.meta?.ufs.find((u) => u.uf === uf);
   const nomeUf = uf ? UF_NOMES[uf] : '';
+  useTitulo(uf ? (uf === 'ZZ' ? 'Apuração no exterior' : `Apuração em ${nomeUf}`) : null);
   // UF de um município só (DF): no lugar do mapa, as seções do município.
   const codUnico = ufMeta && ufMeta.uf !== 'ZZ' && ufMeta.municipios === 1 && ufMeta.capitalCod ? ufMeta.capitalCod : undefined;
   const qUnico = useMunicipio(ctx.id, uf ?? undefined, codUnico, t);

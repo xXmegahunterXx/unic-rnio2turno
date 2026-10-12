@@ -58,7 +58,7 @@ export function Confianca({ className }: { className?: string }) {
             <p className="mt-2 text-pretty text-[14px] leading-relaxed text-fg-muted">{p.texto}</p>
             <Link
               to={p.link.to}
-              className="group mt-auto inline-flex items-center gap-1 self-start rounded-md pt-4 text-[13.5px] font-semibold text-fg transition-colors hover:text-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="toque group relative mt-auto inline-flex items-center gap-1 self-start rounded-md pt-4 text-[13.5px] font-semibold text-fg transition-colors hover:text-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               {p.link.label}
               <Icon name="chevron-direita" size={15} className="transition-transform group-hover:translate-x-0.5" />

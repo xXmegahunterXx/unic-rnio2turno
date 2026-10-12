@@ -65,6 +65,14 @@ mantida; `SIM_AUTOSTART=force` reinicia sempre. O painel fica em `/admin` (senha
 
 ## Deploy
 
+**Produção numa VPS: siga o [`DEPLOY.md`](./DEPLOY.md).** Docker + Caddy (HTTPS automático com Let's Encrypt,
+HTTP/3) com poucos comandos: `deploy/install.sh` (Ubuntu 22.04/24.04: Docker, firewall, `.env` com senha e segredos,
+build, subida e backup de hora em hora), `deploy/update.sh` (atualiza com o site no ar: ensaio da imagem nova,
+troca sem erro para o visitante e volta automática se falhar), `deploy/backup.sh`/`restore.sh` e
+`deploy/status.sh`, além da configuração da Cloudflare. Imagem: `Dockerfile` (Node 22 Debian slim, usuário sem
+privilégios, `HEALTHCHECK` em `/healthz`); configuração: `.env.example`. As seções abaixo são a referência técnica
+(execução sem Docker, cache para CDN, capacidade, várias instâncias).
+
 ### Build e execução
 
 ```bash
@@ -158,7 +166,8 @@ O motor é determinístico: mesma configuração ⇒ mesmos números **e mesmos 
 com duas instâncias lado a lado). Instâncias que compartilham o `STATE_DIR` (mesma máquina ou volume compartilhado:
 PM2, `docker compose --scale`) convergem para o `admin.json` mais recente em ≤ ~1 s; com o mesmo `ADMIN_SECRET`, a
 sessão do admin vale em todas. Em máquinas sem volume compartilhado, use uma única origem atrás da CDN (a CDN
-absorve o tráfego; a origem aguenta ~13 mil req/s por núcleo).
+absorve o tráfego; a origem aguenta ~13 mil req/s por núcleo). Com Docker: `docker-compose.replicas.yml` (N réplicas
+atrás do Caddy, distribuídas por visitante; testado com 3 — limitações e recomendação em `DEPLOY.md`, seção 10).
 
 Limitação conhecida: trocar o **cenário/preset** reconstrói o modelo na thread principal (~0,7–1,3 s); nesse
 intervalo as requisições esperam (a CDN continua servindo o conteúdo anterior com `stale-while-revalidate`).
@@ -260,8 +269,11 @@ npx tsx scripts/data/build-data.ts && npx tsx scripts/data/validate.ts   # meta.
 ```
 
 Todos aceitam `--offline` (só cache); `cargos_build.ts --refresh` rebaixa os arquivos do feed (use quando o TSE
-retotalizar — em 09/10/2026 os deputados do AM estavam em "Aguarde reprocessamento da eleição": votos completos, sem
-eleitos; as listas do AM saem com `aviso` e `camara-am`/`assembleia-am` sem fichas até o TSE concluir). Fontes, com
+retotalizar). Se uma UF voltar a "Aguarde reprocessamento da eleição" (votos completos, sem eleitos — o AM ficou
+assim de 09/10 até 10/10/2026 10:14), a lista sai com `aviso` e `camara-{uf}`/`assembleia-{uf}` sem fichas até o TSE
+concluir; votos anulados em definitivo depois da eleição (`van`, ex.: AM, Dep. Estadual) ficam nos válidos
+computados, como no `vvc` do TSE. Nomes de exibição: `nomeSimples` em `candidatos_comum.ts` (siglas "ACM Neto", "da
+CUT", romanos "Silva II", parênteses, apóstrofos; casos em `scripts/data/nomes.test.ts`). Fontes, com
 cache: feed `ele2026/6259/dados/{uf}/{uf}-c000{3,5,6,7|8}-e006259-u.json` (Governador, Senador, Dep. Federal,
 Dep. Estadual; 8 = Distrital, só no DF) e `ele2026/6257`/`6258` (Presidente) em `data-raw/tse/` (~6 MB);
 `consulta_cand_2026.zip` e `bem_candidato_2026.zip` em `data-raw/tse-abertos/` (~7 MB); fotos
@@ -296,7 +308,11 @@ etárias × gênero (`idade = [fem[], masc[]]`; gênero não informado e idade "
 (Analfabeto → Superior completo + "Não informado"), deficiência e nome social. Extras opcionais além do contrato:
 `dataReferencia`, `estadoCivil`, `racaCor`, `identidadeGenero` (rótulos no topo; somam `eleitores`), `biometria`,
 `quilombola` e `interpreteLibras` (quem declarou SIM). Raça/cor, identidade de gênero, quilombola e Libras são
-autodeclarações recentes: ~79% do eleitorado ainda aparece como "Não informado".
+autodeclarações recentes: ~79% do eleitorado ainda aparece como "Não informado". Totais EXATOS (extras): `genero` =
+[feminino, masculino, não informado] com todas as idades (rótulos em `generos`); `idadeSemGenero` (por faixa, gênero
+não informado) e `idadeInvalida` só quando não são zero — total da faixa i = `idade[0][i] + idade[1][i] +
+idadeSemGenero[i]`, e `naoInformado` = Σ `idadeSemGenero` + `idadeInvalida` (no país: 23.336 sem gênero, 1.212 com
+idade inválida).
 
 O perfil conta o eleitor no **domicílio eleitoral**; o eleitorado da fase 1 (aptos do 1º turno) conta onde ele
 **vota**, com o voto em trânsito. Por isso os municípios diferem um pouco (capitais e cidades grandes recebem
@@ -322,12 +338,32 @@ npx vitest run scripts/data/curiosidades.test.ts src/shared/cenarios.test.ts   #
   os finalistas/"Outros" não baterem com a race `pres-t1`.
 - **`curiosidades.json`** (`CuriosidadesDataset`, `src/shared/curiosidades.ts`): os fatos do 1º turno. Lê **só** o
   dataset compilado (`public/data/**`: `uf/`, `secao/`, `locais/`, `perfil/`, `cargos/`, `candidatos/`, `meta.json`) —
-  rode depois de qualquer pipeline acima que mude esses arquivos (por exemplo, quando o TSE divulgar os eleitos do AM ou
-  o `perfil_build.py` passar a gravar os totais sem gênero/idade). Aborta se os totais não baterem com
+  rode depois de qualquer pipeline acima que mude esses arquivos (mulheres e 70+ usam os totais exatos do perfil:
+  `genero`, `idadeSemGenero`). Aborta se os totais não baterem com
   `meta.totaisPrimeiroTurno`, se faltar número num fato, se título > 48 ou texto > 200 caracteres, ou se aparecer NaN.
   Regras editoriais (pares simétricos, pisos, nenhuma seção unânime) no topo do script e em `ARCHITECTURE.md` §11.3.
 - Os dois arquivos são estáticos e vão para `dist/data` e `dist-demo/data` no build; o servidor lê o mesmo
   `curiosidades.json` para as meta tags e a imagem de `/curiosidades?fato=`.
+
+### Mudança no quadro do 2º turno (Governador)
+
+A lista de UFs com 2º turno de Governador tem uma fonte só: `UFS_GOV_2T` em `src/shared/constants.ts` (o
+`secao_comum.py` lê a mesma linha). Se uma retotalização do TSE mudar o quadro, `cargos_build.ts` para com a
+explicação (UF, candidato eleito e horário do feed). **Situação em 12/10/2026:** em 10/10/2026 15:09 o TSE anulou em
+definitivo os 274.411 votos do candidato 10 ao governo do RJ (antes "anulados sub judice", agora nulos técnicos) e
+Douglas Ruas passou a "Eleito" no 1º turno (50,88%); o `ele-c.json` e o `consulta_cand` de 11/10 já não trazem 2º
+turno de Governador no RJ. Os dados publicados continuam no quadro de 7 UFs (cache do feed do RJ de 04/10) até o
+app ser ajustado. Para aplicar:
+
+```bash
+# 1) tire a UF de UFS_GOV_2T (src/shared/constants.ts) e ajuste os textos "7 disputas/7 estados" e os testes do app
+npx tsx scripts/data/fetch-tse.ts && npx tsx scripts/data/py/cargos_build.ts --refresh   # feed novo do RJ
+npx tsx scripts/data/build-data.ts && npx tsx scripts/data/validate.ts                    # meta.json sem gov-rj
+python3 -I scripts/data/py/secao_build.py && npx tsx scripts/data/validate-secao.ts      # secao/ sem governador no RJ
+npx tsx scripts/data/py/candidatos_build.ts && python3 -I scripts/data/py/fotos_build.py # fichas e fotos
+npm run data:presidente-t1 && npm run data:curiosidades
+npx vitest run scripts/data
+```
 
 ## Fontes de dados
 
