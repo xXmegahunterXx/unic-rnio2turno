@@ -328,6 +328,8 @@ export function CompartilharSheet({
                 onChange={setFormato}
                 block
                 size="sm"
+                // respiro: no topo da área rolável, a área de toque invisível (42 px) era cortada
+                className="mt-1"
                 options={formatos.map((f) => ({ value: f, label: DIMENSOES_CARTAO[f].rotulo }))}
               />
             ) : null}

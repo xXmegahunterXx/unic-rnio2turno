@@ -45,8 +45,36 @@ mantida; `SIM_AUTOSTART=force` reinicia sempre. O painel fica em `/admin` (senha
 
 ### Variáveis de ambiente do servidor
 
+Referência completa (com exemplos) no topo de [`src/server/config.ts`](./src/server/config.ts). Valores inválidos são
+ignorados com aviso no log da subida.
+
 | Variável | Padrão | Uso |
 |---|---|---|
+| `PORT` / `HOST` | `8787` / `0.0.0.0` | porta e interface HTTP |
+| `NODE_ENV` | — | `production`: serve `dist/`, cookie `Secure`, HSTS, CSP, logs em JSON, troca automática para o TSE, trava da simulação e exige `ADMIN_PASSWORD` |
+| `ADMIN_PASSWORD` | dev: `sintonia` | senha do painel. **Produção sem ela = admin desabilitado (503)**. Trocar a senha derruba as sessões abertas |
+| `ADMIN_SECRET` | aleatório por processo | segredo HMAC-SHA256 do cookie de sessão (≥ 16 caracteres). Defina para as sessões sobreviverem a reinícios e valerem em todas as instâncias |
+| `ADMIN_SESSAO_HORAS` | `12` | validade da sessão do painel (1–72 h) |
+| `PUBLIC_URL` | Host da requisição | origem pública (`https://sintonia.app`): `og:image`/`og:url`, `sitemap.xml`, `robots.txt` e a conferência de origem (CSRF) do painel. **Defina em produção** |
+| `TRUST_PROXY` | desligado | `1` atrás de proxy/CDN: IP do cliente por `CF-Connecting-IP` → `Fly-Client-IP` → `X-Real-IP` (o Caddy do deploy manda este) → o **último** endereço do `X-Forwarded-For`; também aceita `X-Forwarded-Proto/Host` e um `X-Request-Id` bem formado |
+| `TSE_AUTO` | produção: `1` · dev: `0` | troca automática `pre` → `tse` no início da apuração, conferindo o feed antes (ver "Noite da eleição") |
+| `TSE_INICIO` | `2026-10-25T17:00:00-03:00` | horário da troca automática (ISO 8601). Mude para um ensaio; o painel também muda sem reiniciar |
+| `ALLOW_SIMULACAO` | dev: sempre · produção: desligado | `1` permite pôr a fonte `simulacao` no ar em produção. Sem ela: comando de simulação → 403 com o motivo, `SIM_AUTOSTART` ignorado e estado salvo em simulação volta para `pre` |
+| `SIM_AUTOSTART` | — | `1`: sobe simulando a 20× (se não houver simulação/TSE em curso) · `force`: sempre. Em produção só com `ALLOW_SIMULACAO=1` |
+| `DATA_DIR` | `public/data` (dev) · `dist/data` (produção) | dataset (`meta.json`, `uf/*.json`) |
+| `DIST_DIR` | `dist` | build do app servido em produção |
+| `STATE_DIR` | `.server-state` | estado do admin (`admin.json`) e histórico do TSE (`tse-historico.json`) |
+| `SERVE_STATIC` | só em produção | `1`/`0` força servir (ou não) o `DIST_DIR` |
+| `FONTS_DIR` | `dist-server/assets/fonts` | fontes TTF das imagens de compartilhamento |
+| `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`) |
+| `OG_LIMITE_MIN` | `30` | imagens de compartilhamento **novas** (renderizações) por cliente por minuto (`0` = sem limite; excesso → 429). Imagem já pronta nunca conta: uma CDN pedindo de novo não é barrada |
+| `ENCERRAMENTO_SEG` | `8` | `SIGTERM`: segundos para terminar as requisições em andamento antes de fechar (1–60) |
+| `LOG_FORMAT` | produção: `json` · dev: `texto` | formato do log (JSON = um objeto por linha) |
+| `LOG_AMOSTRA` | `0.01` | fração das requisições "quentes" registradas (`/api/status`, apuração, estáticos). 5xx, 429, lentas (≥ 1 s) e o painel: sempre |
+| `LOG_AMOSTRA_PAGINAS` | `0.1` | fração das páginas (HTML) e imagens OG registradas |
+| `SINTONIA_COMMIT` / `SINTONIA_BUILD_DATE` | `.git` local ou `dev` | versão do build mostrada em `x-sintonia-versao`, `/api/versao`, `/healthz` e no painel (a imagem Docker grava o commit a partir do build-arg `GIT_COMMIT`; `GIT_COMMIT`/`BUILD_DATE` também valem) |
+
+---|---|---|
 | `PORT` / `HOST` | `8787` / `0.0.0.0` | porta e interface HTTP |
 | `NODE_ENV` | — | `production`: serve `dist/`, cookie `Secure`, HSTS, exige `ADMIN_PASSWORD` |
 | `ADMIN_PASSWORD` | dev: `sintonia` | senha do painel. **Produção sem ela = admin desabilitado (503)** |
@@ -90,14 +118,27 @@ Leve para a máquina: `dist/`, `dist-server/`, `package.json`, `package-lock.jso
 (`npm ci --omit=dev`). Dependências de execução: `hono`, `@hono/node-server`, `zod`, `satori` e `@resvg/resvg-js`
 (binário nativo: o `npm ci` instala o da plataforma — Linux x64/arm64 glibc ou musl, macOS, Windows — então rode o `npm ci` na imagem de destino). Monte `STATE_DIR` num volume persistente.
 
-- **Subida**: ~1 s (lê o dataset, constrói o modelo de 499.248 seções em ~0,7–1,3 s, restaura o estado salvo).
-- **Saúde**: `GET /healthz` → `{ ok, fonte, fase, versao, uptimeSeg, memoriaMb, tse }` (`no-store`).
-- **Encerramento gracioso**: `SIGTERM`/`SIGINT` param de aceitar conexões, param o polling do TSE e gravam o que
-  estiver pendente (limite de 10 s). Keep-alive de 65 s (maior que o dos balanceadores comuns).
-- **Memória**: ~180 MB parado, ~360 MB sob carga.
-- **Log**: uma linha por evento no stdout (`2026-10-25T20:00:00.000Z info  …`) e, a cada minuto com tráfego, um
-  resumo: requisições, latência de processamento (p50/p95/p99), acerto do cache, 304, 5xx e clientes estimados.
-  Nunca registramos IP, cookie, senha nem o código de um Duelo.
+- **Subida**: ~1 s (lê o dataset, constrói o modelo de 499.248 seções em ~0,7–1,3 s, restaura o estado salvo, aplica
+  as travas de produção e agenda a troca automática para o TSE).
+- **Saúde**: `GET /healthz` (vivo: o processo responde; rápido, sem tocar em dados) → `{ ok, fonte, fase, versao,
+  uptimeSeg, memoriaMb, tse, build, encerrando }`; `GET /readyz` (pronto para tráfego: dataset carregado, modelo
+  construído, build do app presente e não está encerrando) → 200 `{ ok: true, motivos: [] }` ou **503** com os
+  motivos. Ambos `no-store`.
+- **Versão**: toda resposta leva `x-sintonia-versao: <commit>`; `GET /api/versao` → `{ commit, data, versao, node,
+  iniciadoEm }`. Toda resposta leva também `x-request-id` (o do proxy, se bem formado e `TRUST_PROXY=1`; senão gerado),
+  que aparece nas linhas de log da requisição.
+- **Encerramento gracioso**: no `SIGTERM`/`SIGINT` o `/readyz` passa a 503, o servidor para de aceitar conexões, as
+  respostas em andamento terminam com `Connection: close` (até `ENCERRAMENTO_SEG`, padrão 8 s; as que sobrarem são
+  fechadas), o polling do TSE para e o estado pendente é gravado. Keep-alive de 65 s (maior que o dos balanceadores
+  comuns), fila de conexões de 4.096 (rajadas de conexões novas não perdem SYN) e requisição inteira em até 30 s.
+- **Memória**: ~250 MB parado, ~450–570 MB sob carga (cache das imagens OG, respostas comprimidas e estáticos).
+- **Log** (stdout): em produção, **JSON** — um objeto por linha (`{"t":"…","nivel":"info","msg":"…"}`), com as
+  requisições como `{"msg":"req","id","metodo","rota","status","ms","amostra"}` (rota sem query; `amostra` = fração
+  registrada, para estimar o total). Rotas quentes por amostragem (`LOG_AMOSTRA`, 1%), páginas e imagens a 10%, e
+  sempre: erros 5xx (com a pilha só no log, nunca para o cliente), 429, respostas ≥ 1 s e o painel. A cada minuto com
+  tráfego, um resumo com campos (`requisicoes`, `reqPorSeg`, `p50Ms`/`p95Ms`/`p99Ms`, `cacheHit`, `respostas304`,
+  `respostas429`, `erros5xx`, `clientes`, `memoriaMb`). Nunca registramos IP, cookie, senha, query string nem o código
+  de um Duelo. Filtrar: `docker compose logs app | grep '"nivel":"erro"'` ou `… | jq 'select(.status >= 500)'`.
 
 ### CDN (recomendado na noite da eleição)
 
@@ -174,16 +215,35 @@ intervalo as requisições esperam (a CDN continua servindo o conteúdo anterior
 
 ### Segurança
 
-- Admin: senha comparada em tempo constante; cookie `sintonia_admin` assinado (HMAC-SHA256), `HttpOnly`,
-  `SameSite=Strict`, `Path=/api/admin`, `Secure` em produção, validade de 12 h, revogado no logout; 10 tentativas de
-  login por minuto por cliente (300/min no total) → 429 com `Retry-After`; `POST` só com `application/json` (sem
-  CSRF por formulário); corpo ≤ 64 KB; comandos validados com zod (`src/server/validation.ts`).
-- Cabeçalhos: `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `X-Frame-Options: SAMEORIGIN` e
-  `frame-ancestors 'self'` nas páginas (exceto `/embed/*`, com `frame-ancestors *`), HSTS em produção,
-  `X-Robots-Tag: noindex` em `/admin`, `/duelo/*`, `/embed/*` e `/cenarios?c=`. `robots.txt` libera `/api/og/` (o robô
-  do X respeita o robots.txt também para a imagem do cartão).
+- Admin: senha comparada em tempo constante; cookie `sintonia_admin` assinado (HMAC-SHA256 com chave derivada de
+  `ADMIN_SECRET` **e da senha** — trocar a senha derruba as sessões), `HttpOnly`, `SameSite=Strict`, `Path=/api/admin`,
+  `Secure` em produção, validade de 12 h (`ADMIN_SESSAO_HORAS`), revogado no logout; 10 tentativas de login por minuto
+  por cliente (IP real com `TRUST_PROXY`, pelo último salto — forjar o começo do `X-Forwarded-For` não escapa) e 300/min
+  no total → 429 com `Retry-After`; **CSRF**: `POST` só com `application/json`, e pedido de navegador vindo de outro site
+  é recusado (403) pelo `Sec-Fetch-Site` e pelo `Origin`/`Referer`, que precisam ser o próprio site (`PUBLIC_URL` ou o
+  Host; clientes fora do navegador, como `curl`, não mandam esses cabeçalhos e passam); corpo ≤ 64 KB (256 KB no
+  `/command`, por causa da logo do patrocínio); comandos validados com zod (`src/server/validation.ts`).
+- Simulação em produção só com `ALLOW_SIMULACAO=1` (senão: 403 com o motivo, que o painel também mostra).
+- Limites: URL ≤ 8 KB (414), corpo declarado ≤ 512 KB em qualquer rota (413); parâmetros validados por rota (UF,
+  código, zona, seção, `?t=`, código de cenário ≤ 600 caracteres).
+- Cabeçalhos: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS de 1 ano em
+  produção; nas páginas, **Content-Security-Policy** (scripts só do próprio site + os 2 scripts inline do `index.html`
+  autorizados pelo hash SHA-256, calculado do build na subida; estilos inline; imagens do site, `data:`/`blob:` e
+  `https:`; `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`), `frame-ancestors 'self'` +
+  `X-Frame-Options: SAMEORIGIN` (exceto `/embed/*`, com `frame-ancestors *`), `Permissions-Policy` (sem câmera,
+  microfone, localização, pagamentos, USB, tópicos) e `Cross-Origin-Opener-Policy: same-origin-allow-popups`;
+  `X-Robots-Tag: noindex` em `/admin`, `/duelo/*`, `/embed/*` e `/cenarios?c=`.
+- Estáticos: só arquivos dentro de `DIST_DIR` (sem `..`, `\`, byte nulo) e nunca arquivos ocultos (`.env`, `.git`…,
+  exceto `/.well-known/`). Meta tags: textos escapados e inseridos sem interpretar `$&`/`` $` ``/`$'`; sem `PUBLIC_URL`,
+  o Host é validado e entra na chave do cache do HTML (um Host forjado não contamina a página dos outros).
+- Erros: o cliente recebe só `{ erro }` (5xx = mensagem genérica); a pilha vai só para o log.
 - Imagens OG: geradas uma por vez (no máximo 16 na fila; excesso → 503 com `Retry-After`), com a imagem anterior da
-  mesma fonte servida enquanto a nova é gerada.
+  mesma fonte servida enquanto a nova é gerada; no máximo `OG_LIMITE_MIN` (30) imagens **novas** por cliente por
+  minuto (429) — imagem pronta nunca conta, então uma CDN pedindo de novo não é barrada.
+- SEO: `GET /sitemap.xml` (início, apuração, as 27 UFs, governadores, Senado, Câmara, assembleias e `/assembleias/:uf`,
+  curiosidades, cenários, Teste Cego, metodologia, sobre, privacidade, com `PUBLIC_URL`) e `GET /robots.txt` (libera
+  `/api/og/` — o robô do X respeita o robots.txt também para a imagem do cartão —, fecha a API e o painel, e aponta o
+  sitemap). Ambos gerados pelo servidor (valem mesmo se o build trouxer os seus).
 
 ---
 
@@ -201,10 +261,16 @@ Painel em `/admin` (fora do layout público). Rotas (todas JSON, `no-store`):
 | `GET /api/admin/tse/test` | testa o feed do TSE com a configuração atual: `{ ok, detalhe, amostra }` |
 | `GET /api/admin/tse/health` | saúde do polling do TSE (arquivos, falhas, fila de municípios, HTTP) ou `null` |
 
+O `AdminSnapshot` do servidor traz também `servidor`: build, produção ou não, se a simulação pode ir ao ar (e o
+motivo), o estado da troca automática para o TSE e métricas do processo (req/s, p50/p99, 5xx/429, cache, requisições
+em andamento, atraso do event loop, memória, imagens OG). O painel mostra tudo em Fonte e Monitor.
+
 Comandos: `relogio` (iniciar · pausar · retomar · reiniciar), `velocidade`, `saltar-tempo`, `saltar-pct`,
 `cenario` (parcial), `preset`, `fonte` (`pre` · `simulacao` · `tse`), `aviso` (faixa para todos os visitantes),
-`congelar` (simula instabilidade: números param) e `tse` (códigos e intervalo do feed). Cada comando incrementa a
-`versao`, que invalida o cache dos clientes e da CDN, e é gravado em `STATE_DIR/admin.json` (escrita atômica).
+`congelar` (simula instabilidade: números param), `tse` (códigos e intervalo do feed), `nomes-reais`, `patrocinio` e
+`troca-auto` (`ligar` · `desligar` · `agora` · `adiar` com `para` = epoch ms ou `null` para o horário padrão). Cada
+comando incrementa a `versao`, que invalida o cache dos clientes e da CDN, e é gravado em `STATE_DIR/admin.json`
+(escrita atômica).
 
 ```bash
 curl -c jar -H 'content-type: application/json' -d '{"senha":"sintonia"}' localhost:8787/api/admin/login
@@ -212,12 +278,25 @@ curl -b jar -H 'content-type: application/json' -d '{"tipo":"saltar-pct","pct":5
 curl -b jar localhost:8787/api/admin/tse/test
 ```
 
-**Na noite da eleição** (25/10): antes das 17h deixe a fonte em `pre` (as páginas mostram o 1º turno real com a
-contagem regressiva); rode `tse/test`; às 17h troque a fonte para `tse`. Se o TSE ficar instável, o adaptador
-mantém o último dado bom; publique um `aviso` se precisar. **Ensaio**: com a fonte `tse` e os códigos do 1º turno
-(`{"tipo":"tse","tse":{"eleicaoPres":"6257","eleicaoGov":"6259","pleito":"3220"}}`) o servidor serve o 1º turno
-real pelo caminho ao vivo (Brasil, UF, município, zona e boletim de urna decodificado); volte depois para
-`6258`/`6260`/`3221`.
+### Noite da eleição (25/10)
+
+1. **Antes das 17h**: deixe a fonte em `pre` (padrão; as páginas mostram o 1º turno real com a contagem regressiva).
+   No painel → Fonte, use "Testar conexão": além de ler o feed, ele confere os códigos do 2º turno contra o
+   `ele-c.json` do TSE e avisa se algo não bater (ver [`src/tse/README.md`](./src/tse/README.md) §4).
+2. **Às 17h, sozinho** (`TSE_AUTO`, ligado em produção): o servidor confere se o feed do TSE responde e troca a fonte
+   para `tse`. Se o TSE não responder, a fonte continua `pre`, o site mostra o aviso discreto "Aguardando os primeiros
+   dados do TSE" (só se não houver um aviso seu publicado) e o servidor tenta de novo em 15 s, 30 s, 60 s e depois a
+   cada 2 min — tudo no log e no painel (Fonte → "Troca automática para o TSE": estado, tentativas, último erro e a
+   próxima tentativa). No painel dá para **desligar**, **adiar** (+5 min, +15 min, +1 h ou um horário de Brasília) e
+   **trocar agora**. Trocar a fonte à mão continua valendo a qualquer momento; depois de feita (automática ou à mão,
+   após o horário) a troca não se repete — "ligar" de novo rearma.
+3. **Durante a apuração**: se o TSE ficar instável, o adaptador mantém o último dado bom; publique um `aviso` se
+   precisar. A simulação não pode ir ao ar por engano em produção (`ALLOW_SIMULACAO`).
+
+**Ensaio**: `TSE_INICIO=2026-10-20T15:00:00-03:00` (ou "Marcar para" no painel) faz a troca acontecer nesse horário.
+Com os códigos do 1º turno (`{"tipo":"tse","tse":{"eleicaoPres":"6257","eleicaoGov":"6259","pleito":"3220"}}`) o
+servidor serve o 1º turno real pelo caminho ao vivo (Brasil, UF, município, zona e boletim de urna decodificado);
+volte depois para `6258`/`6260`/`3221` e para o horário padrão.
 
 ---
 

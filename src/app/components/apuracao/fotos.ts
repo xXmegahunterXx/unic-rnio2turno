@@ -38,7 +38,9 @@ export function numerosSimulados(status: Pick<LiveStatus, 'simulacao' | 'fase'> 
 export function useFotosRace(race: (Pick<Race, 'candidatos'> & Partial<Pick<Race, 'turno'>>) | undefined | null, opts: FotosOpts = {}): (string | undefined)[] {
   const { data: status } = useStatus();
   const anonimizado = !!status?.anonimizado;
-  const simulado = !opts.real && numerosSimulados(status, race);
+  // Sem o status ainda (1ª carga) não dá para saber se os números são simulados: espera, em vez de arriscar um
+  // rosto ao lado de número fictício por um instante.
+  const simulado = !opts.real && (!status || numerosSimulados(status, race));
   const bloqueado = opts.desligado || (anonimizado && !opts.real) || simulado || !race;
   const finalistas: Candidate[] = race ? race.candidatos.filter((c) => !c.agregado) : [];
   const grupos = bloqueado ? [] : [...new Set(finalistas.map((c) => c.fotoGrupo).filter((g): g is string => !!g))];

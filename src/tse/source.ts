@@ -1214,6 +1214,7 @@ export class TseSource {
               .filter((p) => p.c === this.config.ciclo)
               .map((p) => ({ pleito: p.cd, data: p.dt, eleicoes: p.e.map((e) => ({ cd: e.cd, nome: e.nm, turno: e.t })) }))
           : undefined;
+      const conferencia = cfg.status === 'ok' ? this.conferirCodigos(cfg.data) : null;
       const pres = this.races.find((r) => r.turno === 2 && r.cargo === 'Presidente') ?? this.races[0];
       const cod = this.codigos(pres);
       const br = await this.client.getJson<TseResultadoArquivo>(tsePaths.resultado(cod.ciclo, cod.eleicao, cod.cargo, 'br'), {
@@ -1233,12 +1234,63 @@ export class TseSource {
         ok: true,
         detalhe:
           `Feed ok: eleição ${d.ele} (${d.t}º turno), ${map.int(d.s.st)} de ${map.int(d.s.ts)} seções totalizadas, ` +
-          `arquivo gerado ${d.dg} ${d.hg}, latência ${br.ms} ms`,
-        amostra: { pleitos, br: { ele: d.ele, t: d.t, dg: d.dg, hg: d.hg, dt: d.dt, ht: d.ht, tf: d.tf, s: { ts: d.s.ts, st: d.s.st }, cands } },
+          `arquivo gerado ${d.dg} ${d.hg}, latência ${br.ms} ms` +
+          (conferencia?.avisos.length ? `. Atenção: ${conferencia.avisos.join(' ')}` : ''),
+        amostra: {
+          pleitos,
+          conferencia,
+          br: { ele: d.ele, t: d.t, dg: d.dg, hg: d.hg, dt: d.dt, ht: d.ht, tf: d.tf, s: { ts: d.s.ts, st: d.s.st }, cands },
+        },
       };
     } catch (err) {
       return { ok: false, detalhe: `Falha ao acessar o TSE: ${msgDe(err)}` };
     }
+  }
+
+  /**
+   * Confere os códigos configurados contra o `ele-c.json`: o pleito existe, as eleições de Presidente/Governador estão
+   * nele como 2º turno (`t: '2'`), e batem com o `cdt2` (código do 2º turno) das eleições do 1º turno do dataset. Também
+   * lista as UFs de Governador com 2º turno publicadas pelo TSE × as do dataset. Só informa (nunca bloqueia).
+   */
+  conferirCodigos(cfg: TseConfigGeralArquivo): {
+    esperado: { pleito: string | null; eleicaoPres: string | null; eleicaoGov: string | null };
+    ufsGovTse: string[];
+    ufsGovDataset: string[];
+    avisos: string[];
+  } {
+    const avisos: string[] = [];
+    const c = this.config;
+    const doCiclo = cfg.pl.filter((p) => p.c === c.ciclo);
+    const t1Pres = this.races.find((r) => r.turno === 1 && r.cargo === 'Presidente')?.tse.eleicao;
+    const t1Gov = this.races.find((r) => r.turno === 1 && r.cargo !== 'Presidente')?.tse.eleicao;
+    const cdt2 = (ele: string | undefined) => (ele ? (doCiclo.flatMap((p) => p.e).find((e) => e.cd === ele)?.cdt2 ?? null) : null);
+    const espPres = cdt2(t1Pres);
+    const espGov = cdt2(t1Gov);
+    const pleitoDe = (ele: string | null) => (ele ? (doCiclo.find((p) => p.e.some((e) => e.cd === ele))?.cd ?? null) : null);
+    const espPleito = pleitoDe(espPres) ?? pleitoDe(espGov);
+    const pl = doCiclo.find((p) => p.cd === c.pleito);
+    if (!pl) avisos.push(`o pleito ${c.pleito} não aparece no ele-c.json do ciclo ${c.ciclo}${espPleito ? ` (o 2º turno publicado é o ${espPleito})` : ''}.`);
+    const govTse = pl?.e.find((e) => e.cd === c.eleicaoGov);
+    for (const [rot, cd, esp] of [
+      ['Presidente', c.eleicaoPres, espPres],
+      ['Governador', c.eleicaoGov, espGov],
+    ] as const) {
+      const e = pl?.e.find((x) => x.cd === cd);
+      if (pl && !e) avisos.push(`a eleição ${cd} (${rot}) não está no pleito ${c.pleito}${esp ? ` (o TSE liga o 1º turno à eleição ${esp})` : ''}.`);
+      else if (e && e.t !== '2') avisos.push(`a eleição ${cd} (${rot}) é de ${e.t}º turno (ensaio com dados do 1º turno?).`);
+      else if (esp && esp !== cd) avisos.push(`o TSE liga o 1º turno de ${rot} à eleição ${esp}, mas a configuração usa ${cd}.`);
+    }
+    const ufsGovTse = (govTse?.abr ?? []).map((a) => a.cd.toUpperCase()).sort();
+    const ufsGovDataset = this.races.filter((r) => r.turno === 2 && r.cargo !== 'Presidente').flatMap((r) => r.ufs).sort();
+    const faltam = ufsGovDataset.filter((u) => !ufsGovTse.includes(u));
+    const sobram = ufsGovTse.filter((u) => !ufsGovDataset.includes(u as never));
+    if (govTse && t1Gov && govTse.t === '2' && (faltam.length || sobram.length)) {
+      avisos.push(
+        `2º turno de Governador no TSE: ${ufsGovTse.join(', ') || 'nenhuma UF'}` +
+          `${faltam.length ? `; sem arquivo no TSE: ${faltam.join(', ')}` : ''}${sobram.length ? `; fora do site: ${sobram.join(', ')}` : ''}.`,
+      );
+    }
+    return { esperado: { pleito: espPleito, eleicaoPres: espPres, eleicaoGov: espGov }, ufsGovTse, ufsGovDataset, avisos };
   }
 
   /** Série + eventos de todas as corridas (para persistir; restaure com `historico` nas opções). */

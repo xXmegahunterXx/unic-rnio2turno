@@ -15,7 +15,8 @@ em `src/shared/types.ts`) para a noite de 25/10/2026.
 | `__fixtures__/` | Arquivos **reais** do 1º turno (reduzidos), `fake-fetch.ts` e `races.json` para os testes |
 
 Tudo foi verificado com `curl` e com os testes contra o 1º turno de 2026 (pleito 3220, eleições
-6257/6259), em 09/10/2026.
+6257/6259), em 09/10/2026; testes "live" refeitos contra o feed real em 12/10/2026 (6 de 6 passando: totais oficiais do
+Brasil, soma das UFs, Roraima município a município, 57 zonas de São Paulo, 3 boletins de urna e os códigos do 2º turno).
 
 ---
 
@@ -143,16 +144,49 @@ Horas gravadas no BU (abertura/encerramento) são locais da urna.
 - `x-ratelimit-limit: 2000` por segundo. Mesmo assim limitamos a ≤ 8 conexões simultâneas.
 - Arquivo ainda não publicado: **404 com XML `NoSuchKey`** (S3/Ceph) → tratado como "ausente", não erro.
 
-## 4. Estado do 2º turno no feed (09/10/2026)
+## 4. Códigos do 2º turno e estado do feed (conferidos em 12/10/2026)
 
-- `6258` (Presidente): `br-c0001-e006258-u.json` publicado, zerado (`and: "n"`, `tf: "n"`), com
-  `s.ts = 48.964` e `e.te = 15.922.180` — a configuração ainda está sendo carregada (SP 33.403 seções). O
-  total cresce até a eleição; o adaptador sempre usa o que o feed traz.
-- `6260` (Governador): em `ele-c.json` e no `cm` só **DF e ES** até agora; `rj-c0003-e006260-u.json` dá 404
-  (as outras 5 UFs aparecem como `ausentes` no health até serem publicadas).
-- `arquivo-urna/3221`: `cs` de SP publicado (sem `da`); de AC, 404.
+| Item | 1º turno (04/10) | 2º turno (25/10) | Onde fica |
+|---|---|---|---|
+| Ciclo | `ele2026` | `ele2026` | `TseConfig.ciclo` |
+| Pleito | `3220` | **`3221`** | `TseConfig.pleito` (arquivos de urna: `arquivo-urna/{pleito}/…`) |
+| Presidente (cargo 1, abrangência `br`) | `6257` | **`6258`** | `TseConfig.eleicaoPres` |
+| Governador (cargo 3, por UF) | `6259` | **`6260`** | `TseConfig.eleicaoGov` |
 
----
+O próprio TSE liga os turnos: no `comum/config/ele-c.json`, a eleição do 1º turno traz `cdt2` (código do 2º turno):
+`6257 → 6258` e `6259 → 6260`; o pleito `3221` (25/10/2026) lista `6258` e `6260` com `t: "2"` (além de eleições
+suplementares e consultas populares municipais, que não usamos). O padrão do servidor vem do dataset
+(`Race.tse` das corridas de 2º turno, `tsePadrao` em `src/engine/state.ts`).
+
+**Estado em 12/10/2026 (10:3x):** `br-c0001-e006258-u.json` publicado e zerado (`0 de 470.848 seções`, gerado em
+11/10 12:32). Governador `6260` publicado para **AC, AM, DF, ES e RN**; **RJ** e **TO** dão 404 (o RJ teve o
+2º turno de Governador desfeito em 10/10 — ver README, "Mudança no quadro do 2º turno"; o TO ainda aparece como
+"2º turno" no arquivo do 1º turno, mas não está na eleição `6260`). Enquanto o arquivo de uma UF não existe, a corrida
+fica em `ausentes` no `health()` e as páginas mostram "aguardando" (nunca número inventado). `arquivo-urna/3221`: `cs`
+de SP publicado (sem `da`).
+
+### 4.1 Conferir e trocar os códigos
+
+- **Conferir**: admin → Fonte → "Testar conexão" (`GET /api/admin/tse/test`). Além de ler o arquivo Brasil, o teste
+  confere a configuração contra o `ele-c.json` (`TseSource.conferirCodigos`): o pleito existe, as eleições estão nele
+  como 2º turno e batem com o `cdt2` do 1º turno; e lista as UFs de Governador que o TSE publicou × as do site. Qualquer
+  divergência aparece como "Atenção: …" no resultado (e em `amostra.conferencia`). Pela linha de comando:
+  `TSE_LIVE=1 npx vitest run src/tse/live.test.ts` (o teste "códigos do 2º turno conferem com o ele-c.json" falha se o
+  TSE mudar os códigos).
+- **Trocar** (se o TSE publicar outros códigos): admin → Fonte → "Feed do TSE" → edite Pleito/Eleição e "Salvar"
+  (comando `{ "tipo": "tse", "tse": { "pleito": "…", "eleicaoPres": "…", "eleicaoGov": "…" } }`). Vale na hora, para
+  todas as instâncias, e fica gravado em `STATE_DIR/admin.json`; as corridas recomeçam do zero com os códigos novos.
+  Para descobrir os códigos: `curl -s https://resultados.tse.jus.br/oficial/comum/config/ele-c.json` e procure o
+  pleito de 25/10/2026 (`"dt": "25/10/2026"`) e as eleições com `"t": "2"`.
+- **Ensaio com o 1º turno** (dados reais pelo caminho ao vivo): `pleito 3220`, `eleicaoPres 6257`, `eleicaoGov 6259`
+  — o teste avisa "é de 1º turno"; volte para `3221/6258/6260` depois.
+
+### 4.2 Troca automática para a fonte `tse` (servidor)
+
+Em produção, às 17h de 25/10 (ou `TSE_INICIO`, ou o horário marcado no admin) o servidor troca a fonte de `pre` para
+`tse` sozinho, depois de conferir o feed com o mesmo `testar()`. Sem resposta, mantém `pre` com o aviso público
+"Aguardando os primeiros dados do TSE" e tenta de novo (15 s, 30 s, 60 s, depois a cada 2 min). Detalhes:
+`src/server/troca-auto.ts` e README ("Noite da eleição").
 
 ## 5. `TseSource` (uso no servidor)
 
@@ -255,7 +289,8 @@ municípios com seções novas são baixados.
 
 ```bash
 npx vitest run src/tse                      # sem rede (fixtures reais reduzidas, ~400 KB)
-TSE_LIVE=1 npx vitest run src/tse/live.test.ts   # contra o feed real (1º turno + disponibilidade do 2º)
+TSE_LIVE=1 npx vitest run src/tse/live.test.ts   # contra o feed real (1º turno + disponibilidade e códigos do 2º)
+# neste contêiner (proxy com CA própria): NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt TSE_LIVE=1 npx vitest run …
 ```
 
 Números conferidos à mão (1T): Brasil Flávio 56.104.503 (47,03%), Lula 53.879.538 (45,16%), Outros

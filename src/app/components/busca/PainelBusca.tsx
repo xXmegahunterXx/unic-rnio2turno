@@ -295,7 +295,7 @@ export default function PainelBusca({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg px-2 py-1 text-[13px] font-medium text-brand-fg sm:hidden"
+            className="toque relative shrink-0 rounded-lg px-2 py-1 text-[13px] font-medium text-brand-fg sm:hidden"
           >
             Cancelar
           </button>

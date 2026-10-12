@@ -174,16 +174,19 @@ export function SecaoMonitor() {
   );
 }
 
+/** Milissegundos com 1 casa abaixo de 10 ms (0,4 ms em vez de "0 ms"). */
+const msCurto = (v: number) => (v < 10 ? `${fmtDecimal(v, 1)} ms` : fmtMs(v));
+
 /** Processo do servidor: build, ambiente e as métricas do último minuto fechado (AdminSnapshot.servidor). */
 function PainelServidor({ s }: { s: ServidorInfo }) {
   const m = s.metricas;
   const itens: [string, ReactNode, ReactNode?][] = [
     ['Requisições/s', fmtDecimal(m.reqPorSeg, 1), 'média do último minuto'],
-    ['Processamento', `${fmtMs(m.p50Ms)} · ${fmtMs(m.p99Ms)}`, 'p50 · p99 (minuto fechado)'],
+    ['Processamento', `${msCurto(m.p50Ms)} · ${msCurto(m.p99Ms)}`, 'p50 · p99 (minuto fechado)'],
     ['Erros 5xx · 429', `${fmtInt(m.erros5xx)} · ${fmtInt(m.respostas429)}`, 'minuto fechado'],
-    ['Cache de respostas', m.cacheHit ? fmtPct(m.cacheHit * 100, 0) : '—', `${fmtInt(m.respostasEmCache)} rotas montadas agora`],
+    ['Cache de respostas', m.cacheHit ? fmtPct(m.cacheHit * 100, 0) : '—', `${fmtInt(m.respostasEmCache)} ${m.respostasEmCache === 1 ? 'rota montada' : 'rotas montadas'} agora`],
     ['Em andamento', fmtInt(m.emAndamento), 'requisições abertas agora'],
-    ['Event loop', fmtMs(m.eventLoopP99Ms), 'atraso p99 (~10 s)'],
+    ['Event loop', msCurto(m.eventLoopP99Ms), 'atraso p99 (~10 s)'],
     ['Memória', `${fmtInt(m.rssMb)} MB`, `heap ${fmtInt(m.heapMb)} MB`],
     ['Imagens de prévia', `${fmtInt(m.og.emMemoria)} em memória`, `${fmtDecimal(m.og.mb, 1)} MB · ${fmtInt(m.og.naFila)} na fila`],
   ];

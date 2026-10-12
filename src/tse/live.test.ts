@@ -42,6 +42,15 @@ describe.skipIf(!live)('feed real do TSE (TSE_LIVE=1)', () => {
     expect(n.resumo.secoes).toBeGreaterThan(0);
   });
 
+  it('códigos do 2º turno conferem com o ele-c.json do TSE (pleito 3221, eleições 6258/6260 via cdt2)', async () => {
+    const r = await fetch(`${CONFIG.baseUrl}/comum/config/ele-c.json`);
+    const conf = src.conferirCodigos(await r.json());
+    console.log('conferência:', JSON.stringify(conf));
+    expect(conf.esperado).toEqual({ pleito: '3221', eleicaoPres: '6258', eleicaoGov: '6260' });
+    // avisos só sobre o quadro de Governador (UFs sem arquivo no TSE), nunca sobre os códigos
+    expect(conf.avisos.filter((a) => !/2º turno de Governador no TSE/.test(a))).toEqual([]);
+  });
+
   it('Brasil 1º turno: totais oficiais', async () => {
     const n = await src.nacional('pres-t1');
     expect(n.resumo.votos.slice(0, 2)).toEqual([53_879_538, 56_104_503]);

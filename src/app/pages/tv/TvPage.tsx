@@ -325,7 +325,7 @@ function Controles({
             role="radio"
             aria-checked={mapaMun === o.v}
             onClick={() => setMapaMun(o.v)}
-            className={cn('h-8 rounded-lg px-3 text-[14px] font-semibold transition-colors', mapaMun === o.v ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:text-fg')}
+            className={cn('toque relative h-8 rounded-lg px-3 text-[14px] font-semibold transition-colors', mapaMun === o.v ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:text-fg')}
           >
             {o.r}
           </button>

@@ -60,6 +60,13 @@ export class Estaticos {
   readonly raiz: string;
   private cache = new Map<string, Arquivo>();
   private bytes = 0;
+  /**
+   * Caminhos inexistentes vistos há pouco (→ expira em): as rotas da SPA (/apuracao/sp…) não são arquivos, e cada
+   * página consultaria o disco (stat com erro) a cada requisição. 2 s de validade; no máximo 5.000 caminhos.
+   */
+  private ausentes = new Map<string, number>();
+  /** Arquivos conferidos há menos de 1 s não passam pelo stat de novo (index.html é lido a cada página). */
+  private conferidoEm = new Map<string, number>();
 
   constructor(raiz: string) {
     this.raiz = resolve(raiz);
@@ -82,13 +89,27 @@ export class Estaticos {
   }
 
   private carregar(abs: string): Arquivo | null {
+    const agora = Date.now();
+    const aus = this.ausentes.get(abs);
+    if (aus !== undefined) {
+      if (aus > agora) return null;
+      this.ausentes.delete(abs);
+    }
+    const recente = this.cache.get(abs);
+    if (recente && (this.conferidoEm.get(abs) ?? 0) > agora - 1000) return recente;
     let st;
     try {
       st = statSync(abs);
     } catch {
+      st = null;
+    }
+    if (!st || !st.isFile()) {
+      if (this.ausentes.size >= 5000) this.ausentes.clear();
+      this.ausentes.set(abs, agora + 2000);
       return null;
     }
-    if (!st.isFile()) return null;
+    if (this.conferidoEm.size >= 20_000) this.conferidoEm.clear();
+    this.conferidoEm.set(abs, agora);
     const hit = this.cache.get(abs);
     if (hit && hit.mtimeMs === st.mtimeMs && hit.tamanho === st.size) {
       this.cache.delete(abs); // LRU: reinsere no fim

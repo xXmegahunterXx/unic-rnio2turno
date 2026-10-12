@@ -15,7 +15,7 @@
 import { unwatchFile, watchFile } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { serve } from '@hono/node-server';
+import { createAdaptorServer } from '@hono/node-server';
 import type { AdminState, UF } from '../shared/types';
 import { createController, loadDataset } from '../engine/controller';
 import type { JsonLoader } from '../engine/api';
@@ -101,9 +101,13 @@ async function main() {
     }
   });
 
-  const server = serve({ fetch: sintonia.app.fetch, port: config.port, hostname: config.host }, (info) => {
+  const server = createAdaptorServer({ fetch: sintonia.app.fetch, hostname: config.host });
+  // fila de conexões maior que o padrão do Node (511): rajadas de conexões novas (CDN/proxy reabrindo o pool, visitantes
+  // chegando juntos) não perdem SYN — perder um custa 1–3 s de retransmissão ao cliente. O kernel limita a somaxconn.
+  server.listen({ port: config.port, host: config.host, backlog: 4096 }, () => {
+    const info = server.address() as { port: number } | null;
     log.info(
-      `Sintonia no ar em http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${info.port} ` +
+      `Sintonia no ar em http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${info?.port ?? config.port} ` +
         `(${config.producao ? 'produção' : 'desenvolvimento'}, fonte ${controller.status().fonte}, ` +
         `${config.serveStatic ? `servindo ${config.distDir}` : 'só API'}, simulação ${config.permitirSimulacao ? 'permitida' : 'bloqueada'}; ` +
         `subida em ${Math.round(performance.now() - t0)} ms)`,

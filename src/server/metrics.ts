@@ -120,6 +120,7 @@ export class Metricas {
   ultimoResumo: ResumoMinuto | null = null;
   private loop: IntervalHistogram | null = null;
   private loopP99 = 0;
+  private loopLido = false;
   private loopEm = 0;
   readonly clientes: ClientesAtivos;
   private pessoas: { em: number; v: number } | null = null;
@@ -167,9 +168,11 @@ export class Metricas {
       }
     }
     const t = this.now();
-    if (t - this.loopEm >= 10_000 || this.loopP99 === 0) {
+    if (t - this.loopEm >= 10_000 || !this.loopLido) {
+      this.loopLido = true;
       const p = this.loop.percentile(99);
-      if (Number.isFinite(p) && p > 0) this.loopP99 = Math.round((p / 1e6) * 10) / 10;
+      // o histograma mede o intervalo inteiro do timer (inclui a resolução de 20 ms): o atraso é o que passa disso
+      if (Number.isFinite(p) && p > 0) this.loopP99 = Math.max(0, Math.round((p / 1e6 - 20) * 10) / 10);
       if (t - this.loopEm >= 10_000) {
         this.loop.reset();
         this.loopEm = t;

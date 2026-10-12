@@ -74,7 +74,7 @@ function Moldura({
           href={link}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex shrink-0 items-center gap-1 rounded-md font-semibold text-fg hover:text-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="toque relative inline-flex shrink-0 items-center gap-1 rounded-md font-semibold text-fg hover:text-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
           via Sintonia
           <Icon name="externo" size={13} />

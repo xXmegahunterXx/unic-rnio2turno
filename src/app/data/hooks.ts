@@ -6,7 +6,7 @@
  * agora (com polling). Com `t`: o instante truncado ao segundo entra na chave e NÃO há polling — o passado não
  * muda; uma mudança de `versao` no admin invalida tudo (useStatus). Instante futuro é limitado ao agora pela fonte.
  */
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { FeedEvent, LiveStatus, Race, RaceId, UF } from '@/shared/types';
 import type { PublicMeta } from '@/shared/api';
@@ -55,6 +55,23 @@ export function pollMs(status: LiveStatus | undefined, nivel: 'br' | 'uf' | 'mun
   if (status.fase !== 'apurando' || status.pausado || status.congelado) return nivel === 'br' ? 15000 : 30000;
   const base = { br: 2500, uf: 4000, mun: 6000, zona: 8000 }[nivel];
   return status.velocidade >= 20 ? Math.max(1500, base / 2) : base;
+}
+
+/**
+ * Pré-carga na entrada do app (main.tsx), antes de o chunk da página chegar: os dados que a rota aberta vai pedir de
+ * qualquer jeito. `meta` sempre; o placar nacional do Presidente (2º e 1º turno — antes das 17h a página mostra o 1º)
+ * em `/` e `/apuracao` (sem outra disputa na URL). Mesmas chaves e funções dos hooks: a página monta com os dados já em
+ * cache, em vez de esperar o próprio chunk para só então pedir. Medido (celular emulado, CPU 4×, 4G lenta): ver relatório.
+ */
+export function preCarregarDadosDaRota(qc: QueryClient, pathname: string, search = '') {
+  void qc.prefetchQuery({ queryKey: ['meta'], queryFn: async () => (await getClient()).meta(), staleTime: Infinity });
+  const rota = pathname.replace(/\/+$/, '') || '/';
+  const race = new URLSearchParams(search).get('race');
+  const placarPres = rota === '/' || (rota === '/apuracao' && (!race || race === 'pres' || race === 'pres-t1'));
+  if (!placarPres) return;
+  for (const id of ['pres', 'pres-t1'] as RaceId[]) {
+    void qc.prefetchQuery({ queryKey: ['nacional', id], queryFn: async () => (await getClient()).nacional(id) });
+  }
 }
 
 export function useMeta() {
