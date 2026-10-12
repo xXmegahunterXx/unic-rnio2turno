@@ -1,0 +1,92 @@
+# Sintonia — proxy reverso (Caddy 2) na frente do app. Montado pelo docker-compose.yml em /etc/caddy.
+#
+# Variáveis (vêm do .env pelo docker-compose.yml):
+#   SITE_ADDRESS   endereço(s) atendido(s):
+#                    "sintonia.app"                    HTTPS automático (Let's Encrypt) + redireciona HTTP → HTTPS
+#                    "sintonia.app, www.sintonia.app"  idem; o www redireciona para o domínio principal
+#                    ":80"                             teste local, só HTTP, sem certificado
+#                    "localhost"                       teste local com HTTPS de certificado interno (não confiável)
+#   ACME_EMAIL     e-mail da conta no Let's Encrypt (avisos sobre o certificado)
+#   APP_PORT       porta do app dentro da rede do Docker (8787)
+#
+# O app já cuida de: compressão br/gzip das respostas, Cache-Control/ETag de cada rota, HSTS, nosniff,
+# Referrer-Policy e frame-ancestors (widgets /embed/* liberados para iframe). Aqui NÃO sobrescrevemos nada disso.
+# Sem log de acesso de propósito: o Sintonia não registra IP de visitante.
+#
+# Depois de editar:  docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+{
+	email {$ACME_EMAIL}
+	# o certificado interno ("localhost") não tenta se instalar no sistema do contêiner
+	skip_install_trust
+	# encerramento: espera as requisições em andamento por até 10 s
+	grace_period 10s
+	# log do Caddy (erros, certificados) sem as consultas do healthcheck à API interna (127.0.0.1:2019)
+	log default {
+		output stderr
+		exclude admin.api
+	}
+
+	servers {
+		# IP real do visitante atrás da Cloudflare: só confiamos no CF-Connecting-IP quando a conexão vem de
+		# um IP da própria Cloudflare (lista oficial: https://www.cloudflare.com/ips/ , conferida em 12/10/2026).
+		# Sem Cloudflare a lista não atrapalha: um visitante comum não consegue se passar por ela.
+		trusted_proxies static 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+		client_ip_headers CF-Connecting-IP X-Forwarded-For
+		# HTTP/1.1, HTTP/2 e HTTP/3 (QUIC, porta 443/udp)
+		protocols h1 h2 h3
+	}
+}
+
+{$SITE_ADDRESS} {
+	# www.dominio → dominio (mesmo caminho e query)
+	@www header_regexp www Host ^www\.(.+)$
+	redir @www https://{re.www.1}{uri} 308
+
+	# Compressão só do que o app ainda não comprimiu (respostas pequenas); o que já vem com
+	# Content-Encoding (br/gzip do app) passa intacto.
+	encode {
+		zstd
+		gzip 5
+		minimum_length 1024
+	}
+
+	header {
+		-Server
+		-Via
+		# defensivo: o app já manda; "?" só define se estiver ausente
+		?X-Content-Type-Options nosniff
+	}
+	# arquivos com hash do Vite: imutáveis (o app já manda o mesmo; aqui só se faltar)
+	header /assets/* ?Cache-Control "public, max-age=31536000, immutable"
+
+	reverse_proxy {
+		# todas as instâncias do serviço "app" (1 por padrão; N com docker-compose.replicas.yml)
+		dynamic a {
+			name app
+			port {$APP_PORT:8787}
+			refresh 2s
+		}
+		# o mesmo visitante cai sempre na mesma instância (sem cookie)
+		lb_policy client_ip_hash
+		# app reiniciando (atualização, queda): segura a requisição e tenta de novo por até 20 s em vez de
+		# devolver 502 na hora (medido: recriar o contêiner do app = ~2–4 s de espera, nenhum erro).
+		# A saúde de cada instância vem do Docker: só contêineres no ar entram no DNS "app", e o healthcheck
+		# do app reinicia um processo travado (o health_uri ativo do Caddy não vale para upstreams dinâmicos).
+		lb_try_duration 20s
+		lb_try_interval 250ms
+		fail_duration 2s
+
+		# IP do visitante para o app (TRUST_PROXY=1): só o X-Real-IP calculado aqui, à prova de falsificação;
+		# cabeçalhos de IP que o app também leria, vindos de fora, são descartados
+		header_up X-Real-IP {client_ip}
+		header_up -CF-Connecting-IP
+		header_up -Fly-Client-IP
+		header_up -True-Client-IP
+
+		transport http {
+			dial_timeout 3s
+			# menor que o keep-alive do app (65 s): nunca reaproveita conexão que o Node já fechou
+			keepalive 55s
+		}
+	}
+}

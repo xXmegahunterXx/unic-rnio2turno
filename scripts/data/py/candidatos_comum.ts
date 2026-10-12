@@ -179,6 +179,11 @@ export interface CandLido {
   st: string;
   situacao: SituacaoCandidato;
   subJudice: boolean;
+  /**
+   * Votos anulados em definitivo depois da eleição (`dvt` = "Anulado", ex.: registro indeferido com trânsito em
+   * julgado). O TSE os mantém nos válidos computados (`vvc`, denominador do `pvap`) e fora do `tvtn` do partido.
+   */
+  anulado: boolean;
   partido: TsePartidoX;
   agr: TseAgremiacaoX;
   vs: TseViceX[];
@@ -213,6 +218,8 @@ export interface CargoLido {
   nominais: number;
   legenda: number;
   subJudice: number;
+  /** votos anulados em definitivo (`van`), incluídos em `validos` como no `vvc` do TSE */
+  anulados: number;
   brancos: number;
   nulos: number;
   quociente?: number;
@@ -245,7 +252,8 @@ export const pctTse = (parte: number, todo: number) => {
  * Lê um arquivo de resultado (qualquer cargo) e confere a consistência interna:
  *  - totalização encerrada; Σ votos dos candidatos (+ legenda) = válidos computados (`vvc`);
  *  - `vvc` + brancos + nulos = total de votos; total de votos = vagas × comparecimento (Senado: 2 votos por eleitor);
- *  - sub judice = `vansj`; nominais/legenda = `vnom`/`vl`; Σ por partido = `tvtn`/`tvtl`;
+ *  - sub judice = `vansj`; anulados em definitivo = `van` (vvc = vv + vansj + van); nominais/legenda = `vnom`/`vl`;
+ *    Σ por partido = `tvtn`/`tvtl`;
  *  - eleitos = vagas (governador: 1 eleito ou 2 no 2º turno); `pvap` publicado = votos ÷ vvc.
  */
 export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
@@ -273,7 +281,7 @@ export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
   let somaVotos = 0;
   let somaLegenda = 0;
   let somaLegendaApurada = 0;
-  let anuladosPendentes = 0;
+  let anulados = 0;
   for (const agr of carg.agr) {
     for (const par of agr.par) {
       const p: PartidoLido = {
@@ -301,7 +309,10 @@ export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
           anulado = true;
           sj = true;
           subJudice += votos;
-          anuladosPendentes += votos;
+        } else if (cand.dvt === 'Anulado') {
+          // Totalização encerrada: anulados em definitivo vão para `van` (dentro do vvc, fora do tvtn do partido).
+          anulado = true;
+          anulados += votos;
         } else if (!DESTINO_COMPUTADO.has(cand.dvt)) {
           fail(`[${c}] destinação de voto não tratada: "${cand.dvt}"`);
         } else if (cand.dvt === 'Anulado sub judice') {
@@ -310,7 +321,7 @@ export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
         }
         somaVotos += votos;
         nominaisComSj += votos;
-        if (!sj) p.nominais += votos;
+        if (!sj && !anulado) p.nominais += votos;
         const sit = pendente ? 'outro' : situacao(cand.st);
         if (ehEleito(sit)) p.eleitos++;
         candidatos.push({
@@ -324,6 +335,7 @@ export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
           st: cand.st,
           situacao: sit,
           subJudice: sj,
+          anulado,
           partido: par,
           agr,
           vs: cand.vs ?? [],
@@ -362,9 +374,9 @@ export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
   if (somaVotos + somaLegendaApurada !== validos) {
     fail(`[${ctx}] Σ votos ${somaVotos} + legenda apurada ${somaLegendaApurada} ≠ vvc ${validos}`);
   }
-  if (vv + subJudice !== validos) fail(`[${ctx}] vv ${vv} + sub judice ${subJudice} ≠ vvc ${validos}`);
+  if (vv + subJudice + anulados !== validos) fail(`[${ctx}] vv ${vv} + sub judice ${subJudice} + anulados ${anulados} ≠ vvc ${validos}`);
   if (num(v.vansj, 'v.vansj', ctx) !== subJudice) fail(`[${ctx}] sub judice ${subJudice} ≠ vansj ${v.vansj}`);
-  if (num(v.van, 'v.van', ctx) !== 0) fail(`[${ctx}] votos anulados em definitivo (van=${v.van}) não tratados`);
+  if (num(v.van, 'v.van', ctx) !== anulados) fail(`[${ctx}] anulados em definitivo ${anulados} ≠ van ${v.van}`);
   if (nominais + legenda !== vv) fail(`[${ctx}] nominais ${nominais} + legenda ${legenda} ≠ vv ${vv}`);
   if (legenda !== somaLegenda) fail(`[${ctx}] legenda ${legenda} ≠ Σ tvtl ${somaLegenda}`);
   if (num(v.vn, 'v.vn', ctx) + num(v.vnt, 'v.vnt', ctx) !== nulos) fail(`[${ctx}] vn + vnt ≠ tvn`);
@@ -420,6 +432,7 @@ export function lerCargo(r: TseResultadoX, ctx: string): CargoLido {
     nominais,
     legenda,
     subJudice,
+    anulados,
     brancos,
     nulos,
     quociente: carg.qe ? num(carg.qe, 'qe', ctx) : undefined,
@@ -481,32 +494,75 @@ export function nomeFederacao(nm: string): string {
   return FEDERACOES[k] ?? fail(`federação sem grafia de exibição: "${nm}" (acrescente em FEDERACOES)`);
 }
 
-/** Ajustes pós-titleCasePt (iguais aos de lib/nomes.ts): "Olho-D'água" → "Olho-d'Água", "Sant'ana" → "Sant'Ana". */
+/**
+ * Ajustes pós-titleCasePt (como os de lib/nomes.ts, mas aceitando também os apóstrofos tipográficos que o TSE usa em
+ * nomes de urna: ´ ’ `): "Olho-D'água" → "Olho-d'Água", "Sant'ana" → "Sant'Ana", "D´avila" → "d´Ávila".
+ */
 function ajustarApostrofos(s: string): string {
   return s
-    .replace(/([\s-])D'(\p{L})/gu, (_, pre: string, c: string) => `${pre}d'${c.toUpperCase()}`)
-    .replace(/(\p{L})'(\p{Ll})/gu, (_, a: string, c: string) => `${a}'${c.toUpperCase()}`);
+    .replace(/([\s-])D(['´’`])(\p{L})/gu, (_, pre: string, ap: string, c: string) => `${pre}d${ap}${c.toUpperCase()}`)
+    .replace(/(\p{L})(['´’`])(\p{Ll})/gu, (_, a: string, ap: string, c: string) => `${a}${ap}${c.toUpperCase()}`);
 }
 
 /** Abreviações só de consoantes que se escrevem com inicial maiúscula ("Dr.", "Sgt."), não como sigla. */
 const ABREVIACOES = new Set(['DR', 'JR', 'PR', 'SGT', 'CB', 'CMDT', 'SR', 'ST', 'TEN']);
 
 /**
+ * Siglas COM vogal que aparecem em nomes de urna (a regra das consoantes não as pega). Lista explícita, levantada
+ * na varredura de todos os nomes do feed de 2026 (README › Dados): nome político ("ACM Neto"), entidades e
+ * profissões ("da CUT", "do SAMU", "ONG", "ACS" = agente comunitário de saúde, "SOS"), partido ("do PCO").
+ */
+const SIGLAS_COM_VOGAL = new Set(['ACM', 'ACS', 'APPD', 'AVC', 'CIC', 'CQO', 'CSI', 'CUT', 'MEP', 'ONG', 'PCO', 'SAMU', 'SOS']);
+/** Siglas ambíguas que só são sigla depois de "da"/"do" ("Kleber da TI"; em "Ti Migué" é apelido). */
+const SIGLAS_APOS_PARTICULA = new Set(['TI']);
+const SIGLAS_UF = new Set<string>(UFS);
+/** Algarismo romano como última palavra ("Martins II", "Vinycius VI"); "Ii"/"Vi" nunca são a grafia pretendida. */
+const ROMANO = /^(?=[IVX]{2,}$)X{0,3}(?:IX|IV|V?I{0,3})$/;
+/** Partículas que titleCasePt deixa em minúsculas no meio do nome. */
+const PARTICULAS_NOME = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+/** Só consoantes (Y conta como vogal: "Crys", "Wyllys", "Sky"). */
+const SO_CONSOANTES = /^[B-DF-HJ-NP-TV-XZ]{2,}$/;
+
+/**
  * Nome de pessoa SEM a tabela de correções de acento de lib/nomes.ts (que só vale para os finalistas verificados):
- * para os demais candidatos, a grafia é exatamente a do TSE, só com a capitalização de exibição (titleCasePt) e dois
- * ajustes de caixa: palavras só de consoantes (siglas: "JHC", "MLB", "PT", "DJ") ficam em maiúsculas, salvo
- * abreviações como "Dr"/"Jr"/"Sgt"; e letra logo depois de ponto fica maiúscula ("J.R.", "Hosp.Câncer").
+ * para os demais candidatos, a grafia é exatamente a do TSE (letras, acentos e pontuação), só com a capitalização de
+ * exibição (titleCasePt) e ajustes de CAIXA:
+ *  - siglas em maiúsculas: palavras só de consoantes ("JHC", "MLB", "PT", "DJ", "(PC)", "LGBT+"), salvo abreviações
+ *    como "Dr"/"Jr"/"Sgt"; siglas com vogal da lista SIGLAS_COM_VOGAL ("ACM Neto", "da CUT"); "TI" depois de da/do;
+ *    algarismo romano ("Silva II") ou sigla de UF ("Habitat PE") como última palavra;
+ *  - palavra que começa com algarismo fica como no TSE ("4E20"); letra logo depois de ponto ("J.R.", "S.O.S",
+ *    "Hosp.Câncer"), de barra ("Comunidades/Pablo") ou de pontuação de abertura ("(Levino)", "\"Daniel da TV\"",
+ *    "'Ana") fica maiúscula; "D'" no início do nome fica maiúsculo ("D'Jane"), no meio minúsculo ("Joana d'Arc").
  */
 export function nomeSimples(nm: string): string {
   const bruto = nm.trim().replace(/\s+/g, ' ');
-  const siglas = new Set(
-    bruto.split(/[\s-]+/).filter((w) => /^[B-DF-HJ-NP-TV-Z]{2,}$/.test(w) && !ABREVIACOES.has(w)),
-  );
-  return ajustarApostrofos(titleCasePt(bruto))
-    .split(/(\s+|-)/)
-    .map((w) => (siglas.has(w.toUpperCase()) ? w.toUpperCase() : w))
+  const partes = ajustarApostrofos(titleCasePt(bruto)).split(/(\s+|-|\/)/);
+  const palavras = partes.filter((_, i) => i % 2 === 0);
+  let iPalavra = -1;
+  let anterior = '';
+  return partes
+    .map((w, i) => {
+      if (i % 2 === 1) return w; // separador
+      iPalavra++;
+      const prev = anterior;
+      anterior = w.toLowerCase();
+      const chave = w.replace(/[^\p{L}\p{N}]/gu, '').toUpperCase();
+      if (!chave) return w;
+      const ultima = iPalavra === palavras.length - 1 && palavras.length >= 2;
+      if (SO_CONSOANTES.test(chave) && !ABREVIACOES.has(chave)) return w.toUpperCase();
+      if (SIGLAS_COM_VOGAL.has(chave)) return w.toUpperCase();
+      if (SIGLAS_APOS_PARTICULA.has(chave) && (prev === 'da' || prev === 'do')) return w.toUpperCase();
+      if (ultima && (ROMANO.test(chave) || SIGLAS_UF.has(chave))) return w.toUpperCase();
+      if (/^\p{N}/u.test(w)) return w.toUpperCase();
+      // Abertura de parêntese/aspas: maiúscula, salvo partícula ("Serginho (do Posto)", "(Tia Aline)", "\"O Tererê\"").
+      if (PARTICULAS_NOME.has(chave.toLowerCase())) return w;
+      return w.replace(/^([(\[{"“'´’`.#¿¡]+)(\p{Ll})/u, (_, p: string, c: string) => `${p}${c.toUpperCase()}`);
+    })
     .join('')
-    .replace(/(\p{L})\.(\p{Ll})/gu, (_, a: string, c: string) => `${a}.${c.toUpperCase()}`);
+    .replace(/(?<=\p{L})\.(\p{Ll})/gu, (_, c: string) => `.${c.toUpperCase()}`)
+    .replace(/\/(\p{Ll})/gu, (_, c: string) => `/${c.toUpperCase()}`)
+    .replace(/\.Com\b/g, '.com')
+    .replace(/^d(['´’`])/u, 'D$1');
 }
 
 /** Nomes de partido que o feed publica sem acento (grafia oficial do estatuto). */

@@ -266,31 +266,55 @@ describe('curiosidades.json · revisão adversarial (QA de dados, fase 3)', () =
     expect(Number(f.dados.cidadesA) + Number(f.dados.cidadesB) + emp + semComp + Number(f.dados.cidadesSemVotoNosDois)).toBe(zz.length);
   });
 
-  it('perfil: mulheres e 70+ só afirmam o que vale para qualquer valor do intervalo [contado, contado + não informado]', () => {
+  it('perfil: mulheres e 70+ EXATOS (extras genero/idadeSemGenero do perfil_build), conferidos campo a campo', () => {
+    type Agregado = {
+      eleitores: number;
+      idade: [number[], number[]];
+      naoInformado: number;
+      genero: [number, number, number];
+      idadeSemGenero?: number[];
+      idadeInvalida?: number;
+    };
     let el = 0;
     let f = 0;
     let m = 0;
     let v = 0;
-    let ni = 0;
+    let semGenero = 0;
+    let invalida = 0;
+    const porUf: { uf: string; pf: number; pv: number }[] = [];
     for (const uf of TODAS) {
-      const p = ler<{ faixas: string[]; total: { eleitores: number; idade: [number[], number[]]; naoInformado: number } }>(`perfil/${uf.toLowerCase()}.json`);
+      const p = ler<{ faixas: string[]; total: Agregado }>(`perfil/${uf.toLowerCase()}.json`);
       const t = p.total;
-      el += t.eleitores;
-      ni += t.naoInformado;
-      f += t.idade[0].reduce((x, y) => x + y, 0);
-      m += t.idade[1].reduce((x, y) => x + y, 0);
+      // o que está fora de gênero × idade é exatamente: sem gênero (idade válida) + idade inválida
+      const sg = t.idadeSemGenero ?? p.faixas.map(() => 0);
+      const somaSg = sg.reduce((x, y) => x + y, 0);
+      expect(t.naoInformado, uf).toBe(somaSg + (t.idadeInvalida ?? 0));
+      expect(t.genero[0] + t.genero[1] + t.genero[2], uf).toBe(t.eleitores);
+      let vUf = 0;
       p.faixas.forEach((rot, i) => {
-        if (/^(7\d|8\d|9\d|1\d\d)/.test(rot)) v += t.idade[0][i] + t.idade[1][i];
+        if (/^(7\d|8\d|9\d|1\d\d)/.test(rot)) vUf += t.idade[0][i] + t.idade[1][i] + sg[i];
       });
+      el += t.eleitores;
+      f += t.genero[0];
+      m += t.genero[1];
+      semGenero += t.genero[2];
+      invalida += t.idadeInvalida ?? 0;
+      v += vUf;
+      if (uf !== 'ZZ') porUf.push({ uf, pf: t.genero[0] / t.eleitores, pv: vUf / t.eleitores });
     }
     const mul = fato('eleitorado-mulheres');
-    const casasM = mul.destaque!.casas ?? 2;
-    for (const x of [f, f + ni]) expect((x / el) * 100, 'pct mulheres').toBeCloseTo(mul.destaque!.valor, casasM === 0 ? 0 : casasM);
-    const milhoes = (s: string) => Number(/mais de ([\d,]+) milh/.exec(s)![1].replace(',', '.')) * 1e6;
-    expect(f).toBeGreaterThan(milhoes(mul.texto));
+    expect(mul.destaque!.valor).toBe(pct2(f, el));
+    expect(mul.dados).toMatchObject({ eleitores: el, mulheres: f, homens: m, generoNaoInformado: semGenero });
+    const fmt = (n: number) => n.toLocaleString('pt-BR');
+    expect(mul.texto).toContain(`${fmt(f)} eleitoras, ${fmt(f - m)} a mais que os homens`);
+    expect(mul.dados.ufMaior).toBe([...porUf].sort((x, y) => y.pf - x.pf)[0].uf);
     const id = fato('eleitorado-70-mais');
-    for (const x of [v, v + ni]) expect(Math.round((x / el) * 1000) / 10).toBe(id.destaque!.valor);
-    expect(v).toBeGreaterThan(milhoes(id.texto));
+    expect(id.destaque!.valor).toBe(pct2(v, el));
+    expect(id.dados).toMatchObject({ idosos: v, eleitores: el, idadeInvalida: invalida });
+    expect(id.texto).toContain(`${fmt(v)} pessoas`);
+    const ord = [...porUf].sort((x, y) => y.pv - x.pv);
+    expect(id.dados.ufMaior).toBe(ord[0].uf);
+    expect(id.dados.ufMenor).toBe(ord[ord.length - 1].uf);
   });
 
   it('o lugar da disputa de governador leva ao mapa de governador, não ao de Presidente', () => {

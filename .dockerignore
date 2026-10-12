@@ -1,0 +1,36 @@
+# Contexto do build da imagem (Dockerfile): só o que o `npm run build` precisa.
+# Segredos e estado NUNCA entram na imagem.
+.env
+.env.*
+!.env.example
+.server-state
+backups
+
+# saídas de build e dependências (a imagem instala e compila do zero)
+node_modules
+dist
+dist-server
+dist-demo
+
+# brutos do pipeline de dados (~1,5 GB), QA e testes
+data-raw
+scripts
+preview-out
+test-results
+playwright-report
+src/**/__fixtures__
+**/*.test.ts
+
+# repositório, documentação e infraestrutura (só o healthcheck vai para a imagem)
+.git
+.github
+.vscode
+.idea
+*.log
+.DS_Store
+*.md
+Dockerfile
+.dockerignore
+docker-compose*.yml
+deploy/*
+!deploy/healthcheck.mjs

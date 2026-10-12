@@ -17,10 +17,19 @@ Regras de agregação (por MUNICÍPIO, código TSE, e total da UF; as zonas são
 - `escolaridade`: ordem natural (Analfabeto → Superior completo); "Não informado" entra como último rótulo só se
   existir no arquivo. Invariante: soma(escolaridade) == eleitores.
 - `deficiencia` = QT_ELEITORES_DEFICIENCIA; `nomeSocial` = QT_ELEITORES_NOME_SOCIAL (soma).
+- Totais EXATOS por gênero e por faixa (extras, porque `idade` só tem quem tem gênero E idade válidos; o resto,
+  ~25 mil eleitores no país, fica em `naoInformado`):
+  `genero` = [feminino, masculino, não informado] com todas as idades (inclusive "Inválida"); soma = eleitores.
+  `idadeSemGenero` = por faixa (ordem de `faixas`), quem tem idade válida e gênero não informado; `idadeInvalida`
+  = faixa "Inválida" (qualquer gênero). Os dois só aparecem quando não são zero (ausente = zeros), para não
+  inflar os arquivos. Total exato da faixa i = idade[0][i] + idade[1][i] + idadeSemGenero[i];
+  Σ faixas + idadeInvalida = eleitores. São esses que dão "mulheres" e "70 anos ou mais" exatos
+  (scripts/data/curiosidades.ts).
 
 Campos EXTRAS (opcionais, além do contrato; não quebram PerfilUfDataset — ver relatório/README):
-- topo: `dataReferencia` (ISO da DT_GERACAO), `estadosCivis`, `racasCores`, `identidadesGenero` (rótulos);
-- por agregado: `estadoCivil[]`, `racaCor[]` e `identidadeGenero[]` (com "Não informado" no fim; somam
+- topo: `dataReferencia` (ISO da DT_GERACAO), `generos`, `estadosCivis`, `racasCores`, `identidadesGenero` (rótulos);
+- por agregado: `genero[]`, `idadeSemGenero[]`/`idadeInvalida` (acima), `estadoCivil[]`, `racaCor[]` e
+  `identidadeGenero[]` (com "Não informado" no fim; somam
   `eleitores`), `biometria` (QT_ELEITORES_BIOMETRIA), `quilombola` e `interpreteLibras` (quem declarou SIM).
   Raça/cor, identidade de gênero, quilombola e intérprete de Libras são autodeclarações recentes: a maior parte do
   eleitorado ainda aparece como "Não informado" — a UI deve mostrar essa parcela.
@@ -60,6 +69,7 @@ FAIXAS_ROT = ['16 anos', '17 anos', '18 anos', '19 anos', '20 anos', '21 a 24', 
 FAIXA_IX = {c: i for i, c in enumerate(FAIXAS_CD)}
 
 GENERO_IX = {'4': 0, '2': 1}  # 4 FEMININO → 0, 2 MASCULINO → 1 (ordem do contrato: [feminino[], masculino[]])
+GENERO_ROT = ['Feminino', 'Masculino', 'Não informado']  # extra `genero`: o não informado (0/-1) é o índice 2
 
 # Escolaridade: CD_GRAU_ESCOLARIDADE 1..8 (ordem natural). Qualquer outro código (0/-1 "NÃO INFORMADO") → índice 8.
 ESCOL_CD = ['1', '2', '3', '4', '5', '6', '7', '8']
@@ -115,7 +125,10 @@ O_NS = O_DEF + 1
 O_BIO = O_NS + 1
 O_QUI = O_BIO + 1
 O_LIB = O_QUI + 1
-TAM = O_LIB + 1
+O_GEN = O_LIB + 1                # 3: feminino, masculino, não informado (todas as idades)
+O_FXT = O_GEN + 3                # NF: por faixa, gênero não informado (idade válida)
+O_FXI = O_FXT + NF               # 1: faixa "Inválida", qualquer gênero
+TAM = O_FXI + 1
 
 
 def agregar_uf(args: tuple[str, str]) -> dict:
@@ -168,6 +181,13 @@ def agregar_uf(args: tuple[str, str]) -> dict:
                 v[O_NI] += q
             else:
                 v[(O_FEM if g == 0 else O_MAS) + f] += q
+            v[O_GEN + (2 if g is None else g)] += q
+            if f is None:
+                if r[i_fx] != '-3':
+                    raise ValueError(f'{membro}: faixa etária sem índice: {r[i_fx]!r}')
+                v[O_FXI] += q
+            elif g is None:
+                v[O_FXT + f] += q
             v[O_ESC + ESCOL_IX.get(r[i_esc], 8)] += q
             v[O_CIV + CIVIL_IX.get(r[i_civ], 5)] += q
             v[O_RACA + RACA_IX.get(r[i_raca], 5)] += q
@@ -217,6 +237,7 @@ def para_agregado(v: list[int], com_escol_ni: bool) -> dict:
         'deficiencia': v[O_DEF],
         'nomeSocial': v[O_NS],
         # extras (fora do contrato, opcionais)
+        'genero': v[O_GEN:O_GEN + 3],
         'estadoCivil': v[O_CIV:O_CIV + 6],
         'racaCor': v[O_RACA:O_RACA + 6],
         'identidadeGenero': v[O_IDG:O_IDG + 4],
@@ -224,6 +245,10 @@ def para_agregado(v: list[int], com_escol_ni: bool) -> dict:
         'quilombola': v[O_QUI],
         'interpreteLibras': v[O_LIB],
     }
+    if any(v[O_FXT:O_FXT + NF]):
+        out['idadeSemGenero'] = v[O_FXT:O_FXT + NF]
+    if v[O_FXI]:
+        out['idadeInvalida'] = v[O_FXI]
     return out
 
 
@@ -235,9 +260,21 @@ def conferir_agregado(nome: str, a: dict) -> None:
         erros.append(f'idade+naoInformado {soma_idade} ≠ {e}')
     if sum(a['escolaridade']) != e:
         erros.append(f'escolaridade {sum(a["escolaridade"])} ≠ {e}')
-    for k in ('estadoCivil', 'racaCor', 'identidadeGenero'):
+    for k in ('estadoCivil', 'racaCor', 'identidadeGenero', 'genero'):
         if sum(a[k]) != e:
             erros.append(f'{k} {sum(a[k])} ≠ {e}')
+    sem_gen = a.get('idadeSemGenero', [0] * NF)
+    inv = a.get('idadeInvalida', 0)
+    if len(sem_gen) != NF or sum(a['idade'][0]) + sum(a['idade'][1]) + sum(sem_gen) + inv != e:
+        erros.append('idade[fem] + idade[masc] + idadeSemGenero + idadeInvalida ≠ eleitores')
+    # o exato contém o conhecido por gênero × idade
+    if a['genero'][0] < sum(a['idade'][0]) or a['genero'][1] < sum(a['idade'][1]):
+        erros.append('genero < Σ idade do mesmo gênero')
+    # naoInformado = (sem gênero, idade válida) + (idade inválida, qualquer gênero)
+    if a['naoInformado'] != sum(sem_gen) + inv:
+        erros.append(f'naoInformado {a["naoInformado"]} ≠ idadeSemGenero {sum(sem_gen)} + idadeInvalida {inv}')
+    if a['genero'][2] < sum(sem_gen):
+        erros.append('gênero não informado < idadeSemGenero')
     for k in ('deficiencia', 'nomeSocial', 'biometria', 'quilombola', 'interpreteLibras'):
         if not 0 <= a[k] <= e:
             erros.append(f'{k} {a[k]} fora de [0, {e}]')
@@ -351,6 +388,7 @@ def main() -> None:
             'municipios': municipios,
             # extras
             'dataReferencia': data_ref,
+            'generos': GENERO_ROT,
             'estadosCivis': CIVIL_ROT,
             'racasCores': RACA_ROT,
             'identidadesGenero': IDGEN_ROT,

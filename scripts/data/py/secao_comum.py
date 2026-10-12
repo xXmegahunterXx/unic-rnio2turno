@@ -18,6 +18,7 @@ import csv
 import io
 import json
 import os
+import re
 import shutil
 import struct
 import sys
@@ -35,7 +36,24 @@ BASE_URL = 'https://cdn.tse.jus.br/estatistica/sead/odsele/'
 UFS = ['AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR',
        'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO']
 TODAS = UFS + ['ZZ']
-UFS_GOV_2T = ['AC', 'AM', 'DF', 'ES', 'RJ', 'RN', 'TO']
+
+
+def _ufs_gov_2t() -> list[str]:
+    """UFs com 2º turno de Governador. Fonte única: `UFS_GOV_2T` em src/shared/constants.ts (o app, o servidor e o
+    pipeline em TS usam a mesma lista; se o TSE mudar o quadro — ex.: retotalização que define um governador no 1º
+    turno —, muda-se só lá e roda-se o pipeline de novo)."""
+    with open(os.path.join(ROOT, 'src', 'shared', 'constants.ts'), encoding='utf-8') as f:
+        txt = f.read()
+    m = re.search(r'export const UFS_GOV_2T\s*:\s*UF\[\]\s*=\s*\[([^\]]*)\]', txt)
+    if not m:
+        raise SystemExit('✗ UFS_GOV_2T não encontrado em src/shared/constants.ts')
+    ufs = re.findall(r"'([A-Z]{2})'", m.group(1))
+    if not ufs or any(u not in UFS for u in ufs) or len(set(ufs)) != len(ufs):
+        raise SystemExit(f'✗ UFS_GOV_2T inválido em src/shared/constants.ts: {ufs}')
+    return ufs
+
+
+UFS_GOV_2T = _ufs_gov_2t()
 
 NULOS_TSE = {'#NULO#', '#NE#', '#NULO', '#NE'}
 

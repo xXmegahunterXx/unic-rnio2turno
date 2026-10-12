@@ -142,12 +142,16 @@ const SIGLAS_UF = new Set<string>(UFS);
 export function nomeColigacao(nm: string): string {
   // Apóstrofos/aspas soltos nas pontas são anomalia do feed ("ESPERANÇA E TRABALHO'").
   const limpo = limpar(nm).replace(/^['"´`]+|['"´`]+$/g, '').trim();
-  return limpo
-    .split(' ')
+  const palavras = limpo.split(' ');
+  return palavras
     .map((w, i) => {
       if (SIGLAS_UF.has(w)) return w;
+      // "Alagoas Gigante II": algarismo romano no fim fica em maiúsculas (titleCasePt daria "Ii").
+      if (i === palavras.length - 1 && i > 0 && ROMANO.test(w)) return w.toUpperCase();
       const lower = w.toLocaleLowerCase('pt-BR');
-      if (i > 0 && PARTICULAS.has(lower)) return lower;
+      // "Nosso Rio Grande Não Para": depois de "não", "para" é verbo, não partícula.
+      const depoisDeNao = i > 0 && palavras[i - 1].toLocaleLowerCase('pt-BR') === 'não';
+      if (i > 0 && PARTICULAS.has(lower) && !depoisDeNao) return lower;
       return ajustarApostrofos(titleCasePt(w));
     })
     .join(' ');

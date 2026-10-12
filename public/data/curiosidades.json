@@ -1,6 +1,6 @@
 {
  "versao": 1,
- "geradoEm": "2026-10-10T14:56:04.276Z",
+ "geradoEm": "2026-10-12T12:38:23.508Z",
  "fonte": "Calculado pelo Sintonia a partir dos dados oficiais do TSE do 1º turno de 04/10/2026 (resultado por município e por seção, locais de votação, perfil do eleitorado, candidaturas e resultados de Câmara, Senado e Governador). Script: scripts/data/curiosidades.ts.",
  "finalistas": {
   "a": {
@@ -912,13 +912,12 @@
    "tema": "eleitorado",
    "titulo": "Elas são a maioria",
    "destaque": {
-    "valor": 53,
+    "valor": 52.84,
     "formato": "pct",
-    "casas": 0,
     "unidade": "do eleitorado são mulheres"
    },
-   "contexto": "São mais de 83,8 milhões de eleitoras, cerca de 9 milhões a mais que os homens. A maior proporção feminina está no Distrito Federal: 54,13%.",
-   "texto": "As mulheres são 53% do eleitorado brasileiro em 2026: mais de 83,8 milhões de eleitoras, cerca de 9 milhões a mais que os homens.",
+   "contexto": "São 83.877.126 eleitoras, 9.032.125 a mais que os homens. A maior proporção feminina está no Distrito Federal: 54,13%.",
+   "texto": "As mulheres são 52,84% do eleitorado brasileiro em 2026: 83.877.126 eleitoras, 9.032.125 a mais que os homens.",
    "lugares": [
     {
      "nome": "Distrito Federal",
@@ -929,13 +928,13 @@
    "rota": "/apuracao/df?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
-   "criterio": "Gênero declarado no cadastro eleitoral; inclui o exterior. 24.547 eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados (\"mais de\", \"cerca de\").",
+   "criterio": "Gênero declarado no cadastro eleitoral (todas as idades); inclui o exterior. 23.336 eleitores sem gênero informado entram no total do eleitorado e em nenhum dos dois grupos.",
    "dados": {
     "eleitores": 158745463,
-    "mulheres": 83876462,
-    "homens": 74844454,
-    "naoInformado": 24547,
-    "pct": 53,
+    "mulheres": 83877126,
+    "homens": 74845001,
+    "generoNaoInformado": 23336,
+    "pct": 52.84,
     "ufMaior": "DF",
     "pctUfMaior": 54.13
    }
@@ -961,7 +960,7 @@
    "rota": "/apuracao/rr?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
-   "criterio": "Idade na data da eleição, conforme o perfil do eleitorado do TSE. Inclui o exterior no total.",
+   "criterio": "Idade na data da eleição, conforme o perfil do eleitorado do TSE (qualquer gênero). Inclui o exterior no total.",
    "dados": {
     "jovens": 1634244,
     "eleitores": 158745463,
@@ -976,13 +975,12 @@
    "tema": "eleitorado",
    "titulo": "Com 70 anos ou mais",
    "destaque": {
-    "valor": 10.9,
+    "valor": 10.87,
     "formato": "pct",
-    "casas": 1,
     "unidade": "do eleitorado tem 70 anos ou mais"
    },
-   "contexto": "São mais de 17,2 milhões de eleitores, e o voto também é facultativo para eles. A maior proporção está no Rio Grande do Sul (14,52%); a menor, no Amazonas (6,10%).",
-   "texto": "10,9% do eleitorado brasileiro tem 70 anos ou mais: mais de 17,2 milhões de pessoas, para quem o voto é facultativo. A maior proporção está no Rio Grande do Sul: 14,52%.",
+   "contexto": "São 17.251.915 eleitores, e o voto também é facultativo para eles. A maior proporção está no Rio Grande do Sul (14,52%); a menor, no Amazonas (6,10%).",
+   "texto": "10,87% do eleitorado brasileiro tem 70 anos ou mais: 17.251.915 pessoas, para quem o voto é facultativo. A maior proporção está no Rio Grande do Sul: 14,52%.",
    "lugares": [
     {
      "nome": "Rio Grande do Sul",
@@ -993,12 +991,12 @@
    "rota": "/apuracao/rs?race=pres-t1",
    "rotuloRota": "Ver no mapa",
    "fonte": "TSE · perfil do eleitorado 2026 (dados abertos)",
-   "criterio": "Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE; inclui o exterior. 24.547 eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados (\"mais de\").",
+   "criterio": "Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE (qualquer gênero); inclui o exterior. 1.212 eleitores com data de nascimento inválida no cadastro entram no total do eleitorado e em nenhuma faixa.",
    "dados": {
-    "idososContados": 17237195,
-    "idososMax": 17261742,
+    "idosos": 17251915,
     "eleitores": 158745463,
-    "pct": 10.9,
+    "idadeInvalida": 1212,
+    "pct": 10.87,
     "ufMaior": "RS",
     "pctUfMaior": 14.52,
     "ufMenor": "AM",
@@ -1170,12 +1168,12 @@
    "tema": "cargos",
    "titulo": "Mulheres eleitas",
    "destaque": {
-    "valor": 108,
+    "valor": 109,
     "formato": "int",
     "unidade": "deputadas federais eleitas"
    },
-   "contexto": "São 21,39% dos 505 deputados federais eleitos já divulgados (falta o Amazonas, com 8 vagas). No Senado, 12 das 54 vagas; entre os 20 governadores eleitos no 1º turno, 1 mulher: Raquel Lyra (PE). As mulheres são 53% do eleitorado.",
-   "texto": "108 mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (21,39% dos eleitos já divulgados). No Senado, 12 das 54 vagas.",
+   "contexto": "São 21,25% dos 513 deputados federais eleitos. No Senado, 12 das 54 vagas; entre os 20 governadores eleitos no 1º turno, 1 mulher: Raquel Lyra (PE). As mulheres são 52,84% do eleitorado.",
+   "texto": "109 mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (21,25% dos 513 eleitos). No Senado, 12 das 54 vagas.",
    "lugares": [
     {
      "nome": "Câmara dos Deputados",
@@ -1185,14 +1183,12 @@
    "rota": "/camara",
    "rotuloRota": "Ver a Câmara",
    "fonte": "TSE · resultado oficial do 1º turno (04/10/2026) · gênero: TSE, candidaturas 2026",
-   "criterio": "Eleitos já divulgados pelo TSE. AM: eleitos ainda não divulgados (8 vagas).",
+   "criterio": "Eleitos divulgados pelo TSE.",
    "dados": {
-    "deputadasEleitas": 108,
-    "deputadosEleitos": 505,
-    "ufsPendentes": [
-     "AM"
-    ],
-    "vagasPendentes": 8,
+    "deputadasEleitas": 109,
+    "deputadosEleitos": 513,
+    "ufsPendentes": [],
+    "vagasPendentes": 0,
     "senadorasEleitas": 12,
     "senadoresEleitos": 54,
     "governadorasEleitas": 1,

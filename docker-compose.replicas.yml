@@ -1,0 +1,25 @@
+# Várias instâncias do app atrás do Caddy (PLANO B — leia "Escalar" no DEPLOY.md antes de usar).
+#
+# Recomendado para a noite da eleição: 1 instância + Cloudflare na frente (a CDN absorve o tráfego; 1 processo
+# aguenta ~13 mil req/s por núcleo). Use réplicas só se NÃO houver CDN e a CPU de 1 processo saturar.
+#
+# Ativar (todos os scripts de deploy/ passam a usar):
+#   echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.replicas.yml' >> .env
+#   echo 'APP_REPLICAS=3' >> .env          # padrão 2; até 1 por vCPU, deixando 1 vCPU livre
+#   docker compose up -d
+#
+# O que já funciona entre instâncias: mesmo volume de estado (o admin.json mais recente vale para todas em ≤ ~1 s),
+# mesma sessão do admin (ADMIN_SECRET), mesmos números e ETags na simulação, e o Caddy distribui por visitante
+# (client_ip_hash: o mesmo visitante cai sempre na mesma instância) com verificação de saúde de cada uma.
+# Limitações: "pessoas agora" passa a contar só os visitantes da instância que respondeu (≈ 1/N do total); na
+# fonte TSE cada instância consulta o TSE por conta própria (N× o tráfego ao TSE) e pode estar alguns segundos
+# à frente ou atrás das outras.
+services:
+  app:
+    deploy:
+      replicas: ${APP_REPLICAS:-2}
+      resources:
+        limits:
+          memory: ${APP_MEMORIA:-1024M}
+        reservations:
+          memory: 384M

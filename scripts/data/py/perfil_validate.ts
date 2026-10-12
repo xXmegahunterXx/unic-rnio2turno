@@ -11,7 +11,8 @@
  *     todo número inteiro ≥ 0 e todo vetor com o tamanho dos rótulos.
  *  2. Por agregado: Σ idade[fem] + Σ idade[masc] + naoInformado = eleitores; Σ escolaridade = eleitores;
  *     deficiência, nome social (e extras biometria/quilombola/Libras) ≤ eleitores; extras estadoCivil/racaCor/
- *     identidadeGenero (quando houver) somam eleitores.
+ *     identidadeGenero (quando houver) somam eleitores; totais exatos (extras): Σ genero = eleitores,
+ *     genero[fem/masc] ≥ Σ idade do gênero, naoInformado = Σ idadeSemGenero + idadeInvalida (ausentes = 0).
  *  3. Municípios: mesmo conjunto de chaves de UfDataset.municipios; total da UF = Σ municípios, campo a campo.
  *  4. Eleitorado: Σ por UF e nacional comparados com UfMeta.eleitorado e meta.totaisPrimeiroTurno.eleitorado —
  *     diferença tolerada ≤ 0,5% por UF e ≤ 0,01% no país (o perfil conta o eleitor no domicílio; os aptos do
@@ -30,6 +31,12 @@ const ORCAMENTO = 6e6;
 
 /** Campos extras gravados pelo ETL além do contrato (opcionais). */
 interface PerfilAgregadoExtras extends PerfilAgregado {
+  /** [feminino, masculino, não informado], todas as idades */
+  genero?: number[];
+  /** por faixa: idade válida e gênero não informado (ausente = zeros) */
+  idadeSemGenero?: number[];
+  /** faixa "Inválida", qualquer gênero (ausente = 0) */
+  idadeInvalida?: number;
   estadoCivil?: number[];
   racaCor?: number[];
   identidadeGenero?: number[];
@@ -39,6 +46,7 @@ interface PerfilAgregadoExtras extends PerfilAgregado {
 }
 interface PerfilUfExtras extends PerfilUfDataset {
   dataReferencia?: string;
+  generos?: string[];
   estadosCivis?: string[];
   racasCores?: string[];
   identidadesGenero?: string[];
@@ -81,6 +89,16 @@ function conferirAgregado(onde: string, a: PerfilAgregadoExtras, d: PerfilUfExtr
     const x = a[k];
     if (x !== undefined && (!inteiro(x) || x > e)) falha(`${onde}: ${k} ${x} fora de [0, ${e}]`);
   }
+  if (a.genero !== undefined) {
+    const sg = a.idadeSemGenero ?? new Array<number>(nf).fill(0);
+    const inv = a.idadeInvalida ?? 0;
+    if (!vetor(`${onde}.genero`, a.genero, 3) || !vetor(`${onde}.idadeSemGenero`, sg, nf) || !inteiro(inv)) return;
+    if (d.generos?.length !== 3) falha(`${onde}: genero sem os 3 rótulos (generos) no topo`);
+    if (soma(a.genero) !== e) falha(`${onde}: Σ genero ${soma(a.genero)} ≠ ${e}`);
+    if (a.genero[0] < soma(a.idade[0]) || a.genero[1] < soma(a.idade[1])) falha(`${onde}: genero < Σ idade do gênero`);
+    if (a.naoInformado !== soma(sg) + inv) falha(`${onde}: naoInformado ${a.naoInformado} ≠ idadeSemGenero + idadeInvalida`);
+    if (a.genero[2] < soma(sg)) falha(`${onde}: gênero não informado < Σ idadeSemGenero`);
+  } else if (a.idadeSemGenero !== undefined || a.idadeInvalida !== undefined) falha(`${onde}: idadeSemGenero sem genero`);
   const extras = [
     ['estadoCivil', d.estadosCivis],
     ['racaCor', d.racasCores],

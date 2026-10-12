@@ -1,0 +1,104 @@
+# Sintonia em produção: app (Node) + Caddy (HTTPS automático, HTTP/3, proxy reverso).
+#
+#   cp .env.example .env   # e preencha (ou rode deploy/install.sh, que faz tudo)
+#   docker compose up -d --build
+#
+# Guia completo: DEPLOY.md. Várias instâncias do app: docker-compose.replicas.yml.
+name: sintonia
+
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        # gravada no JavaScript do site no build: mudar exige rebuild (deploy/update.sh faz)
+        VITE_SITE_URL: ${VITE_SITE_URL:-}
+        GIT_COMMIT: ${GIT_COMMIT:-}
+        BUILD_DATE: ${BUILD_DATE:-}
+    image: sintonia-app:latest
+    init: true # PID 1 de verdade: repassa sinais e permite o vigia do healthcheck reiniciar um processo travado
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      # fixos aqui (valem mais que o .env): o contêiner sempre roda assim
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: ${PORT:-8787}
+      TRUST_PROXY: "1" # sempre atrás do Caddy
+      STATE_DIR: /var/lib/sintonia
+      DIST_DIR: /app/dist
+      DATA_DIR: /app/dist/data
+    volumes:
+      - estado:/var/lib/sintonia
+    expose:
+      - "${PORT:-8787}"
+    # o app encerra sozinho em até 10 s (grava o estado); 30 s antes de o Docker forçar
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "node", "/app/healthcheck.mjs"]
+      interval: 15s
+      timeout: 8s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
+    # segurança: sistema de arquivos só de leitura (grava só no volume e em /tmp), sem capacidades extras
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: ${APP_MEMORIA:-1536M}
+        reservations:
+          memory: 384M
+    logging: *logs
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp" # HTTP/3
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:?defina SITE_ADDRESS (ou DOMINIO) no .env}
+      ACME_EMAIL: ${ACME_EMAIL:?defina ACME_EMAIL no .env}
+      APP_PORT: ${PORT:-8787}
+    volumes:
+      - ./deploy/caddy:/etc/caddy:ro
+      - caddy_data:/data # certificados: guarde (evita pedir de novo ao Let's Encrypt)
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *logs
+
+volumes:
+  estado:
+  caddy_data:
+  caddy_config:

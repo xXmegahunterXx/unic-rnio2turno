@@ -14,9 +14,10 @@
  *   public/data/cargos/assembleia.json     Deputado Estadual (26 UFs) e Deputado Distrital (DF): idem
  *
  * Convenções:
- *  - `validos` = válidos computados (`vvc` do TSE: nominais + legenda + anulados sub judice), denominador do `pct`
+ *  - `validos` = válidos computados (`vvc` do TSE: nominais + legenda + anulados sub judice + anulados em definitivo
+ *    depois da eleição, `van`), denominador do `pct`
  *    oficial de cada candidato (`pct` = `pvap` do TSE, conferido; voto > 0 que arredondaria para 0,00% vira 0,01%,
- *    como no TSE). Σ partidos[].votos = válidos sem os anulados sub judice (nominais válidos + legenda).
+ *    como no TSE). Σ partidos[].votos = válidos sem os anulados (nominais válidos + legenda).
  *  - Senado (2 vagas): cada eleitor vota 2 vezes; validos + brancos + nulos = 2 × comparecimento. Use
  *    (validos + brancos + nulos) como denominador de brancos/nulos nessa casa.
  *  - `comparecimento`/`eleitorado`/`secoes` são os do cargo na UF (feed). O comparecimento estadual pode diferir do
@@ -179,6 +180,30 @@ async function conferirFase1(gov: Map<UFBr, CargoLido>, todos: CargoLido[][]) {
   );
 }
 
+/**
+ * O quadro de 2º turno de Governador do feed tem de ser o de UFS_GOV_2T (src/shared/constants.ts). Uma retotalização
+ * pode mudá-lo depois da eleição — em 10/10/2026 o TSE anulou em definitivo os votos de um candidato no RJ (antes
+ * "anulados sub judice") e o Governador do RJ passou a "Eleito" no 1º turno. Nesse caso o build para com a
+ * instrução: tirar a UF de UFS_GOV_2T (e dos textos do app) e rodar o pipeline de novo (README › Dados).
+ */
+function conferirUfsSegundoTurno(gov: Map<UFBr, CargoLido>) {
+  const doFeed = UFS.filter((uf) => gov.get(uf)!.candidatos.some((c) => c.situacao === 'segundo-turno'));
+  if (doFeed.join() === UFS_GOV_2T.join()) return;
+  const sairam = UFS_GOV_2T.filter((uf) => !(doFeed as string[]).includes(uf));
+  const entraram = doFeed.filter((uf) => !UFS_GOV_2T.includes(uf));
+  const det = sairam.map((uf) => {
+    const g = gov.get(uf as UFBr)!;
+    const el = g.candidatos.find((c) => c.situacao === 'eleito');
+    return `${uf}: ${el ? `${el.nmu} (${el.numero}) "Eleito" no 1º turno` : 'sem finalistas'} (feed ${g.feed.dg} ${g.feed.hg})`;
+  });
+  fail(
+    `quadro do 2º turno de Governador mudou no TSE: feed = ${doFeed.join(', ')} × UFS_GOV_2T = ${UFS_GOV_2T.join(', ')}` +
+      `${det.length ? `\n  ${det.join('\n  ')}` : ''}${entraram.length ? `\n  novas UFs com 2º turno: ${entraram.join(', ')}` : ''}` +
+      `\n  → atualize UFS_GOV_2T em src/shared/constants.ts (e os textos "7 disputas" do app) e rode o pipeline ` +
+      `(README › Dados › "Mudança no quadro do 2º turno").`,
+  );
+}
+
 async function main() {
   const t0 = Date.now();
   if (REFRESH && !OFFLINE) {
@@ -197,6 +222,7 @@ async function main() {
     cam.push(await lerCargoUf(uf, CARGO.depFederal));
     ass.push(await lerCargoUf(uf, cargoAssembleia(uf)));
   }
+  conferirUfsSegundoTurno(gov);
   await conferirFase1(gov, [[...gov.values()], sen, cam, ass]);
 
   const fin = finalistasSq([...gov.values()]);
@@ -280,6 +306,13 @@ async function main() {
   console.log(`Senado (eleitos 2026, top 10): ${senDs.composicao!.slice(0, 10).map((c) => `${c.sigla} ${c.eleitos}`).join(' · ')}`);
   const sj = [...sen, ...cam, ...ass, ...gov.values()].filter((r) => r.subJudice > 0);
   console.log(`Votos anulados sub judice (incluídos em validos, como o TSE): ${sj.length} (UF × cargo), total ${fmt(sj.reduce((a, r) => a + r.subJudice, 0))}`);
+  const an = [...sen, ...cam, ...ass, ...gov.values()].filter((r) => r.anulados > 0);
+  if (an.length) {
+    console.log(
+      `Votos anulados em definitivo (van, também incluídos em validos, como o vvc do TSE): ` +
+        an.map((r) => `${r.ctx} ${fmt(r.anulados)}`).join(' · '),
+    );
+  }
   for (const a of avisos) console.log(`⚠ ${a}`);
   console.log(`\nTotal cargos: ${(Object.values(tam).reduce((a, b) => a + b, 0) / 1024).toFixed(0)} KB em ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 }

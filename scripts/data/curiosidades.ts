@@ -39,7 +39,7 @@ import type { UF, UFBr } from '../../src/shared/types';
 import { UFS } from '../../src/shared/types';
 import { UF_NOMES } from '../../src/shared/constants';
 import { decodeFaixas, pctAbstencao, pctBrancos, pctComparecimento, pctNulos, pctValidos } from '../../src/shared/calc';
-import { fmtCompact, fmtInt, fmtPct } from '../../src/shared/format';
+import { fmtInt, fmtPct } from '../../src/shared/format';
 import { decodeU16 } from '../../src/shared/u16';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
@@ -56,6 +56,21 @@ const FONTE_PERFIL = 'TSE · perfil do eleitorado 2026 (dados abertos)';
 const FONTE_CARGOS = 'TSE · resultado oficial do 1º turno (04/10/2026)';
 
 const TODAS: UF[] = [...UFS, 'ZZ'];
+
+/**
+ * Perfil com os extras EXATOS que scripts/data/py/perfil_build.py grava além do contrato PerfilAgregado:
+ * `genero` = [feminino, masculino, não informado] (todas as idades); `idadeSemGenero` = por faixa, quem não tem
+ * gênero informado; `idadeInvalida` = data de nascimento inválida (os dois últimos ausentes = zeros).
+ */
+interface PerfilComExatos extends PerfilAgregado {
+  genero?: number[];
+  idadeSemGenero?: number[];
+  idadeInvalida?: number;
+}
+interface PerfilUfComExatos extends PerfilUfDataset {
+  total: PerfilComExatos;
+  municipios: Record<string, PerfilComExatos>;
+}
 
 function lerJson<T>(rel: string): T {
   return JSON.parse(readFileSync(path.join(DATA, rel), 'utf8')) as T;
@@ -135,39 +150,6 @@ const menor = <T extends { eleitorado?: number; cod?: string }>(arr: T[], f: (x:
 
 const plural = (n: number, um: string, varios: string) => (n === 1 ? um : varios);
 
-/**
- * Percentual de uma contagem conhecida só por um intervalo [lo, hi] (perfil do eleitorado: quem não tem gênero
- * informado ou tem idade inválida no cadastro fica em `naoInformado`, fora das faixas de gênero × idade).
- * Usa 2 casas quando os dois extremos dão o mesmo número exibido; senão 1 casa; senão 0; senão falha (nunca
- * exibe um número que pode estar errado).
- */
-function pctSeguro(lo: number, hi: number, todo: number, id: string): { valor: number; casas: 0 | 1 | 2; txt: string } {
-  for (const casas of [2, 1, 0] as const) {
-    const a = fmtPct(proporcao(lo, todo), casas);
-    if (a === fmtPct(proporcao(hi, todo), casas)) {
-      const f = 10 ** casas;
-      const valor = Math.round(proporcao(lo, todo) * f) / f;
-      exigir(fmtPct(valor, casas) === a, `${id}: arredondamento divergente (${a})`);
-      return { valor, casas, txt: a };
-    }
-  }
-  throw new Error(`curiosidades: ${id}: percentual ambíguo entre ${proporcao(lo, todo)} e ${proporcao(hi, todo)}`);
-}
-
-/** "mais de 17,2 milhões" — piso em décimos de milhão (verdadeiro para qualquer valor ≥ lo). */
-function maisDeMilhoes(lo: number, id: string): string {
-  const piso = Math.floor(lo / 1e5) * 1e5;
-  exigir(lo > piso && piso >= 1e6, `${id}: valor fora da faixa para "mais de … milhões" (${lo})`);
-  return `mais de ${fmtCompact(piso).replace(/\s?mi$/, piso < 2e6 ? ' milhão' : ' milhões')}`;
-}
-
-/** "cerca de 9 milhões" — só quando os dois extremos do intervalo arredondam para o mesmo milhão. */
-function cercaDeMilhoes(lo: number, hi: number, id: string): string {
-  const a = Math.round(lo / 1e6);
-  exigir(a === Math.round(hi / 1e6) && a >= 2, `${id}: "cerca de … milhões" ambíguo (${lo} a ${hi})`);
-  return `cerca de ${fmtInt(a)} milhões`;
-}
-
 function exigir(cond: unknown, msg: string): asserts cond {
   if (!cond) throw new Error(`curiosidades: ${msg}`);
 }
@@ -181,7 +163,7 @@ export interface Entrada {
   muns: Mun[];
   secoes: Secoes[];
   locais: Record<string, LocaisUfDataset>;
-  perfil: Record<string, PerfilUfDataset>;
+  perfil: Record<string, PerfilUfComExatos>;
   camara: CargoDataset;
   senado: CargoDataset;
   governador: CargoDataset;
@@ -207,7 +189,7 @@ function carregar(): Entrada {
   const muns: Mun[] = [];
   const secoes: Secoes[] = [];
   const locais: Record<string, LocaisUfDataset> = {};
-  const perfil: Record<string, PerfilUfDataset> = {};
+  const perfil: Record<string, PerfilUfComExatos> = {};
   for (const uf of TODAS) {
     const ufl = uf.toLowerCase();
     const d = lerJson<UfDataset>(`uf/${ufl}.json`);
@@ -252,7 +234,7 @@ function carregar(): Entrada {
       outros: decodeU16(sd.pres.outros),
     });
     locais[uf] = lerJson<LocaisUfDataset>(`locais/${ufl}.json`);
-    perfil[uf] = lerJson<PerfilUfDataset>(`perfil/${ufl}.json`);
+    perfil[uf] = lerJson<PerfilUfComExatos>(`perfil/${ufl}.json`);
   }
 
   const fichas = new Map<string, CandidatoFicha>();
@@ -882,16 +864,20 @@ export function calcular(e: Entrada): Curiosidade[] {
   {
     const faixas = e.perfil.SP.faixas;
     const escol = e.perfil.SP.escolaridade;
-    // 16 e 17 anos: contagem EXATA — no perfil bruto do TSE não há eleitor de 16/17 anos sem gênero informado, e a
-    // faixa "Inválida" não cai em 16/17 (conferido em 10/10/2026: 1.634.244 nos dois). Já mulheres e 70+ usam intervalo.
     const iJovem = faixas.map((f, i) => [f, i] as const).filter(([f]) => /^1[67] anos$/.test(f)).map(([, i]) => i);
     const i70 = faixas.map((f, i) => [f, i] as const).filter(([f]) => /^(7\d|8\d|9\d|1\d\d)/.test(f)).map(([, i]) => i);
     exigir(iJovem.length === 2 && i70.length >= 6, `faixas etárias inesperadas: ${faixas.join(', ')}`);
     const iSup = escol.indexOf('Superior completo');
     exigir(iSup >= 0, 'escolaridade sem "Superior completo"');
-    const somaIdx = (p: PerfilAgregado, idx: number[]) => idx.reduce((s, i) => s + p.idade[0][i] + p.idade[1][i], 0);
-    const fem = (p: PerfilAgregado) => p.idade[0].reduce((a, b) => a + b, 0);
-    const masc = (p: PerfilAgregado) => p.idade[1].reduce((a, b) => a + b, 0);
+    // Contagens EXATAS (perfil_build.py grava os extras `genero` e `idadeSemGenero`/`idadeInvalida`): `idade` só tem
+    // quem tem gênero E idade válidos; quem não tem gênero informado entra aqui pela faixa (idadeSemGenero) e quem
+    // tem idade inválida entra no gênero (genero). Nada fica de fora: Σ genero = Σ faixas + inválida = eleitores.
+    const faixaExata = (p: PerfilComExatos, i: number) => p.idade[0][i] + p.idade[1][i] + (p.idadeSemGenero?.[i] ?? 0);
+    const somaIdx = (p: PerfilComExatos, idx: number[]) => idx.reduce((s, i) => s + faixaExata(p, i), 0);
+    const gen = (p: PerfilComExatos) => {
+      exigir(p.genero?.length === 3, 'perfil sem `genero` (rode scripts/data/py/perfil_build.py)');
+      return p.genero;
+    };
     const ufsBr = UFS as readonly UFBr[];
     const linhas = ufsBr.map((uf) => {
       const p = e.perfil[uf].total;
@@ -901,63 +887,46 @@ export function calcular(e: Entrada): Curiosidade[] {
         eleitorado: p.eleitores,
         jovens: proporcao(somaIdx(p, iJovem), p.eleitores),
         idosos: proporcao(somaIdx(p, i70), p.eleitores),
-        fem: proporcao(fem(p), p.eleitores),
+        fem: proporcao(gen(p)[0], p.eleitores),
         sup: proporcao(p.escolaridade[iSup], p.eleitores),
-        // limites superiores: quem está em `naoInformado` (sem gênero ou com idade inválida) pode pertencer ao grupo
-        idososMax: proporcao(somaIdx(p, i70) + p.naoInformado, p.eleitores),
-        femMax: proporcao(fem(p) + p.naoInformado, p.eleitores),
-        v: somaIdx(p, i70),
-        f: fem(p),
-        ni: p.naoInformado,
       };
     });
-    /** O recorde por UF só vale se o mínimo do primeiro superar o máximo de todos os outros (e vice-versa). */
-    const recordeSeguro = (l: (typeof linhas)[number], lo: (x: (typeof linhas)[number]) => number, hi: (x: (typeof linhas)[number]) => number, maiorQue: boolean, id: string) =>
-      exigir(
-        linhas.every((o) => o === l || (maiorQue ? lo(l) > hi(o) : hi(l) < lo(o))),
-        `${id}: recorde por UF ambíguo por causa de eleitores sem gênero/idade no perfil`,
-      );
     const tot = TODAS.reduce(
       (s, uf) => {
         const p = e.perfil[uf].total;
         s.el += p.eleitores;
         s.j += somaIdx(p, iJovem);
         s.v += somaIdx(p, i70);
-        s.f += fem(p);
-        s.m += masc(p);
-        s.ni += p.naoInformado;
+        s.f += gen(p)[0];
+        s.m += gen(p)[1];
+        s.gni += gen(p)[2];
+        s.inv += p.idadeInvalida ?? 0;
         p.escolaridade.forEach((x, i) => (s.esc[i] = (s.esc[i] ?? 0) + x));
         return s;
       },
-      { el: 0, j: 0, v: 0, f: 0, m: 0, ni: 0, esc: [] as number[] },
+      { el: 0, j: 0, v: 0, f: 0, m: 0, gni: 0, inv: 0, esc: [] as number[] },
     );
+    exigir(tot.f + tot.m + tot.gni === tot.el, 'perfil: Σ genero ≠ eleitores');
     const iModa = tot.esc.indexOf(Math.max(...tot.esc));
     const rotUf = (uf: UF) => lugarUf(uf);
 
-    // Perfil agregado: eleitores sem gênero informado ou com idade inválida ficam em `naoInformado` (fora de
-    // gênero × idade). Mulheres e 70+ são conhecidos só por intervalo [contado, contado + naoInformado]:
-    // os números saem com a precisão que o intervalo garante (pctSeguro, "mais de", "cerca de").
     const fMax = maior(linhas, (l) => l.fem);
-    recordeSeguro(fMax, (l) => l.fem, (l) => l.femMax, true, 'eleitorado-mulheres');
-    const pctMulheres = pctSeguro(tot.f, tot.f + tot.ni, tot.el, 'eleitorado-mulheres');
-    const pctFMax = pctSeguro(fMax.f, fMax.f + fMax.ni, fMax.eleitorado, 'eleitorado-mulheres/UF');
-    const eleitoras = maisDeMilhoes(tot.f, 'eleitorado-mulheres');
-    const aMais = cercaDeMilhoes(tot.f - (tot.m + tot.ni), tot.f + tot.ni - tot.m, 'eleitorado-mulheres/diferença');
+    exigir(fmtPct(fMax.fem) !== fmtPct(maiores(linhas, (l) => l.fem)[1].fem), 'eleitorado-mulheres: empate no recorde por UF');
     add({
       id: 'eleitorado-mulheres',
       tema: 'eleitorado',
       titulo: 'Elas são a maioria',
-      destaque: { valor: pctMulheres.valor, formato: 'pct', casas: pctMulheres.casas, unidade: 'do eleitorado são mulheres' },
-      contexto: `São ${eleitoras} de eleitoras, ${aMais} a mais que os homens. A maior proporção feminina está ${emUf(fMax.uf)}: ${pctFMax.txt}.`,
-      texto: `As mulheres são ${pctMulheres.txt} do eleitorado brasileiro em 2026: ${eleitoras} de eleitoras, ${aMais} a mais que os homens.`,
+      destaque: { valor: r2(proporcao(tot.f, tot.el)), formato: 'pct', unidade: 'do eleitorado são mulheres' },
+      contexto: `São ${fmtInt(tot.f)} eleitoras, ${fmtInt(tot.f - tot.m)} a mais que os homens. A maior proporção feminina está ${emUf(fMax.uf)}: ${fmtPct(fMax.fem)}.`,
+      texto: `As mulheres são ${fmtPct(proporcao(tot.f, tot.el))} do eleitorado brasileiro em 2026: ${fmtInt(tot.f)} eleitoras, ${fmtInt(tot.f - tot.m)} a mais que os homens.`,
       lugares: [rotUf(fMax.uf)],
       rota: rota.uf(fMax.uf),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_PERFIL,
-      criterio: `Gênero declarado no cadastro eleitoral; inclui o exterior. ${fmtInt(tot.ni)} eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados ("mais de", "cerca de").`,
+      criterio: `Gênero declarado no cadastro eleitoral (todas as idades); inclui o exterior. ${fmtInt(tot.gni)} eleitores sem gênero informado entram no total do eleitorado e em nenhum dos dois grupos.`,
       dados: {
-        eleitores: tot.el, mulheres: tot.f, homens: tot.m, naoInformado: tot.ni,
-        pct: pctMulheres.valor, ufMaior: fMax.uf, pctUfMaior: pctFMax.valor,
+        eleitores: tot.el, mulheres: tot.f, homens: tot.m, generoNaoInformado: tot.gni,
+        pct: r2(proporcao(tot.f, tot.el)), ufMaior: fMax.uf, pctUfMaior: r2(fMax.fem),
       },
     });
 
@@ -974,33 +943,27 @@ export function calcular(e: Entrada): Curiosidade[] {
       rota: rota.uf(jMax.uf),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_PERFIL,
-      criterio: 'Idade na data da eleição, conforme o perfil do eleitorado do TSE. Inclui o exterior no total.',
+      criterio: 'Idade na data da eleição, conforme o perfil do eleitorado do TSE (qualquer gênero). Inclui o exterior no total.',
       dados: { jovens: tot.j, eleitores: tot.el, ufMaior: jMax.uf, pctUfMaior: r2(jMax.jovens), ufMenor: jMin.uf, pctUfMenor: r2(jMin.jovens) },
     });
 
     const vMax = maior(linhas, (l) => l.idosos);
     const vMin = menor(linhas, (l) => l.idosos);
-    recordeSeguro(vMax, (l) => l.idosos, (l) => l.idososMax, true, 'eleitorado-70-mais');
-    recordeSeguro(vMin, (l) => l.idosos, (l) => l.idososMax, false, 'eleitorado-70-mais');
-    const pctV = pctSeguro(tot.v, tot.v + tot.ni, tot.el, 'eleitorado-70-mais');
-    const pctVMax = pctSeguro(vMax.v, vMax.v + vMax.ni, vMax.eleitorado, 'eleitorado-70-mais/max');
-    const pctVMin = pctSeguro(vMin.v, vMin.v + vMin.ni, vMin.eleitorado, 'eleitorado-70-mais/min');
-    const idosos = maisDeMilhoes(tot.v, 'eleitorado-70-mais');
     add({
       id: 'eleitorado-70-mais',
       tema: 'eleitorado',
       titulo: 'Com 70 anos ou mais',
-      destaque: { valor: pctV.valor, formato: 'pct', casas: pctV.casas, unidade: 'do eleitorado tem 70 anos ou mais' },
-      contexto: `São ${idosos} de eleitores, e o voto também é facultativo para eles. A maior proporção está ${emUf(vMax.uf)} (${pctVMax.txt}); a menor, ${emUf(vMin.uf)} (${pctVMin.txt}).`,
-      texto: `${pctV.txt} do eleitorado brasileiro tem 70 anos ou mais: ${idosos} de pessoas, para quem o voto é facultativo. A maior proporção está ${emUf(vMax.uf)}: ${pctVMax.txt}.`,
+      destaque: { valor: r2(proporcao(tot.v, tot.el)), formato: 'pct', unidade: 'do eleitorado tem 70 anos ou mais' },
+      contexto: `São ${fmtInt(tot.v)} eleitores, e o voto também é facultativo para eles. A maior proporção está ${emUf(vMax.uf)} (${fmtPct(vMax.idosos)}); a menor, ${emUf(vMin.uf)} (${fmtPct(vMin.idosos)}).`,
+      texto: `${fmtPct(proporcao(tot.v, tot.el))} do eleitorado brasileiro tem 70 anos ou mais: ${fmtInt(tot.v)} pessoas, para quem o voto é facultativo. A maior proporção está ${emUf(vMax.uf)}: ${fmtPct(vMax.idosos)}.`,
       lugares: [rotUf(vMax.uf)],
       rota: rota.uf(vMax.uf),
       rotuloRota: 'Ver no mapa',
       fonte: FONTE_PERFIL,
-      criterio: `Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE; inclui o exterior. ${fmtInt(tot.ni)} eleitores sem gênero informado ou com idade inválida ficam fora das faixas do perfil agregado, por isso os números saem arredondados ("mais de").`,
+      criterio: `Faixas etárias de 70 anos em diante do perfil do eleitorado do TSE (qualquer gênero); inclui o exterior. ${fmtInt(tot.inv)} eleitores com data de nascimento inválida no cadastro entram no total do eleitorado e em nenhuma faixa.`,
       dados: {
-        idososContados: tot.v, idososMax: tot.v + tot.ni, eleitores: tot.el, pct: pctV.valor,
-        ufMaior: vMax.uf, pctUfMaior: pctVMax.valor, ufMenor: vMin.uf, pctUfMenor: pctVMin.valor,
+        idosos: tot.v, eleitores: tot.el, idadeInvalida: tot.inv, pct: r2(proporcao(tot.v, tot.el)),
+        ufMaior: vMax.uf, pctUfMaior: r2(vMax.idosos), ufMenor: vMin.uf, pctUfMenor: r2(vMin.idosos),
       },
     });
 
@@ -1116,10 +1079,11 @@ export function calcular(e: Entrada): Curiosidade[] {
     const govMulheres = eleitos.filter((g) => e.fichas.get(g.c1.sqcand)?.genero === 'Feminino');
     const pctDep = proporcao(depMulheres.length, depEleitos.length);
     const perfilTot = TODAS.reduce(
-      (s, uf) => ({ el: s.el + e.perfil[uf].total.eleitores, f: s.f + e.perfil[uf].total.idade[0].reduce((a, b) => a + b, 0), ni: s.ni + e.perfil[uf].total.naoInformado }),
-      { el: 0, f: 0, ni: 0 },
+      (s, uf) => ({ el: s.el + e.perfil[uf].total.eleitores, f: s.f + (e.perfil[uf].total.genero?.[0] ?? NaN) }),
+      { el: 0, f: 0 },
     );
-    const pctEleitoras = pctSeguro(perfilTot.f, perfilTot.f + perfilTot.ni, perfilTot.el, 'cargos-mulheres-eleitas');
+    exigir(Number.isInteger(perfilTot.f), 'perfil sem `genero` (rode scripts/data/py/perfil_build.py)');
+    const pctEleitoras = { txt: fmtPct(proporcao(perfilTot.f, perfilTot.el)) };
     const govTxt =
       govMulheres.length === 0
         ? `nenhum dos ${eleitos.length} governadores eleitos no 1º turno é mulher`
@@ -1132,7 +1096,7 @@ export function calcular(e: Entrada): Curiosidade[] {
       titulo: 'Mulheres eleitas',
       destaque: { valor: depMulheres.length, formato: 'int', unidade: 'deputadas federais eleitas' },
       contexto: `São ${fmtPct(pctDep)} dos ${fmtInt(depEleitos.length)} deputados federais eleitos${pendentes.length ? ` já divulgados (${pendentes.length === 1 ? `falta ${artigoUf(pendentes[0].uf as UF)}` : `faltam ${pendentes.map((u) => u.uf).join(', ')}`}, com ${vagasPend} vagas)` : ''}. No Senado, ${senMulheres.length} das ${senEleitos.length} vagas; ${govTxt}. As mulheres são ${pctEleitoras.txt} do eleitorado.`,
-      texto: `${depMulheres.length} mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (${fmtPct(pctDep)} dos eleitos já divulgados). No Senado, ${senMulheres.length} das ${senEleitos.length} vagas.`,
+      texto: `${depMulheres.length} mulheres foram eleitas deputadas federais em 4 de outubro de 2026 (${fmtPct(pctDep)} dos ${pendentes.length ? 'eleitos já divulgados' : `${fmtInt(depEleitos.length)} eleitos`}). No Senado, ${senMulheres.length} das ${senEleitos.length} vagas.`,
       lugares: [{ nome: 'Câmara dos Deputados', rota: rota.camara() }],
       rota: rota.camara(),
       rotuloRota: 'Ver a Câmara',
