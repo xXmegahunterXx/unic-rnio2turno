@@ -9,7 +9,9 @@ import { AppShell } from './components/layout/AppShell';
 function page(loader: () => Promise<{ default: ComponentType }>) {
   const C = lazy(loader);
   return (
-    <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
+    // Altura de uma tela inteira enquanto o chunk da página chega: com 60vh o rodapé aparecia na 1ª dobra e era
+    // empurrado para baixo quando a página montava (CLS ≈ 0,28 medido no celular).
+    <Suspense fallback={<div className="min-h-[100dvh]" aria-busy="true" />}>
       <C />
     </Suspense>
   );
