@@ -6,6 +6,7 @@ import { useMemo, useState, type ReactNode } from 'react';
 import type { CorCandidato, OrdemRegional, PresetInfo, Race, Ritmo, ScenarioConfig } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtPct, fmtPP } from '@/shared/format';
+import { nDisputasGov } from '@/shared/gov2t';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
@@ -385,7 +386,7 @@ function EditorAvancado({
           </Ajuste>
         </Grupo>
 
-        <Grupo titulo="Governadores" descricao="Alvo de votos válidos em cada uma das 7 disputas de 2º turno.">
+        <Grupo titulo="Governadores" descricao={`Alvo de votos válidos em cada uma das ${nDisputasGov(govRaces.length)} de 2º turno.`}>
           <div className="grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2">
             {govRaces.map((r) => {
               const id = r.id;

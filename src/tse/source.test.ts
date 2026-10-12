@@ -126,21 +126,24 @@ describe('corridas de 1º turno com dados reais', () => {
   it('404 coerente para escopos inexistentes', async () => {
     const { src } = criar(criarFakeFetch());
     await expect(src.nacional('xyz')).rejects.toBeInstanceOf(NotFoundError);
-    await expect(src.uf('gov-rj', 'SP')).rejects.toBeInstanceOf(NotFoundError);
+    await expect(src.uf('gov-df', 'SP')).rejects.toBeInstanceOf(NotFoundError);
+    // UF que saiu do 2º turno de governador (RJ, retotalização do TSE de 10/10/2026): corrida inexistente
+    await expect(src.nacional('gov-rj')).rejects.toBeInstanceOf(NotFoundError);
     await expect(src.uf('pres', 'XX')).rejects.toBeInstanceOf(NotFoundError);
     await expect(src.municipio('pres-t1', 'AC', '99999')).rejects.toBeInstanceOf(NotFoundError);
     await expect(src.zona('pres-t1', 'AC', '01120', 3)).rejects.toBeInstanceOf(NotFoundError);
   });
 
-  it('Governador RJ 1º turno', async () => {
+  it('Governador DF 1º turno', async () => {
     const { src } = criar(criarFakeFetch());
-    const n = await src.nacional('gov-rj-t1');
-    expect(n.resumo.votos).toEqual([4_271_199, 3_706_984, 690_855]);
-    expect(Object.keys(n.ufs)).toEqual(['RJ']);
-    expect(n.regioes.SE!.votos).toEqual(n.resumo.votos);
-    const rio = await src.municipio('gov-rj-t1', 'RJ', '60011');
-    expect(rio.resumo.votos).toEqual([1_319_722, 1_730_683, 244_887]);
-    expect(rio.zonas).toHaveLength(49);
+    const n = await src.nacional('gov-df-t1');
+    // Celina Leão (11) × Leandro Grass (13) + Outros (inclui 1.843 votos "anulados sub judice")
+    expect(n.resumo.votos).toEqual([825_530, 569_930, 257_777]);
+    expect(Object.keys(n.ufs)).toEqual(['DF']);
+    expect(n.regioes.CO!.votos).toEqual(n.resumo.votos);
+    const bsb = await src.municipio('gov-df-t1', 'DF', '97012');
+    expect(bsb.resumo.votos).toEqual(n.resumo.votos);
+    expect(bsb.zonas.length).toBeGreaterThan(1);
   });
 });
 
@@ -157,11 +160,11 @@ describe('2º turno', () => {
     const m = await src.municipio('pres', 'AC', '01120');
     expect(m.resumo.status).toBe('aguardando');
     expect(m.primeiroTurno).toEqual({ votos: [1_508, 5_940, 343], brancos: 56, nulos: 208, comparecimento: 8_055, eleitorado: 10_207 });
-    const gov = await src.nacional('gov-rj');
+    const gov = await src.nacional('gov-df');
     expect(gov.resumo.status).toBe('aguardando');
     const h = src.health();
     expect(h.ok).toBe(true);
-    expect(h.corridas.find((c) => c.race === 'gov-rj')!.ausentes).toEqual(['RJ']);
+    expect(h.corridas.find((c) => c.race === 'gov-df')!.ausentes).toEqual(['DF']);
     expect(h.corridas.find((c) => c.race === 'pres')!.ausentes).toContain('BA');
   });
 
@@ -317,7 +320,7 @@ describe('2º turno', () => {
       expect(mb.margem[0]).toBe(Math.round(((52_000 - 47_000) / 99_000) * 1000));
       const mb2 = await src.municipiosBr('pres', ordem, T2);
       expect(mb2).toMatchObject({ simNow: T2, lider: [1, -1, -1], apurado: [300, 0, 0], municipiosLiderados: [0, 1] });
-      const gov = await src.municipiosBr('gov-rj', ordem);
+      const gov = await src.municipiosBr('gov-df', ordem);
       expect(gov.lider).toEqual([-1, -1, -1]);
 
       // persistência: o histórico (com os estados completos) sobrevive a reinício

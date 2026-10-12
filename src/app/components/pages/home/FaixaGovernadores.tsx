@@ -1,7 +1,8 @@
 /**
- * Faixa dos 7 governadores na Home. Antes da apuração: quem disputa e o resultado de cada um no 1º turno
- * (dado oficial). Durante/depois: % de válidos do 2º turno ao vivo e % de seções.
- * Celular: carrossel com encaixe; desktop: grade 4 × 2 (o 8º cartão leva a /governadores).
+ * Faixa das disputas de governador do 2º turno na Home (uma por UF de `UFS_GOV_2T`; quantidade e textos derivados
+ * dela). Antes da apuração: quem disputa e o resultado de cada um no 1º turno (dado oficial). Durante/depois: % de
+ * válidos do 2º turno ao vivo e % de seções.
+ * Celular: carrossel com encaixe; desktop: grade de 4 colunas (o último cartão leva a /governadores).
  * Corridas via `useRaces` (anonimizadas na simulação); candidatos na ordem da urna.
  */
 import { Link } from 'react-router-dom';
@@ -9,6 +10,7 @@ import type { Candidate, Fase, NationalSnapshot, Race, UF } from '@/shared/types
 import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtPct } from '@/shared/format';
+import { nDisputasGov, nEstadosGov } from '@/shared/gov2t';
 import { useNacional, useRaces } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
@@ -19,17 +21,16 @@ import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 
 const ID = (uf: UF) => `gov-${uf.toLowerCase()}`;
 
-/** As 7 consultas sempre na mesma ordem (regras de hooks). */
+/**
+ * Uma consulta por UF de `UFS_GOV_2T`, sempre na mesma ordem: a lista é constante do módulo, então o número e a ordem
+ * das chamadas de hook nunca mudam entre renderizações (regras de hooks), qualquer que seja o tamanho do quadro.
+ */
 function useGovernadores() {
-  const l = UFS_GOV_2T;
-  const q0 = useNacional(ID(l[0]));
-  const q1 = useNacional(ID(l[1]));
-  const q2 = useNacional(ID(l[2]));
-  const q3 = useNacional(ID(l[3]));
-  const q4 = useNacional(ID(l[4]));
-  const q5 = useNacional(ID(l[5]));
-  const q6 = useNacional(ID(l[6]));
-  return [q0, q1, q2, q3, q4, q5, q6].map((q, i) => ({ uf: l[i], data: q.data && q.data.race === ID(l[i]) ? q.data : undefined }));
+  return UFS_GOV_2T.map((uf) => {
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- lista constante do módulo
+    const q = useNacional(ID(uf));
+    return { uf, data: q.data && q.data.race === ID(uf) ? q.data : undefined };
+  });
 }
 
 export function FaixaGovernadores({ fase, className }: { fase: Fase; className?: string }) {
@@ -42,7 +43,7 @@ export function FaixaGovernadores({ fase, className }: { fase: Fase; className?:
         <div className="min-w-0">
           <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-brand-fg">Também no dia 25</p>
           <h2 id="home-gov" className="mt-1.5 text-balance font-display text-[26px] font-semibold leading-tight tracking-[-0.03em] text-fg sm:text-[34px]">
-            Governador em 7 estados
+            Governador em <span className="num">{nEstadosGov()}</span>
           </h2>
           <p className="mt-1.5 text-[14.5px] leading-snug text-fg-muted">
             {pre ? 'Quem disputa o 2º turno e como cada um foi no 1º turno.' : 'O 2º turno para governador, ao vivo.'}
@@ -75,7 +76,7 @@ export function FaixaGovernadores({ fase, className }: { fase: Fase; className?:
               <Icon name="grade" size={20} />
             </span>
             <span>
-              <span className="block font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">As 7 disputas lado a lado</span>
+              <span className="block font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">As {nDisputasGov()} lado a lado</span>
               <span className="mt-1 inline-flex items-center gap-1 text-[13.5px] font-medium text-brand-fg">
                 Ver governadores
                 <Icon name="seta" size={15} className="transition-transform group-hover:translate-x-0.5" />

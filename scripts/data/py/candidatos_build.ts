@@ -10,7 +10,7 @@
  *
  * Saídas (JSON minificado):
  *   public/data/candidatos/{grupo}.json   { grupo, candidatos: CandidatoFicha[], aviso? }
- *     segundo-turno    Presidente e Governador (7 UFs) que disputam o 2º turno, cada um seguido do seu vice
+ *     segundo-turno    Presidente e Governador (UFS_GOV_2T) que disputam o 2º turno, cada um seguido do seu vice
  *     governadores     Governadores eleitos no 1º turno (20)
  *     senado           todos os candidatos ao Senado que estavam na urna (27 UFs)
  *     camara-{uf}      Deputados Federais ELEITOS na UF
@@ -293,7 +293,7 @@ async function main() {
 
   const grupos = new Map<string, { candidatos: CandidatoFicha[]; aviso?: string }>();
 
-  // segundo-turno: Presidente + Governadores das 7 UFs, por número, cada titular seguido do vice.
+  // segundo-turno: Presidente + Governadores das UFs de UFS_GOV_2T, por número, cada titular seguido do vice.
   const st: CandidatoFicha[] = [];
   const corridas: [CargoLido, 'BR' | UFBr][] = [[pres, 'BR'], ...UFS_GOV_2T.map((uf): [CargoLido, UFBr] => [gov.get(uf as UFBr)!, uf as UFBr])];
   for (const [r, uf] of corridas) {

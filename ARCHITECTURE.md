@@ -120,8 +120,8 @@ Arquivos usados (todos JSON):
 - `ele2026/6257/dados/{uf}/{uf}{cdmun}-c0001-e006257-u.json`: **resultado do 1º turno para Presidente
   por município**. Candidatos ficam em `carg[0].agr[].par[].cand[]` (`n` = número, `vap` = votos), e os
   votos em `v`: `vb` (brancos), `tvn` (nulos), `vv` (válidos), `vnom` (nominais).
-- `ele2026/6259/dados/{uf}/{uf}{cdmun}-c0003-e006259-u.json`: idem para Governador (só nas 7 UFs com
-  2º turno).
+- `ele2026/6259/dados/{uf}/{uf}{cdmun}-c0003-e006259-u.json`: idem para Governador (só nas UFs com
+  2º turno, `UFS_GOV_2T`).
 - `ele2026/6258/dados/{uf|br}/{uf|br}-c0001-e006258-u.json`: arquivo do **2º turno**, hoje zerado e
   com os candidatos (Lula 13 × Flávio Bolsonaro 22, vices em `vs`). Será preenchido ao vivo em 25/10.
 
@@ -131,9 +131,23 @@ brancos 2.300.798 · nulos 3.674.249 · Flávio Bolsonaro 56.104.503 (47,03%) ·
 
 2º turno de Governador (TSE, `st: "2º turno"`): AC (Mailza Assis PP 11 × Alan Rick Republicanos 10),
 AM (Omar Aziz PSD 55 × Profª Maria do Carmo PL 22), DF (Celina Leão PP 11 × Leandro Grass PT 13),
-ES (Lorenzo Pazolini Republicanos 10 × Ricardo Ferraço MDB 15), RJ (Douglas Ruas PL 22 × Eduardo Paes
-PSD 55), RN (Allyson União 44 × Cadu de Lula PT 13), TO (Profª Dorinha União 44 × Vicentinho Júnior
-PSDB 45). **Leia sempre do feed**, não digite à mão. Os nomes de exibição saem do `nmu` em título.
+ES (Lorenzo Pazolini Republicanos 10 × Ricardo Ferraço MDB 15), RN (Allyson União 44 × Cadu de Lula PT 13),
+TO (Profª Dorinha União 44 × Vicentinho Júnior PSDB 45). **Leia sempre do feed**, não digite à mão. Os nomes de
+exibição saem do `nmu` em título.
+
+**Quadro do 2º turno de Governador: `UFS_GOV_2T` (`src/shared/constants.ts`) é a fonte única** — pipeline, motor,
+servidor, OG e textos derivam dela (`src/shared/gov2t.ts` monta quantidade, siglas e nomes; nunca número fixo em
+texto). Decisões:
+- **RJ fora (12/10/2026).** O TSE retotalizou Governador do RJ em **10/10/2026 15:09:50** (geração de
+  `ele2026/6259/dados/rj/rj-c0003-e006259-u.json`): os 274.411 votos do nº 10, antes "anulados sub judice", viraram
+  nulos técnicos e **Douglas Ruas (PL, 22) foi "Eleito" no 1º turno com 50,88%** (Eduardo Paes, PSD 55, "Não eleito",
+  44,16%). `comum/config/ele-c.json` lista a eleição 6260 só para AC, AM, DF, ES e RN; o 6260 do RJ dá 404; o
+  `consulta_cand` de 11/10 traz "ELEITO". O RJ passa aos governadores eleitos no 1º turno (21); `meta.json` não tem
+  mais `gov-rj`/`gov-rj-t1` (14 corridas); links antigos com `gov-rj` caem em Presidente.
+- **TO mantido.** Em 12/10/2026 o arquivo do 1º turno de TO ainda marca os dois finalistas como "2º turno" (resultado
+  oficial publicado), embora o 6260 de TO dê 404 e TO não esteja na lista da 6260. Se o TSE confirmar o contrário,
+  basta tirar TO de `UFS_GOV_2T` e rodar o pipeline (README › Dados › "Mudança no quadro do 2º turno"); os testes
+  derivam o quadro da constante.
 
 Cuidados: baixe com concorrência limitada (≤ 12) e retry; guarde o bruto em `data-raw/`, que é ignorado
 pelo git. Os arquivos de município são ~5.570 + exterior.
@@ -311,7 +325,7 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 |---|---|
 | `/` | Hero, contagem regressiva para 17h de 25/10, chamada para a Apuração e para o Teste Cego, placar ao vivo quando apurando |
 | `/apuracao?race=pres` | Placar nacional (duelo), % de seções, mapa por UF, gráfico da apuração (série), feed de eventos, regiões, ranking de UFs, comparecimento/brancos/nulos/abstenção, "para virar" |
-| `/governadores` | As 7 disputas de governador lado a lado |
+| `/governadores` | As disputas de governador do 2º turno (`UFS_GOV_2T`) lado a lado + governadores eleitos no 1º turno |
 | `/apuracao/:uf?race=` | Placar da UF, mapa por município, tabela de municípios (busca, ordenação), série, eventos |
 | `/apuracao/:uf/:cod?race=&zona=` | Placar do município, comparação com o 1º turno, zonas, **mosaico de seções** e lista de seções da zona |
 | `/apuracao/:uf/:cod/:zona/:secao?race=` | **Boletim de Urna** da seção (cartão visual) |
@@ -437,7 +451,7 @@ de usuários; as respostas do Teste Cego nunca saem do aparelho (exceto o link d
 | Município | "Minha cidade no 1º turno" (`cartoes/MunicipioT1`) | oficial | oficial (nunca com nomes ocultos) |
 | Candidato | ficha (`cartoes/Candidato`) | oficial | oficial |
 | Senado, Câmara, Assembleias | mini hemiciclo + maiores bancadas; Senado com `?uf=` mostra os 2 eleitos | oficial | Senado por UF |
-| Governadores | as 7 disputas (antes do dia 25, o 1º turno) | idem | nunca |
+| Governadores | as disputas do 2º turno, uma por UF de `UFS_GOV_2T` (antes do dia 25, o 1º turno) | idem | nunca |
 | Feed e "Reveja a noite" | "momento" com o placar daquele instante; o link leva `?t=` | idem placar | idem placar |
 | Teste Cego | Desafio (padrão, sem resultado), Meu resultado (escolha explícita, com aviso), Duelo (placar entre duas pessoas), convite | respostas da pessoa | nunca |
 | Curiosidades | fato (par simétrico dos finalistas) e resumo de 3 destaques | oficial | nunca |
@@ -511,7 +525,7 @@ meio; só se nem uma couber inteira ela vai em linha única com reticências.
 | `/api/og/secao.png?race=&uf=&cod=&zona=&secao=` | boletim de urna (2º turno, se houver, + 1º turno oficial) e local |
 | `/api/og/candidato.png?sq=` | ficha com foto oficial (candidato inexistente → 404) |
 | `/api/og/senado.png`, `/camara.png`, `/assembleia.png` (`?uf=`) | hemiciclo e maiores bancadas; Senado por UF com os eleitos |
-| `/api/og/governadores.png` | as 7 disputas (sempre turquesa/âmbar) |
+| `/api/og/governadores.png` | as disputas do 2º turno, título com a quantidade derivada (sempre turquesa/âmbar) |
 | `/api/og/curiosidade.png?f=` | fato (ou capa com 3 destaques) |
 | `/api/og/cenario.png?c=` | cenário recalculado do código validado (inválido → cartão genérico da calculadora) |
 | `/api/og/teste.png` | Teste Cego (genérico; o código de um Duelo nunca é lido) |

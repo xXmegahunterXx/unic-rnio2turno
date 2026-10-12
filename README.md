@@ -157,7 +157,7 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`).
 | `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | logo do patrocínio enviada em data URI (o `/api/status` leva só esta URL) |
 | 404 de `/api/apuracao/…` | `public, max-age=30, s-maxage=60` | evita martelar a origem com URLs inexistentes |
 | `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630 |
-| `GET /api/og/{municipio,secao,governadores}.png` | ao vivo: como `apuracao.png`; 1º turno oficial (antes da apuração): `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | município, boletim de urna e as 7 disputas de governador |
+| `GET /api/og/{municipio,secao,governadores}.png` | ao vivo: como `apuracao.png`; 1º turno oficial (antes da apuração): `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | município, boletim de urna e as disputas de governador do 2º turno (`UFS_GOV_2T`) |
 | `GET /api/og/{candidato,senado,camara,assembleia,curiosidade,cenario}.png` | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | dado oficial (ou cenário recalculado do `?c=`); o `&v=` das meta tags é a versão do dataset |
 | `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego (o código de um Duelo nunca é lido) |
 | `/assets/*` | `public, max-age=31536000, immutable` | nomes com hash do Vite |
@@ -365,12 +365,12 @@ erro se faltar município, se a ordem divergir do cadastro do TSE ou se o viewBo
 python3 -I scripts/data/py/secao_download.py   # ZIPs de dados abertos do TSE → data-raw/tse-abertos/ (~950 MB; cache por tamanho)
 python3 -I scripts/data/py/locais_build.py     # → public/data/locais/{uf}.json (~40 s)
 python3 -I scripts/data/py/secao_build.py      # → public/data/secao/{uf}.json (~2,5 min; lê o índice do local de locais/)
-npx tsx scripts/data/validate-secao.ts         # conferência independente em TS (+ 7 boletins de urna do feed; --sem-bu sem rede)
+npx tsx scripts/data/validate-secao.ts         # conferência independente em TS (+ boletins de urna de 6 seções do feed; --sem-bu sem rede)
 python3 -I scripts/data/py/locais_nomes.py     # autotestes da capitalização dos nomes/endereços
 ```
 
 Fontes (`cdn.tse.jus.br/estatistica/sead/odsele/`, lidas em streaming de dentro do ZIP, latin-1/`;`):
-`votacao_secao_2026_BR.zip` (Presidente) e `_{AC,AM,DF,ES,RJ,RN,TO}.zip` (Governador), `detalhe_votacao_secao_2026.zip`
+`votacao_secao_2026_BR.zip` (Presidente) e `_{UF}.zip` das UFs de `UFS_GOV_2T` (Governador; hoje AC, AM, DF, ES, RN e TO), `detalhe_votacao_secao_2026.zip`
 (aptos, comparecimento, brancos, nulos) e `eleitorado_local_votacao_2026.zip` (seção → local, 1º turno; o 2º turno
 entra no campo extra `segundoTurno`: seções que mudam de local em 25/10 e também as de locais que mantêm o número mas
 mudam de nome/endereço no cadastro do 2º turno — o TSE reaproveita o `NR_LOCAL_VOTACAO`, às vezes para outro prédio).
@@ -405,7 +405,7 @@ Dep. Estadual; 8 = Distrital, só no DF) e `ele2026/6257`/`6258` (Presidente) em
   que arredondaria a 0,00% aparece como 0,01%, igual ao TSE). No Senado (2 vagas) cada eleitor vota 2 vezes:
   validos + brancos + nulos = 2 × comparecimento. Os cargos estaduais têm ~182 mil eleitores a menos que Presidente
   (eleitores em trânsito de outras UFs só votam para Presidente); seções e eleitorado conferem com a fase 1.
-- **Fichas** (`{ grupo, candidatos: CandidatoFicha[], aviso? }`): `segundo-turno` (Presidente e 7 Governadores, cada um
+- **Fichas** (`{ grupo, candidatos: CandidatoFicha[], aviso? }`): `segundo-turno` (Presidente e os Governadores de `UFS_GOV_2T`, cada um
   seguido do vice), `governadores` (eleitos no 1º turno), `senado` (todos), `camara-{uf}` e `assembleia-{uf}` (eleitos).
   `index.json` = `{ colunas, linhas }` com sqcand, nome de urna, número, partido, cargo, UF e grupo (busca e rota
   `/candidato/:sqcand`). Nome = `nm` do feed (já traz o nome social); CPF, título e e-mail nunca entram. O arquivo de
@@ -467,23 +467,53 @@ npx vitest run scripts/data/curiosidades.test.ts src/shared/cenarios.test.ts   #
 
 ### Mudança no quadro do 2º turno (Governador)
 
-A lista de UFs com 2º turno de Governador tem uma fonte só: `UFS_GOV_2T` em `src/shared/constants.ts` (o
-`secao_comum.py` lê a mesma linha). Se uma retotalização do TSE mudar o quadro, `cargos_build.ts` para com a
-explicação (UF, candidato eleito e horário do feed). **Situação em 12/10/2026:** em 10/10/2026 15:09 o TSE anulou em
-definitivo os 274.411 votos do candidato 10 ao governo do RJ (antes "anulados sub judice", agora nulos técnicos) e
-Douglas Ruas passou a "Eleito" no 1º turno (50,88%); o `ele-c.json` e o `consulta_cand` de 11/10 já não trazem 2º
-turno de Governador no RJ. Os dados publicados continuam no quadro de 7 UFs (cache do feed do RJ de 04/10) até o
-app ser ajustado. Para aplicar:
+A lista de UFs com 2º turno de Governador tem **uma fonte só**: `UFS_GOV_2T` em `src/shared/constants.ts` (o
+`secao_comum.py` lê a mesma linha). O pipeline de dados, o motor, o servidor, as imagens OG e **todos** os textos do app
+(página `/governadores`, faixas da home e da apuração, menu "Mais", busca, 404, metodologia, admin, cartões de
+compartilhar, meta tags) derivam dela — `src/shared/gov2t.ts` monta "6 disputas", "AC, AM, DF, ES, RN e TO" etc.;
+nenhum texto traz o número fixo. Se uma retotalização do TSE mudar o quadro, `cargos_build.ts` para com a explicação
+(UF, candidato eleito e horário do feed).
+
+**Situação (aplicada em 12/10/2026): o RJ saiu do 2º turno.** Fonte: TSE, arquivo
+`ele2026/6259/dados/rj/rj-c0003-e006259-u.json` gerado em **10/10/2026 15:09:50** (totalização 15:07:39). Na
+retotalização os 274.411 votos do candidato 10 (antes "anulados sub judice") viraram nulos técnicos: **Douglas Ruas
+(PL, 22) "Eleito" no 1º turno com 50,88%** dos válidos; Eduardo Paes (PSD, 55) "Não eleito", 44,16%. Confirmam:
+`comum/config/ele-c.json` (pleito 3221 lista a eleição 6260 só para AC, AM, DF, ES e RN), o 6260 do RJ (404) e o
+`consulta_cand_2026.zip` de 11/10/2026 19:31:40 (Douglas Ruas "ELEITO", nenhuma linha de 2º turno no RJ). Efeito:
+`meta.json` com 14 corridas (sem `gov-rj`/`gov-rj-t1`: como nas outras UFs que elegeram no 1º turno, o resultado do RJ
+fica em `cargos/governador-t1.json`); 21 governadores eleitos no 1º turno (Douglas Ruas com a foto oficial no grupo
+`governadores`); `candidatos/segundo-turno` com 28 fichas (sem os dois finalistas do RJ e os vices); `uf/rj.json` e
+`secao/rj.json` sem governador; curiosidades "20 → 21 governadores eleitos". Links antigos (`?race=gov-rj` na
+apuração, na TV e nos widgets) caem em Presidente; um estado salvo do admin com alvo para `gov-rj` perde só essa chave.
+
+**Tocantins (conferido de novo em 12/10/2026, ~14h30):** o arquivo do 1º turno (`to-c0003-e006259-u.json`, gerado em
+04/10/2026 21:18:59) ainda marca Professora Dorinha (UNIÃO, 44) e Vicentinho Júnior (PSDB, 45) como "2º turno",
+embora o 6260 de TO dê 404 e TO não esteja na lista da eleição 6260. **TO continua no quadro** (é o resultado oficial
+publicado); o "Testar conexão" do admin avisa que TO ainda não tem arquivo, e a corrida fica em "aguardando" (nunca
+número inventado) até o TSE publicar. Acompanhe com `npx tsx scripts/data/fetch-tse.ts` (diz quantos arquivos 6260
+faltam) e com o arquivo do 1º turno de TO.
+
+**Procedimento: tirar ou pôr uma UF** (ex.: o TO, se o TSE publicar "Eleito" no 1º turno):
 
 ```bash
-# 1) tire a UF de UFS_GOV_2T (src/shared/constants.ts) e ajuste os textos "7 disputas/7 estados" e os testes do app
-npx tsx scripts/data/fetch-tse.ts && npx tsx scripts/data/py/cargos_build.ts --refresh   # feed novo do RJ
-npx tsx scripts/data/build-data.ts && npx tsx scripts/data/validate.ts                    # meta.json sem gov-rj
-python3 -I scripts/data/py/secao_build.py && npx tsx scripts/data/validate-secao.ts      # secao/ sem governador no RJ
-npx tsx scripts/data/py/candidatos_build.ts && python3 -I scripts/data/py/fotos_build.py # fichas e fotos
-npm run data:presidente-t1 && npm run data:curiosidades
-npx vitest run scripts/data
+# 0) confira no TSE: situação ("st") dos candidatos no 1º turno e a lista da eleição 6260 no ele-c.json
+curl -s https://resultados.tse.jus.br/oficial/ele2026/6259/dados/to/to-c0003-e006259-u.json | grep -o '"st":"[^"]*"' | sort | uniq -c
+# 1) edite SÓ a linha UFS_GOV_2T em src/shared/constants.ts (uma linha, ordem alfabética; o Python lê essa linha)
+# 2) dados (cada passo confere e para com erro se algo não fechar)
+npx tsx scripts/data/fetch-tse.ts && npx tsx scripts/data/py/cargos_build.ts --refresh   # feed novo; 2º turno = UFS_GOV_2T
+npx tsx scripts/data/build-data.ts && npx tsx scripts/data/validate.ts                    # meta.json e uf/
+python3 -I scripts/data/py/secao_build.py && npx tsx scripts/data/validate-secao.ts      # secao/ (governador só nas UFs do quadro)
+npx tsx scripts/data/py/candidatos_build.ts && python3 -I scripts/data/py/fotos_build.py # fichas e fotos oficiais
+npm run data:curiosidades                                                                  # "N governadores eleitos"
+# 3) conferência completa
+npx tsc -p tsconfig.json --noEmit && npx tsc -p tsconfig.server.json --noEmit && npx vitest run
 ```
+
+Os testes derivam o quadro de `UFS_GOV_2T` e usam AM, DF, AC e ES (com o 6260 já publicado) nos casos pontuais, então
+tirar o TO não exige mexer em teste. Ao **pôr** uma UF nova, acrescente o alvo neutro dela em `NEUTROS`
+(`src/engine/tests/engine.test.ts`, o teste mostra o valor) e, se quiser vê-la na vitrine `/kit`, os finalistas em
+`GOV` (`src/app/fixtures/core.ts`). Depois do deploy, limpe o cache da CDN de `/data/*` (ver `DEPLOY.md`): o
+`meta.json` novo muda a versão do dataset e as imagens OG mudam de endereço sozinhas.
 
 ## Fontes de dados
 

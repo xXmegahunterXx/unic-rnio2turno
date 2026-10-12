@@ -25,7 +25,7 @@
  *
  *   GET  /healthz (vivo) · /readyz (pronto para receber tráfego) · /api/versao → BuildInfo · /sitemap.xml · /robots.txt
  *
- * `:race` = RaceId ('pres', 'gov-rj', 'pres-t1', 'gov-rj-t1', ...). UF e race em minúsculas na URL.
+ * `:race` = RaceId ('pres', 'gov-df', 'pres-t1', 'gov-df-t1', ...). UF e race em minúsculas na URL.
  */
 import type {
   AdminMetrics,

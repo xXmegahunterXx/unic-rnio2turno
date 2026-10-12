@@ -145,17 +145,18 @@ describe('outros cartões', () => {
   it('governadores (ao vivo e antes do dia)', () => {
     const itens = [
       { uf: 'AC' as const, dif: 3.2, definida: false },
-      { uf: 'RJ' as const, dif: 0.8, definida: false },
+      { uf: 'ES' as const, dif: 0.8, definida: false },
       { uf: 'DF' as const, dif: 12, definida: true },
     ];
     const vivo = textoGovernadores(itens, { simulado: true, pst: 42.17 });
     conferir(vivo);
-    expect(vivo).toContain('no Rio de Janeiro');
+    expect(vivo).toContain('no Espírito Santo');
     expect(vivo).toContain('0,8 p.p.');
     expect(vivo.startsWith(PREFIXO_SIMULACAO)).toBe(true);
     const pre = textoGovernadores(itens, { t1: true });
     conferir(pre);
-    expect(pre).toContain('AC, RJ e DF');
+    expect(pre).toContain('AC, ES e DF');
+    expect(pre).toContain('em 3 estados');
   });
   it('ficha do candidato', () => {
     const t = textoCandidato({ nomeUrna: 'Fulana de Tal', partido: 'PSD', numero: 555, cargo: 'Senadora', uf: 'SP', resultado: { votos: 3038438, pct: 25.31 }, situacao: 'Eleita' });

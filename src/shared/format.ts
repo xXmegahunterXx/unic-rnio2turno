@@ -46,3 +46,26 @@ export function titleCasePt(s: string): string {
 /** Remove acentos e baixa caixa — para busca. */
 export const normalize = (s: string) =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+/** "AC, AM e DF" — lista em pt-BR: vírgulas e a conjunção ("e"/"ou") antes do último item. */
+export function fmtLista(itens: readonly string[], conjuncao: 'e' | 'ou' = 'e'): string {
+  if (itens.length <= 1) return itens.join('');
+  return `${itens.slice(0, -1).join(', ')} ${conjuncao} ${itens[itens.length - 1]}`;
+}
+
+const EXTENSO = [
+  'zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze',
+  'catorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove', 'vinte',
+];
+
+/**
+ * Número inteiro por extenso, para quantidades pequenas no meio de uma frase ("seis estados", "duas disputas").
+ * De 0 a 30; fora disso (ou não inteiro), cai em `fmtInt`. `genero` 'f' flexiona um/dois → uma/duas.
+ */
+export function fmtExtenso(n: number, genero: 'm' | 'f' = 'm'): string {
+  if (!Number.isInteger(n) || n < 0 || n > 30) return fmtInt(n);
+  const fem = (s: string) => (genero === 'f' ? s.replace(/^um$/, 'uma').replace(/^dois$/, 'duas') : s);
+  if (n <= 20) return fem(EXTENSO[n]);
+  if (n === 30) return 'trinta';
+  return `vinte e ${fem(EXTENSO[n - 20])}`;
+}

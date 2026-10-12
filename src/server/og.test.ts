@@ -33,13 +33,15 @@ describe('GET /api/og/apuracao.png', () => {
   }, 30_000);
 
   it('governador por UF, 1º turno e erros de parâmetro', async () => {
-    const gov = await m.app.request('/api/og/apuracao.png?race=gov-rj');
+    const gov = await m.app.request('/api/og/apuracao.png?race=gov-am');
     expect(gov.status).toBe(200);
     expect(dimensoesPng(Buffer.from(await gov.arrayBuffer()))).toEqual({ w: 1200, h: 630 });
     const uf = await m.app.request('/api/og/apuracao.png?race=pres-t1&uf=ba');
     expect(uf.status).toBe(200);
     expect((await m.app.request('/api/og/apuracao.png?race=nada')).status).toBe(404);
-    expect((await m.app.request('/api/og/apuracao.png?race=gov-rj&uf=sp')).status).toBe(404);
+    expect((await m.app.request('/api/og/apuracao.png?race=gov-am&uf=sp')).status).toBe(404);
+    // UF que saiu do 2º turno de governador (RJ, 10/10/2026): corrida inexistente
+    expect((await m.app.request('/api/og/apuracao.png?race=gov-rj')).status).toBe(404);
     expect((await m.app.request('/api/og/apuracao.png?race=pres&uf=xyz')).status).toBe(400);
   }, 30_000);
 
@@ -79,14 +81,14 @@ describe('regras do placar e proteção da origem', () => {
   it('"ELEITO" só no 2º turno e na abrangência da disputa (nunca no recorte de UF nem no 1º turno)', () => {
     const pres = m.ds.meta.races.find((r) => r.id === 'pres')!;
     const t1 = m.ds.meta.races.find((r) => r.id === 'pres-t1')!;
-    const gov = m.ds.meta.races.find((r) => r.id === 'gov-rj')!;
+    const gov = m.ds.meta.races.find((r) => r.id === 'gov-am')!;
     const base = m.controller.nacional('pres').resumo;
     const resumo = { ...base, votos: [100, 200], status: 'encerrada' as const, eleito: 1, secoesTotalizadas: base.secoes };
     const txt = (o: Partial<Parameters<typeof layoutPlacar>[0]>) =>
       JSON.stringify(layoutPlacar({ race: pres, resumo, simulacao: false, horario: 0, pre: false, ...o }));
     expect(txt({})).toContain('ELEITO');
     expect(txt({ uf: 'AC' })).not.toContain('ELEITO');
-    expect(txt({ race: gov, uf: 'RJ' })).toContain('ELEITO');
+    expect(txt({ race: gov, uf: 'AM' })).toContain('ELEITO');
     expect(txt({ race: t1, resumo: { ...resumo, votos: [100, 200, 50] } })).not.toContain('ELEITO');
     expect(txt({ resumo: { ...resumo, status: 'apurando' } })).toContain('MATEMATICAMENTE ELEITO');
   });

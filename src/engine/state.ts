@@ -171,8 +171,15 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
   };
   let cenario = fallback.cenario;
   if (isObj(v.cenario)) {
+    const bruto = { ...(v.cenario as Partial<ScenarioConfig>) };
+    // Corrida de governador que saiu do quadro do 2º turno (ex.: gov-rj, retotalização do TSE de 10/10/2026) num
+    // estado salvo antes da mudança: descarta só essa chave, sem perder o resto do cenário do admin.
+    if (isObj(bruto.alvoGov)) {
+      const govs = new Set(st.govRaces.map((g) => g.id));
+      bruto.alvoGov = Object.fromEntries(Object.entries(bruto.alvoGov).filter(([k]) => govs.has(k)));
+    }
     try {
-      cenario = normalizaCenario({ ...fallback.cenario, ...(v.cenario as Partial<ScenarioConfig>) } as ScenarioConfig, st);
+      cenario = normalizaCenario({ ...fallback.cenario, ...bruto } as ScenarioConfig, st);
     } catch {
       cenario = fallback.cenario;
     }

@@ -10,6 +10,8 @@ import type { CuriosidadesDataset } from '../shared/curiosidades';
 import type { PresidenteT1Dataset } from '../shared/cenarios';
 import { MARCA_CENARIO, calcularCenario, cenarioDoPreset, codificarCenario, premissasCenario } from '../shared/cenarios';
 import { anonimizarRace } from '../shared/anon';
+import { UFS_GOV_2T } from '../shared/constants';
+import type { UF } from '../shared/types';
 import { CC } from './app';
 import { C } from './og';
 import { comPrimeiroTurnoLocal } from './og-rotas';
@@ -100,7 +102,7 @@ describe('imagens da apuração (seguem a página: 1º turno antes das 17h, 2º 
     await png('/api/og/municipio.png?race=pres&uf=sp', 400);
     await png('/api/og/municipio.png?race=pres&uf=sp&cod=abc', 400);
     await png('/api/og/municipio.png?race=pres&uf=sp&cod=99999', 404);
-    await png('/api/og/municipio.png?race=gov-rj&uf=sp&cod=71072', 404);
+    await png('/api/og/municipio.png?race=gov-am&uf=sp&cod=71072', 404);
     await png('/api/og/secao.png?race=pres&uf=sp&cod=71072&zona=1&secao=99999', 400);
     await png('/api/og/secao.png?race=pres&uf=sp&cod=71072&zona=1&secao=9999', 404);
     await png('/api/og/candidato.png?sq=12', 400);
@@ -214,7 +216,7 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
   it('governadores: sempre cores neutras (turquesa/âmbar), nunca vermelho/azul — nem com nomes reais', () => {
     const disputas = m.ds.meta.races
       .filter((r) => r.turno === 2 && r.cargo === 'Governador')
-      .map((r) => ({ uf: r.abrangencia as 'RJ', race: r, resumo: m.controller.nacional(r.id).resumo }));
+      .map((r) => ({ uf: r.abrangencia as UF, race: r, resumo: m.controller.nacional(r.id).resumo }));
     const txt = JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: false, simulacao: true, aoVivo: true }));
     expect(txt).not.toContain(C.vermelho);
     expect(txt).not.toContain(C.azul);
@@ -239,8 +241,10 @@ describe('layouts: neutralidade e marcas obrigatórias', () => {
   it('governadores: SIMULAÇÃO só quando simulado', () => {
     const disputas = m.ds.meta.races
       .filter((r) => r.turno === 2 && r.cargo === 'Governador')
-      .map((r) => ({ uf: r.abrangencia as 'RJ', race: anonimizarRace(r), resumo: m.controller.nacional(r.id).resumo }));
-    expect(disputas).toHaveLength(7);
+      .map((r) => ({ uf: r.abrangencia as UF, race: anonimizarRace(r), resumo: m.controller.nacional(r.id).resumo }));
+    // uma disputa por UF de UFS_GOV_2T (o RJ saiu em 10/10/2026), e o título diz quantas são
+    expect(disputas.map((d) => d.uf)).toEqual(UFS_GOV_2T);
+    expect(JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: false, simulacao: false, aoVivo: true }))).toContain(`As ${UFS_GOV_2T.length} disputas de governador`);
     expect(JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: false, simulacao: true, aoVivo: true, anonimizado: true }))).toContain('SIMULAÇÃO');
     expect(JSON.stringify(layoutGovernadores({ disputas, primeiroTurno: true, simulacao: false, aoVivo: false }))).not.toContain('SIMULAÇÃO');
   });

@@ -117,43 +117,45 @@
   }
  },
  {
-  "id": "gov-rj",
+  "id": "gov-df",
   "cargo": "Governador",
   "turno": 2,
-  "abrangencia": "RJ",
-  "titulo": "Governador · Rio de Janeiro",
+  "abrangencia": "DF",
+  "titulo": "Governador · Distrito Federal",
   "candidatos": [
    {
-    "numero": 22,
-    "nomeUrna": "Douglas Ruas",
-    "nome": "Douglas Ruas dos Santos",
-    "partido": "PL",
-    "coligacao": "Rio Real",
-    "composicao": "PL / MOBILIZA / AGIR / AVANTE",
-    "vice": "Fernanda Louback",
+    "numero": 11,
+    "nomeUrna": "Celina Leão",
+    "nome": "Celina Leão Hizim Ferreira",
+    "partido": "PP",
+    "coligacao": "Propósito e Ação",
+    "composicao": "REPUBLICANOS / MDB / PODE / PL / DC / MOBILIZA / DEMOCRATA / PRD / SOLIDARIEDADE / PP / UNIÃO",
+    "vice": "Gustavo Rocha",
     "cor": "a",
     "primeiroTurno": {
-     "votos": 4271199,
-     "pct": 49.27
-    }
+     "votos": 825530,
+     "pct": 49.93
+    },
+    "fotoGrupo": "segundo-turno"
    },
    {
-    "numero": 55,
-    "nomeUrna": "Eduardo Paes",
-    "nome": "Eduardo da Costa Paes",
-    "partido": "PSD",
-    "coligacao": "Juntos para Mudar Coragem para Reconstruir",
-    "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
-    "vice": "Jane Reis",
+    "numero": 13,
+    "nomeUrna": "Leandro Grass",
+    "nome": "Leandro Antônio Grass Peixoto",
+    "partido": "PT",
+    "coligacao": "DF do Povo",
+    "composicao": "PDT / PCdoB / PT / PV / PSOL / REDE",
+    "vice": "Dora Gomes",
     "cor": "b",
     "primeiroTurno": {
-     "votos": 3706984,
-     "pct": 42.76
-    }
+     "votos": 569930,
+     "pct": 34.47
+    },
+    "fotoGrupo": "segundo-turno"
    }
   ],
   "ufs": [
-   "RJ"
+   "DF"
   ],
   "tse": {
    "ciclo": "ele2026",
@@ -304,39 +306,41 @@
   }
  },
  {
-  "id": "gov-rj-t1",
+  "id": "gov-df-t1",
   "cargo": "Governador",
   "turno": 1,
-  "abrangencia": "RJ",
-  "titulo": "Governador · Rio de Janeiro · 1º turno",
+  "abrangencia": "DF",
+  "titulo": "Governador · Distrito Federal · 1º turno",
   "candidatos": [
    {
-    "numero": 22,
-    "nomeUrna": "Douglas Ruas",
-    "nome": "Douglas Ruas dos Santos",
-    "partido": "PL",
-    "coligacao": "Rio Real",
-    "composicao": "PL / MOBILIZA / AGIR / AVANTE",
-    "vice": "Fernanda Louback",
+    "numero": 11,
+    "nomeUrna": "Celina Leão",
+    "nome": "Celina Leão Hizim Ferreira",
+    "partido": "PP",
+    "coligacao": "Propósito e Ação",
+    "composicao": "REPUBLICANOS / MDB / PODE / PL / DC / MOBILIZA / DEMOCRATA / PRD / SOLIDARIEDADE / PP / UNIÃO",
+    "vice": "Gustavo Rocha",
     "cor": "a",
     "primeiroTurno": {
-     "votos": 4271199,
-     "pct": 49.27
-    }
+     "votos": 825530,
+     "pct": 49.93
+    },
+    "fotoGrupo": "segundo-turno"
    },
    {
-    "numero": 55,
-    "nomeUrna": "Eduardo Paes",
-    "nome": "Eduardo da Costa Paes",
-    "partido": "PSD",
-    "coligacao": "Juntos para Mudar Coragem para Reconstruir",
-    "composicao": "PDT / MDB / DC / PSB / PSD / CIDADANIA / PSDB / PCdoB / PT / PV / PRD / SOLIDARIEDADE",
-    "vice": "Jane Reis",
+    "numero": 13,
+    "nomeUrna": "Leandro Grass",
+    "nome": "Leandro Antônio Grass Peixoto",
+    "partido": "PT",
+    "coligacao": "DF do Povo",
+    "composicao": "PDT / PCdoB / PT / PV / PSOL / REDE",
+    "vice": "Dora Gomes",
     "cor": "b",
     "primeiroTurno": {
-     "votos": 3706984,
-     "pct": 42.76
-    }
+     "votos": 569930,
+     "pct": 34.47
+    },
+    "fotoGrupo": "segundo-turno"
    },
    {
     "numero": 0,
@@ -346,13 +350,13 @@
     "cor": "outros",
     "agregado": true,
     "primeiroTurno": {
-     "votos": 690855,
-     "pct": 7.97
+     "votos": 257777,
+     "pct": 15.59
     }
    }
   ],
   "ufs": [
-   "RJ"
+   "DF"
   ],
   "tse": {
    "ciclo": "ele2026",

@@ -299,7 +299,7 @@ Meta de < 120 ms por desenho: cumprida em todos os casos no desktop e nas atuali
 |---|---|
 | `useNaTela(margem?)` | `src/app/lib/useNaTela.ts` — `[ref, visto]`: libera o download de dados pesados só quando o bloco chega perto da tela. Usado por `LocaisVotacao`, `PerfilEleitorado` (prop `adiar`, padrão sim) e `EleitosUf`/fotos dos cargos. |
 | Perfil do eleitorado na UF | `UfPage` → seção "Quem vota aqui" com `<PerfilEleitorado uf nome />` (sem `cod` = total da UF; exterior incluído). |
-| Governadores eleitos no 1º turno | `/governadores` termina com `<GovernadoresEleitosT1 mostrarSegundoTurno={false} onSelectUf2t=… />` (as 7 disputas já aparecem acima). Nova prop `mostrarSegundoTurno` (padrão `true`). O mapa (`MapaUfs`) usa a geometria IBGE real: UFs de 2º turno com listras na cor da marca. |
+| Governadores eleitos no 1º turno | `/governadores` termina com `<GovernadoresEleitosT1 mostrarSegundoTurno={false} onSelectUf2t=… />` (as disputas do 2º turno já aparecem acima). Nova prop `mostrarSegundoTurno` (padrão `true`). O mapa (`MapaUfs`) usa a geometria IBGE real: UFs de 2º turno com listras na cor da marca. |
 | Nome → ficha | `Placar` (hero/default) liga o nome a `/candidato/:sqcand` quando a corrida tem `sqcand` — nunca na simulação anonimizada (`anonimizarRace` remove a chave) nem no `compact` (já é link). `CandidateName linkFicha` faz o mesmo. |
 | Cores dos partidos | Tokens `--partido-1..10` agora em `src/app/styles.css` (escuro, claro e `prefers-color-scheme`), na ordem de `PARTIDOS_COM_COR`. `partidos.ts` não injeta mais `<style>` (`garantirPaletaPartidos` virou no-op por compatibilidade). |
 | Textos com artigo | `deUf(uf, nome)` em `components/pages/detalhe/fmt.ts` ("do Amazonas", "da Bahia") — use com `emUf` em vez de "de/em" + nome. |
@@ -370,7 +370,7 @@ congelados do momento em que o sheet abriu. No navegador embutido aparece um avi
 | `BotaoCompartilharCandidato` (`Candidato.tsx`) | CandidatoPage | Ficha: foto oficial 3:4, nome de urna, número, partido (cor neutra + sigla), cargo, votos e % no 1º turno, situação. |
 | `BotaoCompartilharComposicao` (`Cargos.tsx`) | Senado, Câmara (BR/UF), Assembleias (BR/UF) | Mini hemiciclo estático (`posicionar` do Hemiciclo) + maiores bancadas com sigla; cadeiras aguardando o TSE em cinza. |
 | `BotaoCompartilharSenadoUf` (`Cargos.tsx`) | Senado com `?uf=` (painel da UF) | Os 2 eleitos com foto oficial (mesmo tamanho e corpo de letra para os dois). |
-| `BotaoCompartilharGovernadores` (`Governadores.tsx`) | /governadores | As 7 disputas (placar, barra, % apurado, selo de definida) + resumo dos 7 estados; antes do dia 25, o 1º turno oficial. |
+| `BotaoCompartilharGovernadores` (`Governadores.tsx`) | /governadores | As disputas do 2º turno, uma por UF de `UFS_GOV_2T` (placar, barra, % apurado, selo de definida) + resumo dessas UFs na célula final, que completa a última linha da grade; antes do dia 25, o 1º turno oficial. |
 | `BotaoMomento` (`Momento.tsx`) | FeedPanel (nacional) e eventos da UF, via `EventFeed acao` | Evento (virada, liderança, marco, eleito, UF encerrada) + placar daquele instante; link com `?t=` no minuto seguinte (`rotaMomento`). |
 | `BotaoInstante` (`Momento.tsx`) | `LinhaDoTempo` enquanto revendo | "Compartilhar este momento": placar do instante + link `?t=18h42`. A régua aceita `compartilhar={{ race, uf, simulado }}` (sem a prop deduz da rota; `false` esconde). |
 

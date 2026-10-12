@@ -1,12 +1,15 @@
 /**
- * Cartão das 7 disputas de governador no 2º turno: o placar de cada uma (nomes na ordem da urna, % dos válidos na cor
- * do slot, barra com a marca dos 50%, % de seções totalizadas e o selo de resultado definido). Antes do dia 25, o
- * 1º turno oficial dessas UFs (com os demais candidatos). Sem fotos: é uma grade de números.
+ * Cartão das disputas de governador no 2º turno (uma por UF de `UFS_GOV_2T`; a quantidade vem de `itens`, nunca fixa):
+ * o placar de cada uma (nomes na ordem da urna, % dos válidos na cor do slot, barra com a marca dos 50%, % de seções
+ * totalizadas e o selo de resultado definido). Antes do dia 25, o 1º turno oficial dessas UFs (com os demais
+ * candidatos). Sem fotos: é uma grade de números. A célula final (resumo ou data do 2º turno) ocupa as colunas que
+ * sobram na última linha, para a grade fechar com qualquer número de disputas.
  */
 import type { Race, Summary, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { margem, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
-import { fmtPct } from '@/shared/format';
+import { fmtInt, fmtPct } from '@/shared/format';
+import { asDisputasGov, nDisputasGov, nEstadosGov } from '@/shared/gov2t';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import type { ButtonSize, ButtonVariant } from '@/app/ui/Button';
@@ -97,21 +100,24 @@ function Miolo({ itens, t1 }: { itens: DisputaGov[]; t1?: boolean }) {
   const definidas = itens.filter((i) => i.resumo.eleito !== null).length;
   const secoes = itens.reduce((s, i) => s + i.resumo.secoes, 0);
   const tot = itens.reduce((s, i) => s + i.resumo.secoesTotalizadas, 0);
+  const cols = x ? 4 : formato === 'feed' ? 3 : 2;
+  // a célula final completa a última linha (ou ocupa uma linha inteira se as disputas já fecharem a grade)
+  const span = cols - (itens.length % cols);
   return (
     <div className="flex flex-1 flex-col justify-center" style={{ gap: (x ? 12 : 30) * k, paddingTop: (x ? 10 : 24) * k, paddingBottom: (x ? 10 : 20) * k }}>
       <div className={cn(x && 'flex items-end justify-between')} style={{ gap: 20 * k }}>
         <div className="font-display font-semibold leading-[1.02] tracking-[-0.03em]" style={{ fontSize: (x ? 34 : formato === 'story' ? 52 : 50) * k }}>
-          Governador em {itens.length} estados
+          Governador em {nEstadosGov(itens.length)}
         </div>
         <RotuloCartao style={{ marginTop: x ? 0 : 12 * k }}>{t1 ? 'Como foi o 1º turno' : '2º turno · 25 de outubro'}</RotuloCartao>
       </div>
-      <div className={cn('grid', x ? 'grid-cols-4' : formato === 'feed' ? 'grid-cols-3' : 'grid-cols-2')} style={{ gap: (x ? 10 : 16) * k }}>
+      <div className={cn('grid', cols === 4 ? 'grid-cols-4' : cols === 3 ? 'grid-cols-3' : 'grid-cols-2')} style={{ gap: (x ? 10 : 16) * k }}>
         {itens.map((d) => (
           <Celula key={d.uf} d={d} t1={t1} />
         ))}
         {!t1 ? (
-          <div className="flex min-w-0 flex-col justify-center rounded-[0.9em] bg-brand/10" style={{ padding: `${(x ? 12 : 18) * k}px ${(x ? 14 : 20) * k}px` }}>
-            <RotuloCartao>Nos 7 estados</RotuloCartao>
+          <div className="flex min-w-0 flex-col justify-center rounded-[0.9em] bg-brand/10" style={{ padding: `${(x ? 12 : 18) * k}px ${(x ? 14 : 20) * k}px`, gridColumn: `span ${span}` }}>
+            <RotuloCartao>{itens.length === 1 ? 'No estado' : `Nos ${nEstadosGov(itens.length)}`}</RotuloCartao>
             <div className="num font-display font-semibold leading-none tracking-[-0.03em]" style={{ fontSize: (x ? 34 : 46) * k, marginTop: 10 * k }}>
               {fmtPct(pctTotalizadas({ secoes, secoesTotalizadas: tot }))}
             </div>
@@ -119,11 +125,11 @@ function Miolo({ itens, t1 }: { itens: DisputaGov[]; t1?: boolean }) {
               das seções totalizadas
             </div>
             <div className="num font-semibold text-fg" style={{ fontSize: (x ? 15 : 19) * k, marginTop: 10 * k }}>
-              {definidas} de {itens.length} definidas
+              {fmtInt(definidas)} de {fmtInt(itens.length)} definidas
             </div>
           </div>
         ) : (
-          <div className="flex min-w-0 flex-col justify-center rounded-[0.9em] bg-brand/10" style={{ padding: `${(x ? 12 : 18) * k}px ${(x ? 14 : 20) * k}px` }}>
+          <div className="flex min-w-0 flex-col justify-center rounded-[0.9em] bg-brand/10" style={{ padding: `${(x ? 12 : 18) * k}px ${(x ? 14 : 20) * k}px`, gridColumn: `span ${span}` }}>
             <RotuloCartao>2º turno</RotuloCartao>
             <div className="font-display font-semibold leading-tight tracking-[-0.02em]" style={{ fontSize: (x ? 26 : 34) * k, marginTop: 10 * k }}>
               25 de outubro
@@ -166,7 +172,7 @@ export function BotaoCompartilharGovernadores({ itens, simulado, t1, caminho = '
       {...botao}
       label={label}
       titulo="Compartilhar · Governadores"
-      descricao={t1 ? 'As 7 disputas do 2º turno · resultado oficial do 1º turno.' : 'As 7 disputas de governador no 2º turno.'}
+      descricao={t1 ? `As ${nDisputasGov()} do 2º turno · resultado oficial do 1º turno.` : `${asDisputasGov()} no 2º turno.`}
       texto={texto}
       caminho={caminho}
       hashtags={t1 ? hashtags('primeiroTurno') : hashtags('governador')}

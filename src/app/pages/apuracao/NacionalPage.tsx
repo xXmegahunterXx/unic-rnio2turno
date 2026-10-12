@@ -1,6 +1,6 @@
 /**
  * /apuracao — a vitrine da noite da eleição: placar nacional, mapa por UF, corrida da apuração, feed,
- * regiões, participação, todos os estados, exterior e as 7 disputas de governador.
+ * regiões, participação, todos os estados, exterior e as disputas de governador do 2º turno (UFS_GOV_2T).
  *
  * Fases: 'pre' → contagem regressiva + 1º turno real (corridas '-t1'); 'apurando' → ao vivo;
  * 'encerrada' → resultado final. `?race=gov-xx` redireciona para a página da UF.

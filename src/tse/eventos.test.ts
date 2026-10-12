@@ -7,7 +7,7 @@ import racesJson from './__fixtures__/races.json';
 
 const races = racesJson as unknown as Race[];
 const PRES = races.find((r) => r.id === 'pres')!;
-const GOV_RJ = races.find((r) => r.id === 'gov-rj')!;
+const GOV_DF = races.find((r) => r.id === 'gov-df')!;
 const T0 = Date.UTC(2026, 9, 25, 20, 0, 0);
 
 /** Summary sintético: `st` de 1000 seções, votos [a, b], eleitorado 100 por seção. */
@@ -114,13 +114,13 @@ describe('HistoricoCorrida', () => {
   });
 
   it('Governador: a UF é a abrangência principal (feed nacional = feed da UF)', () => {
-    const h = new HistoricoCorrida(GOV_RJ, 'k');
-    h.registrar('RJ', S(0, 0, 0), T0, true);
-    h.registrar('RJ', S(300, 30, 20), T0 + 1, true);
+    const h = new HistoricoCorrida(GOV_DF, 'k');
+    h.registrar('DF', S(0, 0, 0), T0, true);
+    h.registrar('DF', S(300, 30, 20), T0 + 1, true);
     expect(h.eventosNacionais().map((e) => e.tipo)).toEqual(['lideranca', 'marco', 'inicio']);
-    expect(h.eventosDaUf('RJ')).toEqual(h.eventosNacionais());
+    expect(h.eventosDaUf('DF')).toEqual(h.eventosNacionais());
     expect(h.eventosNacionais()[1].titulo).toBe('25% das seções totalizadas');
-    expect(h.eventosNacionais()[0].titulo).toBe('Com 30,0% das seções totalizadas, Douglas Ruas aparece à frente');
+    expect(h.eventosNacionais()[0].titulo).toBe('Com 30,0% das seções totalizadas, Celina Leão aparece à frente');
   });
 
   it('afinarSerie mantém extremos', () => {

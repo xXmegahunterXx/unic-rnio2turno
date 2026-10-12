@@ -6,8 +6,8 @@
  *   npx tsx scripts/data/py/cargos_build.ts --refresh  # rebaixa os arquivos do feed (ex.: após retotalização)
  *
  * Saídas (CargoDataset em src/shared/dataset.ts, JSON minificado):
- *   public/data/cargos/governador-t1.json  27 UFs: todos os candidatos a Governador (eleitos no 1º turno e os 7 pares
- *                                          que foram ao 2º turno); composicao = eleitos no 1º turno por partido
+ *   public/data/cargos/governador-t1.json  27 UFs: todos os candidatos a Governador (eleitos no 1º turno e os pares
+ *                                          que vão ao 2º turno, UFS_GOV_2T); composicao = eleitos no 1º turno por partido
  *   public/data/cargos/senado.json         27 UFs × 2 vagas: todos os candidatos; composicao = 54 eleitos em 2026
  *   public/data/cargos/camara.json         513 vagas: por UF, eleitos + 20 mais votados não eleitos; partidos com votos
  *                                          e eleitos; composicao nacional por partido
@@ -127,7 +127,7 @@ async function gravar(nome: string, d: CargoDataset): Promise<number> {
  *  - Os 4 cargos de cada UF têm o MESMO eleitorado, comparecimento e seções (mesmos eleitores e urnas).
  *  - Seções = meta.json. Eleitorado/comparecimento estaduais ≤ os de Presidente: a diferença são os eleitores em
  *    trânsito vindos de outras UFs, que só votam para Presidente (é relatada, não é erro).
- *  - Governador nas 7 UFs com 2º turno: eleitorado, comparecimento e votos de cada candidato = Σ t1gov dos municípios;
+ *  - Governador nas UFs com 2º turno (UFS_GOV_2T): eleitorado, comparecimento e votos de cada candidato = Σ t1gov dos municípios;
  *    finalistas = meta.json (número, votos e %).
  */
 async function conferirFase1(gov: Map<UFBr, CargoLido>, todos: CargoLido[][]) {
@@ -172,7 +172,7 @@ async function conferirFase1(gov: Map<UFBr, CargoLido>, todos: CargoLido[][]) {
     }
   }
   console.log(
-    `✓ fase 1: seções das 27 UFs = meta.json; 4 cargos por UF com o mesmo eleitorado/comparecimento; governador das 7 UFs = Σ t1gov (votos, eleitorado, comparecimento) e finalistas = meta.json`,
+    `✓ fase 1: seções das 27 UFs = meta.json; 4 cargos por UF com o mesmo eleitorado/comparecimento; governador das ${UFS_GOV_2T.length} UFs do 2º turno = Σ t1gov (votos, eleitorado, comparecimento) e finalistas = meta.json`,
   );
   console.log(
     `  eleitores em trânsito de outras UFs (só votam para Presidente): eleitorado ${totEleit.toLocaleString('pt-BR')}, ` +
@@ -184,7 +184,7 @@ async function conferirFase1(gov: Map<UFBr, CargoLido>, todos: CargoLido[][]) {
  * O quadro de 2º turno de Governador do feed tem de ser o de UFS_GOV_2T (src/shared/constants.ts). Uma retotalização
  * pode mudá-lo depois da eleição — em 10/10/2026 o TSE anulou em definitivo os votos de um candidato no RJ (antes
  * "anulados sub judice") e o Governador do RJ passou a "Eleito" no 1º turno. Nesse caso o build para com a
- * instrução: tirar a UF de UFS_GOV_2T (e dos textos do app) e rodar o pipeline de novo (README › Dados).
+ * instrução: tirar a UF de UFS_GOV_2T (os textos do app derivam dela) e rodar o pipeline de novo (README › Dados).
  */
 function conferirUfsSegundoTurno(gov: Map<UFBr, CargoLido>) {
   const doFeed = UFS.filter((uf) => gov.get(uf)!.candidatos.some((c) => c.situacao === 'segundo-turno'));
@@ -199,7 +199,7 @@ function conferirUfsSegundoTurno(gov: Map<UFBr, CargoLido>) {
   fail(
     `quadro do 2º turno de Governador mudou no TSE: feed = ${doFeed.join(', ')} × UFS_GOV_2T = ${UFS_GOV_2T.join(', ')}` +
       `${det.length ? `\n  ${det.join('\n  ')}` : ''}${entraram.length ? `\n  novas UFs com 2º turno: ${entraram.join(', ')}` : ''}` +
-      `\n  → atualize UFS_GOV_2T em src/shared/constants.ts (e os textos "7 disputas" do app) e rode o pipeline ` +
+      `\n  → atualize UFS_GOV_2T em src/shared/constants.ts (os textos do app derivam dela) e rode o pipeline ` +
       `(README › Dados › "Mudança no quadro do 2º turno").`,
   );
 }

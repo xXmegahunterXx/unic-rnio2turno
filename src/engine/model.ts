@@ -2,7 +2,7 @@
  * Construção do modelo (determinística) — ARCHITECTURE.md §5.1 e §10.2.1.
  *
  * Para cada seção (arrays tipados, Struct of Arrays):
- *   aptos → comparecimento → brancos/nulos → votos dos 2 candidatos (Presidente e, nas 7 UFs, Governador)
+ *   aptos → comparecimento → brancos/nulos → votos dos 2 candidatos (Presidente e, nas UFs de UFS_GOV_2T, Governador)
  *   → chegada (ms após 17:00).
  * Depois: ordem de chegada (argsort), calibragem e linha do tempo (série + eventos).
  *

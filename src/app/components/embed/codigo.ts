@@ -2,7 +2,7 @@
  * Widgets para incorporar (/embed/:tipo): opções, URL e o código do iframe pronto para copiar.
  * Puro (testado em codigo.test.ts).
  *
- *  - placar  ?race=pres | gov-xx   (Presidente ou Governador nas 7 UFs com 2º turno)
+ *  - placar  ?race=pres | gov-xx   (Presidente ou Governador nas UFs com 2º turno, UFS_GOV_2T)
  *  - mapa    ?race=pres            (quem está à frente em cada estado)
  *  - uf      ?uf=sp                (o estado: Presidente, Governador quando houver e as maiores cidades)
  *  - tema    ?tema=auto | escuro | claro   (aceita também dark/light)

@@ -53,11 +53,11 @@ describe('conferirCodigos', () => {
     expect(r.esperado).toEqual({ pleito: '3221', eleicaoPres: '6258', eleicaoGov: '6260' });
   });
 
-  it('UFs de Governador sem arquivo no TSE (ex.: RJ e TO em 12/10/2026) → aviso com a lista', () => {
-    const r = fonte().conferirCodigos(ELE_C(['am', 'rn', 'df', 'es', 'ac']));
-    expect(r.ufsGovTse).toEqual(['AC', 'AM', 'DF', 'ES', 'RN']);
-    const faltam = govDataset.map((u) => u.toUpperCase()).filter((u) => !['AC', 'AM', 'DF', 'ES', 'RN'].includes(u));
-    if (faltam.length) expect(r.avisos.join(' ')).toContain(`sem arquivo no TSE: ${faltam.sort().join(', ')}`);
+  it('UF de Governador do dataset sem arquivo no TSE (ex.: TO em 12/10/2026) → aviso com a lista', () => {
+    expect(govDataset).toEqual(['ac', 'df']);
+    const r = fonte().conferirCodigos(ELE_C(['am', 'rn', 'es', 'ac']));
+    expect(r.ufsGovTse).toEqual(['AC', 'AM', 'ES', 'RN']);
+    expect(r.avisos.join(' ')).toContain('sem arquivo no TSE: DF');
   });
 
   it('código errado, pleito errado e ensaio com o 1º turno → avisos explicativos', () => {

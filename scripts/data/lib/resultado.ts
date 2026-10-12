@@ -4,8 +4,10 @@
  *
  * Votos "Anulado sub judice" (candidato com registro indeferido, mas com recurso pendente):
  *   o TSE os soma em `v.vvc` ("votos válidos computados" = `vv` + `vansj`) e é sobre `vvc` que ele calcula o
- *   percentual oficial de cada candidato (`pvap`). Ex.: Governador RJ 2026 — Garotinho (10) teve 274.411 votos
- *   sub judice; Douglas Ruas aparece com 49,27% (sobre `vvc`) e não 50,88% (sobre `vv`), por isso há 2º turno.
+ *   percentual oficial de cada candidato (`pvap`). Ex.: Governador DF 2026 — 1.843 votos sub judice (nº 28 e 36);
+ *   Celina Leão aparece com 49,93% (sobre `vvc`) e não 49,99% (sobre `vv`). (Até 10/10/2026 o exemplo era o RJ:
+ *   274.411 votos sub judice do nº 10 deixavam Douglas Ruas com 49,27%; a retotalização daquele dia os tornou
+ *   nulos técnicos e ele passou a "Eleito" no 1º turno com 50,88% — por isso o RJ saiu de UFS_GOV_2T.)
  *   Por isso esses votos entram em `votos` como os de qualquer candidato: assim os percentuais derivados no app
  *   (votos ÷ Σ votos) reproduzem exatamente os do TSE e comparecimento = Σ votos + brancos + nulos.
  *   Votos anulados em definitivo (`v.van`, destinação "Anulado") não ocorrem em 2026; se aparecerem, o build

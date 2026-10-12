@@ -24,7 +24,7 @@ describe('TseClient', () => {
   it('404 do CDN (NoSuchKey) é "ausente", sem retry', async () => {
     const f = criarFakeFetch();
     const c = new TseClient({ baseUrl: BASE, fetch: f, ...semEspera });
-    const r = await c.getJson('ele2026/6260/dados/rj/rj-c0003-e006260-u.json');
+    const r = await c.getJson('ele2026/6260/dados/sp/sp-c0003-e006260-u.json');
     expect(r).toMatchObject({ status: 'ausente', httpStatus: 404 });
     expect(f.chamadas).toHaveLength(1);
   });

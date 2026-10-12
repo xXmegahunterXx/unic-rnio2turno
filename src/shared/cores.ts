@@ -10,7 +10,7 @@
 import { CORES_IDENTIDADE } from './constants';
 import type { Candidate, CorCandidato, Race, RaceId } from './types';
 
-/** Família da corrida para fins de cor: 'pres-t1' → 'pres'; 'gov-rj-t1' → 'gov-rj'. */
+/** Família da corrida para fins de cor: 'pres-t1' → 'pres'; 'gov-df-t1' → 'gov-df'. */
 export const familiaCor = (raceId: RaceId): string => raceId.replace(/-t1$/, '');
 
 /** Slot neutro pela posição na urna entre os candidatos reais: 0 → 'a', 1 → 'b'. */

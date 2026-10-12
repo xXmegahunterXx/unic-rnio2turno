@@ -17,7 +17,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import type { AdminCommand } from '../shared/api';
-import { INICIO_APURACAO, UF_REGIAO } from '../shared/constants';
+import { INICIO_APURACAO, UF_REGIAO, UFS_GOV_2T } from '../shared/constants';
 import type {
   AdminState,
   FeedEvent,
@@ -44,8 +44,9 @@ import { dataset, relogio, semGeradoEm } from './tests/helpers';
 
 const INI = INICIO_APURACAO;
 const ds = await dataset();
-const GOVS = ['gov-ac', 'gov-am', 'gov-df', 'gov-es', 'gov-rj', 'gov-rn', 'gov-to'];
-const UFS_MUN: UF[] = ['AC', 'RJ', 'ZZ']; // todos os municípios (snapshot de município + zonas)
+/** Corridas de governador do 2º turno, derivadas de UFS_GOV_2T. */
+const GOVS = UFS_GOV_2T.map((u) => `gov-${u.toLowerCase()}`);
+const UFS_MUN: UF[] = ['AC', 'RJ', 'ZZ']; // todos os municípios (snapshot de município + zonas), Presidente
 const SP_CAPITAL = '71072';
 
 type Errs = string[];

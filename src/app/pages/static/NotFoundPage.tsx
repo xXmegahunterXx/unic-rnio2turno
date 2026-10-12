@@ -8,12 +8,13 @@ import { Container } from '@/app/components/layout/Container';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { ButtonLink } from '@/app/ui/Button';
 import { Icon, type IconName } from '@/app/ui/Icon';
+import { nDisputasGov } from '@/shared/gov2t';
 
 const ATALHOS: { to: string; icone: IconName; titulo: string; texto: string }[] = [
   { to: '/apuracao', icone: 'ao-vivo', titulo: 'Apuração ao vivo', texto: 'Presidente, estado por estado' },
   { to: '/teste', icone: 'olho-fechado', titulo: 'Teste Cego', texto: 'Ideias sem nome nem partido' },
   { to: '/apuracao/consulta', icone: 'busca', titulo: 'Consulte sua seção', texto: 'O boletim da sua urna' },
-  { to: '/governadores', icone: 'grade', titulo: 'Governadores', texto: 'As 7 disputas do 2º turno' },
+  { to: '/governadores', icone: 'grade', titulo: 'Governadores', texto: `As ${nDisputasGov()} do 2º turno` },
 ];
 
 const L = 100; // comprimento de onda da parte "sintonizada"

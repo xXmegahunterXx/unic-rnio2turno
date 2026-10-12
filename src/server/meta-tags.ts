@@ -13,6 +13,7 @@
 import { pctTotalizadas, pctValidos } from '../shared/calc';
 import { APP_NAME, UF_NOMES } from '../shared/constants';
 import { fmtInt, fmtPct } from '../shared/format';
+import { SIGLAS_GOV_2T, asDisputasGov } from '../shared/gov2t';
 import type { CandidatoFicha, CargoDataset } from '../shared/dataset';
 import type { Curiosidade } from '../shared/curiosidades';
 import type { Fase, Race, Summary, UF } from '../shared/types';
@@ -234,9 +235,9 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
   if (s0 === 'governadores' && seg.length === 1) {
     return pagina({
       titulo: `Governadores · 2º turno nos estados · ${APP_NAME}`,
-      descricao: 'As 7 disputas de governador no 2º turno (AC, AM, DF, ES, RJ, RN e TO), lado a lado, ao vivo.',
+      descricao: `${asDisputasGov()} no 2º turno (${SIGLAS_GOV_2T}), lado a lado, ao vivo.`,
       imagem: '/api/og/governadores.png',
-      imagemAlt: 'As 7 disputas de governador no 2º turno',
+      imagemAlt: `${asDisputasGov()} no 2º turno`,
     });
   }
   if (s0 === 'teste' && (seg.length === 1 || (seg.length === 2 && s1 === 'resultado'))) {

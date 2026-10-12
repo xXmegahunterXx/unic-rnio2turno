@@ -83,8 +83,10 @@ describe('rotas públicas', () => {
     ['/api/apuracao/PRES!/br', 400, /Corrida inválida/],
     ['/api/apuracao/pres/uf/xx', 400, /UF inválida/],
     ['/api/apuracao/pres/uf/s', 400, /UF inválida/],
-    ['/api/apuracao/gov-rj/uf/sp', 404, /não participa/],
-    ['/api/apuracao/gov-rj/uf/zz', 404, /não participa/],
+    ['/api/apuracao/gov-am/uf/sp', 404, /não participa/],
+    ['/api/apuracao/gov-am/uf/zz', 404, /não participa/],
+    // o RJ saiu do 2º turno de governador (retotalização do TSE de 10/10/2026): a corrida não existe mais
+    ['/api/apuracao/gov-rj/br', 404, /Corrida desconhecida/],
     ['/api/apuracao/pres/uf/sp/mun/abc', 400, /município inválido/],
     ['/api/apuracao/pres/uf/sp/mun/123456', 400, /município inválido/],
     ['/api/apuracao/pres/uf/sp/mun/99999', 404, /não encontrado/],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { caminhoEmbed, caminhoPaginaCompleta, codigoIframe, lerOpcoesEmbed, MENSAGEM_ALTURA, normalizarTema, tituloEmbed } from './codigo';
+import { UFS_GOV_2T } from '@/shared/constants';
 
 const P = (s: string) => new URLSearchParams(s);
 
@@ -8,12 +9,14 @@ describe('lerOpcoesEmbed', () => {
     expect(lerOpcoesEmbed(undefined, P(''))).toEqual({ tipo: 'placar', race: 'pres', uf: 'SP', tema: 'auto' });
     expect(lerOpcoesEmbed('xyz', P('race=senado&uf=zz&tema=roxo'))).toEqual({ tipo: 'placar', race: 'pres', uf: 'SP', tema: 'auto' });
   });
-  it('placar de governador só nas 7 UFs do 2º turno', () => {
-    expect(lerOpcoesEmbed('placar', P('race=GOV-RJ')).race).toBe('gov-rj');
+  it('placar de governador só nas UFs do 2º turno (UFS_GOV_2T)', () => {
+    for (const uf of UFS_GOV_2T) expect(lerOpcoesEmbed('placar', P(`race=GOV-${uf}`)).race).toBe(`gov-${uf.toLowerCase()}`);
     expect(lerOpcoesEmbed('placar', P('race=gov-sp')).race).toBe('pres');
+    // o RJ saiu do 2º turno (retotalização do TSE de 10/10/2026): widget antigo cai no placar de Presidente
+    expect(lerOpcoesEmbed('placar', P('race=gov-rj')).race).toBe('pres');
   });
   it('mapa é sempre do Presidente; uf aceita minúsculas', () => {
-    expect(lerOpcoesEmbed('mapa', P('race=gov-rj')).race).toBe('pres');
+    expect(lerOpcoesEmbed('mapa', P('race=gov-am')).race).toBe('pres');
     expect(lerOpcoesEmbed('uf', P('uf=pe&tema=light'))).toMatchObject({ tipo: 'uf', uf: 'PE', tema: 'claro' });
   });
   it('tema', () => {
@@ -31,26 +34,26 @@ describe('caminhos e títulos', () => {
     expect(caminhoEmbed({ tipo: 'mapa', race: 'pres', uf: 'SP', tema: 'auto' })).toBe('/embed/mapa');
   });
   it('a ida e volta preserva as opções', () => {
-    const o = { tipo: 'placar' as const, race: 'gov-to', uf: 'SP' as const, tema: 'claro' as const };
+    const o = { tipo: 'placar' as const, race: 'gov-es', uf: 'SP' as const, tema: 'claro' as const };
     const [path, qs] = caminhoEmbed(o).split('?');
     expect(lerOpcoesEmbed(path.split('/').pop(), P(qs))).toEqual(o);
   });
   it('página completa e título', () => {
-    expect(caminhoPaginaCompleta({ tipo: 'placar', race: 'gov-rj', uf: 'SP' })).toBe('/apuracao/rj?race=gov-rj');
+    expect(caminhoPaginaCompleta({ tipo: 'placar', race: 'gov-am', uf: 'SP' })).toBe('/apuracao/am?race=gov-am');
     expect(caminhoPaginaCompleta({ tipo: 'uf', race: 'pres', uf: 'BA' })).toBe('/apuracao/ba');
     expect(caminhoPaginaCompleta({ tipo: 'mapa', race: 'pres', uf: 'SP' })).toBe('/apuracao');
-    expect(tituloEmbed({ tipo: 'placar', race: 'gov-rj', uf: 'SP' })).toBe('Governador · Rio de Janeiro · Sintonia');
+    expect(tituloEmbed({ tipo: 'placar', race: 'gov-am', uf: 'SP' })).toBe('Governador · Amazonas · Sintonia');
     expect(tituloEmbed({ tipo: 'uf', race: 'pres', uf: 'BA' })).toBe('Apuração em Bahia · Sintonia');
   });
 });
 
 describe('codigoIframe', () => {
-  const url = 'https://sintonia.app/embed/placar?race=gov-rj&tema=claro';
-  const o = lerOpcoesEmbed('placar', P('race=gov-rj&tema=claro'));
+  const url = 'https://sintonia.app/embed/placar?race=gov-am&tema=claro';
+  const o = lerOpcoesEmbed('placar', P('race=gov-am&tema=claro'));
   const cod = codigoIframe(o, url);
   it('iframe com src, título, lazy e marcador', () => {
-    expect(cod).toContain('<iframe src="https://sintonia.app/embed/placar?race=gov-rj&amp;tema=claro"');
-    expect(cod).toContain('title="Governador · Rio de Janeiro · Sintonia"');
+    expect(cod).toContain('<iframe src="https://sintonia.app/embed/placar?race=gov-am&amp;tema=claro"');
+    expect(cod).toContain('title="Governador · Amazonas · Sintonia"');
     expect(cod).toContain('loading="lazy"');
     expect(cod).toContain('data-sintonia');
     expect(cod).toContain('max-width:640px');

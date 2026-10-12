@@ -38,11 +38,11 @@ describe('fonte única das cores', () => {
 
   it('corCandidato: identidade na família pres; slot neutro pela posição nas demais', () => {
     expect(familiaCor('pres-t1')).toBe('pres');
-    expect(familiaCor('gov-rj-t1')).toBe('gov-rj');
+    expect(familiaCor('gov-am-t1')).toBe('gov-am');
     expect(corCandidato('pres', 13, 0)).toBe('vermelho');
     expect(corCandidato('pres-t1', 22, 1)).toBe('azul');
     // governador: o mesmo número (13 = PT no DF e no RN; 22 = PL no RJ e no AM) NÃO herda vermelho/azul
-    expect(corCandidato('gov-rj', 22, 0)).toBe('a');
+    expect(corCandidato('gov-am', 22, 0)).toBe('a');
     expect(corCandidato('gov-df', 13, 1)).toBe('b');
     expect(corCandidato('gov-rn-t1', 13, 0)).toBe('a');
     expect(corNeutra(0)).toBe('a');
@@ -66,7 +66,7 @@ describe('fonte única das cores', () => {
     expect(x.candidatos.map((c) => c.cor)).toEqual(['vermelho', 'azul', 'outros']);
     expect(r.candidatos[0].cor).toBe('a'); // não muta a entrada
     expect(aplicarCores(x)).toEqual(x);
-    const gov = aplicarCores({ id: 'gov-rj', candidatos: [cand(22, 'vermelho'), cand(55, 'azul')] });
+    const gov = aplicarCores({ id: 'gov-am', candidatos: [cand(22, 'vermelho'), cand(55, 'azul')] });
     expect(gov.candidatos.map((c) => c.cor)).toEqual(['a', 'b']);
   });
 

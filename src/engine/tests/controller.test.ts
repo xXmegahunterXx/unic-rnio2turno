@@ -148,18 +148,20 @@ describe('comandos', () => {
     expect(c.metrics().modeloMs).toBeGreaterThan(0);
     expect(c.metrics().modeloConstruidoEm).toBeGreaterThanOrEqual(antes!);
     // mescla: alvoGov chave a chave; ufVies 0 remove; null limpa
-    c.command({ tipo: 'cenario', cenario: { alvoGov: { 'gov-rj': 47 }, ufVies: { SP: 0, BA: -3 } } });
-    expect(c.state().cenario.alvoGov['gov-rj']).toBe(47);
+    c.command({ tipo: 'cenario', cenario: { alvoGov: { 'gov-am': 47 }, ufVies: { SP: 0, BA: -3 } } });
+    expect(c.state().cenario.alvoGov['gov-am']).toBe(47);
     expect(c.state().cenario.alvoGov['gov-df']).toBe(57.73);
     expect(c.state().cenario.ufVies).toEqual({ BA: -3 });
     c.command({ tipo: 'cenario', cenario: { ufVies: null as never } });
     expect(c.state().cenario.ufVies).toEqual({});
-    const r = c.nacional('gov-rj').resumo;
+    const r = c.nacional('gov-am').resumo;
     expect(Math.abs((100 * r.votos[0]) / (r.votos[0] + r.votos[1]) - 47)).toBeLessThan(0.05);
     expect(() => c.command({ tipo: 'cenario', cenario: { ritmo: 'turbo' as never } })).toThrow(CommandError);
     expect(() => c.command({ tipo: 'cenario', cenario: { alvoPres: 'abc' as never } })).toThrow(/alvoPres/);
     expect(() => c.command({ tipo: 'cenario', cenario: { ufVies: { XX: 3 } as never } })).toThrow(/UF desconhecida/);
     expect(() => c.command({ tipo: 'cenario', cenario: { alvoGov: { 'gov-sp': 50 } } })).toThrow(/governador/);
+    // UF que saiu do 2º turno (RJ, retotalização do TSE de 10/10/2026): o comando é recusado
+    expect(() => c.command({ tipo: 'cenario', cenario: { alvoGov: { 'gov-rj': 50 } } })).toThrow(/governador/);
   });
 
   it('preset: aplica sobre o padrão neutro e mantém a semente; desconhecido → erro', () => {
@@ -250,6 +252,15 @@ describe('serialização e sincronização', () => {
     expect(p.cenario).toEqual(fb.cenario);
     const q = parseAdminState({ cenario: { alvoPres: 'x' } }, fb, st);
     expect(q.cenario).toEqual(fb.cenario);
+  });
+
+  it('estado salvo com uma corrida de governador que saiu do 2º turno (gov-rj): descarta só ela', () => {
+    const fb = estadoPadrao('servidor', 0, cenarioPadrao(st), st);
+    const p = parseAdminState({ cenario: { ...fb.cenario, alvoPres: 52.5, alvoGov: { 'gov-rj': 47, 'gov-am': 45 } } }, fb, st);
+    expect(p.cenario.alvoPres).toBe(52.5);
+    expect(p.cenario.alvoGov['gov-am']).toBe(45);
+    expect('gov-rj' in p.cenario.alvoGov).toBe(false);
+    expect(Object.keys(p.cenario.alvoGov).sort()).toEqual(st.govRaces.map((g) => g.id).sort());
   });
 
   it('setState aplica o estado (reconstrói se o cenário mudou) e NÃO chama onStateChange', () => {

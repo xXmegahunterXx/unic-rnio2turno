@@ -6,6 +6,7 @@ import type { UF } from '@/shared/types';
 import { UFS } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { normalize } from '@/shared/format';
+import { nEstadosGov } from '@/shared/gov2t';
 import type { IconName } from '@/app/ui/Icon';
 
 export type TipoItem = 'pagina' | 'uf' | 'municipio' | 'candidato' | 'secao';
@@ -43,7 +44,7 @@ export interface CandidatoBase {
 
 export const PAGINAS: ItemBusca[] = [
   { id: 'p-apuracao', tipo: 'pagina', rotulo: 'Apuração do 2º turno', sub: 'Placar nacional', to: '/apuracao', icone: 'ao-vivo', chave: 'apuracao placar presidente segundo turno resultado' },
-  { id: 'p-governadores', tipo: 'pagina', rotulo: 'Governadores', sub: '2º turno em 7 estados e eleitos no 1º turno', to: '/governadores', icone: 'grade', chave: 'governadores governador estados' },
+  { id: 'p-governadores', tipo: 'pagina', rotulo: 'Governadores', sub: `2º turno em ${nEstadosGov()} e eleitos no 1º turno`, to: '/governadores', icone: 'grade', chave: 'governadores governador estados' },
   { id: 'p-senado', tipo: 'pagina', rotulo: 'Senado', sub: '54 senadores eleitos no 1º turno', to: '/senado', icone: 'usuarios', chave: 'senado senadores senador' },
   { id: 'p-camara', tipo: 'pagina', rotulo: 'Câmara dos Deputados', sub: '513 deputados federais', to: '/camara', icone: 'usuarios', chave: 'camara deputados federais deputado federal bancadas hemiciclo' },
   { id: 'p-assembleias', tipo: 'pagina', rotulo: 'Assembleias Legislativas', sub: 'Deputados estaduais e distritais', to: '/assembleias', icone: 'usuarios', chave: 'assembleias assembleia legislativa deputados estaduais distritais camara legislativa' },

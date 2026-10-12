@@ -19,7 +19,7 @@ export type UFBr = (typeof UFS)[number];
 export type UF = UFBr | 'ZZ';
 export type Regiao = 'N' | 'NE' | 'CO' | 'SE' | 'S' | 'EX';
 
-/** 'pres' (Presidente 2º turno), 'gov-rj' etc. (Governador 2º turno), 'pres-t1' / 'gov-rj-t1' (1º turno, final). */
+/** 'pres' (Presidente 2º turno), 'gov-df' etc. (Governador 2º turno, UFs de UFS_GOV_2T), 'pres-t1' / 'gov-df-t1' (1º turno, final). */
 export type RaceId = string;
 
 /**
@@ -58,7 +58,7 @@ export interface Race {
   turno: 1 | 2;
   /** 'BR' para Presidente; a UF para Governador. */
   abrangencia: 'BR' | UF;
-  titulo: string; // "Presidente" | "Governador · Rio de Janeiro"
+  titulo: string; // "Presidente" | "Governador · Distrito Federal"
   /** Ordenados pelo número na urna (asc). 2º turno: exatamente 2. 1º turno: os 2 que foram ao 2º turno + "Outros". */
   candidatos: Candidate[];
   /** UFs que votam nesta disputa (Presidente: 27 + ZZ). */
@@ -315,7 +315,7 @@ export interface ScenarioConfig {
   seed: number;
   /** Alvo nacional: % de votos válidos do candidato índice 0 da corrida 'pres' (ex.: 50.6). */
   alvoPres: number;
-  /** Alvo por corrida de governador: % de válidos do candidato índice 0. Ex.: { 'gov-rj': 48.2 } */
+  /** Alvo por corrida de governador: % de válidos do candidato índice 0. Ex.: { 'gov-df': 48.2 } */
   alvoGov: Record<RaceId, number>;
   /** 0–1: fração dos eleitores dos demais candidatos do 1º turno que migra para o candidato 0 (antes da calibragem). */
   transferenciaOutros: number;

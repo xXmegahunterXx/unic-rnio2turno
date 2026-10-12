@@ -33,8 +33,26 @@ export const REGIAO_NOMES: Record<Regiao, string> = {
   N: 'Norte', NE: 'Nordeste', CO: 'Centro-Oeste', SE: 'Sudeste', S: 'Sul', EX: 'Exterior',
 };
 
-/** UFs com 2º turno para Governador em 2026 (conforme TSE, 1º turno de 04/10/2026). */
-export const UFS_GOV_2T: UF[] = ['AC', 'AM', 'DF', 'ES', 'RJ', 'RN', 'TO'];
+/**
+ * UFs com 2º turno para Governador em 2026, na ordem alfabética da sigla. FONTE ÚNICA do quadro: o pipeline de dados
+ * (scripts/data, inclusive o `secao_comum.py`, que lê esta linha), o motor, o servidor, as imagens OG e todos os textos
+ * do app derivam daqui — nenhum texto traz o número de disputas fixo (use `QTD_GOV_2T` e `listaUfsGov2t()`).
+ *
+ * Quadro conforme o TSE:
+ *  - 04/10/2026 (1º turno): AC, AM, DF, ES, RJ, RN, TO.
+ *  - 10/10/2026 15:09:50 (retotalização do RJ, `ele2026/6259/dados/rj/rj-c0003-e006259-u.json`): os votos do
+ *    candidato 10 viraram nulos técnicos e Douglas Ruas (PL, 22) passou a "Eleito" no 1º turno (50,88%). O RJ saiu
+ *    do 2º turno; o `comum/config/ele-c.json` lista a eleição 6260 só para AC, AM, DF, ES e RN.
+ *  - TO continua: o arquivo do 1º turno (`to-c0003-e006259-u.json`) ainda marca os dois finalistas como "2º turno"
+ *    (conferido em 12/10/2026), embora o 6260 de TO ainda não tenha sido publicado.
+ *
+ * Mudar o quadro (tirar ou pôr uma UF): edite SÓ esta linha (mantenha o formato de uma linha, que o Python lê) e rode
+ * o passo a passo do README › Dados › "Mudança no quadro do 2º turno (Governador)".
+ */
+export const UFS_GOV_2T: UF[] = ['AC', 'AM', 'DF', 'ES', 'RN', 'TO'];
+
+/** Quantas disputas de governador há no 2º turno (derivado de `UFS_GOV_2T`). */
+export const QTD_GOV_2T = UFS_GOV_2T.length;
 
 /** Buckets de margem (pontos percentuais) usados no mapa e no mosaico de seções. */
 export const MARGEM_BUCKETS = [5, 15, 30] as const;

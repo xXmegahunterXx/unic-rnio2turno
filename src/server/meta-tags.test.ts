@@ -4,6 +4,8 @@
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { Race } from '../shared/types';
+import { UFS_GOV_2T } from '../shared/constants';
+import { fmtLista } from '../shared/format';
 import { DadosEstaticos } from './dados-estaticos';
 import { consultaNormalizada, deUf, emUf, escapeHtml, injetarMeta, metaDaRota, normalizarTwitterSite, type ContextoMeta } from './meta-tags';
 import { RAIZ, datasetReal } from './test-helpers';
@@ -46,7 +48,7 @@ describe('imagem específica por página', () => {
     expect(s.imagem).toBe('/api/og/secao.png?race=pres&uf=sp&cod=71072&zona=1&secao=15');
     expect(s.titulo).toContain('Boletim de urna · Zona 1, Seção 15 · São Paulo (SP)');
     // governador de outra UF: a página cai em Presidente, a imagem e o título também
-    const g = metaDaRota('/apuracao/sp/71072', q('race=gov-rj'), ctx);
+    const g = metaDaRota('/apuracao/sp/71072', q('race=gov-am'), ctx);
     expect(g.imagem).toContain('race=pres&');
     expect(g.titulo).toContain('· Presidente ·');
     expect(metaDaRota('/apuracao/sp/99999', q(), ctx).status).toBe(404);
@@ -82,6 +84,10 @@ describe('imagem específica por página', () => {
     expect(df.descricao).toContain('Câmara Legislativa do Distrito Federal');
     expect(metaDaRota('/assembleias/zz', q(), ctx).status).toBe(404);
     expect(metaDaRota('/governadores', q(), ctx).imagem).toBe('/api/og/governadores.png');
+    // quantidade e siglas derivadas de UFS_GOV_2T (o RJ saiu do 2º turno em 10/10/2026)
+    const gov = metaDaRota('/governadores', q(), ctx);
+    expect(gov.descricao).toContain(`As ${UFS_GOV_2T.length} disputas de governador no 2º turno (${fmtLista(UFS_GOV_2T)})`);
+    expect(gov.descricao).not.toContain('RJ');
   });
 
   it('curiosidades: fato (?fato= ou ?f=) e capa; id desconhecido → capa', () => {
@@ -161,7 +167,7 @@ describe('injetarMeta e utilidades', () => {
   });
 
   it('consulta normalizada: só os parâmetros que mudam a página, em ordem fixa e limitados', () => {
-    expect(consultaNormalizada(q('utm_source=x&race=gov-rj&fbclid=1'))).toBe('race=gov-rj');
+    expect(consultaNormalizada(q('utm_source=x&race=gov-am&fbclid=1'))).toBe('race=gov-am');
     expect(consultaNormalizada(q('fato=a&race=pres'))).toBe('race=pres&fato=a');
     expect(consultaNormalizada(q(`c=${'A'.repeat(5_000)}`)).length).toBeLessThan(700);
   });

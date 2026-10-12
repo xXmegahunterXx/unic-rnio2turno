@@ -66,23 +66,23 @@ export const RACE_PRES_T1: Race = {
 };
 
 type CandGov = [number, string, string, string];
-const GOV: Record<string, [CandGov, CandGov]> = {
+/** Finalistas por UF do 2º turno (só para a vitrine; a lista que vale é `UFS_GOV_2T`). */
+const GOV: Partial<Record<UF, [CandGov, CandGov]>> = {
   AC: [[10, 'Alan Rick', 'REPUBLICANOS', 'Ricardo Leite'], [11, 'Mailza Assis', 'PP', 'Jéssica Sales']],
   AM: [[22, 'Professora Maria do Carmo', 'PL', 'Coronel Aníbal'], [55, 'Omar Aziz', 'PSD', 'Alessandra Campelo']],
   DF: [[11, 'Celina Leão', 'PP', 'Gustavo Rocha'], [13, 'Leandro Grass', 'PT', 'Dora Gomes']],
   ES: [[10, 'Lorenzo Pazolini', 'REPUBLICANOS', 'Eliane Leal'], [15, 'Ricardo Ferraço', 'MDB', 'Camillo Neves']],
-  RJ: [[22, 'Douglas Ruas', 'PL', 'Fernanda Louback'], [55, 'Eduardo Paes', 'PSD', 'Jane Reis']],
   RN: [[13, 'Cadu de Lula', 'PT', 'Larissa'], [44, 'Allyson', 'UNIÃO', 'Hermano']],
   TO: [[44, 'Professora Dorinha', 'UNIÃO', 'Atos Gomes'], [45, 'Vicentinho Júnior', 'PSDB', 'Amélio Cayres']],
 };
 
-export const RACES_GOV: Race[] = UFS_GOV_2T.map((uf) => ({
+export const RACES_GOV: Race[] = UFS_GOV_2T.filter((uf) => GOV[uf]).map((uf) => ({
   id: `gov-${uf.toLowerCase()}`,
   cargo: 'Governador',
   turno: 2,
   abrangencia: uf,
   titulo: `Governador · ${UF_NOMES[uf]}`,
-  candidatos: GOV[uf].map(([numero, nomeUrna, partido, vice], i) => ({
+  candidatos: GOV[uf]!.map(([numero, nomeUrna, partido, vice], i) => ({
     numero,
     nomeUrna,
     nome: nomeUrna,
@@ -256,7 +256,7 @@ const MUN_RJ: [nome: string, peso: number][] = [
   ['Cachoeiras de Macacu', 1.1], ['Paraíba do Sul', 0.8], ['Santo Antônio de Pádua', 0.8], ['Paraty', 0.8],
 ];
 
-function municipiosRj(t: number, simNow: number, race: 'pres' | 'gov'): MunicipioResumo[] {
+function municipiosRj(t: number, simNow: number, race: 'pres'): MunicipioResumo[] {
   const [eleitorado, secoes] = UF_BASE.RJ;
   const pesos = MUN_RJ.map(([, p]) => p);
   const els = repartir(eleitorado, pesos);
@@ -266,7 +266,7 @@ function municipiosRj(t: number, simNow: number, race: 'pres' | 'gov'): Municipi
     const capital = i === 0;
     const med = medUf * (capital ? 0.95 : 1 + 0.25 * jit(`mmed:${nome}`));
     const f = t >= FIM_MIN ? 1 : cdfLogNormal(t, med);
-    const pBase = race === 'pres' ? p0Uf('RJ', f) : p0Gov('RJ', f);
+    const pBase = p0Uf('RJ', f);
     const p0 = pBase + 0.08 * jit(`mp:${race}:${nome}`) + (capital ? 0.03 : 0);
     const tally = tallyArea(secs[i], els[i], f, p0, `rj:${race}:${nome}`);
     return {

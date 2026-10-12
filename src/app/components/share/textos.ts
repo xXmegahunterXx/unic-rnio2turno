@@ -9,7 +9,8 @@
 import type { FeedEvent, Race, Tally, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
-import { fmtHora, fmtInt, fmtPP, fmtPct } from '@/shared/format';
+import { fmtHora, fmtInt, fmtLista, fmtPP, fmtPct } from '@/shared/format';
+import { nEstadosGov } from '@/shared/gov2t';
 import { emUf } from '@/engine/events';
 import { pesoTextoX } from '@/app/lib/share';
 
@@ -176,20 +177,19 @@ export interface GovTextoItem {
   definida: boolean;
 }
 
-/** As 7 disputas de governador. */
+/** As disputas de governador do 2º turno (quantidade e siglas vêm de `itens`, uma por UF de `UFS_GOV_2T`). */
 export function textoGovernadores(itens: GovTextoItem[], opts: { simulado?: boolean; t1?: boolean; pst?: number }): string {
-  const siglas = itens.map((i) => i.uf);
-  const lista = siglas.length > 1 ? `${siglas.slice(0, -1).join(', ')} e ${siglas[siglas.length - 1]}` : siglas.join('');
+  const lista = fmtLista(itens.map((i) => i.uf));
   if (opts.t1) {
-    return finalizar(`Governador no 2º turno em ${itens.length} estados (${lista}): veja como foi o 1º turno e acompanhe a apuração de 25/10.`, false);
+    return finalizar(`Governador no 2º turno em ${nEstadosGov(itens.length)} (${lista}): veja como foi o 1º turno e acompanhe a apuração de 25/10.`, false);
   }
   const comVotos = itens.filter((i) => i.dif !== null);
   if (!comVotos.length) {
-    return finalizar(`Apuração do 2º turno para governador em ${itens.length} estados (${lista}), ao vivo e seção por seção.`, opts.simulado);
+    return finalizar(`Apuração do 2º turno para governador em ${nEstadosGov(itens.length)} (${lista}), ao vivo e seção por seção.`, opts.simulado);
   }
   const definidas = itens.filter((i) => i.definida).length;
   const apertada = comVotos.reduce((a, b) => (b.dif! < a.dif! ? b : a));
-  const partes = [`Governador · 2º turno em ${itens.length} estados: ${definidas} de ${itens.length} com resultado definido`];
+  const partes = [`Governador · 2º turno em ${nEstadosGov(itens.length)}: ${fmtInt(definidas)} de ${fmtInt(itens.length)} com resultado definido`];
   if (opts.pst !== undefined) partes[0] += `, ${fmtPct(opts.pst)} das seções totalizadas`;
   partes[0] += '.';
   partes.push(`A disputa mais apertada é ${emUf(apertada.uf, UF_NOMES[apertada.uf])}: ${fmtPP(apertada.dif!).replace('+', '')} de diferença.`);

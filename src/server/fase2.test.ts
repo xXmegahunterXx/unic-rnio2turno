@@ -141,12 +141,12 @@ describe('"reveja a noite" (?t=) na simulação', () => {
     expect(passado.simNow).toBe(Math.floor((t25 + 500) / 1000) * 1000);
 
     // governador: fora da UF da disputa, sem dado
-    const gov = (await (await get('/api/apuracao/gov-rj/br/municipios')).json()) as MunicipiosNacionalSnapshot;
+    const gov = (await (await get('/api/apuracao/gov-am/br/municipios')).json()) as MunicipiosNacionalSnapshot;
     expect(gov.lider).toHaveLength(n);
     if (m.ds.municipiosBr) {
       const ufs = m.ds.municipiosBr.uf;
-      expect(gov.lider.every((x, i) => ufs[i] === 'RJ' || x === -1)).toBe(true);
-      expect(gov.apurado.every((x, i) => ufs[i] === 'RJ' || x === 0)).toBe(true);
+      expect(gov.lider.every((x, i) => ufs[i] === 'AM' || x === -1)).toBe(true);
+      expect(gov.apurado.every((x, i) => ufs[i] === 'AM' || x === 0)).toBe(true);
     }
     expect((await get('/api/apuracao/nada/br/municipios')).status).toBe(404);
     expect((await get('/api/apuracao/pres/br/municipios?t=x')).status).toBe(400);

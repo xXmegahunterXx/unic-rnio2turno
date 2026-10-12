@@ -127,19 +127,19 @@ describe('outras abrangências reais', () => {
     expect(z.secoes).toBe(449);
   });
 
-  it('Governador RJ 1º turno: "anulado sub judice" entra em Outros, como no pvap oficial', () => {
-    const rj = map.resumoDoResultado(res('6259/dados/rj/rj-c0003-e006259-u.json'), R('gov-rj-t1'), races, true, 'RJ');
-    expect(rj.race.id).toBe('gov-rj-t1');
-    expect(R('gov-rj-t1').candidatos.map((c) => c.numero)).toEqual([22, 55, 0]);
-    const s = rj.resumo;
-    expect(s.votos).toEqual([4_271_199, 3_706_984, 690_855]); // Outros inclui Garotinho (274.411, sub judice)
-    expect(soma(s.votos)).toBe(8_669_038); // = vvc
-    expect([s.brancos, s.nulos]).toEqual([501_537, 675_292]);
-    expect(soma(s.votos) + s.brancos + s.nulos).toBe(9_845_867);
-    expect(pctValidos(s, 0).toFixed(2)).toBe('49.27'); // pvap oficial de Douglas Ruas
-    expect(pctValidos(s, 1).toFixed(2)).toBe('42.76');
-    // horário: arquivo do RJ "04/10/2026 22:19:52" (Brasília)
-    expect(s.ultimaAtualizacao).toBe(Date.UTC(2026, 9, 5, 1, 19, 52));
+  it('Governador DF 1º turno: "anulado sub judice" entra em Outros, como no pvap oficial', () => {
+    const df = map.resumoDoResultado(res('6259/dados/df/df-c0003-e006259-u.json'), R('gov-df-t1'), races, true, 'DF');
+    expect(df.race.id).toBe('gov-df-t1');
+    expect(R('gov-df-t1').candidatos.map((c) => c.numero)).toEqual([11, 13, 0]);
+    const s = df.resumo;
+    expect(s.votos).toEqual([825_530, 569_930, 257_777]); // Outros inclui 1.843 votos "anulados sub judice" (28 e 36)
+    expect(soma(s.votos)).toBe(1_653_237); // = vvc (vv = 1.651.394)
+    expect([s.brancos, s.nulos]).toEqual([74_774, 89_910]);
+    expect(soma(s.votos) + s.brancos + s.nulos).toBe(1_817_921);
+    expect(pctValidos(s, 0).toFixed(2)).toBe('49.93'); // pvap oficial de Celina Leão (sobre vv seria 49,99%)
+    expect(pctValidos(s, 1).toFixed(2)).toBe('34.47');
+    // horário: totalização do DF "04/10/2026 20:22:29" (Brasília)
+    expect(s.ultimaAtualizacao).toBe(Date.UTC(2026, 9, 4, 23, 22, 29));
   });
 });
 

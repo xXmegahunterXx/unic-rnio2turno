@@ -12,7 +12,7 @@
  *   - ele2026/6257/dados/{uf}/{uf}-e006257-ab.json          (seções/eleitorado/comparecimento por município)
  *   - ele2026/6257/dados/{uf}/{uf}[{mun}]-c0001-e006257-u.json  (Presidente 1º turno: UF e cada município)
  *   - ele2026/6257/dados/br/br-c0001-e006257-u.json         (Presidente 1º turno: Brasil + exterior)
- *   - ele2026/6259/dados/{uf}/{uf}[{mun}]-c0003-e006259-u.json  (Governador 1º turno, só nas 7 UFs com 2º turno)
+ *   - ele2026/6259/dados/{uf}/{uf}[{mun}]-c0003-e006259-u.json  (Governador 1º turno, só nas UFs com 2º turno, UFS_GOV_2T)
  *   - ele2026/6258/dados/br/br-c0001-e006258-u.json         (2º turno Presidente: candidatos; sempre atualizado)
  *   - ele2026/6260/dados/{uf}/{uf}-c0003-e006260-u.json     (2º turno Governador: opcional, pode não existir ainda)
  *   - IBGE api/v1/localidades/municipios → _ibge/…            (nomes oficiais: referência de grafia para exibição)

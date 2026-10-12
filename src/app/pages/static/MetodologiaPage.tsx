@@ -19,6 +19,7 @@ import {
   type ValorLikert,
 } from '@/app/content/afirmacoes';
 import { fmtInt, fmtPct } from '@/shared/format';
+import { SIGLAS_GOV_2T, nEstadosGov } from '@/shared/gov2t';
 import { REGRA_CORES, coresPresidente } from '@/shared/cores';
 import type { CorCandidato } from '@/shared/types';
 import { useMeta } from '@/app/data/hooks';
@@ -91,7 +92,7 @@ export default function MetodologiaPage() {
               <LinkExterno key="tse" href="https://resultados.tse.jus.br" className="whitespace-nowrap">
                 TSE · Resultados
               </LinkExterno>,
-              '2º turno (25/10) para Presidente e para Governador em 7 estados: totais do país, dos estados, dos municípios e das seções',
+              `2º turno (25/10) para Presidente e para Governador em ${nEstadosGov()} (${SIGLAS_GOV_2T}): totais do país, dos estados, dos municípios e das seções`,
               'A cada ~15 s na noite da apuração',
             ],
             ['TSE · 1º turno', 'Resultado oficial final de 4/10, por município, para comparação', 'Fixo (oficial)'],

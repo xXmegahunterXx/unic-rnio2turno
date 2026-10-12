@@ -3,6 +3,7 @@
  * sincronia com as rotas daqui (mais.test.ts confere).
  */
 import type { IconName } from '@/app/ui/Icon';
+import { nEstadosGov } from '@/shared/gov2t';
 
 /** Ícones extras do menu "Mais" (desenhados em layout/IconesExtras.tsx). */
 export type IconeExtra = 'tv' | 'codigo';
@@ -29,7 +30,7 @@ export const MAIS: GrupoMais[] = [
     itens: [
       { to: '/curiosidades', label: 'Curiosidades', desc: 'Recordes e fatos do 1º turno', icon: 'grafico', match: (p) => p.startsWith('/curiosidades') },
       { to: '/cenarios', label: 'E se…? Monte seu cenário', desc: 'Calculadora do 2º turno, não é previsão', icon: 'troca', match: (p) => p.startsWith('/cenarios') },
-      { to: '/governadores', label: 'Governadores', desc: '2º turno em 7 estados', icon: 'grade', match: (p) => p.startsWith('/governadores') },
+      { to: '/governadores', label: 'Governadores', desc: `2º turno em ${nEstadosGov()}`, icon: 'grade', match: (p) => p.startsWith('/governadores') },
       { to: '/tv', label: 'Modo TV', desc: 'Tela cheia para transmissão', icon: 'tv' },
     ],
   },

@@ -23,7 +23,7 @@ export function parseUf(v: string): UF {
   return u as UF;
 }
 
-/** Corrida: formato 'pres', 'gov-rj', 'pres-t1', 'gov-rj-t1' (a existência é conferida depois → 404). */
+/** Corrida: formato 'pres', 'gov-df', 'pres-t1', 'gov-df-t1' (a existência é conferida depois → 404). */
 export function parseRace(v: string): string {
   const r = String(v ?? '').toLowerCase();
   if (!/^[a-z][a-z0-9-]{1,23}$/.test(r)) throw new ErroValidacao(`Corrida inválida: "${String(v).slice(0, 24)}".`);

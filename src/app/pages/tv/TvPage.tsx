@@ -10,14 +10,15 @@
  *    quando possível. Controles somem depois de 3 s sem mexer o mouse.
  *  - Legível a 3 m em 1920×1080 e 1280×720: todas as medidas derivam de `--u` (≈ 1% da altura útil); também
  *    funciona em tablet (retrato empilha placar e mapa).
- *  - Parâmetros: `?race=` (padrão pres; gov-xx mostra a UF), `?mapa=municipios`, `?rodizio=0`.
+ *  - Parâmetros: `?race=` (padrão pres; gov-xx mostra a UF — só as UFs de `UFS_GOV_2T`; uma UF fora do quadro,
+ *    como um link antigo de gov-rj, cai em Presidente), `?mapa=municipios`, `?rodizio=0`.
  *  - Na fase 'pre' mostra a contagem regressiva e o 1º turno oficial.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
 import type { FeedEvent, Patrocinio, Race, RaceId, Summary, UF } from '@/shared/types';
-import { UF_NOMES } from '@/shared/constants';
+import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
 import { margem, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtHora, fmtHoraSeg, fmtInt, fmtPct, fmtPP } from '@/shared/format';
 import { useMunicipiosBr, useNacional, useRace, useStatus, useUf } from '@/app/data/hooks';
@@ -58,7 +59,7 @@ export default function TvPage() {
   const status = statusQ.data;
   const pre = status?.fase === 'pre';
   const pedida = (params.get('race') || 'pres').toLowerCase();
-  const gov = /^gov-[a-z]{2}$/.test(pedida) ? pedida : null;
+  const gov = /^gov-[a-z]{2}$/.test(pedida) && UFS_GOV_2T.includes(pedida.slice(4).toUpperCase() as UF) ? pedida : null;
   const ufGov = gov ? (gov.slice(4).toUpperCase() as UF) : null;
   const raceId: RaceId = pre ? `${gov ?? 'pres'}-t1` : (gov ?? 'pres');
   const race = useRace(raceId);

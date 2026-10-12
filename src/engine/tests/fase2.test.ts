@@ -4,7 +4,7 @@
  * public/data/secao).
  */
 import { describe, expect, it, vi } from 'vitest';
-import { INICIO_APURACAO } from '../../shared/constants';
+import { INICIO_APURACAO, UFS_GOV_2T } from '../../shared/constants';
 import type { LocaisUfDataset, MunicipiosBr } from '../../shared/dataset';
 import type { AdminState, MunicipiosNacionalSnapshot, Patrocinio, Summary, UF } from '../../shared/types';
 import { UFS } from '../../shared/types';
@@ -51,7 +51,7 @@ describe('reveja a noite (instante t)', () => {
       ref.command({ tipo: 'saltar-tempo', simNow: T });
       expect(semGeradoEm(c.nacional('pres', T))).toEqual(semGeradoEm(ref.nacional('pres')));
       expect(semGeradoEm(c.uf('pres', 'BA', T))).toEqual(semGeradoEm(ref.uf('pres', 'BA')));
-      expect(semGeradoEm(c.nacional('gov-rj', T))).toEqual(semGeradoEm(ref.nacional('gov-rj')));
+      expect(semGeradoEm(c.nacional('gov-am', T))).toEqual(semGeradoEm(ref.nacional('gov-am')));
       expect(semGeradoEm(c.municipio('pres', 'SP', '71072', T))).toEqual(semGeradoEm(ref.municipio('pres', 'SP', '71072')));
       expect(semGeradoEm(c.zona('pres', 'SP', '71072', 1, T))).toEqual(semGeradoEm(ref.zona('pres', 'SP', '71072', 1)));
       expect(c.secao('pres', 'DF', '97012', 1, 1, T)).toEqual(ref.secao('pres', 'DF', '97012', 1, 1));
@@ -197,7 +197,7 @@ describe('municipiosBr (mapa nacional por município)', () => {
       expect(mb.apurado.every((x) => x === 1000)).toBe(true);
       expect(mb.municipiosLiderados[0] + mb.municipiosLiderados[1]).toBeGreaterThan(5500);
     }
-    checaMapa(c, 'gov-rj', ordem, `gov-rj@${pct}%`);
+    checaMapa(c, 'gov-am', ordem, `gov-am@${pct}%`);
   });
 
   it('governador: só a UF da disputa tem dados; 1º turno: 100% apurado e % sobre todos os válidos', () => {
@@ -398,16 +398,20 @@ describe('locais de votação (sob demanda, com cache)', () => {
 // 1º turno REAL por seção (dados sintéticos coerentes com o dataset)
 // ---------------------------------------------------------------------------------------------
 
-const SINT: UF[] = ['AC', 'DF', 'RJ', 'RN', 'ZZ'];
+// RJ fica pelo volume de seções (Presidente); desde a retotalização de 10/10/2026 não tem 2º turno de governador.
+const SINT: UF[] = ['AC', 'AM', 'DF', 'RJ', 'RN', 'ZZ'];
+/** UFs sintéticas com 2º turno de governador (derivado de UFS_GOV_2T). */
+const SINT_GOV = SINT.filter((uf) => (UFS_GOV_2T as UF[]).includes(uf));
 const dsSint = comSecaoSintetica(semSecao(ds), SINT);
 const stSint = buildStructure(dsSint);
 
-describe('1º turno real por seção (sintético: AC, DF, RJ, RN, ZZ; demais UFs no fallback)', () => {
+describe('1º turno real por seção (sintético: AC, AM, DF, RJ, RN, ZZ; demais UFs no fallback)', () => {
   it('estrutura: UFs com dados, conferência por município, avisos de arquivo inválido', () => {
     expect(stSint.real!.nUfs).toBe(SINT.length);
     for (const uf of SINT) expect(stSint.real!.ufPres[stSint.ufIndex.get(uf)!], uf).toBe(1);
     expect(stSint.real!.ufPres[stSint.ufIndex.get('SP')!]).toBe(0);
-    for (const uf of ['AC', 'DF', 'RJ', 'RN'] as UF[]) expect(stSint.real!.ufGov[stSint.ufIndex.get(uf)!], uf).toBe(1);
+    expect(SINT_GOV).toEqual(['AC', 'AM', 'DF', 'RN']);
+    for (const uf of SINT) expect(stSint.real!.ufGov[stSint.ufIndex.get(uf)!], uf).toBe(SINT_GOV.includes(uf) ? 1 : 0);
     for (const uf of SINT) {
       const u = stSint.ufIndex.get(uf)!;
       for (let m = stSint.ufMunStart[u]; m < stSint.ufMunEnd[u]; m++) expect(stSint.real!.munConfere[m]).toBe(1);
@@ -477,8 +481,8 @@ describe('1º turno real por seção (sintético: AC, DF, RJ, RN, ZZ; demais UFs
         const us = c.uf('pres', uf);
         checaSoma(us.municipios, us.resumo, `mun→${uf}`);
       }
-      for (const [uf, cod] of [['DF', '97012'], ['RJ', '60011'], ['AC', '01392']] as [UF, string][]) {
-        for (const race of ['pres', `gov-${uf.toLowerCase()}`]) {
+      for (const [uf, cod] of [['DF', '97012'], ['AM', '02550'], ['RJ', '60011'], ['AC', '01392']] as [UF, string][]) {
+        for (const race of SINT_GOV.includes(uf) ? ['pres', `gov-${uf.toLowerCase()}`] : ['pres']) {
           const ms = c.municipio(race, uf, cod);
           checaTally(ms.resumo, `${race} ${uf}/${cod}`);
           checaSoma(ms.zonas, ms.resumo, `${race} zonas→${uf}/${cod}`);
@@ -495,7 +499,7 @@ describe('1º turno real por seção (sintético: AC, DF, RJ, RN, ZZ; demais UFs
   it('pres-t1/gov-t1: zona e seção com os números REAIS; município com zonas reais e mosaico seção a seção', () => {
     const { c } = novo(dsSint);
     const real = stSint.real!;
-    for (const [race, uf, cod] of [['pres-t1', 'DF', '97012'], ['pres-t1', 'RJ', '60011'], ['gov-rj-t1', 'RJ', '60011'], ['pres-t1', 'ZZ', ds.ufs.ZZ!.municipios[0].cod]] as [string, UF, string][]) {
+    for (const [race, uf, cod] of [['pres-t1', 'DF', '97012'], ['pres-t1', 'RJ', '60011'], ['gov-am-t1', 'AM', '02550'], ['pres-t1', 'ZZ', ds.ufs.ZZ!.municipios[0].cod]] as [string, UF, string][]) {
       const gov = race.startsWith('gov');
       const col = gov ? real.gov : real.pres;
       const ms = c.municipio(race, uf, cod);

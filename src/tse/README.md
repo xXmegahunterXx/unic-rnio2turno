@@ -109,8 +109,11 @@ Vencedor por seção exigiria 1 BU por seção (~500 mil downloads): inviável. 
 - Números chegam como string; `""` = 0. Percentuais com vírgula (só para conferência).
 - **Ordem dos votos** = `Race.candidatos` (por número). Corridas `-t1`: 2 finalistas + "Outros" (`numero 0`).
 - **"Outros" = soma do `vap` de todos os demais candidatos = `vvc − finalistas`**, inclusive "anulado sub
-  judice". É a base do `pvap` oficial: RJ governador 1T → Douglas Ruas 4.271.199 / 8.669.038 = **49,27%**
-  (pvap do TSE), e não 50,88% (que seria sobre `vv`). Com isso `calc.ts` reproduz os % do TSE.
+  judice". É a base do `pvap` oficial: DF governador 1T → Celina Leão 825.530 / 1.653.237 = **49,93%**
+  (pvap do TSE; o `vvc` inclui 1.843 votos "anulados sub judice"), e não 49,99% (que seria sobre `vv`). Com isso
+  `calc.ts` reproduz os % do TSE. (O exemplo antigo era o RJ: Douglas Ruas 49,27% com 274.411 votos sub judice; na
+  retotalização de 10/10/2026 esses votos viraram nulos técnicos, o `vvc` caiu para o `vv` e ele passou a 50,88%,
+  "Eleito" no 1º turno.)
 - brancos = `v.vb`; nulos = `v.tvn` (nulos + nulos técnicos) + eventual sobra de `vvc` (só quando a corrida
   não tem "Outros"). Sempre Σvotos + brancos + nulos = `v.tv` = comparecimento.
 - comparecimento `e.c`; eleitorado `e.te`; eleitorado das seções totalizadas `e.est`; abstenção = **`e.a`
@@ -159,9 +162,10 @@ suplementares e consultas populares municipais, que não usamos). O padrão do s
 (`Race.tse` das corridas de 2º turno, `tsePadrao` em `src/engine/state.ts`).
 
 **Estado em 12/10/2026 (10:3x):** `br-c0001-e006258-u.json` publicado e zerado (`0 de 470.848 seções`, gerado em
-11/10 12:32). Governador `6260` publicado para **AC, AM, DF, ES e RN**; **RJ** e **TO** dão 404 (o RJ teve o
-2º turno de Governador desfeito em 10/10 — ver README, "Mudança no quadro do 2º turno"; o TO ainda aparece como
-"2º turno" no arquivo do 1º turno, mas não está na eleição `6260`). Enquanto o arquivo de uma UF não existe, a corrida
+11/10 12:32). Governador `6260` publicado para **AC, AM, DF, ES e RN**; **TO** dá 404 (ainda aparece como "2º turno"
+no arquivo do 1º turno, conferido de novo em 12/10, mas não está na eleição `6260`). O **RJ** saiu do quadro: o 2º
+turno de Governador foi desfeito na retotalização de 10/10/2026 15:09:50 e o RJ não está mais em `UFS_GOV_2T` (ver
+README, "Mudança no quadro do 2º turno"). Enquanto o arquivo de uma UF não existe, a corrida
 fica em `ausentes` no `health()` e as páginas mostram "aguardando" (nunca número inventado). `arquivo-urna/3221`: `cs`
 de SP publicado (sem `da`).
 
@@ -294,5 +298,5 @@ TSE_LIVE=1 npx vitest run src/tse/live.test.ts   # contra o feed real (1º turno
 ```
 
 Números conferidos à mão (1T): Brasil Flávio 56.104.503 (47,03%), Lula 53.879.538 (45,16%), Outros
-9.316.747, brancos 2.300.798, nulos 3.674.249, comparecimento 125.275.835, 499.248 seções; RJ governador
-49,27%/42,76%; Acrelândia/AC 1.508 × 5.940 + 343; BUs de 3 seções; soma de zonas e municípios (ao vivo).
+9.316.747, brancos 2.300.798, nulos 3.674.249, comparecimento 125.275.835, 499.248 seções; DF governador
+49,93%/34,47% (com votos sub judice em "Outros"); Acrelândia/AC 1.508 × 5.940 + 343; BUs de 3 seções; soma de zonas e municípios (ao vivo).

@@ -3,7 +3,7 @@
  * calibragem, curva de totalização, regra de "eleito", eventos, 1º turno e desempenho.
  */
 import { describe, expect, it } from 'vitest';
-import { INICIO_APURACAO } from '../../shared/constants';
+import { INICIO_APURACAO, UFS_GOV_2T } from '../../shared/constants';
 import type { MunicipioSnapshot, NationalSnapshot, Summary, UF } from '../../shared/types';
 import { NotFoundError, type Controller, type LoadedDataset } from '../api';
 import { createController } from '../controller';
@@ -16,7 +16,12 @@ import { checaSoma, checaTally, dataset, relogio, semGeradoEm } from './helpers'
 import { semSecao } from './secao-sintetica';
 
 const INI = INICIO_APURACAO;
-const GOVS = ['gov-ac', 'gov-am', 'gov-df', 'gov-es', 'gov-rj', 'gov-rn', 'gov-to'];
+/** Corridas de governador do 2º turno: derivadas de UFS_GOV_2T (o quadro do TSE pode mudar; ex.: o RJ saiu em 10/10/2026). */
+const GOVS = UFS_GOV_2T.map((u) => `gov-${u.toLowerCase()}`);
+/** Disputa de governador dos testes pontuais: Manaus (AM), capital com 13 zonas (AM tem o 6260 publicado pelo TSE). */
+const GOV = 'gov-am';
+const GOV_UF: UF = 'AM';
+const GOV_CAP = '02550';
 const pct0 = (s: Summary) => (100 * s.votos[0]) / (s.votos[0] + s.votos[1]);
 
 // carregado no topo (os blocos `describe` montam controllers durante a coleta)
@@ -45,6 +50,7 @@ describe('estrutura e dataset', () => {
     expect(eleit).toBe(158_745_502);
     expect(eleit).toBe(ds.meta.totaisPrimeiroTurno.eleitorado);
     expect(st.govRaces.map((g) => g.id)).toEqual(GOVS);
+    expect(GOVS).toContain(GOV);
   });
 });
 
@@ -102,7 +108,7 @@ describe('determinismo', () => {
     b.ir(42.5);
     expect(semGeradoEm(b.c.nacional('pres'))).toEqual(semGeradoEm(a.c.nacional('pres')));
     expect(semGeradoEm(b.c.uf('pres', 'MG'))).toEqual(semGeradoEm(a.c.uf('pres', 'MG')));
-    expect(semGeradoEm(b.c.municipio('gov-rj', 'RJ', '60011'))).toEqual(semGeradoEm(a.c.municipio('gov-rj', 'RJ', '60011')));
+    expect(semGeradoEm(b.c.municipio(GOV, GOV_UF, GOV_CAP))).toEqual(semGeradoEm(a.c.municipio(GOV, GOV_UF, GOV_CAP)));
   });
 });
 
@@ -146,7 +152,7 @@ describe('invariantes em vários instantes', () => {
         expect(gn.resumo.eleitoradoTotalizado).toBe(nac.ufs[uf]!.eleitoradoTotalizado);
         expect(gn.resumo.secoesTotalizadas).toBe(nac.ufs[uf]!.secoesTotalizadas);
       }
-      checaMunicipio(c, 'gov-rj', 'RJ', '60011', false);
+      checaMunicipio(c, GOV, GOV_UF, GOV_CAP, false);
       checaMunicipio(c, 'gov-df', 'DF', '97012', true);
     });
   }
@@ -206,15 +212,17 @@ describe('calibragem', () => {
   it('padrão neutro = 1º turno com transferência 50/50 (valores derivados do dataset)', () => {
     const n = alvosNeutros(st);
     expect(n.pres).toBe(49.07);
-    expect(n.gov).toEqual({
+    // valores conferidos por UF; o teste olha só as UFs do quadro atual (UFS_GOV_2T), para que tirar/pôr uma UF
+    // seja um ajuste de uma linha em constants.ts
+    const NEUTROS: Record<string, number> = {
       'gov-ac': 41.25,
       'gov-am': 41.93,
       'gov-df': 57.73,
       'gov-es': 57.79,
-      'gov-rj': 53.25,
       'gov-rn': 49.61,
       'gov-to': 50.79,
-    });
+    };
+    expect(n.gov).toEqual(Object.fromEntries(GOVS.map((g) => [g, NEUTROS[g]])));
   });
 
   it.each(PRESET_IDS)('preset %s: resultado final = alvo ± 0,05 p.p. (Presidente e cada governador)', (id) => {
@@ -270,7 +278,7 @@ describe('robustez', () => {
       { alvoPres: 5, intensidadeRegional: 1.5, ruidoSecao: 1, transferenciaOutros: 0 },
       { alvoPres: 95, intensidadeRegional: 0, ruidoSecao: 0, transferenciaOutros: 1 },
       { comparecimentoDelta: -30, brancosFator: 5, nulosFator: 0, ordemRegional: 'aleatoria' as const },
-      { comparecimentoDelta: 30, brancosFator: 0, nulosFator: 5, ritmo: 'rapido' as const, alvoGov: { 'gov-to': 99 } },
+      { comparecimentoDelta: 30, brancosFator: 0, nulosFator: 5, ritmo: 'rapido' as const, alvoGov: { [GOV]: 99 } },
     ];
     for (const e of extremos) {
       const cen = mesclaCenario(cenarioPadrao(st), e, st);
@@ -433,7 +441,7 @@ describe('eventos e "eleito"', () => {
     const { c, ir } = ctrlEm('equilibrio-a');
     for (const pct of [3, 37.5, 81, 100]) {
       ir(pct);
-      for (const s of [c.nacional('pres'), c.uf('pres', 'SP'), c.nacional('gov-rj')]) {
+      for (const s of [c.nacional('pres'), c.uf('pres', 'SP'), c.nacional(GOV)]) {
         const serie = s.serie;
         expect(serie.length).toBeGreaterThan(0);
         for (let i = 1; i < serie.length; i++) {
@@ -508,7 +516,7 @@ describe('1º turno (dataset oficial)', () => {
     for (const z of m.mosaico) expect(z.estado).toBe(ch.repeat(z.estado.length));
     expect(m.primeiroTurno).toBeNull();
     expect(() => c.zona('pres-t1', 'SP', '71072', 1)).toThrow(NotFoundError);
-    expect(() => c.secao('gov-rj-t1', 'RJ', '60011', 4, 1)).toThrow(/1º turno/);
+    expect(() => c.secao(`${GOV}-t1`, GOV_UF, GOV_CAP, 1, 550)).toThrow(/1º turno/);
   });
 
   it('município no 2º turno traz o 1º turno local na ordem da corrida -t1', () => {
@@ -517,7 +525,7 @@ describe('1º turno (dataset oficial)', () => {
     expect(m.primeiroTurno!.votos[0]).toBe(d.t1.votos['13']);
     expect(m.primeiroTurno!.votos[1]).toBe(d.t1.votos['22']);
     expect(m.primeiroTurno!.comparecimento).toBe(d.t1.comparecimento);
-    const g = c.municipio('gov-rj', 'RJ', '60011');
+    const g = c.municipio(GOV, GOV_UF, GOV_CAP);
     expect(g.primeiroTurno!.votos.length).toBe(3);
   });
 });
@@ -526,7 +534,8 @@ describe('escopos inexistentes → NotFoundError', () => {
   const { c } = ctrlEm();
   it.each([
     ['corrida', () => c.nacional('vereador')],
-    ['UF fora da corrida', () => c.uf('gov-rj', 'SP')],
+    ['UF fora da corrida', () => c.uf(GOV, 'SP')],
+    ['UF que saiu do 2º turno de governador (RJ, retotalização de 10/10/2026)', () => c.nacional('gov-rj')],
     ['UF desconhecida', () => c.uf('pres', 'XX' as UF)],
     ['exterior em governador', () => c.uf('gov-df', 'ZZ')],
     ['município', () => c.municipio('pres', 'SP', '99999')],
@@ -604,5 +613,7 @@ describe('desempenho', () => {
 const FINGERPRINT = 261226385;
 /** Impressão digital do cenário padrão com os arquivos REAIS de seção, por resumo (hash) dos arquivos. */
 const FINGERPRINT_SECAO: Record<number, number> = {
-  1918870254: 485363866, // public/data/secao de 10/10/2026 (28 UFs, 7 governadores)
+  // public/data/secao de 10/10/2026 (28 UFs). Resumo e impressão usam só as colunas de Presidente: não mudaram quando o
+  // RJ saiu do 2º turno de governador (12/10/2026, retotalização do TSE).
+  1918870254: 485363866,
 };

@@ -5,7 +5,7 @@
  * Regras da corrida exibida:
  *  - `?race=` é validado contra o meta e contra a UF (governador só na própria UF; exterior só Presidente).
  *  - Na fase 'pre' (antes das 17h de 25/10 ou fonte 'pre') mostramos o 1º TURNO REAL (`-t1`)
- *    automaticamente; a URL continua com a "família" (pres, gov-rj) para que, quando a apuração começar,
+ *    automaticamente; a URL continua com a "família" (pres, gov-df) para que, quando a apuração começar,
  *    a página passe sozinha ao 2º turno.
  *  - Um link explícito para `-t1` durante a apuração é respeitado (com aviso e atalho para o 2º turno).
  */

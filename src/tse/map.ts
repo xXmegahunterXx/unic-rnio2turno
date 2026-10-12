@@ -13,7 +13,8 @@
  *    hora do Acre). Ver `FUSO_UF` e `dataHoraLocal`;
  *  - `vvc` (válidos computados) = soma de `vap` de TODOS os candidatos, inclusive "anulado sub judice"; é a
  *    base do `pvap` oficial. Por isso "Outros" (corridas de 1º turno) soma todos os demais `vap`, e o % de
- *    calc.ts bate com o `pvap` do TSE (ex.: RJ governador 1T: Douglas Ruas 49,27%).
+ *    calc.ts bate com o `pvap` do TSE (ex.: DF governador 1T: Celina Leão 825.530 / 1.653.237 = 49,93%; sobre `vv`
+ *    seriam 49,99%).
  */
 import type {
   ApuracaoStatus,

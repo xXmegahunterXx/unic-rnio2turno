@@ -9,7 +9,7 @@
 Fontes (dados abertos do TSE, https://cdn.tse.jus.br/estatistica/sead/odsele/), lidas em streaming de dentro do ZIP:
  - detalhe_votacao_secao/detalhe_votacao_secao_2026.zip
      · detalhe_votacao_secao_2026_BR.csv   → Presidente (cargo 1), todas as UFs + ZZ, 1 linha por seção ativa
-     · detalhe_votacao_secao_2026_{UF}.csv → cargos estaduais; usamos Governador (cargo 3) nas 7 UFs com 2º turno
+     · detalhe_votacao_secao_2026_{UF}.csv → cargos estaduais; usamos Governador (cargo 3) nas UFs com 2º turno (UFS_GOV_2T)
    Colunas usadas: QT_APTOS, QT_COMPARECIMENTO, QT_VOTOS_BRANCOS, QT_VOTOS_NULOS, QT_VOTOS_NOMINAIS, NR_LOCAL_VOTACAO.
  - votacao_secao/votacao_secao_2026_BR.zip   → votos por seção e votável, Presidente (todas as UFs + ZZ)
  - votacao_secao/votacao_secao_2026_{UF}.zip → idem por UF; usamos só Governador (cargo 3)
@@ -17,7 +17,7 @@ Fontes (dados abertos do TSE, https://cdn.tse.jus.br/estatistica/sead/odsele/), 
 Convenções (iguais às do dataset da fase 1, public/data/uf/*.json — ver scripts/data/lib/resultado.ts):
  - a / b = finalistas do 2º turno em ordem do número (Presidente 13 e 22; Governador: corrida gov-xx de meta.json).
  - outros = Σ votos dos demais candidatos COMPUTADOS no resultado oficial (os números que aparecem em
-   UfDataset.municipios[].t1.votos / t1gov.votos — inclui "Anulado sub judice", ex.: Garotinho (10) no RJ).
+   UfDataset.municipios[].t1.votos / t1gov.votos — inclui "Anulado sub judice", ex.: nº 28 e 36 no DF).
  - brancos = NR_VOTAVEL 95.
  - nulos = NR_VOTAVEL 96 + votos de candidatos NÃO computados (nulo técnico; em 2026: Presidente nº 28, cujos votos o
    TSE soma em "nulos" = tvn). Assim, por seção: comp = a + b + outros + brancos + nulos.
@@ -246,7 +246,7 @@ def main() -> None:
             # foi transferida; o detalhe e o eleitorado_local trazem o local onde a urna de fato funcionou (o que usamos)
             obs_local_original.add((uf, i))
 
-    # --- Governador (7 UFs)
+    # --- Governador (UFs de UFS_GOV_2T)
     for uf in UFS_GOV_2T:
         log(f'lendo Governador {uf}…')
         for r in ler_csv(DET_ZIP, f'detalhe_votacao_secao_2026_{uf}.csv'):

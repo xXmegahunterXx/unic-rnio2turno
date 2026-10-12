@@ -119,11 +119,17 @@ describe('SPA com meta tags por rota', () => {
     expect(html.match(/<title>/g)).toHaveLength(1);
   });
 
-  it('/apuracao?race=gov-rj → título e imagem da corrida', async () => {
+  it('/apuracao?race=gov-am → título e imagem da corrida', async () => {
+    const html = await (await get('/apuracao?race=gov-am')).text();
+    expect(html).toContain('<title>Apuração ao vivo · Governador · Amazonas · Sintonia</title>');
+    expect(html).toContain('apuracao.png?race=gov-am');
+    expect(html).toContain('<meta property="og:url" content="https://sintonia.exemplo.br/apuracao?race=gov-am" />');
+  });
+
+  it('link antigo de uma UF que saiu do 2º turno (gov-rj, 10/10/2026) cai em Presidente', async () => {
     const html = await (await get('/apuracao?race=gov-rj')).text();
-    expect(html).toContain('<title>Apuração ao vivo · Governador · Rio de Janeiro · Sintonia</title>');
-    expect(html).toContain('apuracao.png?race=gov-rj');
-    expect(html).toContain('<meta property="og:url" content="https://sintonia.exemplo.br/apuracao?race=gov-rj" />');
+    expect(html).toContain('<title>Apuração ao vivo · Presidente · Sintonia</title>');
+    expect(html).toContain('apuracao.png?race=pres');
   });
 
   it('/apuracao/:uf e /apuracao/:uf/:cod usam nomes do dataset', async () => {

@@ -12,7 +12,7 @@
  *
  * Verificações (qualquer falha → código de saída 1):
  *  1. Estrutura: 28 arquivos, `n` = UfMeta.secoes = nº de seções da ordem canônica, toda coluna com `n` posições,
- *     Governador presente exatamente nas 7 UFs com 2º turno.
+ *     Governador presente exatamente nas UFs com 2º turno (UFS_GOV_2T).
  *  2. Por seção: a + b + outros + brancos + nulos = comparecimento ≤ aptos (Presidente e Governador).
  *  3. Por MUNICÍPIO, 100% exato: Σ seções de aptos, comparecimento, a, b, outros, brancos e nulos = t1 / t1gov
  *     (aptos = eleitorado; outros = Σ votos − a − b). Σ por UF e nacional idem.

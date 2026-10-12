@@ -6,7 +6,7 @@
  *   /api/og/secao.png?race=&uf=&cod=&zona=&secao=   boletim de urna: 2º turno (se houver) + 1º turno oficial
  *   /api/og/candidato.png?sq=               ficha do candidato (foto oficial, dado real)
  *   /api/og/senado.png[?uf=]  /api/og/camara.png[?uf=]  /api/og/assembleia.png[?uf=]   hemiciclo/eleitos
- *   /api/og/governadores.png                as 7 disputas de governador
+ *   /api/og/governadores.png                as disputas de governador do 2º turno (UFS_GOV_2T)
  *   /api/og/curiosidade.png[?f=<id>]        fato do 1º turno (sem f: capa das curiosidades)
  *   /api/og/cenario.png[?c=<código>]        cenário hipotético (código inválido → cartão genérico da calculadora)
  *   /api/og/teste.png                       Teste Cego (genérico; o código de um Duelo NUNCA é lido — LGPD)
@@ -467,7 +467,7 @@ export function registrarOg(app: App, d: DepsOg): void {
   app.get('/api/og/camara.png', (c) => composicaoProporcional('camara', c, ufBr(validar(qUfOpcional, c.req.query(), 'Parâmetro: ?uf=<sigla>.').uf)));
   app.get('/api/og/assembleia.png', (c) => composicaoProporcional('assembleia', c, ufBr(validar(qUfOpcional, c.req.query(), 'Parâmetro: ?uf=<sigla>.').uf)));
 
-  // ---- governadores (as 7 disputas) ------------------------------------------------------------------
+  // ---- governadores (as disputas do 2º turno, UFS_GOV_2T) --------------------------------------------
   app.get('/api/og/governadores.png', async (c) => {
     const st = dados.status();
     const pre = st.fase === 'pre';

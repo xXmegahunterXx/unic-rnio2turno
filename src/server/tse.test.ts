@@ -69,7 +69,7 @@ describe('fonte tse', () => {
   });
 
   it('UF inexistente na corrida → 404 também na fonte tse', async () => {
-    expect((await m.app.request('/api/apuracao/gov-rj/uf/sp')).status).toBe(404);
+    expect((await m.app.request('/api/apuracao/gov-am/uf/sp')).status).toBe(404);
   });
 
   it('?t= na fonte tse: Brasil/UF pelo histórico; município responde o agora; mapa nacional por município', async () => {

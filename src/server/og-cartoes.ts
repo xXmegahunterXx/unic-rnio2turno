@@ -1,6 +1,6 @@
 /**
  * Layouts das imagens de compartilhamento (OG, 1200×630) das páginas além do placar (og.ts): município, boletim de
- * urna da seção, ficha do candidato, Senado/Câmara/Assembleias (hemiciclo), as 7 disputas de governador,
+ * urna da seção, ficha do candidato, Senado/Câmara/Assembleias (hemiciclo), as disputas de governador do 2º turno,
  * curiosidades e cenários. Mesma linguagem visual do placar (tema escuro, marca, selo, kicker, título, rodapé).
  *
  * Regras (ARCHITECTURE §1): a cor de cada candidato vem dos dados (`Candidate.cor`: Presidente vermelho/azul —
@@ -21,6 +21,7 @@ import { corCandidato, coresIdentidadePresidente, coresPresidente } from '../sha
 import { pctTotalizadas, pctValidos, validos } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
 import { fmtInt, fmtPP, fmtPct } from '../shared/format';
+import { asDisputasGov } from '../shared/gov2t';
 import { C, OG_H, OG_W, corOg, fundo, h, iniciais, marca, pill, tintaOg, type Estilo, type No } from './og';
 import { COR_PENDENTE, corPartido, porTamanho, svgHemiciclo, type Bancada } from './og-hemiciclo';
 
@@ -506,8 +507,11 @@ export function layoutEleitosUf(inp: { uf: UF; titulo: string; kicker: string; e
 }
 
 // ---------------------------------------------------------------------------------------------
-// As 7 disputas de governador
+// As disputas de governador do 2º turno (uma por UF de UFS_GOV_2T; quantidade e título derivados dela)
 // ---------------------------------------------------------------------------------------------
+
+/** Quantas linhas de disputa cabem na imagem 1200×630 (capacidade do layout, não o número de disputas). */
+const MAX_LINHAS_GOV = 7;
 
 export interface DisputaGov {
   uf: UF;
@@ -577,10 +581,10 @@ export function layoutGovernadores(inp: OgGovernadoresInput): No {
     simulacao: inp.simulacao,
     selo,
     kicker: inp.primeiroTurno ? 'GOVERNADORES · 1º TURNO 2026 · % DOS VÁLIDOS' : 'GOVERNADORES · 2º TURNO 2026 · % DOS VÁLIDOS',
-    titulo: inp.primeiroTurno ? 'As 7 disputas de governador no 2º turno' : 'As 7 disputas de governador',
+    titulo: inp.primeiroTurno ? `${asDisputasGov(inp.disputas.length)} no 2º turno` : asDisputasGov(inp.disputas.length),
     tamTitulo: 38,
     padTopo: 34,
-    corpo: h('div', { flexDirection: 'column', gap: 3, marginTop: -8 }, ...inp.disputas.slice(0, 7).map((d) => linhaGov(d, !!inp.anonimizado))),
+    corpo: h('div', { flexDirection: 'column', gap: 3, marginTop: -8 }, ...inp.disputas.slice(0, MAX_LINHAS_GOV).map((d) => linhaGov(d, !!inp.anonimizado))),
     rodapeEsq: inp.simulacao ? 'SIMULAÇÃO · dados fictícios' : inp.primeiroTurno ? 'Resultado do 1º turno · 2º turno em 25/10, a partir das 17h' : 'Fonte: TSE',
     rodapeDir: inp.dominio ?? null,
   });

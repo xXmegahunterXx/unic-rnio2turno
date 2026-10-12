@@ -1,8 +1,8 @@
 /**
- * /governadores — as 7 disputas de governador do 2º turno lado a lado (AC, AM, DF, ES, RJ, RN, TO):
- * mini mapa por município, placar, diferença, progresso e selo de resultado definido; ordenável por
- * "mais apertadas". Na fase 'pre', contagem regressiva + o 1º turno real de governador nessas UFs.
- * No fim, os governadores eleitos no 1º turno nas outras 20 UFs (mapa por partido, fotos oficiais).
+ * /governadores — as disputas de governador do 2º turno lado a lado (UFS_GOV_2T: quantidade, siglas e nomes vêm
+ * sempre de lá, nunca fixos no texto): mini mapa por município, placar, diferença, progresso e selo de resultado
+ * definido; ordenável por "mais apertadas". Na fase 'pre', contagem regressiva + o 1º turno real de governador nessas
+ * UFs. No fim, os governadores eleitos no 1º turno nas demais UFs (mapa por partido, fotos oficiais).
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +10,8 @@ import { motion, useReducedMotion } from 'framer-motion';
 import type { LiveStatus, UF } from '@/shared/types';
 import { INICIO_APURACAO, UF_NOMES } from '@/shared/constants';
 import { pctTotalizadas } from '@/shared/calc';
-import { fmtPct, fmtPP } from '@/shared/format';
+import { fmtInt, fmtPct, fmtPP } from '@/shared/format';
+import { NOMES_GOV_2T, QTD_GOV_2T, estadosGovExtenso, nDisputasGov, nEstadosGov } from '@/shared/gov2t';
 import { useAnonimizado, useMeta, useNacional, useRace, useRaces, useStatus } from '@/app/data/hooks';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
 import { useSimNow } from '@/app/lib/useNow';
@@ -68,7 +69,7 @@ export default function GovernadoresPage() {
   };
 
   const meta = metaQ.data;
-  // 7 itens: ordenar a cada render é trivial (sem memo).
+  // Poucos itens (uma por UF do 2º turno): ordenar a cada render é trivial (sem memo).
   const itens = (() => {
     const lista = govs.map((g) => {
       const race = races?.find((r) => r.id === g.id);
@@ -114,7 +115,7 @@ export default function GovernadoresPage() {
   const secoes = resumos.reduce((s, r) => s + r.secoes, 0);
   const totalizadas = resumos.reduce((s, r) => s + r.secoesTotalizadas, 0);
 
-  // Imagem com as 7 disputas (na ordem alfabética, estável) + texto neutro para o X.
+  // Imagem com as disputas (na ordem alfabética, estável) + texto neutro para o X.
   const disputas: DisputaGov[] = [...itens]
     .sort((a, b) => UF_NOMES[a.uf].localeCompare(UF_NOMES[b.uf], 'pt-BR'))
     .filter((x) => x.race && x.snap)
@@ -189,13 +190,13 @@ export default function GovernadoresPage() {
         </>
       ) : (
         <p className="-mt-1 mb-5 max-w-3xl text-pretty text-[14.5px] leading-relaxed text-fg-muted sm:mb-6">
-          Sete estados escolhem o governador no 2º turno. Toque num cartão para ver o mapa por município, as zonas e o boletim de cada seção.
+          {estadosGovExtenso(true)} escolhem o governador no 2º turno. Toque num cartão para ver o mapa por município, as zonas e o boletim de cada seção.
         </p>
       )}
 
       {!pre ? (
         <dl className="mb-6 grid grid-cols-2 gap-2 sm:mb-7 sm:grid-cols-3 sm:gap-3">
-          <Resumo className="order-1" rotulo="Definidas" valor={`${definidas} de 7`} sub={definidas ? 'resultado matemático' : 'nenhuma ainda'} />
+          <Resumo className="order-1" rotulo="Definidas" valor={`${fmtInt(definidas)} de ${fmtInt(QTD_GOV_2T)}`} sub={definidas ? 'resultado matemático' : 'nenhuma ainda'} />
           <Resumo
             className="order-3 col-span-2 sm:order-2 sm:col-span-1"
             rotulo="Mais apertada"
@@ -206,14 +207,14 @@ export default function GovernadoresPage() {
             className="order-2 sm:order-3"
             rotulo="Seções"
             valor={secoes ? fmtPct(pctTotalizadas({ secoes, secoesTotalizadas: totalizadas })) : '—'}
-            sub="totalizadas nos 7 estados"
+            sub={`totalizadas nos ${nEstadosGov()}`}
           />
         </dl>
       ) : null}
 
       <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3 sm:mb-4">
         <h2 className="font-display text-[20px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[24px]">
-          {pre ? 'As 7 disputas no 1º turno' : 'As 7 disputas'}
+          {pre ? `As ${nDisputasGov()} no 1º turno` : `As ${nDisputasGov()}`}
         </h2>
         <Segmented<Ordem>
           ariaLabel="Ordenar disputas"
@@ -257,7 +258,7 @@ export default function GovernadoresPage() {
         </motion.li>
       </ul>
 
-      {/* As outras 20 UFs elegeram o governador no 1º turno (resultado oficial, dado real: fotos sempre). */}
+      {/* As demais UFs elegeram o governador no 1º turno (resultado oficial, dado real: fotos sempre). */}
       <GovernadoresEleitosT1
         className="mt-10 border-t border-line pt-8 sm:mt-14 sm:pt-10"
         mostrarSegundoTurno={false}
@@ -286,7 +287,7 @@ function PreHeroGov({ status }: { status: LiveStatus | undefined }) {
       alvo={status?.inicioApuracao ?? INICIO_APURACAO}
       agora={agora}
       titulo="A apuração para governador começa às 17h"
-      descricao="Acre, Amazonas, Distrito Federal, Espírito Santo, Rio de Janeiro, Rio Grande do Norte e Tocantins escolhem o governador no 2º turno. Os resultados aparecem aqui ao vivo, município por município."
+      descricao={`${NOMES_GOV_2T} escolhem o governador no 2º turno. Os resultados aparecem aqui ao vivo, município por município.`}
       ancora="primeiro-turno-gov"
       extra={<SiglasGov />}
     />

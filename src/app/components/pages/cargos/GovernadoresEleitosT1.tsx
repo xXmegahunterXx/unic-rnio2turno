@@ -1,14 +1,15 @@
 /**
  * Governadores do 1º turno (resultado oficial, 4/10/2026) — componente para a página /governadores.
  *
- *  - mapa do Brasil: as 20 UFs que elegeram governador no 1º turno, na cor NEUTRA do partido do eleito, e as 7 que
- *    decidem no 2º turno em destaque ("2T");
- *  - legenda por partido (maior primeiro) e cartões dos 20 eleitos (foto oficial, nome → ficha, partido, % e votos);
- *  - as 7 disputas do 2º turno com os dois finalistas e o % de cada um no 1º turno (dado oficial).
+ *  - mapa do Brasil: as UFs que elegeram governador no 1º turno (21 desde a retotalização do RJ de 10/10/2026), na cor
+ *    NEUTRA do partido do eleito, e as que decidem no 2º turno em destaque ("2T");
+ *  - legenda por partido (maior primeiro) e cartões dos eleitos (foto oficial, nome → ficha, partido, % e votos);
+ *  - as disputas do 2º turno com os dois finalistas e o % de cada um no 1º turno (dado oficial).
+ * Tudo sai de `cargos/governador-t1.json` (situação de cada candidato no feed do TSE): nenhuma contagem é fixa.
  *
  * Neutralidade/anonimização: na simulação com nomes ocultos (`status.anonimizado`), por padrão os finalistas do
  * 2º turno aparecem só como "2º turno" (sem nome/foto), para não destoar do placar anônimo da mesma página.
- * `mostrarFinalistas` força o comportamento. Os 20 eleitos são dado real e sempre aparecem.
+ * `mostrarFinalistas` força o comportamento. Os eleitos são dado real e sempre aparecem.
  *
  * Uso: <GovernadoresEleitosT1 onSelectUf2t={(uf) => navigate(`/apuracao/${uf.toLowerCase()}?race=gov-${uf.toLowerCase()}`)} />
  */
@@ -37,8 +38,8 @@ export interface GovernadoresEleitosT1Props {
   /** Título interno (padrão "Eleitos no 1º turno"); `null` omite o cabeçalho. */
   titulo?: string | null;
   /**
-   * Lista "Decidem no 2º turno" (padrão sim). Na /governadores as 7 disputas já aparecem acima, então a página
-   * passa `false` (o mapa continua marcando as 7 UFs e levando à apuração).
+   * Lista "Decidem no 2º turno" (padrão sim). Na /governadores as disputas já aparecem acima, então a página
+   * passa `false` (o mapa continua marcando as UFs do 2º turno e levando à apuração).
    */
   mostrarSegundoTurno?: boolean;
   className?: string;

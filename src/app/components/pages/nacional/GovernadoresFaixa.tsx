@@ -1,10 +1,12 @@
 /**
- * Faixa com as 7 disputas de governador na página nacional: placar compacto de cada uma (link para a
- * UF) e um cartão final para a página /governadores. Celular: carrossel com encaixe; desktop: grade 4×2.
+ * Faixa com as disputas de governador do 2º turno na página nacional (uma por UF de `UFS_GOV_2T`; quantidade e
+ * siglas derivadas dela): placar compacto de cada uma (link para a UF) e um cartão final para a página /governadores.
+ * Celular: carrossel com encaixe; desktop: grade de 2 a 4 colunas.
  */
 import { Link } from 'react-router-dom';
 import type { Race } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
+import { SIGLAS_GOV_2T, nDisputasGov, nEstadosGov } from '@/shared/gov2t';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { Placar } from '@/app/components/apuracao/Placar';
@@ -22,7 +24,7 @@ export interface GovernadoresFaixaProps {
 }
 
 /**
- * Os cartões não levam o selo SIMULAÇÃO (7 selos truncariam os nomes das UFs): a faixa do AppShell e
+ * Os cartões não levam o selo SIMULAÇÃO (um selo por cartão truncaria os nomes das UFs): a faixa do AppShell e
  * o selo do placar principal já sinalizam a simulação na página.
  */
 export function GovernadoresFaixa({ races, t1, linkT1, className }: GovernadoresFaixaProps) {
@@ -34,8 +36,8 @@ export function GovernadoresFaixa({ races, t1, linkT1, className }: Governadores
           <h2 id="gov-titulo" className="font-display text-[20px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[24px]">
             Governadores
           </h2>
-          <p className="mt-1 text-[13.5px] leading-snug text-fg-muted">
-            {t1 ? '1º turno nos 7 estados que têm 2º turno para governador' : '2º turno em 7 estados: AC, AM, DF, ES, RJ, RN e TO'}
+          <p className="num mt-1 text-[13.5px] leading-snug text-fg-muted">
+            {t1 ? `1º turno nos ${nEstadosGov()} que têm 2º turno para governador` : `2º turno em ${nEstadosGov()}: ${SIGLAS_GOV_2T}`}
           </p>
         </div>
         <Link
@@ -78,7 +80,7 @@ export function GovernadoresFaixa({ races, t1, linkT1, className }: Governadores
               <Icon name="grade" size={20} />
             </span>
             <span>
-              <span className="block font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">As 7 disputas lado a lado</span>
+              <span className="block font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">As {nDisputasGov()} lado a lado</span>
               <span className="mt-1 block text-[13px] leading-snug text-fg-muted">Ordene pelas mais apertadas e veja o mapa de cada estado.</span>
             </span>
             <span className="inline-flex items-center gap-1 text-[13.5px] font-medium text-brand-fg">

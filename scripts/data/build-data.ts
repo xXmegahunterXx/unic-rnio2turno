@@ -424,7 +424,7 @@ async function main() {
     tse: { ciclo: CICLO, eleicao: ELE_PRES_T1, cargo: CARGO_PRES, pleito: PLEITO_T1 },
   });
 
-  // Governadores (7 UFs com 2º turno).
+  // Governadores (UFs com 2º turno, UFS_GOV_2T).
   for (const uf of UFS_GOV_2T) {
     const ufLower = uf.toLowerCase();
     const b = builds.find((x) => x.uf === uf)!;
