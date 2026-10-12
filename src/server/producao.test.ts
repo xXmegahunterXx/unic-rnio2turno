@@ -345,6 +345,10 @@ describe('segurança', () => {
       expect(r.status, p).not.toBe(200);
       expect(await r.text()).not.toContain('SEGREDO');
     }
+    // caminho com HTML/JS (refletido no canônico/og:url) sai escapado
+    const xss = await (await m.app.request('/apuracao/%22%3E%3Cscript%3Ealert(1)%3C%2Fscript%3E')).text();
+    expect(xss).not.toContain('<script>alert(1)');
+    expect(xss).not.toMatch(/content="[^"]*"><script/);
     // CSP com o hash do script inline do template
     const csp = (await m.app.request('/')).headers.get('content-security-policy')!;
     expect(csp).toMatch(/script-src 'self' 'sha256-[A-Za-z0-9+/=]{44}'/);

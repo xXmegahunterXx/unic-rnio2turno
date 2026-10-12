@@ -13,7 +13,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
 import type { AdminCommand, MetricasServidor, ServidorInfo } from '../shared/api';
-import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, UF } from '../shared/types';
+import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
 import type { LoadedDataset, Controller } from '../engine/api';
@@ -62,13 +62,13 @@ export interface AppDeps {
   log: Logger;
   now?: () => number;
   /** Conferência do feed antes da troca automática (testes); padrão: `tse.testar`. */
-  verificarTse?: (tse: import('../shared/types').TseConfig) => Promise<{ ok: boolean; detalhe: string }>;
+  verificarTse?: (tse: TseConfig) => Promise<{ ok: boolean; detalhe: string }>;
 }
 
-/** Cache-Control por tipo de rota (ARCHITECTURE.md §6). */
 /** Permissions-Policy das páginas: nada de câmera, microfone, localização, pagamentos, USB nem "tópicos" de anúncio. */
 export const PERMISSOES = 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()';
 
+/** Cache-Control por tipo de rota (ARCHITECTURE.md §6). */
 export const CC = {
   status: 'public, max-age=0, s-maxage=1',
   meta: 'public, max-age=60, s-maxage=300',

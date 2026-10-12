@@ -8,9 +8,10 @@
  * salvo em STATE_DIR, aplica as travas de produção (simulação só com ALLOW_SIMULACAO), liga o agendador da troca
  * automática para o TSE (TSE_AUTO) e começa a servir. Variáveis de ambiente: ver src/server/config.ts e README.md.
  *
- * Encerramento (SIGTERM/SIGINT): /readyz passa a 503, o servidor para de aceitar conexões, as respostas em andamento
- * terminam com `Connection: close` (até ENCERRAMENTO_SEG, padrão 8 s), as que sobrarem são fechadas, o polling do TSE
- * para e o estado pendente é gravado. Sai com código 0 (ou 1 se passar de ENCERRAMENTO_SEG + 5 s).
+ * Encerramento (SIGTERM/SIGINT): /readyz passa a 503 e as respostas saem com `Connection: close` (por até 2 s ainda
+ * aceitando pedidos: os clientes keep-alive fecham depois da resposta, sem reset); depois o servidor para de aceitar
+ * conexões, espera as requisições em andamento (até ENCERRAMENTO_SEG, padrão 8 s, no total), fecha as que sobrarem,
+ * para o polling do TSE e grava o estado pendente. Sai com código 0 (ou 1 se passar de ENCERRAMENTO_SEG + 5 s).
  */
 import { unwatchFile, watchFile } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -148,7 +149,10 @@ async function main() {
     if (encerrando) return;
     encerrando = true;
     const ini = Date.now();
-    log.info(`${sinal}: encerrando — /readyz em 503, sem novas conexões, drenando ${sintonia.metricas.emAndamento} requisição(ões) (até ${config.encerramentoMs / 1000} s)`);
+    log.info(
+      `${sinal}: encerrando — /readyz em 503 e respostas com Connection: close; depois para de aceitar conexões e espera as ` +
+        `requisições em andamento (${sintonia.metricas.emAndamento} agora; até ${config.encerramentoMs / 1000} s no total)`,
+    );
     const forcar = setTimeout(() => {
       log.aviso(`Encerramento passou de ${config.encerramentoMs / 1000 + 5} s: saindo à força`);
       process.exit(1);
@@ -157,13 +161,17 @@ async function main() {
     sintonia.encerrar();
     clearInterval(resumo);
     unwatchFile(store.caminho);
+    // 1ª fase (até 2 s): continua atendendo, mas cada resposta sai com `Connection: close` — os clientes keep-alive
+    // fecham a conexão depois da resposta em vez de levar um reset no meio de um pedido novo; o /readyz já diz 503
+    const fase1 = Math.min(2_000, config.encerramentoMs / 2);
+    await new Promise((r) => setTimeout(r, fase1).unref?.());
     try {
       await new Promise<void>((res) => {
         const prazo = setTimeout(() => {
           log.aviso(`Drenagem: ${sintonia.metricas.emAndamento} requisição(ões) ainda em andamento depois de ${config.encerramentoMs / 1000} s; fechando`);
           srv.closeAllConnections?.();
           res();
-        }, config.encerramentoMs);
+        }, config.encerramentoMs - fase1);
         prazo.unref();
         server.close(() => {
           clearTimeout(prazo);

@@ -47,7 +47,7 @@ export interface AgendadorOpcoes {
   tickMs?: number;
 }
 
-const quando = (ms: number) => `${fmtHoraSeg(ms)} de ${fmtDataHora(ms).slice(0, 5)} (Brasília)`;
+const quando = (ms: number) => `${fmtHoraSeg(ms)} de ${fmtDataHora(ms).slice(0, 5)}`;
 
 export class AgendadorTse {
   private readonly now: () => number;
@@ -74,7 +74,7 @@ export class AgendadorTse {
     const s = this.estado();
     if (this.o.habilitada) {
       this.o.log.info(
-        `Troca automática para o TSE: ${s.ligada ? `agendada para ${quando(this.inicio(s))}` : 'desligada no painel'}` +
+        `Troca automática para o TSE: ${s.ligada ? `agendada para ${quando(this.inicio(s))} (horário de Brasília)` : 'desligada no painel'}` +
           `${s.feitaEm !== null ? ` (já feita em ${quando(s.feitaEm)})` : ''}`,
       );
     } else this.o.log.info('Troca automática para o TSE: desabilitada (TSE_AUTO=0); a fonte só muda pelo painel');
@@ -124,7 +124,7 @@ export class AgendadorTse {
     if (this.ciclo !== chave) {
       this.ciclo = chave;
       this.zerar();
-      this.o.log.info(`Troca automática para o TSE: horário chegou (${quando(inicio)}); fonte atual: ${st.fonte}`);
+      this.o.log.info(`Troca automática para o TSE: horário chegou (${quando(inicio)}, Brasília); fonte atual: ${st.fonte}`);
     }
     if (st.fonte === 'tse') {
       this.zerar();

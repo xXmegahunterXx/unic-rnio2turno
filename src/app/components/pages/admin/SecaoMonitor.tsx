@@ -182,7 +182,7 @@ function PainelServidor({ s }: { s: ServidorInfo }) {
   const m = s.metricas;
   const itens: [string, ReactNode, ReactNode?][] = [
     ['Requisições/s', fmtDecimal(m.reqPorSeg, 1), 'média do último minuto'],
-    ['Processamento', `${msCurto(m.p50Ms)} · ${msCurto(m.p99Ms)}`, 'p50 · p99 (minuto fechado)'],
+    ['Processamento', `${msCurto(m.p50Ms)} · ${msCurto(m.p99Ms)}`, 'p50 · p99 do minuto'],
     ['Erros 5xx · 429', `${fmtInt(m.erros5xx)} · ${fmtInt(m.respostas429)}`, 'minuto fechado'],
     ['Cache de respostas', m.cacheHit ? fmtPct(m.cacheHit * 100, 0) : '—', `${fmtInt(m.respostasEmCache)} ${m.respostasEmCache === 1 ? 'rota montada' : 'rotas montadas'} agora`],
     ['Em andamento', fmtInt(m.emAndamento), 'requisições abertas agora'],

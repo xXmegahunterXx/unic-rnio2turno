@@ -164,7 +164,9 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`).
 | demais arquivos (`/geo`, `/data`, favicon) | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400` | com ETag |
 | páginas (SPA) | `no-cache` | `index.html` com meta tags OG/Twitter da rota (`summary_large_image`, imagem da própria página) |
 | `/embed/placar`, `/embed/mapa`, `/embed/uf` | `no-cache` | widgets: `frame-ancestors *` (podem ser incorporados em qualquer site), `noindex` |
-| `/api/admin/*`, `/healthz` | `no-store` | nunca cachear |
+| `/sitemap.xml`, `/robots.txt` | `public, max-age=3600, s-maxage=86400` | gerados pelo servidor com `PUBLIC_URL` |
+| `/api/admin/*`, `/healthz`, `/readyz`, `/api/versao` | `no-store` | nunca cachear |
+| erros 4xx/5xx e 429 (fora da apuração) | `no-store` | a CDN não guarda erro nem limite |
 
 O "balde" do ETag só muda quando os números podem mudar: fixo com a fonte `pre`, no 1º turno, com o relógio
 pausado ou os dados congelados, antes das 17h e depois do encerramento; por segundo simulado com a simulação
@@ -186,20 +188,59 @@ centenas). Atrás de CDN, conta só quem chega à origem (o `status` tem `s-maxa
 guardados em memória (arquivos ≤ 32 MB, orçamento de 384 MB); na subida, `data/` e `geo/` são pré-comprimidos em
 segundo plano, um arquivo por vez (ex.: `locais/sp.json` 2,4 MB → 0,5 MB em br).
 
-### Capacidade medida (1 processo, 1 núcleo, contêiner de 4 vCPUs, sem CDN)
+### Capacidade medida (1 processo Node = 1 núcleo, sem CDN)
 
-Simulação rodando a 20× com 50% das seções apuradas, 200 conexões keep-alive por 15 s, `Accept-Encoding: br`:
+Medido em 12/10/2026 com `scripts/carga.ts` (Node puro, sem dependências; 3 processos geradores na mesma máquina de
+4 vCPUs, conexões keep-alive abrindo ao longo de 2 s de aquecimento, 8 s medidos por rodada, `Accept-Encoding: br,
+gzip`) contra o **build de produção** (`NODE_ENV=production`, `dist/` + `dist-server/main.js`). O servidor fica em 100%
+de um núcleo em todas as rodadas — os números são o teto de **um** processo. Máquina compartilhada: ±15% entre rodadas.
+**Zero erros** em todas as rodadas abaixo (nenhum 5xx, nenhum tempo-limite).
 
-| Rota | req/s | p50 | p95 | p99 | resposta |
-|---|---|---|---|---|---|
-| `/api/apuracao/pres/br` | 13.402 | 13 ms | 29 ms | 43 ms | 4,8 KB (br) |
-| `/api/apuracao/pres/uf/sp` | 13.126 | 13 ms | 29 ms | 43 ms | 36,5 KB (br) |
-| `/api/status` (sem compressão) | 15.101 | 13 ms | 20 ms | 26 ms | 0,4 KB |
+**Hoje (fonte `pre`, 1º turno + contagem regressiva):** req/s · p50 · p99 (ms)
 
-Com dois geradores de carga em paralelo o servidor satura em ~13 mil req/s (100% de 1 núcleo), sem erros.
+| Rota | 200 conexões | 500 conexões | 1.000 conexões | resposta (br) |
+|---|---|---|---|---|
+| `/` (página) | 8.784 · 20 · 56 | 7.220 · 44 · 129 | 7.804 · 44 · 5.288 | 1,7 KB |
+| `/api/status` | 9.420 · 18 · 74 | 10.556 · 40 · 108 | 10.455 · 42 · 164 | 0,4 KB |
+| `/api/apuracao/pres/br` | 12.127 · 14 · 47 | 11.486 · 34 · 77 | 11.905 · 31 · 75 | 0,7 KB |
+| `/api/apuracao/pres/uf/sp` | 8.062 · 25 · 50 | 10.384 · 38 · 94 | 11.012 · 39 · 139 | 14 KB |
+| `/api/og/apuracao.png` | 7.133 · 26 · 67 | 8.396 · 40 · 101 | 8.254 · 39 · 5.302 | 117 KB |
+| `/teste` (página) | 8.526 · 21 · 54 | 9.298 · 37 · 89 | 9.081 · 44 · 1.561 | 1,7 KB |
 
-Tamanhos (bruto → gzip → br): Brasil 21,0 → 5,0 → 4,5 KB · UF SP 210,7 → 37,1 → 35,6 KB · UF MG 274,6 → 47,5 → 45,3 KB ·
-município SP 55,6 → 20,4 → 19,3 KB · zona 57,8 → 8,0 → 7,3 KB · seção 0,3 KB · meta 16,6 → 3,1 → 2,9 KB.
+**Noite da eleição** (simulação a 20× com 50% das seções apuradas — o caminho mais pesado: os números mudam a cada
+segundo, então cada rota é remontada, serializada e comprimida 1×/s; a fonte `tse` muda a cada 5 s):
+
+| Rota | 200 conexões | 500 conexões | 1.000 conexões | resposta (br) |
+|---|---|---|---|---|
+| `/` (página) | 7.586 · 25 · 68 | 8.118 · 52 · 154 | 8.690 · 40 · 3.541 | 1,7 KB |
+| `/api/status` | 13.628 · 13 · 34 | 9.405 · 35 · 103 | 11.176 · 35 · 98 | 0,4 KB |
+| `/api/apuracao/pres/br` | 8.870 · 20 · 58 | 10.043 · 37 · 91 | 10.116 · 37 · 209 | 5,6 KB |
+| `/api/apuracao/pres/uf/sp` | 7.816 · 23 · 64 | 8.004 · 46 · 139 | 10.681 · 44 · 130 | 37 KB |
+| `/api/og/apuracao.png` | 6.363 · 28 · 81 | 6.360 · 41 · 104 | 6.207 · 42 · 8.705 | 98 KB |
+| `/teste` (página) | 8.276 · 22 · 44 | 8.518 · 39 · 97 | 8.400 · 49 · 3.428 | 1,7 KB |
+| **mistura realista**¹ | 8.429 · 20 · 68 | 6.954 · 41 · 222 | 7.026 · 51 · 7.122 | 9,7 KB |
+
+¹ `--misto`: status 40%, Brasil 25%, SP 12%, `/` 8%, `/apuracao` 5%, `/teste` 5%, imagem 3%, mapa por município 2%.
+
+- **Capacidade de um processo: ~7–12 mil req/s** conforme a rota, com p99 < 0,25 s até 500 conexões simultâneas. Com
+  um visitante consultando o status a cada ~5 s e o placar a cada ~2,5–8 s, isso é da ordem de **20–30 mil pessoas
+  ao mesmo tempo na origem, sem CDN**. Memória: 250 MB parado, 420–460 MB no pico (limite do contêiner: 1,5 GB).
+- **Saturado** (1.000 conexões sempre ocupadas, CPU em 100%), o p99 de algumas rotas sobe para segundos: as conexões
+  NOVAS esperam para ser aceitas (um servidor `http` mínimo do Node, "hello world", mostra o mesmo ~6 s neste ambiente).
+  É o sinal de que a origem chegou ao teto: a partir daí, **CDN** (a origem só vê `s-maxage` de 1–2 s por URL; ver
+  "CDN" acima) ou réplicas (`docker-compose.replicas.yml`).
+- Ajustes desta rodada: páginas (HTML) sem consulta ao disco por requisição (cache de 1 s do `index.html` e de 2 s
+  para caminhos inexistentes das rotas da SPA: `/teste` 5,3 mil → 8,5 mil req/s a 200 conexões) e fila de conexões de
+  4.096 (o padrão do Node é 511). As demais rotas já tinham cache por segundo, ETag/304 e compressão memoizada.
+
+Rodar de novo (depois de `npm run build`):
+
+```bash
+NODE_ENV=production PORT=8787 ADMIN_PASSWORD=x node dist-server/main.js &
+npx tsx scripts/carga.ts --base=http://127.0.0.1:8787 --pid=$! --conexoes=200,500,1000 --duracao=8
+npx tsx scripts/carga.ts --base=http://127.0.0.1:8787 --misto --conexoes=500        # mistura realista
+# noite da eleição simulada: ALLOW_SIMULACAO=1 SIM_AUTOSTART=force no servidor e, no painel, "saltar para 50%"
+```
 
 ### Várias instâncias
 

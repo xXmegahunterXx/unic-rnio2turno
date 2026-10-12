@@ -137,7 +137,18 @@ export function TrocaAutomatica({ className }: { className?: string }) {
             </Callout>
           ) : info.estado === 'feita' ? (
             <Callout tom="ok" titulo="Troca concluída">
-              Para valer de novo (por exemplo, depois de um ensaio), ligue outra vez ou marque um novo horário.
+              Ela não se repete sozinha. Para valer de novo (por exemplo, depois de um ensaio), rearme ou marque um novo horário.
+              <span className="mt-2.5 block">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon="reset"
+                  disabled={ocupado}
+                  onClick={() => void run({ tipo: 'troca-auto', acao: 'ligar' }, { chave: 'troca-auto', sucesso: 'Troca automática rearmada' })}
+                >
+                  Rearmar
+                </Button>
+              </span>
             </Callout>
           ) : info.estado === 'desabilitada' ? (
             <Callout tom="neutro" titulo="Desabilitada neste servidor">

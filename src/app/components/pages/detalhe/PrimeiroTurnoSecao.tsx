@@ -133,11 +133,12 @@ function Corpo({
                 <div className="flex items-baseline justify-between gap-2">
                   {c.sqcand && !c.agregado ? (
                     // nome real (fora da simulação anonimizada, que remove o sqcand) → ficha pública
+                    // corte no miolo: `truncate` no próprio link cortaria a área de toque invisível (`.toque`)
                     <Link
                       to={`/candidato/${c.sqcand}`}
-                      className="truncate text-[14px] font-medium text-fg underline decoration-line/[3] underline-offset-[3px] hover:text-brand-fg"
+                      className="toque relative min-w-0 text-[14px] font-medium text-fg underline decoration-line/[3] underline-offset-[3px] hover:text-brand-fg"
                     >
-                      {c.nomeUrna}
+                      <span className="block truncate">{c.nomeUrna}</span>
                     </Link>
                   ) : (
                     <span className="truncate text-[14px] font-medium text-fg">{c.agregado ? 'Demais candidatos' : c.nomeUrna}</span>

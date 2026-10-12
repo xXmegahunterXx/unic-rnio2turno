@@ -71,7 +71,7 @@ export function LocalVotacaoCartao({
               href={osm}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-[12.5px] font-medium text-fg transition-colors hover:border-line/[2.5] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="toque relative inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-[12.5px] font-medium text-fg transition-colors hover:border-line/[2.5] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <Icon name="mapa" size={14} />
               OpenStreetMap
@@ -82,7 +82,7 @@ export function LocalVotacaoCartao({
               href={google}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-[12.5px] font-medium text-fg transition-colors hover:border-line/[2.5] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="toque relative inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-surface-2 px-2.5 text-[12.5px] font-medium text-fg transition-colors hover:border-line/[2.5] hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
             >
               <Icon name="pin" size={14} />
               Google Maps
