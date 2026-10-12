@@ -813,6 +813,8 @@ export function createApp(deps: AppDeps) {
         return placarMeta(race, controller.municipio(race, uf, cod));
       },
       fase: () => dados.status().fase,
+      // a vitrine /kit só existe no dev e no build demo (no build normal a rota cai no 404 do app)
+      kit: !config.producao,
       ficha: (sq) => ({ lida: dadosEstaticos.ficha(sq), existe: dadosEstaticos.existeCandidato(sq) }),
       cargo: (nome) => dadosEstaticos.cargo(nome),
       curiosidades: () => dadosEstaticos.curiosidades(),

@@ -385,6 +385,22 @@ describe('2º turno', () => {
     expect((await off.testar()).ok).toBe(false);
   });
 
+  it('testar(): ele-c.json fora do ar ou em formato inesperado não bloqueia (o arquivo Brasil decide)', async () => {
+    for (const cfg of [{ dg: '25/10/2026' }, { status: 404 }, { pl: [{ c: 'ele2026', cd: '3221' }] }]) {
+      const f = criarFakeFetch();
+      f.rotas.set('comum/config/ele-c.json', cfg);
+      const { src } = criar(f);
+      const t = await src.testar();
+      expect(t.ok).toBe(true);
+      expect(t.detalhe).toMatch(/eleição 6258 \(2º turno\)/);
+      expect(t.detalhe).toMatch(/Atenção: .*(ele-c\.json|pleito)/);
+    }
+    // sem o arquivo Brasil, continua falhando
+    const g = criarFakeFetch();
+    g.rotas.set('ele2026/6258/dados/br/br-c0001-e006258-u.json', { status: 404 });
+    expect((await criar(g).src.testar()).ok).toBe(false);
+  });
+
   it('start()/stop() não deixam timers pendurados', async () => {
     const { src } = criar(criarFakeFetch());
     src.start();

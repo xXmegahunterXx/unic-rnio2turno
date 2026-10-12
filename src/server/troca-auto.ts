@@ -13,6 +13,9 @@
  *      (só enquanto o admin não tiver publicado um aviso próprio) e tenta de novo com espera crescente: 15 s, 30 s,
  *      60 s e depois a cada 120 s (com variação aleatória de até 20%, para várias instâncias não baterem juntas).
  *
+ * "Feita" vale para o horário atual: uma troca registrada ANTES do horário em vigor (ex.: ensaio em 20/10 com TSE_INICIO,
+ * depois o horário volta para 25/10 17h) não conta — o agendador troca de novo no horário novo, sem precisar "rearmar".
+ *
  * Tudo vai para o log (horário chegou, cada tentativa, falha, sucesso). Várias instâncias com o mesmo STATE_DIR: cada
  * uma roda o seu agendador; a primeira que trocar grava o estado, e as outras o adotam (ou, se trocarem juntas, o
  * resultado é o mesmo). O estado do agendador (tentativas, aviso) é por processo e não é persistido.
@@ -49,6 +52,9 @@ export interface AgendadorOpcoes {
 
 const quando = (ms: number) => `${fmtHoraSeg(ms)} de ${fmtDataHora(ms).slice(0, 5)}`;
 
+/** A troca já foi feita PARA este horário (uma feita antes dele — ensaio — não conta). */
+export const feitaParaInicio = (feitaEm: number | null, inicio: number): boolean => feitaEm !== null && feitaEm >= inicio;
+
 export class AgendadorTse {
   private readonly now: () => number;
   private readonly aleatorio: () => number;
@@ -75,7 +81,7 @@ export class AgendadorTse {
     if (this.o.habilitada) {
       this.o.log.info(
         `Troca automática para o TSE: ${s.ligada ? `agendada para ${quando(this.inicio(s))} (horário de Brasília)` : 'desligada no painel'}` +
-          `${s.feitaEm !== null ? ` (já feita em ${quando(s.feitaEm)})` : ''}`,
+          `${feitaParaInicio(s.feitaEm, this.inicio(s)) ? ` (já feita em ${quando(s.feitaEm!)})` : s.feitaEm !== null ? ` (a troca de ${quando(s.feitaEm)} foi antes deste horário: vale de novo)` : ''}`,
       );
     } else this.o.log.info('Troca automática para o TSE: desabilitada (TSE_AUTO=0); a fonte só muda pelo painel');
     this.timer = setInterval(() => void this.tick(), this.o.tickMs ?? 1000);
@@ -115,7 +121,7 @@ export class AgendadorTse {
     const s = this.estado(st);
     const agora = this.now();
     const inicio = this.inicio(s);
-    if (!this.o.habilitada || !s.ligada || s.feitaEm !== null || agora < inicio) {
+    if (!this.o.habilitada || !s.ligada || feitaParaInicio(s.feitaEm, inicio) || agora < inicio) {
       if (this.aguardando || this.tentativas) this.zerar();
       this.ciclo = null;
       return Promise.resolve();
@@ -173,7 +179,7 @@ export class AgendadorTse {
     // o estado pode ter mudado durante a verificação (admin desligou, trocou a fonte, outra instância já trocou)
     const atual = this.o.controller.state();
     const s = this.estado(atual);
-    if (!this.o.habilitada || !s.ligada || s.feitaEm !== null || atual.fonte !== 'pre' || this.now() < this.inicio(s)) return;
+    if (!this.o.habilitada || !s.ligada || feitaParaInicio(s.feitaEm, this.inicio(s)) || atual.fonte !== 'pre' || this.now() < this.inicio(s)) return;
     const ms = this.now() - t0;
     if (r.ok) {
       this.o.controller.command({ tipo: 'troca-auto', acao: 'executar' });
@@ -200,7 +206,7 @@ export class AgendadorTse {
     const agora = this.now();
     let estado: TrocaAutoInfo['estado'];
     if (!this.o.habilitada) estado = 'desabilitada';
-    else if (s.feitaEm !== null) estado = 'feita';
+    else if (feitaParaInicio(s.feitaEm, inicio)) estado = 'feita';
     else if (!s.ligada) estado = 'desligada';
     else if (agora < inicio) estado = 'agendada';
     else if (st.fonte === 'simulacao') estado = 'nao-aplicavel';
@@ -213,7 +219,7 @@ export class AgendadorTse {
       inicio,
       inicioPadrao: this.o.inicioPadrao,
       adiada: s.adiadaPara !== null,
-      feitaEm: s.feitaEm,
+      feitaEm: feitaParaInicio(s.feitaEm, inicio) ? s.feitaEm : null,
       tentativas: this.tentativas,
       ultimaTentativa: this.ultimaTentativa,
       proximaTentativa: this.proximaTentativa,

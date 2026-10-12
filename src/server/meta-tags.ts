@@ -72,6 +72,8 @@ export interface ContextoMeta {
   curiosidades?(): ComVersao<{ fatos: Curiosidade[] }> | null;
   /** Cenário decodificado (null = código inválido). */
   cenario?(codigo: string): ResumoCenarioMeta | null;
+  /** A vitrine /kit existe neste build (só dev/demo; no build de produção a rota é 404). Padrão: não. */
+  kit?: boolean;
 }
 
 const DESCRICAO_PADRAO =
@@ -187,11 +189,13 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
     if (uf && seg.length <= 5 && seg.length !== 4) {
       const nomeUf = UF_NOMES[uf];
       if (seg.length === 2) {
+        // corrida que a página mostra nesta UF; "Governador · Amazonas" vira "Governador" (o estado já está no título)
+        const tituloUf = (ctx.races.get(raceNaUf(uf))?.titulo ?? 'Presidente').replace(` · ${nomeUf}`, '');
         return pagina({
-          titulo: `Apuração em ${nomeUf} · ${ctx.races.get(raceNaUf(uf))?.titulo ?? tituloRace} · ${APP_NAME}`,
+          titulo: `Apuração em ${nomeUf} · ${tituloUf} · ${APP_NAME}`,
           descricao: comPlacar(`Resultado por município em ${nomeUf}, com mapa, gráfico da apuração e eventos da noite.`, uf),
           imagem: ogApuracao(uf),
-          imagemAlt: altPlacar(nomeUf),
+          imagemAlt: `Placar da apuração · ${tituloUf} · ${nomeUf}`,
         });
       }
       const cod = /^\d{1,5}$/.test(s2) ? s2.padStart(5, '0') : null;
@@ -468,7 +472,7 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
   if (s0 === 'admin' && seg.length === 1) {
     return pagina({ titulo: `Admin · ${APP_NAME}`, descricao: 'Painel de simulação.', imagem: ogApuracao(), imagemAlt: altPlacar(''), noindex: true });
   }
-  if (s0 === 'kit' && (seg.length === 1 || (seg.length === 2 && s1 === 'viz'))) {
+  if (ctx.kit && s0 === 'kit' && (seg.length === 1 || (seg.length === 2 && s1 === 'viz'))) {
     return pagina({ titulo: `Kit visual · ${APP_NAME}`, descricao: 'Vitrine do design system.', imagem: ogApuracao(), imagemAlt: altPlacar(''), noindex: true });
   }
   return naoEncontrada(ogApuracao());

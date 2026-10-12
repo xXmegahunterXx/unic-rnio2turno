@@ -12,11 +12,15 @@
  *   --pid=1234                     PID do servidor: memória (RSS) lida de /proc a cada 250 ms (Linux).
  *                                  Sem ele, usa o memoriaMb do /healthz a cada 1 s
  *   --json                         imprime também o resultado em JSON (para guardar/comparar)
+ *   --conectar=127.0.0.1           conecta neste endereço, mas manda Host/SNI do --base (proxy local com domínio de teste)
+ *   --inseguro                     HTTPS: aceita certificado não confiável (ex.: o interno do Caddy em *.localhost)
  *
  * Cada conexão faz uma requisição por vez (como um navegador com keep-alive) e mede do envio ao último byte. As
  * conexões abrem ao longo do aquecimento (descartado), como visitantes chegando.
  * Cabeçalho `Accept-Encoding: br, gzip` (como os navegadores). Erro = status ≥ 400, falha de socket ou tempo-limite
  * (10 s). Latência em histograma com resolução de 0,1 ms até 100 ms e 1 ms até 30 s.
+ *
+ * HTTPS (através do Caddy) também vale: --base=https://sintonia.localhost:8443 --conectar=127.0.0.1 --inseguro
  *
  * Exemplo (servidor de produção local):
  *   NODE_ENV=production PORT=8787 node dist-server/main.js &
@@ -25,6 +29,7 @@
 import cluster from 'node:cluster';
 import { readFileSync } from 'node:fs';
 import http from 'node:http';
+import https from 'node:https';
 import { availableParallelism } from 'node:os';
 
 // ---- opções -------------------------------------------------------------------------------------
@@ -56,6 +61,12 @@ const TRAB = Math.max(1, Math.min(Number(arg('trabalhadores', String(Math.max(1,
 const PID = arg('pid');
 const JSON_SAIDA = arg('json') === 'true';
 const TIMEOUT_MS = 10_000;
+const HTTPS = BASE.protocol === 'https:';
+const HTTP_MOD: typeof http = HTTPS ? (https as unknown as typeof http) : http;
+const CONECTAR = arg('conectar');
+const TLS = HTTPS ? { servername: BASE.hostname, rejectUnauthorized: arg('inseguro') !== 'true' } : {};
+/** Opções de conexão comuns (endereço, porta, Host e TLS). */
+const destino = () => ({ host: CONECTAR ?? BASE.hostname, port: BASE.port || (HTTPS ? 443 : 80), ...TLS });
 const AQUECIMENTO_MS = 2_000;
 
 // ---- histograma de latência -----------------------------------------------------------------------
@@ -97,7 +108,7 @@ function escolhedor(rota: string): () => string {
 }
 
 async function trabalhador(rota: string, conexoes: number, aquecerAte: number, ate: number): Promise<ResultadoTrab> {
-  const agent = new http.Agent({ keepAlive: true, maxSockets: conexoes, maxFreeSockets: conexoes, timeout: TIMEOUT_MS });
+  const agent = new HTTP_MOD.Agent({ keepAlive: true, maxSockets: conexoes, maxFreeSockets: conexoes, timeout: TIMEOUT_MS, ...TLS });
   const hist = new Uint32Array(N_BALDES);
   const r: ResultadoTrab = { ok: 0, erros: 0, status: {}, bytes: 0, hist: [], max: 0 };
   const proxima = escolhedor(rota);
@@ -105,8 +116,8 @@ async function trabalhador(rota: string, conexoes: number, aquecerAte: number, a
     new Promise<void>((res) => {
       const t0 = performance.now();
       const path = proxima();
-      const req = http.request(
-        { host: BASE.hostname, port: BASE.port || 80, path, agent, headers: { 'accept-encoding': 'br, gzip', 'user-agent': 'sintonia-carga/1' } },
+      const req = HTTP_MOD.request(
+        { ...destino(), path, agent, headers: { host: BASE.host, 'accept-encoding': 'br, gzip', 'user-agent': 'sintonia-carga/1' } },
         (resp) => {
           let n = 0;
           resp.on('data', (c: Buffer) => (n += c.length));
@@ -165,8 +176,8 @@ function rssPid(pid: string): number | null {
 
 async function rssHealthz(): Promise<number | null> {
   return new Promise((res) => {
-    http
-      .get(new URL('/healthz', BASE), (r) => {
+    HTTP_MOD
+      .get({ ...destino(), path: '/healthz', headers: { host: BASE.host } }, (r) => {
         let s = '';
         r.on('data', (c) => (s += c));
         r.on('end', () => {

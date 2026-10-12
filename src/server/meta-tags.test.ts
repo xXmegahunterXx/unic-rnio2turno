@@ -55,6 +55,25 @@ describe('imagem específica por página', () => {
     expect(metaDaRota('/apuracao/sp/71072/0/15', q(), ctx).status).toBe(404);
   });
 
+  it('UF: título e alt com a corrida mostrada na UF, sem repetir o estado (ensaio geral 12/10/2026)', () => {
+    const am = metaDaRota('/apuracao/am', q('race=gov-am'), ctx);
+    expect(am.titulo).toBe('Apuração em Amazonas · Governador · Sintonia');
+    expect(am.imagemAlt).toBe('Placar da apuração · Governador · Amazonas');
+    // governador de outra UF: título, alt e imagem seguem Presidente, como a página
+    const sp = metaDaRota('/apuracao/sp', q('race=gov-am'), ctx);
+    expect(sp.titulo).toBe('Apuração em São Paulo · Presidente · Sintonia');
+    expect(sp.imagemAlt).toBe('Placar da apuração · Presidente · São Paulo');
+    expect(sp.imagem).toContain('race=pres&');
+  });
+
+  it('/kit só existe quando o build tem a vitrine (dev/demo); em produção é 404', () => {
+    expect(metaDaRota('/kit', q(), ctx).status).toBe(404);
+    expect(metaDaRota('/kit/viz', q(), ctx).status).toBe(404);
+    const k = metaDaRota('/kit', q(), { ...ctx, kit: true });
+    expect(k.status).toBe(200);
+    expect(k.noindex).toBe(true);
+  });
+
   it('candidato: ficha real (título, descrição com votos) e 404 fora do índice', () => {
     const m = metaDaRota('/candidato/280002542548', q(), ctx);
     expect(m.status).toBe(200);

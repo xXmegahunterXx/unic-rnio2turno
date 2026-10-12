@@ -1201,20 +1201,32 @@ export class TseSource {
     };
   }
 
-  /** Teste rápido de conectividade e códigos (GET /api/admin/tse/test). Nunca lança. */
+  /**
+   * Teste rápido de conectividade e códigos (GET /api/admin/tse/test; também a conferência da troca automática). Nunca
+   * lança. Quem decide o `ok` é o arquivo Brasil da eleição de Presidente; a configuração geral (`ele-c.json`) só serve
+   * para conferir os códigos — fora do ar ou num formato inesperado, vira um "Atenção" e não bloqueia (ensaio geral
+   * 12/10/2026: um `ele-c.json` sem `pl` fazia o teste falhar com "Cannot read properties of undefined").
+   */
   async testar(): Promise<{ ok: boolean; detalhe: string; amostra?: unknown }> {
     try {
-      const cfg = await this.client.getJson<TseConfigGeralArquivo>(tsePaths.configGeral(), { prioridade: 'alta', tentativas: 1 });
-      if (cfg.status !== 'ok' && cfg.status !== 'nao-modificado') {
-        return { ok: false, detalhe: `Configuração geral do TSE indisponível (HTTP ${cfg.status === 'ausente' ? cfg.httpStatus : '?'})` };
+      let pleitos: { pleito: string; data: string; eleicoes: { cd: string; nome: string; turno: string }[] }[] | undefined;
+      let conferencia: ReturnType<TseSource['conferirCodigos']> | null = null;
+      let avisoCfg: string | null = null;
+      try {
+        const cfg = await this.client.getJson<TseConfigGeralArquivo>(tsePaths.configGeral(), { prioridade: 'alta', tentativas: 1 });
+        if (cfg.status === 'ok' && Array.isArray(cfg.data?.pl)) {
+          pleitos = cfg.data.pl
+            .filter((p) => p?.c === this.config.ciclo)
+            .map((p) => ({ pleito: p.cd, data: p.dt, eleicoes: (p.e ?? []).map((e) => ({ cd: e.cd, nome: e.nm, turno: e.t })) }));
+          conferencia = this.conferirCodigos(cfg.data);
+        } else if (cfg.status === 'ok') {
+          avisoCfg = 'a configuração geral do TSE (ele-c.json) veio num formato inesperado; códigos não conferidos.';
+        } else if (cfg.status !== 'nao-modificado') {
+          avisoCfg = `a configuração geral do TSE (ele-c.json) está indisponível (HTTP ${cfg.status === 'ausente' ? cfg.httpStatus : '?'}); códigos não conferidos.`;
+        }
+      } catch (err) {
+        avisoCfg = `a configuração geral do TSE (ele-c.json) não pôde ser lida (${msgDe(err)}); códigos não conferidos.`;
       }
-      const pleitos =
-        cfg.status === 'ok'
-          ? cfg.data.pl
-              .filter((p) => p.c === this.config.ciclo)
-              .map((p) => ({ pleito: p.cd, data: p.dt, eleicoes: p.e.map((e) => ({ cd: e.cd, nome: e.nm, turno: e.t })) }))
-          : undefined;
-      const conferencia = cfg.status === 'ok' ? this.conferirCodigos(cfg.data) : null;
       const pres = this.races.find((r) => r.turno === 2 && r.cargo === 'Presidente') ?? this.races[0];
       const cod = this.codigos(pres);
       const br = await this.client.getJson<TseResultadoArquivo>(tsePaths.resultado(cod.ciclo, cod.eleicao, cod.cargo, 'br'), {
@@ -1235,7 +1247,7 @@ export class TseSource {
         detalhe:
           `Feed ok: eleição ${d.ele} (${d.t}º turno), ${map.int(d.s.st)} de ${map.int(d.s.ts)} seções totalizadas, ` +
           `arquivo gerado ${d.dg} ${d.hg}, latência ${br.ms} ms` +
-          (conferencia?.avisos.length ? `. Atenção: ${conferencia.avisos.join(' ')}` : ''),
+          (conferencia?.avisos.length || avisoCfg ? `. Atenção: ${[avisoCfg, ...(conferencia?.avisos ?? [])].filter(Boolean).join(' ')}` : ''),
         amostra: {
           pleitos,
           conferencia,

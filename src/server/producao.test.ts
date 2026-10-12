@@ -195,6 +195,30 @@ describe('troca automática pre → tse', () => {
     expect(b.m.log.recentes(50).some((l) => /no horário a fonte é "simulacao"/.test(l.msg))).toBe(true);
   });
 
+  it('troca feita num ensaio ANTES do horário em vigor não impede a troca no horário (sem "rearmar")', async () => {
+    // ensaio em 07/10 (TSE_INICIO), depois o horário voltou ao da noite: o estado salvo ainda tem feitaEm do ensaio
+    const ensaio = INI - 5 * 86_400_000;
+    const chamadas: number[] = [];
+    const m = await montar({
+      env: { ...PROD, ADMIN_PASSWORD: SENHA, TSE_INICIO: new Date(INI).toISOString() },
+      agora: INI - 60_000,
+      estadoInicial: { trocaAuto: { ligada: true, adiadaPara: null, feitaEm: ensaio } } as unknown as AdminState,
+      verificarTse: async () => {
+        chamadas.push(m.relogio.t);
+        return { ok: true, detalhe: 'Feed ok (teste)' };
+      },
+    });
+    expect(m.controller.state().trocaAuto?.feitaEm).toBe(ensaio);
+    expect(m.agendador.info()).toMatchObject({ estado: 'agendada', feitaEm: null });
+    m.relogio.t = INI;
+    await m.agendador.tick();
+    expect(chamadas).toHaveLength(1);
+    expect(m.controller.state().fonte).toBe('tse');
+    expect(m.controller.state().trocaAuto?.feitaEm).toBe(INI);
+    expect(m.agendador.info().estado).toBe('feita');
+    await m.tse.encerrar();
+  });
+
   it('TSE_AUTO=0: só mostra (desabilitada)', async () => {
     const { m, chamadas } = await montarTroca({ ok: true }, { TSE_AUTO: '0' });
     m.relogio.t = INI + 1;
