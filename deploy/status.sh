@@ -23,6 +23,17 @@ if compartilhado; then
   echo "   app nesta máquina: http://127.0.0.1:$(cfg PORTA_LOCAL 8787) $(healthz_local >/dev/null 2>&1 && echo '(respondendo)' || echo '(SEM RESPOSTA)')"
   echo "   portas 80/443:     $PROXY_DESC"
   echo "   domínio:           $(cfg DOMINIO '(ainda nenhum — sudo '"$DIR_DEPLOY"'/dominio.sh seu-dominio.com.br)')"
+  [[ -z "$(cfg ENDERECO_PREVIA)" ]] || echo "   provisório:        $(cfg ENDERECO_PREVIA)"
+  arq="$(cfg CADDY_ARQ)"
+  if [[ -n $arq ]]; then
+    for h in $(cfg DOMINIO) $(cfg ENDERECO_PREVIA | sed 's|^https://||'); do
+      if grep -qxF "# >>> Sintonia: $h" "$arq" 2>/dev/null; then
+        echo "   Caddy da máquina:  bloco de $h presente em $arq"
+      else
+        aviso "   O bloco de $h SUMIU de $arq (o outro projeto regravou o arquivo?). Rode de novo: sudo $DIR_DEPLOY/dominio.sh $([[ $h == *.sslip.io ]] && echo --previa || echo "$h --sem-rebuild")"
+      fi
+    done
+  fi
 fi
 
 info "Contêineres"

@@ -389,7 +389,7 @@ remover_host() { # remover_host <host> → 0 se removeu algo
     feito=0
   fi
   if caddy_alvo_salvo && [[ -f $CF_HOST ]] && grep -qxF "# >>> Sintonia: $h" "$CF_HOST"; then
-    caddy_tirar_bloco "$h" && feito=0
+    if caddy_tirar_bloco "$h"; then feito=0; else return 2; fi
   fi
   return $feito
 }
@@ -397,7 +397,13 @@ remover_host() { # remover_host <host> → 0 se removeu algo
 if [[ -n $REMOVER ]]; then
   dominio_valido "$REMOVER" || morrer "Host inválido: $REMOVER"
   REMOVER=${REMOVER,,}
-  if remover_host "$REMOVER"; then ok "$REMOVER tirado do servidor web da máquina"; else aviso "Nenhuma configuração do Sintonia para $REMOVER."; fi
+  rc=0
+  remover_host "$REMOVER" || rc=$?
+  case $rc in
+    0) ok "$REMOVER tirado do servidor web da máquina" ;;
+    2) morrer "O bloco de $REMOVER continua no Caddyfile (motivo acima); nada foi mudado." ;;
+    *) aviso "Nenhuma configuração do Sintonia para $REMOVER." ;;
+  esac
   # o .env deixa de apontar para o endereço tirado (o app segue em 127.0.0.1)
   if [[ "$(cfg ENDERECO_PREVIA)" == "https://$REMOVER" ]]; then definir_env ENDERECO_PREVIA ""; fi
   if [[ "$(cfg DOMINIO)" == "$REMOVER" ]]; then
@@ -744,7 +750,7 @@ if [[ -n $PRONTO_HTTPS ]]; then
   for _ in $(seq 1 40); do
     # pelo 127.0.0.1 e, se o proxy só ouvir no IP público, por ele
     for destino in 127.0.0.1 ${IP:+"$IP"}; do
-      if curl -fsS -o /dev/null --max-time 8 --noproxy '*' --resolve "$DOM:$porta_ver:$destino" "$esquema://$DOM/healthz" 2>/dev/null; then
+      if curl -fsS -o /dev/null --connect-timeout 3 --max-time 8 --noproxy '*' --resolve "$DOM:$porta_ver:$destino" "$esquema://$DOM/healthz" 2>/dev/null; then
         ok_https=1
         break 2
       fi

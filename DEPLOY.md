@@ -162,15 +162,17 @@ Conforme o que atende 80/443 na máquina:
 - **Caddy, no sistema ou em contêiner Docker** (com o Caddyfile montado do disco, como no `docker-compose` comum):
   acrescenta **um bloco** marcado (`# >>> Sintonia: DOMINIO` … `# <<< Sintonia: DOMINIO`) no fim do Caddyfile em uso,
   editando o arquivo no lugar (um arquivo montado no contêiner continua valendo) e guardando uma cópia em
-  `/var/backups/sintonia/proxy/`. Com o Caddy em contêiner, o app entra na rede dele com o nome `sintonia-app`;
+  `/var/backups/sintonia/proxy/`. Só mexe se a configuração que o Caddy está usando for exatamente a do arquivo
+  (confere pela API dele); com o Caddy em contêiner, o bloco aponta para o IP interno do Docker (`172.17.0.1`), onde
+  o app também atende — o app **não** entra na rede do outro projeto;
 - em todos: confere a configuração inteira (`nginx -t`, `caddy validate`, `apachectl configtest`) **antes** de
   recarregar — se falhar, desfaz —, recarrega **sem reiniciar** (os outros sites não caem) e pede o certificado
   (certbot, instalado se faltar, com renovação automática; no Caddy, ele mesmo). Também recusa um endereço que
   outro site da máquina já usa — nunca mexe no site de outro projeto;
 - **ninguém usa 80/443**: o Caddy do Sintonia passa a atendê-las, com HTTPS automático;
-- **proxy em contêiner**: `nginx-proxy` e `caddy-docker-proxy` são configurados por rótulos; no **Nginx Proxy
-  Manager**, Traefik ou num painel, o script mostra o que cadastrar (destino `http://sintonia-app:8787`: o app já
-  entra na rede do proxy com esse nome; ou `http://127.0.0.1:PORTA` para painéis no próprio sistema);
+- **outros proxies em contêiner**: `nginx-proxy` e `caddy-docker-proxy` são configurados por rótulos; no **Nginx
+  Proxy Manager**, Traefik ou num painel, o script mostra o que cadastrar (destino `http://172.17.0.1:8787`, o IP
+  interno do Docker; ou `http://127.0.0.1:8787` para painéis no próprio sistema);
 - no fim, reconstrói a imagem com o endereço novo (links de compartilhar) sem tirar o site do ar.
 
 **Ver o site antes de ter domínio**: `/opt/sintonia/deploy/dominio.sh --previa` (ou `PREVIA=1` na instalação)
