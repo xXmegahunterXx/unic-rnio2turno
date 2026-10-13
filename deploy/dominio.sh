@@ -31,7 +31,8 @@ while (($#)); do
   case $1 in
     --www) WWW=1 ;;
     --email)
-      EMAIL=${2:-}
+      [[ $# -ge 2 ]] || morrer "Faltou o e-mail depois de --email"
+      EMAIL=$2
       shift
       ;;
     --email=*) EMAIL=${1#*=} ;;
@@ -39,7 +40,8 @@ while (($#)); do
     --sem-dns) SEM_DNS=1 ;;
     --sem-rebuild) SEM_REBUILD=1 ;;
     --remover)
-      REMOVER=${2:-}
+      [[ $# -ge 2 ]] || morrer "Faltou o endereço depois de --remover (ex.: --remover meudominio.com.br)"
+      REMOVER=$2
       shift
       ;;
     -h | --help)
@@ -88,11 +90,53 @@ MARCA="# Sintonia — gerado por $RAIZ/deploy/dominio.sh"
 # ---- Caddy (no sistema ou em contêiner) -------------------------------------------------------------------
 # CF_HOST: o Caddyfile no disco desta máquina (é ele que editamos, sempre no lugar: um arquivo montado num
 # contêiner continua o mesmo); CF_CT: o mesmo arquivo como o Caddy o vê; CADDY_CT: o contêiner (vazio = sistema).
-CF_HOST='' CF_CT='' CADDY_CT=''
-caddy_x() { if [[ -n $CADDY_CT ]]; then docker exec "$CADDY_CT" caddy "$@"; else caddy "$@"; fi; }
+# No sistema, o CLI usado é o binário do processo em execução, com o usuário e o ambiente dele ({$VAR} do Caddyfile).
+CF_HOST='' CF_CT='' CADDY_CT='' CADDY_BIN=caddy CADDY_PID='' CADDY_UID='' CADDY_GID='' CADDY_ENV=()
+caddy_x() {
+  if [[ -n $CADDY_CT ]]; then
+    docker exec "$CADDY_CT" caddy "$@"
+  elif [[ -n $CADDY_PID ]]; then
+    local como=()
+    if [[ -n $CADDY_UID && $CADDY_UID != 0 ]] && command -v setpriv >/dev/null 2>&1; then
+      como=(setpriv --reuid "$CADDY_UID" --regid "$CADDY_GID" --clear-groups)
+    fi
+    "${como[@]}" env -i "${CADDY_ENV[@]}" "$CADDY_BIN" "$@"
+  else
+    "$CADDY_BIN" "$@"
+  fi
+}
+caddy_do_processo() { # binário, usuário e ambiente do Caddy do sistema em execução (pid $1)
+  CADDY_PID=$1
+  CADDY_BIN="$(readlink -f "/proc/$1/exe" 2>/dev/null || true)"
+  [[ -x $CADDY_BIN ]] || CADDY_BIN="$(command -v caddy || echo caddy)"
+  CADDY_UID="$(awk '/^Uid:/ {print $2}' "/proc/$1/status" 2>/dev/null)"
+  CADDY_GID="$(awk '/^Gid:/ {print $2}' "/proc/$1/status" 2>/dev/null)"
+  CADDY_ENV=()
+  if [[ -r /proc/$1/environ ]]; then mapfile -d '' -t CADDY_ENV <"/proc/$1/environ"; fi
+}
+# A configuração NO AR é exatamente a do arquivo? Senão (mudanças pela API, --resume, arquivo editado e ainda não
+# recarregado, outro arquivo) um reload trocaria a configuração viva do outro projeto: aí não mexemos.
+caddy_arquivo_e_o_no_ar() {
+  local adaptado admin vivo
+  command -v python3 >/dev/null 2>&1 || return 1
+  adaptado="$(caddy_x adapt --config "$CF_CT" --adapter caddyfile 2>/dev/null)" || return 1
+  admin="$(python3 -c 'import json,sys; c=json.loads(sys.stdin.read()); a=c.get("admin") or {}; print("" if a.get("disabled") else (a.get("listen") or "localhost:2019"))' <<<"$adaptado" 2>/dev/null)" || return 1
+  admin=${admin#tcp/}
+  [[ -n $admin && $admin != unix/* ]] || return 1
+  case $admin in :*) admin="127.0.0.1$admin" ;; 0.0.0.0:*) admin="127.0.0.1:${admin##*:}" ;; esac
+  if [[ -n $CADDY_CT ]]; then
+    vivo="$(docker exec "$CADDY_CT" wget -qO- -T 5 "http://$admin/config/" 2>/dev/null)" || return 1
+  else
+    vivo="$(curl -fsS --noproxy '*' --max-time 5 "http://$admin/config/" 2>/dev/null)" || return 1
+  fi
+  python3 -c '
+import json, sys
+a, v = (json.loads(x) for x in sys.argv[1:3])
+sys.exit(0 if json.dumps(a, sort_keys=True) == json.dumps(v, sort_keys=True) else 1)' "$adaptado" "$vivo" 2>/dev/null
+}
 caddy_validar() { caddy_x validate --config "$CF_CT" --adapter caddyfile; }
 caddy_recarregar() { # sem reiniciar nada: o Caddy troca a configuração no ar (se a nova falhar, segue a antiga)
-  if [[ -z $CADDY_CT && $CF_HOST == /etc/caddy/Caddyfile ]] && servico_ativo caddy; then
+  if [[ -z $CADDY_CT && -n $CADDY_PID ]] && servico_ativo caddy && [[ "$(systemctl show -p MainPID --value caddy 2>/dev/null)" == "$CADDY_PID" ]]; then
     systemctl reload caddy
   else
     caddy_x reload --config "$CF_CT" --adapter caddyfile
@@ -100,23 +144,32 @@ caddy_recarregar() { # sem reiniciar nada: o Caddy troca a configuração no ar 
 }
 # o alvo gravado no .env por uma configuração anterior (para tirar/trocar o bloco depois)
 caddy_alvo_salvo() {
-  CF_HOST="$(cfg CADDY_ARQ)" CF_CT="$(cfg CADDY_CAMINHO)" CADDY_CT="$(cfg CADDY_CONTEINER)"
-  if [[ -z $CF_HOST && -f /etc/caddy/Caddyfile ]]; then CF_HOST=/etc/caddy/Caddyfile CF_CT=/etc/caddy/Caddyfile CADDY_CT=''; fi
-  [[ -n $CF_HOST ]] || return 1
+  CF_HOST="$(cfg CADDY_ARQ)" CF_CT="$(cfg CADDY_CAMINHO)" CADDY_CT="$(cfg CADDY_CONTEINER)" CADDY_PID=''
+  [[ -n $CF_HOST && -f $CF_HOST ]] || return 1
   CF_CT=${CF_CT:-$CF_HOST}
-  # contêiner sumiu/recriado com outro nome: sem ele não dá para validar nem recarregar
-  if [[ -n $CADDY_CT ]] && ! docker inspect "$CADDY_CT" >/dev/null 2>&1; then return 1; fi
+  if [[ -n $CADDY_CT ]]; then
+    # contêiner sumiu/recriado com outro nome: sem ele não dá para validar nem recarregar
+    docker inspect "$CADDY_CT" >/dev/null 2>&1 || return 1
+  else
+    detectar_proxy
+    [[ $PROXY_TIPO == caddy && $PROXY_CADDYFILE == "$CF_HOST" && -n $PROXY_CADDY_PID ]] || return 1
+    caddy_do_processo "$PROXY_CADDY_PID"
+  fi
 }
-# acha o Caddyfile de um contêiner do Caddy: o caminho do --config no comando (padrão da imagem oficial:
-# /etc/caddy/Caddyfile) e a montagem do disco que o contém → CF_HOST e CF_CT
+# acha o Caddyfile de um contêiner do Caddy: o --config do comando (sem ele, o Caddyfile da pasta de trabalho) e a
+# montagem do disco que o contém → CF_HOST e CF_CT
 caddyfile_do_conteiner() {
-  local c=$1 cmd cfg='' tipo origem destino linhas=()
+  local c=$1 cmd cfg='' wd tipo origem destino linhas=() l
   cmd="$(docker inspect -f '{{json .Config.Entrypoint}} {{json .Config.Cmd}} {{json .Args}}' "$c" 2>/dev/null)" || return 1
-  cfg="$(grep -oE -- '"--config"[^"]*"[^"]+"|"--config=[^"]+"' <<<"$cmd" | head -n 1 | sed -E 's/^"--config"[^"]*"//; s/^"--config=//; s/"$//')"
-  [[ -n $cfg ]] || cfg=/etc/caddy/Caddyfile
-  # JSON ou adaptador diferente de caddyfile: não editamos
-  [[ $cfg != *.json ]] || return 1
+  # configuração pela API/autosave (--resume) ou JSON/outro adaptador: não editamos
+  grep -qE '"--resume"' <<<"$cmd" && return 1
   grep -qE '"--adapter"[^"]*"(json|yaml|nginx)"' <<<"$cmd" && return 1
+  cfg="$(grep -oE -- '"--config"[^"]*"[^"]+"|"--config=[^"]+"' <<<"$cmd" | head -n 1 | sed -E 's/^"--config"[^"]*"//; s/^"--config=//; s/"$//' || true)"
+  wd="$(docker inspect -f '{{.Config.WorkingDir}}' "$c" 2>/dev/null)"
+  [[ -n $cfg ]] || cfg=Caddyfile
+  [[ $cfg == /* ]] || cfg="${wd:-/}/$cfg"
+  cfg="${cfg//\/\//\/}"
+  [[ $cfg != *.json ]] || return 1
   mapfile -t linhas < <(docker inspect -f '{{range .Mounts}}{{.Type}}|{{.Source}}|{{.Destination}}{{"\n"}}{{end}}' "$c" 2>/dev/null)
   for l in "${linhas[@]}"; do # 1º: o próprio arquivo montado
     IFS='|' read -r tipo origem destino <<<"$l"
@@ -134,89 +187,152 @@ caddyfile_do_conteiner() {
   done
   return 1
 }
-caddy_backup() { # cópia do Caddyfile antes de mexer (fora da pasta do outro projeto) → $CF_BKP
+caddy_backup() { # cópia íntegra do Caddyfile antes de mexer (fora da pasta do outro projeto) → $CF_BKP
   local d
   d="$(cfg BACKUP_DIR /var/backups/sintonia)/proxy"
-  install -d -m 700 "$d"
   CF_BKP="$d/Caddyfile-$(date +%Y%m%d-%H%M%S)-$$"
-  cp "$CF_HOST" "$CF_BKP"
-  chmod 600 "$CF_BKP"
+  if ! { install -d -m 700 "$d" && cp -p -- "$CF_HOST" "$CF_BKP" && chmod 600 "$CF_BKP" && cmp -s -- "$CF_HOST" "$CF_BKP"; }; then
+    rm -f "$CF_BKP"
+    return 1
+  fi
+  # guarda as 30 mais recentes
+  find "$d" -maxdepth 1 -name 'Caddyfile-*' -printf '%T@ %p\n' 2>/dev/null | sort -rn | tail -n +31 | cut -d' ' -f2- | xargs -r rm -f
 }
-caddy_sem_bloco() { # imprime o Caddyfile sem o bloco do Sintonia para o host $1
+caddy_restaurar() {
+  if cat -- "$CF_BKP" >"$CF_HOST" && cmp -s -- "$CF_BKP" "$CF_HOST"; then return 0; fi
+  erro "ATENÇÃO: não consegui devolver o Caddyfile. Restaure à mão: cat $CF_BKP > $CF_HOST"
+  return 1
+}
+caddy_sem_bloco() { # imprime o Caddyfile sem o bloco do Sintonia para o host $1 (e sem a UMA linha em branco que o
+  # bloco acrescentou antes dele). Marcador de fim faltando: imprime o arquivo intacto e devolve 1 (nunca corta até o fim)
   awk -v ini="# >>> Sintonia: $1" -v fim="# <<< Sintonia: $1" '
-    $0 == ini { pula = 1; next }
-    pula && $0 == fim { pula = 0; next }
-    !pula { print }' "$CF_HOST"
+    { linha[NR] = $0 }
+    END {
+      a = 0; b = 0
+      for (i = 1; i <= NR; i++) if (linha[i] == ini) { a = i; break }
+      if (a) for (i = a + 1; i <= NR; i++) if (linha[i] == fim) { b = i; break }
+      if (a && !b) { for (i = 1; i <= NR; i++) print linha[i]; exit 1 }
+      for (i = 1; i <= NR; i++) {
+        if (a && i >= a && i <= b) continue
+        if (a && i == a - 1 && linha[i] == "") continue
+        print linha[i]
+      }
+    }' "$CF_HOST"
 }
 caddy_aplicar() { # caddy_aplicar <arquivo novo> <descrição> → grava no lugar, valida, recarrega; desfaz se falhar
   local novo=$1 oque=$2 saida
-  caddy_backup
-  cat "$novo" >"$CF_HOST"
+  [[ -s $novo ]] || {
+    erro "Configuração nova vazia (erro interno): nada foi alterado."
+    return 1
+  }
+  if cmp -s -- "$novo" "$CF_HOST"; then return 0; fi # nada muda: nem grava nem recarrega
+  if ! caddy_arquivo_e_o_no_ar; then
+    erro "A configuração que o Caddy usa AGORA não é a do arquivo $CF_HOST (mudanças feitas pela API, arquivo editado e ainda não recarregado, ou outro arquivo). Recarregar trocaria a configuração do outro projeto: não mexo."
+    return 3
+  fi
+  if [[ -n $CADDY_CT ]] && ! docker exec "$CADDY_CT" cat "$CF_CT" 2>/dev/null | cmp -s - "$CF_HOST"; then
+    erro "O contêiner $CADDY_CT não enxerga $CF_HOST como está no disco (arquivo montado e depois substituído?): não mexo."
+    return 3
+  fi
+  caddy_backup || {
+    erro "Não consegui guardar uma cópia do Caddyfile antes de mexer (disco cheio?): nada foi alterado."
+    return 1
+  }
+  if ! { cat -- "$novo" >"$CF_HOST" && cmp -s -- "$novo" "$CF_HOST"; }; then
+    caddy_restaurar
+    erro "Não consegui gravar o Caddyfile (disco cheio?). Desfeito."
+    return 1
+  fi
   if ! saida="$(caddy_validar 2>&1)"; then
-    cat "$CF_BKP" >"$CF_HOST"
+    caddy_restaurar || return 1
     printf '%s\n' "$saida" | grep -vE '"level":"(info|debug)"' | tail -n 6 >&2 || true
     erro "O Caddy recusou $oque (acima). Desfeito: o Caddyfile voltou ao que era e nada mudou para os outros sites."
     return 1
   fi
   if ! saida="$(caddy_recarregar 2>&1)"; then
-    cat "$CF_BKP" >"$CF_HOST"
+    caddy_restaurar || return 1
     printf '%s\n' "$saida" | tail -n 6 >&2 || true
-    erro "O Caddy não recarregou (acima; a API de administração dele pode estar desligada). Desfeito: segue a configuração de antes."
+    erro "O Caddy não recarregou (acima). Desfeito: o Caddyfile voltou ao que era e segue a configuração de antes."
     return 1
   fi
 }
 caddy_tirar_bloco() { # caddy_tirar_bloco <host>
   local tmp
   tmp="$(mktemp)"
-  caddy_sem_bloco "$1" >"$tmp"
+  if ! caddy_sem_bloco "$1" >"$tmp"; then
+    rm -f "$tmp"
+    erro "O bloco do Sintonia para $1 está sem a linha de fim '# <<< Sintonia: $1': tire-o à mão do $CF_HOST."
+    return 1
+  fi
   caddy_aplicar "$tmp" "a remoção do bloco de $1" || {
     rm -f "$tmp"
     return 1
   }
   rm -f "$tmp"
 }
-configurar_caddy() { # configurar_caddy sistema|conteiner
-  local h tmp upstream
+caddy_aviso_git() { # o Caddyfile é versionado no git do outro projeto? (um deploy dele pode regravar o arquivo)
+  if git -c safe.directory='*' -C "$(dirname "$CF_HOST")" ls-files --error-unmatch -- "$CF_HOST" >/dev/null 2>&1; then
+    aviso "O $CF_HOST é versionado no git do outro projeto. Se um deploy dele regravar o arquivo, o bloco do Sintonia some: rode este comando de novo (ou acrescente o bloco também no repositório dele)."
+  fi
+}
+configurar_caddy() { # configurar_caddy sistema|conteiner → 0 ok; 2 não dá para automatizar (instruções)
+  local h tmp upstream rc ips
   if [[ $1 == conteiner ]]; then
-    CADDY_CT=$PROXY_CONTEINER
+    CADDY_CT=$PROXY_CONTEINER CADDY_PID=''
     if ! caddyfile_do_conteiner "$CADDY_CT"; then
-      aviso "Não achei o Caddyfile do contêiner $CADDY_CT montado do disco desta máquina (Caddy configurado por JSON/API?)."
+      aviso "Não achei o Caddyfile do contêiner $CADDY_CT montado do disco desta máquina (Caddy configurado pela API/--resume ou por JSON?)."
       return 2
     fi
     if [[ -n $PROXY_REDE_HOST ]]; then
       upstream="127.0.0.1:$PORTA"
     else
-      [[ -n "$(cfg REDES_PROXY)" ]] || definir_env REDES_PROXY "$(redes_do_proxy)"
-      if [[ -z "$(cfg REDES_PROXY)" ]]; then
-        aviso "O contêiner $CADDY_CT só está na rede padrão do Docker (bridge), onde o app não tem nome."
-        return 2
-      fi
-      upstream="sintonia-app:$(cfg PORT 8787)"
+      # pelo IP interno do Docker: o app não entra na rede do outro projeto
+      garantir_ponte || return 2
+      upstream="$(cfg IP_PONTE):$PORTA"
     fi
   else
-    CADDY_CT='' CF_HOST=${PROXY_CADDYFILE:-/etc/caddy/Caddyfile} CF_CT=${PROXY_CADDYFILE:-/etc/caddy/Caddyfile}
+    CADDY_CT='' CF_HOST=$PROXY_CADDYFILE CF_CT=$PROXY_CADDYFILE
+    caddy_do_processo "$PROXY_CADDY_PID"
     upstream="127.0.0.1:$PORTA"
   fi
-  caddy_validar >/dev/null 2>&1 || morrer "O Caddyfile atual ($CF_HOST) já tem erro (caddy validate): corrija antes; não mexo em nada assim."
+  caddy_validar >/dev/null 2>&1 || {
+    aviso "O Caddyfile atual ($CF_HOST) não passa no caddy validate: não mexo nele assim."
+    return 2
+  }
+  caddy_arquivo_e_o_no_ar || {
+    aviso "A configuração que o Caddy usa agora não é a do arquivo $CF_HOST (API/--resume ou edição ainda não recarregada): não mexo nele."
+    return 2
+  }
   for h in "${HOSTS[@]}"; do
-    if caddy_sem_bloco "$DOM" | grep -vE '^\s*#' | grep -qE "(^|[[:space:],/])$(re_escapar "$h")([[:space:],:{]|$)"; then
+    if caddy_sem_bloco "$DOM" | grep -vE '^\s*#' | grep -E "(^|[[:space:],/])$(re_escapar "$h")([[:space:],:{]|$)" >/dev/null; then
       morrer "O Caddy já tem um site para $h (outro projeto). Escolha outro endereço ou tire esse site antes; não mexo nele."
     fi
   done
   tmp="$(mktemp)"
+  caddy_sem_bloco "$DOM" >"$tmp" || {
+    rm -f "$tmp"
+    morrer "O bloco antigo do Sintonia no Caddyfile está sem a linha '# <<< Sintonia: $DOM' (editado à mão?). Arrume o arquivo; não mexo nele assim."
+  }
+  [[ -z "$(tail -c 1 "$tmp")" ]] || echo >>"$tmp" # termina com quebra de linha
+  ips="${CF_IPS[*]}"
   {
-    caddy_sem_bloco "$DOM" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' # sem linhas em branco sobrando no fim
     echo
     echo "# >>> Sintonia: $DOM"
     echo "$MARCA. Para remover: sudo $RAIZ/deploy/dominio.sh --remover $DOM"
     echo "$(hosts_virgula) {"
+    if [[ -n $EMAIL ]]; then echo "	tls $EMAIL"; fi
     if [[ -n $WWW ]]; then
       echo "	@www host www.$DOM"
       echo "	redir @www https://$DOM{uri} 308"
     fi
     if [[ -n $PREVIA ]]; then echo '	header X-Robots-Tag "noindex, nofollow"'; fi
+    echo "	# IP do visitante para o app: o CF-Connecting-IP só vale quando a conexão vem da Cloudflare"
+    echo "	@sintonia_cf remote_ip $ips"
+    echo "	@sintonia_direto not remote_ip $ips"
+    echo "	vars @sintonia_cf sintonia_ip {http.request.header.CF-Connecting-IP}"
+    echo "	vars @sintonia_direto sintonia_ip {remote_host}"
     echo "	reverse_proxy $upstream {"
-    echo "		header_up X-Real-IP {remote_host}"
+    echo "		header_up X-Real-IP {http.vars.sintonia_ip}"
     echo "		header_up -CF-Connecting-IP"
     echo "		header_up -Fly-Client-IP"
     echo "		header_up -True-Client-IP"
@@ -225,16 +341,34 @@ configurar_caddy() { # configurar_caddy sistema|conteiner
     echo "	}"
     echo "}"
     echo "# <<< Sintonia: $DOM"
-  } >"$tmp"
-  if ! caddy_aplicar "$tmp" "o bloco do Sintonia"; then
-    rm -f "$tmp"
-    exit 1
-  fi
+  } >>"$tmp"
+  rc=0
+  caddy_aplicar "$tmp" "o bloco do Sintonia" || rc=$?
   rm -f "$tmp"
+  ((rc == 0)) || exit 1
   definir_env CADDY_ARQ "$CF_HOST"
   definir_env CADDY_CAMINHO "$CF_CT"
   definir_env CADDY_CONTEINER "$CADDY_CT"
   ok "Bloco do Sintonia no Caddyfile $CF_HOST${CADDY_CT:+ (contêiner $CADDY_CT)}, entre '# >>> Sintonia' e '# <<< Sintonia'; recarregado sem reiniciar. O Caddy pede o certificado sozinho"
+  caddy_aviso_git
+}
+
+# IP interno do Docker no .env (e a porta publicada nele), para um proxy em contêiner chegar ao app
+garantir_ponte() {
+  local ip
+  ip="$(cfg IP_PONTE)"
+  if [[ -z $ip ]]; then
+    ip="$(ip_ponte_docker)"
+    [[ -n $ip ]] || {
+      aviso "Não achei o IP interno do Docker (rede bridge)."
+      return 1
+    }
+    definir_env IP_PONTE "$ip"
+  fi
+  # instalação antiga: o app tinha entrado na rede do proxy; agora só o nginx-proxy precisa disso
+  if [[ -n "$(cfg REDES_PROXY)" && "$(cfg PROXY_DOCKER)" != nginx-proxy ]]; then definir_env REDES_PROXY ""; fi
+  gerar_compose_vps
+  dc up -d --no-build --remove-orphans >/dev/null 2>&1 || true
 }
 
 # ---- remover um host do servidor web da máquina -----------------------------------------------------
@@ -262,7 +396,15 @@ remover_host() { # remover_host <host> → 0 se removeu algo
 
 if [[ -n $REMOVER ]]; then
   dominio_valido "$REMOVER" || morrer "Host inválido: $REMOVER"
-  if remover_host "${REMOVER,,}"; then ok "$REMOVER tirado do servidor web da máquina"; else aviso "Nenhuma configuração do Sintonia para $REMOVER."; fi
+  REMOVER=${REMOVER,,}
+  if remover_host "$REMOVER"; then ok "$REMOVER tirado do servidor web da máquina"; else aviso "Nenhuma configuração do Sintonia para $REMOVER."; fi
+  # o .env deixa de apontar para o endereço tirado (o app segue em 127.0.0.1)
+  if [[ "$(cfg ENDERECO_PREVIA)" == "https://$REMOVER" ]]; then definir_env ENDERECO_PREVIA ""; fi
+  if [[ "$(cfg DOMINIO)" == "$REMOVER" ]]; then
+    definir_env DOMINIO ""
+    definir_env PUBLIC_URL ""
+    if compartilhado; then dc up -d --no-build --remove-orphans >/dev/null 2>&1 || true; fi
+  fi
   exit 0
 fi
 
@@ -344,7 +486,7 @@ configurar_nginx() {
   nginx -t >/dev/null 2>&1 || morrer "A configuração atual do nginx já tem erro (nginx -t): corrija antes; não mexo em nada assim."
   [[ -n ${SEM_CERTIFICADO:-} ]] || { pedir_email opcional; certbot_pronto nginx; }
   for h in "${HOSTS[@]}"; do
-    if nginx -T 2>/dev/null | grep -vE '^\s*#' | grep -qE "server_name[^;]*[[:space:]]$(re_escapar "$h")[[:space:];]" &&
+    if nginx -T 2>/dev/null | grep -vE '^\s*#' | grep -E "server_name[^;]*[[:space:]]$(re_escapar "$h")[[:space:];]" >/dev/null &&
       ! grep -qsF "$MARCA" "/etc/nginx/sites-available/sintonia-$DOM.conf" "/etc/nginx/conf.d/sintonia-$DOM.conf"; then
       morrer "O nginx já tem um site para $h (outro projeto). Escolha outro domínio ou tire esse site antes."
     fi
@@ -442,6 +584,9 @@ $aliases
     ProxyPreserveHost On
     ProxyPass / http://127.0.0.1:$PORTA/ connectiontimeout=5 timeout=30
     ProxyPassReverse / http://127.0.0.1:$PORTA/
+    # IP real atrás da Cloudflare (mod_remoteip: só vale quando a conexão vem da Cloudflare)
+    RemoteIPHeader CF-Connecting-IP
+$(for h in "${CF_IPS[@]}"; do echo "    RemoteIPTrustedProxy $h"; done)
     RequestHeader set X-Real-IP "%{REMOTE_ADDR}s"
     RequestHeader unset CF-Connecting-IP
     RequestHeader unset Fly-Client-IP
@@ -450,7 +595,7 @@ $([[ -n $PREVIA ]] && echo '    Header always set X-Robots-Tag "noindex, nofollo
 $([[ -n $WWW ]] && printf '    <If "%%{HTTP_HOST} == '"'"'www.%s'"'"'">\n        Redirect 308 / https://%s/\n    </If>\n' "$DOM" "$DOM")
 </VirtualHost>
 APACHE
-  a2enmod -q proxy proxy_http headers >/dev/null
+  a2enmod -q proxy proxy_http headers remoteip >/dev/null
   install -m 644 "$tmp" "$arq"
   rm -f "$tmp"
   a2ensite -q "sintonia-$DOM" >/dev/null
@@ -487,43 +632,45 @@ instrucoes() {
 TXT
   case ${PROXY_DOCKER:-} in
     npm)
-      echo "     (Nginx Proxy Manager: Hosts → Proxy Hosts → Add Proxy Host; Scheme http, Forward Hostname 'sintonia-app',"
-      echo "      Forward Port $(cfg PORT 8787), 'Block Common Exploits'; aba SSL: Request a new certificate + Force SSL + HTTP/2)"
+      echo "     (Nginx Proxy Manager: Hosts → Proxy Hosts → Add Proxy Host; Scheme http, Forward Hostname '$(cfg IP_PONTE 172.17.0.1)',"
+      echo "      Forward Port $PORTA, 'Block Common Exploits'; aba SSL: Request a new certificate + Force SSL + HTTP/2)"
       ;;
     traefik)
-      echo "     (Traefik: o app já está na rede do Traefik como 'sintonia-app'. Traefik de painel — Coolify, Dokploy,"
-      echo "      EasyPanel —: cadastre o domínio por lá. Traefik avulso: no arquivo dinâmico dele, um router"
-      echo "      Host(\`$DOM\`) com certResolver → serviço http://sintonia-app:$(cfg PORT 8787))"
+      echo "     (Traefik de painel — Coolify, Dokploy, EasyPanel —: cadastre o domínio por lá. Traefik avulso: no arquivo"
+      echo "      dinâmico dele, um router Host(\`$DOM\`) com certResolver → serviço http://$(cfg IP_PONTE 172.17.0.1):$PORTA)"
       ;;
   esac
   echo "  Depois rode de novo este comando com --sem-rebuild para conferir."
 }
 
-# endereço provisório antigo sai quando chega o domínio de verdade (evita o mesmo site em dois endereços)
-if [[ -z $PREVIA ]]; then
+# desliga endereços provisórios (*.sslip.io) do Sintonia, menos o $1 — só DEPOIS que o endereço novo está no ar
+# (assim uma troca que falhe nunca deixa o site sem endereço nenhum)
+desligar_previas() {
+  local manter=${1:-} f h
   for f in /etc/nginx/sites-available/sintonia-*.sslip.io.conf /etc/nginx/conf.d/sintonia-*.sslip.io.conf /etc/apache2/sites-available/sintonia-*.sslip.io.conf; do
     [[ -e $f ]] || continue
     h="$(basename "$f" .conf)"
     h="${h#sintonia-}"
-    [[ $h == *-le-ssl ]] && continue
+    [[ $h == *-le-ssl || $h == "$manter" ]] && continue
     if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi
   done
-  if caddy_alvo_salvo && [[ -f $CF_HOST ]]; then
+  if caddy_alvo_salvo; then
     while read -r h; do
+      [[ $h == "$manter" ]] && continue
       if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi
     done < <(sed -n 's/^# >>> Sintonia: \(.*\.sslip\.io\)$/\1/p' "$CF_HOST")
   fi
-fi
+}
 
 # ---- 1. servidor web --------------------------------------------------------------------------------------
 PRONTO_HTTPS=1
 if caddy_proprio || [[ $PROXY_TIPO == nenhum ]]; then
   # o Caddy do Sintonia atende 80/443 (máquina só dele, ou ninguém mais usa essas portas)
+  pedir_email obrigatorio
   if compartilhado && [[ "$(cfg CADDY_PROPRIO 0)" != 1 ]]; then
     definir_env CADDY_PROPRIO 1
     aviso "Ninguém usa as portas 80/443 nesta máquina: o Caddy do Sintonia passa a atendê-las (HTTPS automático)."
   fi
-  pedir_email obrigatorio
   site="$(hosts_virgula)"
   definir_env SITE_ADDRESS "$site"
   definir_env ACME_EMAIL "$EMAIL"
@@ -540,15 +687,17 @@ else
       fi
       if ((rc_caddy == 0)); then
         :
-      elif [[ $PROXY_DOCKER == nginx-proxy || $PROXY_DOCKER == caddy-docker-proxy ]] && [[ -n "$(cfg REDES_PROXY)" ]]; then
+      elif { [[ $PROXY_DOCKER == nginx-proxy ]] && [[ -n "$(cfg REDES_PROXY)" ]]; } || { [[ $PROXY_DOCKER == caddy-docker-proxy ]] && garantir_ponte; }; then
         definir_env HOSTS_PROXY "$(IFS=,; echo "${HOSTS[*]}")"
         ok "$PROXY_DESC: o app ganha os rótulos com o domínio; o proxy pega o certificado sozinho"
       elif [[ -n $PROXY_REDE_HOST ]]; then
         instrucoes "http://127.0.0.1:$PORTA"
         PRONTO_HTTPS=''
+      elif garantir_ponte; then
+        instrucoes "http://$(cfg IP_PONTE):$PORTA   (IP interno do Docker: o proxy em contêiner chega ao app por ele)"
+        PRONTO_HTTPS=''
       else
-        [[ -n "$(cfg REDES_PROXY)" ]] || definir_env REDES_PROXY "$(redes_do_proxy)"
-        instrucoes "http://sintonia-app:$(cfg PORT 8787)   (o app entra na rede do proxy com esse nome)"
+        instrucoes "http://127.0.0.1:$PORTA"
         PRONTO_HTTPS=''
       fi
       ;;
@@ -562,8 +711,10 @@ else
 fi
 
 # ---- 2. .env e imagem -------------------------------------------------------------------------------------
-if [[ -z $PREVIA ]]; then
-  definir_env ENDERECO_PREVIA ""
+if [[ -n $PREVIA ]]; then
+  # o bloco/arquivo já está aplicado: o endereço vale mesmo que o certificado ainda esteja saindo
+  definir_env ENDERECO_PREVIA "https://$DOM"
+else
   definir_env DOMINIO "$DOM"
   definir_env PUBLIC_URL "https://$DOM"
   definir_env VITE_SITE_URL "https://$DOM"
@@ -601,10 +752,19 @@ if [[ -n $PRONTO_HTTPS ]]; then
     sleep 3
   done
   if [[ -n $ok_https ]]; then
-    if [[ -n $PREVIA ]]; then definir_env ENDERECO_PREVIA "$esquema://$DOM"; fi
     ok "No ar: $esquema://$DOM   (painel: $esquema://$DOM/admin)"
     if [[ -n $PREVIA ]]; then aviso "Endereço PROVISÓRIO (fora do Google). Quando o domínio apontar: sudo $DIR_DEPLOY/dominio.sh seu-dominio.com.br"; fi
   else
-    aviso "$esquema://$DOM ainda não respondeu (com certificado válido). Se o certificado é recente, espere 1–2 min e confira: sudo $DIR_DEPLOY/status.sh"
+    aviso "$esquema://$DOM ainda não respondeu com certificado válido. O servidor web pede o certificado sozinho; em geral leva 1–2 min. Confira depois abrindo o endereço ou com: sudo $DIR_DEPLOY/status.sh"
   fi
+fi
+
+# ---- 4. endereços provisórios antigos ---------------------------------------------------------------------
+if [[ -n $PREVIA ]]; then
+  desligar_previas "$DOM" # um provisório de antes, com outro nome
+elif [[ -n ${ok_https:-} ]]; then
+  desligar_previas ""
+  definir_env ENDERECO_PREVIA ""
+elif [[ -n "$(cfg ENDERECO_PREVIA)" ]]; then
+  aviso "O endereço provisório $(cfg ENDERECO_PREVIA) continua ligado até o domínio responder. Depois rode de novo: sudo $DIR_DEPLOY/dominio.sh $DOM --sem-rebuild"
 fi

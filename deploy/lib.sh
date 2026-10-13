@@ -186,7 +186,7 @@ porta_livre() {
   local p=${1:-8787} fim=$((${1:-8787} + 200))
   while ((p < fim)); do
     if [[ -z "$(ss -Htln "sport = :$p" 2>/dev/null)" ]] &&
-      ! { command -v docker >/dev/null 2>&1 && docker ps --format '{{.Ports}}' 2>/dev/null | grep -qE "[:.]$p->"; }; then
+      ! { command -v docker >/dev/null 2>&1 && docker ps --format '{{.Ports}}' 2>/dev/null | grep -E "[:.]$p->" >/dev/null; }; then
       printf '%s' "$p"
       return 0
     fi
@@ -216,7 +216,7 @@ painel_hospedagem() {
 #   PROXY_DOCKER     nginx-proxy | caddy-docker-proxy | npm | traefik | caddy | nginx | outro  (quando PROXY_TIPO=docker)
 #   PROXY_CADDYFILE  Caddyfile do Caddy do sistema (quando PROXY_TIPO=caddy)
 detectar_proxy() {
-  PROXY_TIPO=nenhum PROXY_DESC='' PROXY_CONTEINER='' PROXY_IMAGEM='' PROXY_REDES='' PROXY_REDE_HOST='' PROXY_DOCKER='' PROXY_CADDYFILE=''
+  PROXY_TIPO=nenhum PROXY_DESC='' PROXY_CONTEINER='' PROXY_IMAGEM='' PROXY_REDES='' PROXY_REDE_HOST='' PROXY_DOCKER='' PROXY_CADDYFILE='' PROXY_CADDY_PID=''
   local id nome imagem projeto portas linha proc pid exe cid painel tem_docker=''
   command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && tem_docker=1
 
@@ -251,12 +251,26 @@ detectar_proxy() {
           PROXY_DESC="nginx ($exe)"
           ;;
         caddy)
-          # Caddyfile em uso: o --config do processo (relativo à pasta dele) ou o padrão do pacote
-          PROXY_CADDYFILE="$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | awk 'p { print; exit } $0 == "--config" { p = 1 } /^--config=/ { sub(/^--config=/, ""); print; exit }')"
-          if [[ -n $PROXY_CADDYFILE && $PROXY_CADDYFILE != /* ]]; then PROXY_CADDYFILE="$(readlink -f "/proc/$pid/cwd" 2>/dev/null)/$PROXY_CADDYFILE"; fi
-          PROXY_CADDYFILE=${PROXY_CADDYFILE:-/etc/caddy/Caddyfile}
-          if [[ -f $PROXY_CADDYFILE && $PROXY_CADDYFILE != *.json ]]; then PROXY_TIPO=caddy; else PROXY_TIPO=outro; fi
-          PROXY_DESC="Caddy ($exe, $PROXY_CADDYFILE)"
+          # Caddyfile em uso: o --config do processo (relativo à pasta dele); sem --config, o Caddy usa o Caddyfile da
+          # pasta onde rodou; com --resume a configuração vem da API/autosave (aí não há arquivo para editar)
+          local args cwd adaptador
+          args="$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null || true)"
+          cwd="$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)"
+          PROXY_CADDY_PID=$pid
+          PROXY_CADDYFILE="$(awk 'p { print; exit } $0 == "--config" { p = 1 } /^--config=/ { sub(/^--config=/, ""); print; exit }' <<<"$args")"
+          if [[ -n $PROXY_CADDYFILE && $PROXY_CADDYFILE != /* ]]; then PROXY_CADDYFILE="$cwd/$PROXY_CADDYFILE"; fi
+          if grep -qx -- '--resume' <<<"$args"; then
+            PROXY_CADDYFILE=''
+          elif [[ -z $PROXY_CADDYFILE && -f $cwd/Caddyfile ]]; then
+            PROXY_CADDYFILE="$cwd/Caddyfile"
+          fi
+          adaptador="$(awk 'p { print; exit } $0 == "--adapter" { p = 1 } /^--adapter=/ { sub(/^--adapter=/, ""); print; exit }' <<<"$args")"
+          if [[ -n $PROXY_CADDYFILE && -f $PROXY_CADDYFILE && $PROXY_CADDYFILE != *.json && (-z $adaptador || $adaptador == caddyfile) ]]; then
+            PROXY_TIPO=caddy
+          else
+            PROXY_TIPO=outro
+          fi
+          PROXY_DESC="Caddy ($exe${PROXY_CADDYFILE:+, $PROXY_CADDYFILE}${PROXY_CADDYFILE:- configurado pela API/--resume})"
           ;;
         apache2 | httpd)
           if [[ $exe == /usr/sbin/apache2 && -d /etc/apache2/sites-available ]]; then PROXY_TIPO=apache; else PROXY_TIPO=painel; fi
@@ -292,7 +306,22 @@ detectar_proxy() {
   [[ -n $PROXY_DESC ]] || PROXY_DESC="ninguém usa as portas 80/443"
 }
 
-# redes Docker (não padrão) do proxy em contêiner, onde o app entra com o apelido "sintonia-app"
+# IP desta máquina na ponte padrão do Docker (docker0, em geral 172.17.0.1). Um proxy em contêiner, em QUALQUER
+# rede, chega ao app por ele (porta publicada só nesse IP interno: nada exposto na internet) — sem o app entrar na
+# rede do outro projeto (lá o nome de serviço "app" do Sintonia colidiria com o dele e a rede interna ficaria à vista).
+ip_ponte_docker() {
+  local ip
+  ip="$(docker network inspect bridge -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+(\.[0-9]+){3}$' | head -n 1 || true)"
+  if [[ -z $ip && -n ${PROXY_REDES:-} ]]; then
+    for r in $PROXY_REDES; do
+      ip="$(docker network inspect "$r" -f '{{range .IPAM.Config}}{{.Gateway}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9]+(\.[0-9]+){3}$' | head -n 1 || true)"
+      [[ -n $ip ]] && break
+    done
+  fi
+  printf '%s' "$ip"
+}
+
+# redes Docker (não padrão) do proxy em contêiner — só para o nginx-proxy, que exige o app numa rede comum
 redes_do_proxy() {
   local r out=''
   for r in $PROXY_REDES; do
@@ -303,13 +332,18 @@ redes_do_proxy() {
 }
 
 # Gera docker-compose.vps.yml (modo compartilhado; o .env aponta para ele em COMPOSE_FILE). Fonte: o .env
-# (PORTA_LOCAL, PORT, CADDY_PROPRIO, REDES_PROXY, PROXY_DOCKER, HOSTS_PROXY).
+# (PORTA_LOCAL, PORT, IP_PONTE, CADDY_PROPRIO, REDES_PROXY, PROXY_DOCKER, HOSTS_PROXY).
 gerar_compose_vps() {
-  local arq="$RAIZ/docker-compose.vps.yml" tmp porta interna redes r i=0 tipo hosts
+  local arq="$RAIZ/docker-compose.vps.yml" tmp porta interna redes r i=0 tipo hosts ponte
   porta="$(cfg PORTA_LOCAL 8787)"
   interna="$(cfg PORT 8787)"
   redes="$(cfg REDES_PROXY)"
   tipo="$(cfg PROXY_DOCKER)"
+  ponte="$(cfg IP_PONTE)"
+  [[ $ponte =~ ^[0-9]+(\.[0-9]+){3}$ ]] || ponte=''
+  # rede de outro projeto só para o nginx-proxy (que só enxerga contêineres numa rede comum)
+  [[ $tipo == nginx-proxy ]] || redes=''
+
   hosts="$(cfg HOSTS_PROXY)"
   hosts="${hosts// /}"
   [[ $hosts =~ ^[a-z0-9.,-]+$ ]] || hosts=''
@@ -322,6 +356,10 @@ gerar_compose_vps() {
     echo "    # só nesta máquina (127.0.0.1): o servidor web que já existe encaminha o domínio para cá"
     echo "    ports:"
     echo "      - \"127.0.0.1:$porta:$interna\""
+    if [[ -n $ponte ]]; then
+      echo "      # proxy em contêiner (de outro projeto) chega aqui pelo IP interno do Docker; não é exposto na internet"
+      echo "      - \"$ponte:$porta:$interna\""
+    fi
     if [[ -n $redes ]]; then
       echo "    # rede(s) do proxy em contêiner: lá o app atende como http://sintonia-app:$interna"
       echo "    networks:"
@@ -337,10 +375,10 @@ gerar_compose_vps() {
       echo "      VIRTUAL_HOST: \"$hosts\""
       echo "      VIRTUAL_PORT: \"$interna\""
       echo "      LETSENCRYPT_HOST: \"$hosts\""
-    elif [[ -n $hosts && $tipo == caddy-docker-proxy ]]; then
+    elif [[ -n $hosts && -n $ponte && $tipo == caddy-docker-proxy ]]; then
       echo "    labels:"
       echo "      caddy: \"${hosts//,/, }\""
-      echo "      caddy.reverse_proxy: \"{{upstreams $interna}}\""
+      echo "      caddy.reverse_proxy: \"$ponte:$porta\""
       echo "      caddy.reverse_proxy.header_up: \"X-Real-IP {remote_host}\""
     fi
     if ! caddy_proprio; then

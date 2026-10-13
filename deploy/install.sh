@@ -134,16 +134,24 @@ aptq() { apt-get -o DPkg::Lock::Timeout=600 "$@"; }
 
 info "1/9 Pacotes básicos"
 aptq update -qq
-aptq install -y -qq ca-certificates curl git openssl cron util-linux iproute2 >/dev/null
+# --no-upgrade: o que já está instalado não é atualizado (numa VPS com outros projetos, nada muda sem precisar)
+aptq install -y -qq --no-upgrade ca-certificates curl git openssl cron util-linux iproute2 >/dev/null
 ok "curl, git, openssl e cron instalados"
 
 # ---- 2. código --------------------------------------------------------------------------------------
 info "2/9 Código do Sintonia"
-AQUI="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
-if [[ -z ${INSTALL_DIR:-} && -n $AQUI && -f "$AQUI/../docker-compose.yml" && -d "$AQUI/../.git" ]]; then
+# rodando o install.sh de dentro de um clone do Sintonia, usa esse clone. Com "curl | bash" não há arquivo: nada é
+# deduzido da pasta atual (que pode ser o repositório de OUTRO projeto)
+eh_sintonia() { [[ -f $1/deploy/lib.sh && -d $1/.git ]] && grep -qx 'name: sintonia' "$1/docker-compose.yml" 2>/dev/null; }
+AQUI=''
+if [[ -n ${BASH_SOURCE[0]:-} && -f ${BASH_SOURCE[0]} ]]; then AQUI="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; fi
+if [[ -z ${INSTALL_DIR:-} && -n $AQUI && ${AQUI##*/} == deploy ]] && eh_sintonia "$AQUI/.."; then
   INSTALL_DIR="$(cd "$AQUI/.." && pwd)"
 fi
 INSTALL_DIR=${INSTALL_DIR:-/opt/sintonia}
+if [[ -d $INSTALL_DIR/.git ]] && ! eh_sintonia "$INSTALL_DIR"; then
+  morrer "$INSTALL_DIR é um repositório git, mas não é o do Sintonia: não mexo nele. Use INSTALL_DIR=/opt/sintonia (ou outra pasta vazia)."
+fi
 REPO_URL=${REPO_URL:-$REPO_PADRAO}
 GIT_ARGS=()
 
@@ -321,6 +329,13 @@ elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && motor_o
 elif command -v docker >/dev/null 2>&1 && [[ $MODO == compartilhado && -z ${ATUALIZAR_DOCKER:-} ]]; then
   morrer "O Docker desta máquina ($(docker version -f '{{.Server.Version}}' 2>/dev/null || echo 'sem resposta')) é anterior ao $DOCKER_MIN que o Sintonia usa. Atualizar REINICIA os contêineres dos outros projetos por alguns segundos (os com 'restart' voltam sozinhos). Se puder, rode de novo com ATUALIZAR_DOCKER=1."
 else
+  if [[ $MODO == compartilhado && -z ${ATUALIZAR_DOCKER:-} ]]; then
+    for p in containerd runc podman-docker docker.io; do
+      if dpkg -s "$p" >/dev/null 2>&1; then
+        morrer "Esta máquina tem o pacote '$p' (usado por outro sistema de contêineres). Instalar o Docker oficial o removeria. Se puder, rode de novo com ATUALIZAR_DOCKER=1."
+      fi
+    done
+  fi
   if command -v docker >/dev/null 2>&1; then
     aviso "Atualizando o Docker: os contêineres em execução reiniciam (os com política 'restart' voltam sozinhos)."
   elif [[ $MODO == compartilhado ]]; then
@@ -355,13 +370,27 @@ else
 fi
 
 # ---- 6. swap, relógio e disco ---------------------------------------------------------------------------
-info "6/9 Memória de troca (swap), relógio e disco"
+info "6/9 Disco, memória de troca (swap) e relógio"
+dir_docker="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
+[[ -d $dir_docker ]] || dir_docker=/
+livre_gb="$(df -Pk "$dir_docker" | awk 'NR == 2 {print int($4 / 1048576)}')"
+# numa VPS compartilhada, sobra margem para os outros projetos (bancos, logs)
+disco_min=3
+[[ $MODO == compartilhado ]] && disco_min=5
+if ((livre_gb < disco_min)); then
+  morrer "Só ${livre_gb} GB livres em $dir_docker: o Sintonia precisa de ~3 GB (imagem e build)$([[ $MODO == compartilhado ]] && echo ' e deixo margem para os outros projetos'). Libere espaço (ex.: docker system df) e rode de novo."
+elif ((livre_gb < disco_min + 3)); then
+  aviso "Disco com ${livre_gb} GB livres em $dir_docker (o Sintonia usa ~2–3 GB). Funciona, mas fique de olho."
+else
+  ok "Disco: ${livre_gb} GB livres"
+fi
 SWAP_GB=${SWAP_GB:-2}
 mem_livre_mb="$(awk '/^MemAvailable:/ {print int($2 / 1024)}' /proc/meminfo)"
+if [[ $MODO == compartilhado ]] && ((livre_gb < disco_min + 3 + SWAP_GB)); then SWAP_GB=0; fi
 if [[ -n "$(swapon --show --noheadings 2>/dev/null)" ]]; then
   ok "Swap já existe ($(swapon --show --noheadings --bytes | awk '{s+=$3} END {printf "%.1f GB", s/1073741824}'))"
 elif [[ $SWAP_GB == 0 ]]; then
-  aviso "SWAP_GB=0: sem swap (o build da imagem usa ~1 GB de RAM)."
+  aviso "Sem swap (SWAP_GB=0 ou pouco disco numa VPS compartilhada); o build da imagem usa ~1 GB de RAM."
 elif [[ $MODO == compartilhado && ${mem_livre_mb:-0} -ge 2048 ]]; then
   ok "Sem swap, mas há $((mem_livre_mb / 1024)) GB de RAM livre: não crio swap numa VPS compartilhada"
 elif [[ -e /swapfile ]] && ! grep -qE '^/swapfile\s' /etc/fstab && [[ $MODO == compartilhado ]]; then
@@ -382,22 +411,13 @@ else
   ok "Swap de ${SWAP_GB} GB em /swapfile (só para picos e para o build)"
 fi
 if command -v timedatectl >/dev/null 2>&1; then
-  timedatectl set-ntp true >/dev/null 2>&1 || true
+  # numa VPS compartilhada só confere (pode haver chrony/ntpd configurado pelos outros projetos)
+  [[ $MODO == compartilhado ]] || timedatectl set-ntp true >/dev/null 2>&1 || true
   if [[ "$(timedatectl show -p NTPSynchronized --value 2>/dev/null)" == yes ]]; then
     ok "Relógio sincronizado (NTP)"
   else
     aviso "Relógio ainda não sincronizado pelo NTP (a apuração depende da hora certa). Confira depois: timedatectl"
   fi
-fi
-dir_docker="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
-[[ -d $dir_docker ]] || dir_docker=/
-livre_gb="$(df -Pk "$dir_docker" | awk 'NR == 2 {print int($4 / 1048576)}')"
-if ((livre_gb < 3)); then
-  morrer "Só ${livre_gb} GB livres em $dir_docker: a imagem e o build precisam de ~3 GB. Libere espaço (ex.: docker system df) e rode de novo."
-elif ((livre_gb < 6)); then
-  aviso "Disco com ${livre_gb} GB livres em $dir_docker (o Sintonia usa ~2–3 GB). Funciona, mas fique de olho."
-else
-  ok "Disco: ${livre_gb} GB livres"
 fi
 
 # ---- 7. configuração (.env) -------------------------------------------------------------------------
@@ -487,13 +507,16 @@ if [[ $MODO == compartilhado ]]; then
   fi
   # o docker-compose.yml exige ACME_EMAIL (é do Caddy próprio, desligado aqui): marcador até o dominio.sh
   if [[ $email =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ ]]; then definir_env ACME_EMAIL "$email"; else definir_env ACME_EMAIL "pendente@sintonia.invalid"; fi
-  # proxy em contêiner: o app entra na rede dele (com o apelido sintonia-app)
+  # proxy em contêiner: chega ao app pelo IP interno do Docker (docker0); o app NÃO entra na rede do outro
+  # projeto (exceto nginx-proxy, que só funciona assim)
   if [[ $PROXY_TIPO == docker && -z $PROXY_REDE_HOST ]]; then
-    definir_env REDES_PROXY "$(redes_do_proxy)"
     definir_env PROXY_DOCKER "$PROXY_DOCKER"
-  elif [[ -z $(ler_env REDES_PROXY) ]]; then
+    definir_env IP_PONTE "$(ip_ponte_docker)"
+    if [[ $PROXY_DOCKER == nginx-proxy ]]; then definir_env REDES_PROXY "$(redes_do_proxy)"; else definir_env REDES_PROXY ""; fi
+  else
+    definir_env PROXY_DOCKER "${PROXY_DOCKER:-}"
+    definir_env IP_PONTE ""
     definir_env REDES_PROXY ""
-    definir_env PROXY_DOCKER ""
   fi
   gerar_compose_vps
   ok ".env em $ENV (permissão 600): VPS compartilhada, app em 127.0.0.1:$porta_local${dominio:+, domínio $dominio}"
@@ -589,7 +612,7 @@ fi
 # ---- sem domínio ainda, numa VPS compartilhada: endereço próprio provisório (opcional) ---------------
 if [[ $MODO == compartilhado && -z $(ler_env DOMINIO) && -z $DOMINIO_DEPOIS ]]; then
   previa=${PREVIA:-}
-  if [[ -z $previa ]]; then
+  if [[ -z $previa && -n $TTY ]]; then
     perguntar "Publicar já num endereço PRÓPRIO do Sintonia, provisório e com HTTPS (https://sintonia.<ip>.sslip.io)? S/n" "s"
     previa=$RESP
   fi
@@ -621,6 +644,7 @@ ${C_OK}${C_NEG}Sintonia instalado (VPS compartilhada, ainda sem domínio).${C_FI
 FIM
   if [[ -n $(ler_env ENDERECO_PREVIA) ]]; then
     printf '  %sSite (provisório, só do Sintonia): %s%s   (painel: %s/admin)\n' "$C_NEG" "$(ler_env ENDERECO_PREVIA)" "$C_FIM" "$(ler_env ENDERECO_PREVIA)"
+    printf '  (se o navegador ainda acusar erro de conexão segura, o certificado está saindo: espere 1–2 min)\n'
   else
     printf '  Endereço próprio provisório com HTTPS (não aparece no Google):\n     sudo %s/deploy/dominio.sh --previa\n' "$INSTALL_DIR"
   fi
