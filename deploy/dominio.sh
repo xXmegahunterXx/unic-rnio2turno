@@ -4,18 +4,21 @@
 #
 #   sudo /opt/sintonia/deploy/dominio.sh meudominio.com.br            o registro A do DNS já aponta para esta VPS
 #   sudo /opt/sintonia/deploy/dominio.sh meudominio.com.br --www      também www.meudominio.com.br (crie o DNS do www)
-#   sudo /opt/sintonia/deploy/dominio.sh --previa                     endereço PROVISÓRIO com HTTPS, sem domínio:
-#                                                                     https://<ip-desta-vps>.sslip.io (fora do Google)
+#   sudo /opt/sintonia/deploy/dominio.sh --previa                     endereço PROVISÓRIO e só do Sintonia, com HTTPS,
+#                                                                     sem domínio: https://sintonia.<ip-com-traços>.sslip.io
+#                                                                     (fora do Google; o <ip>.sslip.io "puro" costuma ser
+#                                                                     de outro projeto da máquina e nunca é tocado)
 #   sudo /opt/sintonia/deploy/dominio.sh --remover <host>             tira o <host> do servidor web da máquina
 #
-# Opções: --email voce@exemplo.com (Let's Encrypt; pergunta se faltar)   --sem-dns (não confere o DNS: ex. Cloudflare
-#         com a nuvem laranja já ligada)   --sem-rebuild (não reconstrói a imagem)
+# Opções: --email voce@exemplo.com (avisos do Let's Encrypt; opcional, pergunta se houver terminal)
+#         --sem-dns (não confere o DNS: ex. Cloudflare com a nuvem laranja já ligada)   --sem-rebuild (não reconstrói a imagem)
 #
 # O que faz, conforme quem atende as portas 80/443 desta máquina (detectado sozinho):
 #   - ninguém (ou a máquina é só do Sintonia): o Caddy do Sintonia atende o domínio com HTTPS automático;
-#   - nginx / Caddy / Apache instalados no sistema: cria UM arquivo de site só do Sintonia, confere a configuração
-#     (nginx -t, caddy validate, apachectl configtest) ANTES de recarregar, pede o certificado (certbot ou o próprio
-#     Caddy) e, se algo falhar, desfaz — os outros sites não são tocados;
+#   - nginx / Apache instalados no sistema: cria UM arquivo de site só do Sintonia; Caddy (no sistema OU em
+#     contêiner, com o Caddyfile montado do disco): acrescenta UM bloco marcado no Caddyfile. Sempre confere a
+#     configuração inteira (nginx -t, caddy validate, apachectl configtest) ANTES de recarregar, pede o certificado
+#     (certbot ou o próprio Caddy) e, se algo falhar, desfaz — os outros sites não são tocados e nada é reiniciado;
 #   - proxy em contêiner (nginx-proxy, caddy-docker-proxy): rótulos/variáveis no contêiner do app;
 #     (Nginx Proxy Manager, Traefik, painéis): mostra exatamente o que cadastrar.
 # No fim, reconstrói a imagem com o endereço novo (links de compartilhar) sem tirar o site do ar (update.sh).
@@ -40,7 +43,7 @@ while (($#)); do
       shift
       ;;
     -h | --help)
-      sed -n '2,24p' "$0"
+      sed -n '2,27p' "$0"
       exit 0
       ;;
     -*) morrer "Opção desconhecida: $1 (use --help)" ;;
@@ -67,6 +70,8 @@ definir_env() {
   mv "$tmp" "$ARQ_ENV"
 }
 dominio_valido() { [[ ${1,,} =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$ ]]; }
+re_escapar() { printf '%s' "$1" | sed 's/[.[\*^$()+?{}|]/\\&/g'; } # texto literal dentro de um grep -E
+tem_terminal() { [[ -z ${NAO_INTERATIVO:-} ]] && { : </dev/tty; } 2>/dev/null; }
 email_valido() { [[ $1 =~ ^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$ && $1 != *@sintonia.invalid ]]; }
 ip_publico() { curl -fsS4 --max-time 6 https://api.ipify.org 2>/dev/null || curl -fsS4 --max-time 6 https://ifconfig.me 2>/dev/null || true; }
 servico_ativo() { command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$1" 2>/dev/null; }
@@ -79,6 +84,158 @@ recarregar() { # recarregar nginx|caddy|apache2 — sem derrubar conexões
 }
 PORTA="$(cfg PORTA_LOCAL 8787)"
 MARCA="# Sintonia — gerado por $RAIZ/deploy/dominio.sh"
+
+# ---- Caddy (no sistema ou em contêiner) -------------------------------------------------------------------
+# CF_HOST: o Caddyfile no disco desta máquina (é ele que editamos, sempre no lugar: um arquivo montado num
+# contêiner continua o mesmo); CF_CT: o mesmo arquivo como o Caddy o vê; CADDY_CT: o contêiner (vazio = sistema).
+CF_HOST='' CF_CT='' CADDY_CT=''
+caddy_x() { if [[ -n $CADDY_CT ]]; then docker exec "$CADDY_CT" caddy "$@"; else caddy "$@"; fi; }
+caddy_validar() { caddy_x validate --config "$CF_CT" --adapter caddyfile; }
+caddy_recarregar() { # sem reiniciar nada: o Caddy troca a configuração no ar (se a nova falhar, segue a antiga)
+  if [[ -z $CADDY_CT && $CF_HOST == /etc/caddy/Caddyfile ]] && servico_ativo caddy; then
+    systemctl reload caddy
+  else
+    caddy_x reload --config "$CF_CT" --adapter caddyfile
+  fi
+}
+# o alvo gravado no .env por uma configuração anterior (para tirar/trocar o bloco depois)
+caddy_alvo_salvo() {
+  CF_HOST="$(cfg CADDY_ARQ)" CF_CT="$(cfg CADDY_CAMINHO)" CADDY_CT="$(cfg CADDY_CONTEINER)"
+  if [[ -z $CF_HOST && -f /etc/caddy/Caddyfile ]]; then CF_HOST=/etc/caddy/Caddyfile CF_CT=/etc/caddy/Caddyfile CADDY_CT=''; fi
+  [[ -n $CF_HOST ]] || return 1
+  CF_CT=${CF_CT:-$CF_HOST}
+  # contêiner sumiu/recriado com outro nome: sem ele não dá para validar nem recarregar
+  if [[ -n $CADDY_CT ]] && ! docker inspect "$CADDY_CT" >/dev/null 2>&1; then return 1; fi
+}
+# acha o Caddyfile de um contêiner do Caddy: o caminho do --config no comando (padrão da imagem oficial:
+# /etc/caddy/Caddyfile) e a montagem do disco que o contém → CF_HOST e CF_CT
+caddyfile_do_conteiner() {
+  local c=$1 cmd cfg='' tipo origem destino linhas=()
+  cmd="$(docker inspect -f '{{json .Config.Entrypoint}} {{json .Config.Cmd}} {{json .Args}}' "$c" 2>/dev/null)" || return 1
+  cfg="$(grep -oE -- '"--config"[^"]*"[^"]+"|"--config=[^"]+"' <<<"$cmd" | head -n 1 | sed -E 's/^"--config"[^"]*"//; s/^"--config=//; s/"$//')"
+  [[ -n $cfg ]] || cfg=/etc/caddy/Caddyfile
+  # JSON ou adaptador diferente de caddyfile: não editamos
+  [[ $cfg != *.json ]] || return 1
+  grep -qE '"--adapter"[^"]*"(json|yaml|nginx)"' <<<"$cmd" && return 1
+  mapfile -t linhas < <(docker inspect -f '{{range .Mounts}}{{.Type}}|{{.Source}}|{{.Destination}}{{"\n"}}{{end}}' "$c" 2>/dev/null)
+  for l in "${linhas[@]}"; do # 1º: o próprio arquivo montado
+    IFS='|' read -r tipo origem destino <<<"$l"
+    if [[ ($tipo == bind || $tipo == volume) && $destino == "$cfg" ]]; then
+      CF_HOST=$origem CF_CT=$cfg
+      [[ -f $CF_HOST ]] && return 0
+    fi
+  done
+  for l in "${linhas[@]}"; do # 2º: a pasta que o contém
+    IFS='|' read -r tipo origem destino <<<"$l"
+    if [[ ($tipo == bind || $tipo == volume) && $cfg == "$destino"/* ]]; then
+      CF_HOST="$origem${cfg#"$destino"}" CF_CT=$cfg
+      [[ -f $CF_HOST ]] && return 0
+    fi
+  done
+  return 1
+}
+caddy_backup() { # cópia do Caddyfile antes de mexer (fora da pasta do outro projeto) → $CF_BKP
+  local d
+  d="$(cfg BACKUP_DIR /var/backups/sintonia)/proxy"
+  install -d -m 700 "$d"
+  CF_BKP="$d/Caddyfile-$(date +%Y%m%d-%H%M%S)-$$"
+  cp "$CF_HOST" "$CF_BKP"
+  chmod 600 "$CF_BKP"
+}
+caddy_sem_bloco() { # imprime o Caddyfile sem o bloco do Sintonia para o host $1
+  awk -v ini="# >>> Sintonia: $1" -v fim="# <<< Sintonia: $1" '
+    $0 == ini { pula = 1; next }
+    pula && $0 == fim { pula = 0; next }
+    !pula { print }' "$CF_HOST"
+}
+caddy_aplicar() { # caddy_aplicar <arquivo novo> <descrição> → grava no lugar, valida, recarrega; desfaz se falhar
+  local novo=$1 oque=$2 saida
+  caddy_backup
+  cat "$novo" >"$CF_HOST"
+  if ! saida="$(caddy_validar 2>&1)"; then
+    cat "$CF_BKP" >"$CF_HOST"
+    printf '%s\n' "$saida" | grep -vE '"level":"(info|debug)"' | tail -n 6 >&2 || true
+    erro "O Caddy recusou $oque (acima). Desfeito: o Caddyfile voltou ao que era e nada mudou para os outros sites."
+    return 1
+  fi
+  if ! saida="$(caddy_recarregar 2>&1)"; then
+    cat "$CF_BKP" >"$CF_HOST"
+    printf '%s\n' "$saida" | tail -n 6 >&2 || true
+    erro "O Caddy não recarregou (acima; a API de administração dele pode estar desligada). Desfeito: segue a configuração de antes."
+    return 1
+  fi
+}
+caddy_tirar_bloco() { # caddy_tirar_bloco <host>
+  local tmp
+  tmp="$(mktemp)"
+  caddy_sem_bloco "$1" >"$tmp"
+  caddy_aplicar "$tmp" "a remoção do bloco de $1" || {
+    rm -f "$tmp"
+    return 1
+  }
+  rm -f "$tmp"
+}
+configurar_caddy() { # configurar_caddy sistema|conteiner
+  local h tmp upstream
+  if [[ $1 == conteiner ]]; then
+    CADDY_CT=$PROXY_CONTEINER
+    if ! caddyfile_do_conteiner "$CADDY_CT"; then
+      aviso "Não achei o Caddyfile do contêiner $CADDY_CT montado do disco desta máquina (Caddy configurado por JSON/API?)."
+      return 2
+    fi
+    if [[ -n $PROXY_REDE_HOST ]]; then
+      upstream="127.0.0.1:$PORTA"
+    else
+      [[ -n "$(cfg REDES_PROXY)" ]] || definir_env REDES_PROXY "$(redes_do_proxy)"
+      if [[ -z "$(cfg REDES_PROXY)" ]]; then
+        aviso "O contêiner $CADDY_CT só está na rede padrão do Docker (bridge), onde o app não tem nome."
+        return 2
+      fi
+      upstream="sintonia-app:$(cfg PORT 8787)"
+    fi
+  else
+    CADDY_CT='' CF_HOST=${PROXY_CADDYFILE:-/etc/caddy/Caddyfile} CF_CT=${PROXY_CADDYFILE:-/etc/caddy/Caddyfile}
+    upstream="127.0.0.1:$PORTA"
+  fi
+  caddy_validar >/dev/null 2>&1 || morrer "O Caddyfile atual ($CF_HOST) já tem erro (caddy validate): corrija antes; não mexo em nada assim."
+  for h in "${HOSTS[@]}"; do
+    if caddy_sem_bloco "$DOM" | grep -vE '^\s*#' | grep -qE "(^|[[:space:],/])$(re_escapar "$h")([[:space:],:{]|$)"; then
+      morrer "O Caddy já tem um site para $h (outro projeto). Escolha outro endereço ou tire esse site antes; não mexo nele."
+    fi
+  done
+  tmp="$(mktemp)"
+  {
+    caddy_sem_bloco "$DOM" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' # sem linhas em branco sobrando no fim
+    echo
+    echo "# >>> Sintonia: $DOM"
+    echo "$MARCA. Para remover: sudo $RAIZ/deploy/dominio.sh --remover $DOM"
+    echo "$(hosts_virgula) {"
+    if [[ -n $WWW ]]; then
+      echo "	@www host www.$DOM"
+      echo "	redir @www https://$DOM{uri} 308"
+    fi
+    if [[ -n $PREVIA ]]; then echo '	header X-Robots-Tag "noindex, nofollow"'; fi
+    echo "	reverse_proxy $upstream {"
+    echo "		header_up X-Real-IP {remote_host}"
+    echo "		header_up -CF-Connecting-IP"
+    echo "		header_up -Fly-Client-IP"
+    echo "		header_up -True-Client-IP"
+    echo "		lb_try_duration 20s"
+    echo "		lb_try_interval 250ms"
+    echo "	}"
+    echo "}"
+    echo "# <<< Sintonia: $DOM"
+  } >"$tmp"
+  if ! caddy_aplicar "$tmp" "o bloco do Sintonia"; then
+    rm -f "$tmp"
+    exit 1
+  fi
+  rm -f "$tmp"
+  definir_env CADDY_ARQ "$CF_HOST"
+  definir_env CADDY_CAMINHO "$CF_CT"
+  definir_env CADDY_CONTEINER "$CADDY_CT"
+  ok "Bloco do Sintonia no Caddyfile $CF_HOST${CADDY_CT:+ (contêiner $CADDY_CT)}, entre '# >>> Sintonia' e '# <<< Sintonia'; recarregado sem reiniciar. O Caddy pede o certificado sozinho"
+}
 
 # ---- remover um host do servidor web da máquina -----------------------------------------------------
 remover_host() { # remover_host <host> → 0 se removeu algo
@@ -97,15 +254,8 @@ remover_host() { # remover_host <host> → 0 se removeu algo
     apachectl configtest >/dev/null 2>&1 && recarregar apache2
     feito=0
   fi
-  if [[ -f /etc/caddy/Caddyfile ]] && grep -qF "# >>> Sintonia: $h" /etc/caddy/Caddyfile; then
-    cp -p /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.antes-sintonia"
-    sed -i "/^# >>> Sintonia: ${h//./\\.}\$/,/^# <<< Sintonia: ${h//./\\.}\$/d" /etc/caddy/Caddyfile
-    if caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
-      recarregar caddy
-    else
-      cp -p /etc/caddy/Caddyfile.antes-sintonia /etc/caddy/Caddyfile
-    fi
-    feito=0
+  if caddy_alvo_salvo && [[ -f $CF_HOST ]] && grep -qxF "# >>> Sintonia: $h" "$CF_HOST"; then
+    caddy_tirar_bloco "$h" && feito=0
   fi
   return $feito
 }
@@ -121,7 +271,8 @@ IP="$(ip_publico)"
 if [[ -n $PREVIA ]]; then
   [[ -z "$(cfg DOMINIO)" ]] || morrer "Já existe um domínio configurado ($(cfg DOMINIO)): o endereço provisório é só para antes dele."
   [[ $IP =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || morrer "Não descobri o IP público desta VPS (precisa de internet para api.ipify.org)."
-  DOM="${IP//./-}.sslip.io"
+  # nome PRÓPRIO do Sintonia: o <ip>.sslip.io "puro" costuma já ser de outro projeto da máquina
+  DOM="sintonia.${IP//./-}.sslip.io"
   WWW=''
   SEM_DNS=1 # o sslip.io sempre responde com o IP que está no nome
 fi
@@ -140,12 +291,17 @@ hosts_virgula() { # "a.com, www.a.com"
 }
 
 EMAIL=${EMAIL:-$(cfg ACME_EMAIL)}
-if ! email_valido "$EMAIL"; then
-  if [[ -t 0 ]]; then
-    read -r -p "E-mail para o certificado HTTPS (Let's Encrypt avisa nele se algo der errado): " EMAIL
+email_valido "$EMAIL" || EMAIL=''
+# e-mail só é obrigatório para o Caddy do próprio Sintonia; certbot e Caddy da máquina funcionam sem
+pedir_email() { # pedir_email obrigatorio|opcional
+  if [[ -z $EMAIL ]] && tem_terminal; then
+    printf '%s' "E-mail para avisos do certificado HTTPS (Let's Encrypt)$([[ $1 == opcional ]] && echo ' — Enter pula'): " >/dev/tty
+    IFS= read -r EMAIL </dev/tty || true
+    EMAIL="${EMAIL// /}"
+    email_valido "$EMAIL" || EMAIL=''
   fi
-  email_valido "$EMAIL" || morrer "Informe o e-mail do certificado: --email voce@exemplo.com"
-fi
+  [[ $1 == opcional || -n $EMAIL ]] || morrer "Informe o e-mail do certificado: --email voce@exemplo.com"
+}
 
 # ---- DNS ---------------------------------------------------------------------------------------------
 if [[ -z $SEM_DNS ]]; then
@@ -173,11 +329,12 @@ CF_IPS=(173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64
 certbot_pronto() { # certbot com o plugin do servidor ($1: nginx | apache)
   if command -v certbot >/dev/null 2>&1 && certbot plugins 2>/dev/null | grep -q "^\* $1\$"; then return 0; fi
   info "Instalando o certbot (Let's Encrypt) com o plugin $1"
-  apt-get -o DPkg::Lock::Timeout=600 install -y -qq certbot "python3-certbot-$1" >/dev/null
+  DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=600 install -y -qq certbot "python3-certbot-$1" >/dev/null
 }
 args_certbot() { # → certificado para todos os HOSTS, sem perguntas, com redirecionamento HTTP → HTTPS
   local h
-  CERTBOT_ARGS=(--non-interactive --agree-tos -m "$EMAIL" --redirect --keep-until-expiring --cert-name "sintonia-$DOM")
+  CERTBOT_ARGS=(--non-interactive --agree-tos --redirect --keep-until-expiring --cert-name "sintonia-$DOM")
+  if [[ -n $EMAIL ]]; then CERTBOT_ARGS+=(-m "$EMAIL"); else CERTBOT_ARGS+=(--register-unsafely-without-email); fi
   for h in "${HOSTS[@]}"; do CERTBOT_ARGS+=(-d "$h"); done
 }
 
@@ -185,9 +342,9 @@ args_certbot() { # → certificado para todos os HOSTS, sem perguntas, com redir
 configurar_nginx() {
   local dir link='' arq tmp ip6='' h cf=''
   nginx -t >/dev/null 2>&1 || morrer "A configuração atual do nginx já tem erro (nginx -t): corrija antes; não mexo em nada assim."
-  [[ -n ${SEM_CERTIFICADO:-} ]] || certbot_pronto nginx
+  [[ -n ${SEM_CERTIFICADO:-} ]] || { pedir_email opcional; certbot_pronto nginx; }
   for h in "${HOSTS[@]}"; do
-    if nginx -T 2>/dev/null | grep -vE '^\s*#' | grep -qE "server_name[^;]*[[:space:]]${h}[[:space:];]" &&
+    if nginx -T 2>/dev/null | grep -vE '^\s*#' | grep -qE "server_name[^;]*[[:space:]]$(re_escapar "$h")[[:space:];]" &&
       ! grep -qsF "$MARCA" "/etc/nginx/sites-available/sintonia-$DOM.conf" "/etc/nginx/conf.d/sintonia-$DOM.conf"; then
       morrer "O nginx já tem um site para $h (outro projeto). Escolha outro domínio ou tire esse site antes."
     fi
@@ -269,52 +426,11 @@ NGINX
   ok "Certificado HTTPS emitido (renovação automática pelo certbot)"
 }
 
-# ---- Caddy do sistema ---------------------------------------------------------------------------------
-configurar_caddy_host() {
-  local cf='' h tmp bloco
-  caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 || morrer "O Caddyfile atual já tem erro (caddy validate): corrija antes; não mexo em nada assim."
-  for h in "${HOSTS[@]}"; do
-    if grep -vE '^\s*#' /etc/caddy/Caddyfile | grep -qE "(^|[ ,/])$h([ ,:{]|$)" && ! grep -qF "# >>> Sintonia: $DOM" /etc/caddy/Caddyfile; then
-      morrer "O Caddy já tem um site para $h (outro projeto). Escolha outro domínio ou tire esse site antes."
-    fi
-  done
-  remover_host "$DOM" >/dev/null 2>&1 || true
-  bloco="$(
-    echo "# >>> Sintonia: $DOM"
-    echo "$MARCA. Para remover: sudo $RAIZ/deploy/dominio.sh --remover $DOM"
-    echo "$(hosts_virgula) {"
-    if [[ -n $WWW ]]; then
-      echo "	@www host www.$DOM"
-      echo "	redir @www https://$DOM{uri} 308"
-    fi
-    [[ -n $PREVIA ]] && echo '	header X-Robots-Tag "noindex, nofollow"'
-    echo "	reverse_proxy 127.0.0.1:$PORTA {"
-    echo "		header_up X-Real-IP {remote_host}"
-    echo "		header_up -CF-Connecting-IP"
-    echo "		header_up -Fly-Client-IP"
-    echo "		header_up -True-Client-IP"
-    echo "		lb_try_duration 20s"
-    echo "		lb_try_interval 250ms"
-    echo "	}"
-    echo "}"
-    echo "# <<< Sintonia: $DOM"
-  )"
-  cp -p /etc/caddy/Caddyfile /etc/caddy/Caddyfile.antes-sintonia
-  printf '\n%s\n' "$bloco" >>/etc/caddy/Caddyfile
-  if ! caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
-    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 | tail -n 5 >&2 || true
-    cp -p /etc/caddy/Caddyfile.antes-sintonia /etc/caddy/Caddyfile
-    morrer "O Caddy recusou o bloco do Sintonia (acima). Desfeito: nada mudou para os outros sites."
-  fi
-  recarregar caddy
-  ok "Bloco do Sintonia no /etc/caddy/Caddyfile (entre '# >>> Sintonia' e '# <<< Sintonia'); o Caddy pede o certificado sozinho"
-}
-
 # ---- Apache do sistema --------------------------------------------------------------------------------
 configurar_apache() {
   local arq="/etc/apache2/sites-available/sintonia-$DOM.conf" tmp aliases=''
   apachectl configtest >/dev/null 2>&1 || morrer "A configuração atual do Apache já tem erro (apachectl configtest): corrija antes."
-  [[ -n ${SEM_CERTIFICADO:-} ]] || certbot_pronto apache
+  [[ -n ${SEM_CERTIFICADO:-} ]] || { pedir_email opcional; certbot_pronto apache; }
   [[ -n $WWW ]] && aliases="    ServerAlias www.$DOM"
   tmp="$(mktemp)"
   cat >"$tmp" <<APACHE
@@ -392,8 +508,10 @@ if [[ -z $PREVIA ]]; then
     [[ $h == *-le-ssl ]] && continue
     if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi
   done
-  if [[ -f /etc/caddy/Caddyfile ]]; then
-    while read -r h; do if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi; done < <(sed -n 's/^# >>> Sintonia: \(.*\.sslip\.io\)$/\1/p' /etc/caddy/Caddyfile)
+  if caddy_alvo_salvo && [[ -f $CF_HOST ]]; then
+    while read -r h; do
+      if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi
+    done < <(sed -n 's/^# >>> Sintonia: \(.*\.sslip\.io\)$/\1/p' "$CF_HOST")
   fi
 fi
 
@@ -405,6 +523,7 @@ if caddy_proprio || [[ $PROXY_TIPO == nenhum ]]; then
     definir_env CADDY_PROPRIO 1
     aviso "Ninguém usa as portas 80/443 nesta máquina: o Caddy do Sintonia passa a atendê-las (HTTPS automático)."
   fi
+  pedir_email obrigatorio
   site="$(hosts_virgula)"
   definir_env SITE_ADDRESS "$site"
   definir_env ACME_EMAIL "$EMAIL"
@@ -412,10 +531,16 @@ if caddy_proprio || [[ $PROXY_TIPO == nenhum ]]; then
 else
   case $PROXY_TIPO in
     nginx) configurar_nginx ;;
-    caddy) configurar_caddy_host ;;
+    caddy) configurar_caddy sistema ;;
     apache) configurar_apache ;;
     docker)
-      if [[ $PROXY_DOCKER == nginx-proxy || $PROXY_DOCKER == caddy-docker-proxy ]] && [[ -n "$(cfg REDES_PROXY)" ]]; then
+      rc_caddy=1
+      if [[ $PROXY_DOCKER == caddy ]]; then
+        configurar_caddy conteiner && rc_caddy=0 || rc_caddy=$?
+      fi
+      if ((rc_caddy == 0)); then
+        :
+      elif [[ $PROXY_DOCKER == nginx-proxy || $PROXY_DOCKER == caddy-docker-proxy ]] && [[ -n "$(cfg REDES_PROXY)" ]]; then
         definir_env HOSTS_PROXY "$(IFS=,; echo "${HOSTS[*]}")"
         ok "$PROXY_DESC: o app ganha os rótulos com o domínio; o proxy pega o certificado sozinho"
       elif [[ -n $PROXY_REDE_HOST ]]; then
@@ -432,12 +557,13 @@ else
       PRONTO_HTTPS=''
       ;;
   esac
-  definir_env ACME_EMAIL "$EMAIL"
+  if [[ -n $EMAIL ]]; then definir_env ACME_EMAIL "$EMAIL"; fi
   MODO_PROXY=$PROXY_TIPO
 fi
 
 # ---- 2. .env e imagem -------------------------------------------------------------------------------------
 if [[ -z $PREVIA ]]; then
+  definir_env ENDERECO_PREVIA ""
   definir_env DOMINIO "$DOM"
   definir_env PUBLIC_URL "https://$DOM"
   definir_env VITE_SITE_URL "https://$DOM"
@@ -465,13 +591,17 @@ if [[ -n $PRONTO_HTTPS ]]; then
   info "Conferindo $esquema://$DOM"
   ok_https=''
   for _ in $(seq 1 40); do
-    if curl -fsS -o /dev/null --max-time 8 --resolve "$DOM:$porta_ver:127.0.0.1" "$esquema://$DOM/healthz" 2>/dev/null; then
-      ok_https=1
-      break
-    fi
+    # pelo 127.0.0.1 e, se o proxy só ouvir no IP público, por ele
+    for destino in 127.0.0.1 ${IP:+"$IP"}; do
+      if curl -fsS -o /dev/null --max-time 8 --resolve "$DOM:$porta_ver:$destino" "$esquema://$DOM/healthz" 2>/dev/null; then
+        ok_https=1
+        break 2
+      fi
+    done
     sleep 3
   done
   if [[ -n $ok_https ]]; then
+    if [[ -n $PREVIA ]]; then definir_env ENDERECO_PREVIA "$esquema://$DOM"; fi
     ok "No ar: $esquema://$DOM   (painel: $esquema://$DOM/admin)"
     if [[ -n $PREVIA ]]; then aviso "Endereço PROVISÓRIO (fora do Google). Quando o domínio apontar: sudo $DIR_DEPLOY/dominio.sh seu-dominio.com.br"; fi
   else

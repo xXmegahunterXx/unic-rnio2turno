@@ -32,6 +32,8 @@
 #   SEM_CRON=1 (não agenda o backup de hora em hora)
 #   NAO_INTERATIVO=1 (não pergunta nada: exige DOMINIO e ACME_EMAIL no modo exclusivo; gera a senha)
 #   MODO=compartilhado|exclusivo (padrão: detecta)   PORTA_LOCAL=8787 (compartilhado: porta em 127.0.0.1)
+#   PREVIA=1|0 (compartilhado sem domínio: publica já em https://sintonia.<ip>.sslip.io; sem a variável, pergunta)
+#   SEM_PULL=1 (rodando de novo: não baixa o código novo)
 #   ATUALIZAR_DOCKER=1 (compartilhado: permite atualizar um Docker antigo — reinicia os contêineres dos outros)
 # =====================================================================================================
 # Tudo entre { e } é lido pelo bash ANTES de executar: com "curl … | bash", nenhum comando do meio (docker compose
@@ -173,9 +175,20 @@ fi
 # pasta clonada por outro usuário (sem sudo): o git do root precisa confiar nela
 git config --global --get-all safe.directory 2>/dev/null | grep -qxF "$INSTALL_DIR" || git config --global --add safe.directory "$INSTALL_DIR"
 if [[ -d "$INSTALL_DIR/.git" ]]; then
-  ok "Repositório já em $INSTALL_DIR (commit $(git -C "$INSTALL_DIR" rev-parse --short HEAD)); para atualizar use deploy/update.sh"
   if [[ -n ${GIT_TOKEN:-} ]]; then git -C "$INSTALL_DIR" config credential.helper "store --file=/root/.config/sintonia/git-credentials"; fi
   if [[ -n ${DEPLOY_KEY:-} ]]; then git -C "$INSTALL_DIR" config core.sshCommand "$GIT_SSH_COMMAND"; fi
+  # rodar de novo também traz o código novo (só "fast-forward"; arquivos mexidos à mão nesta máquina ficam)
+  antes="$(git -C "$INSTALL_DIR" rev-parse --short HEAD)"
+  if [[ -n ${SEM_PULL:-} ]]; then
+    ok "Repositório já em $INSTALL_DIR (commit $antes; SEM_PULL: código não atualizado)"
+  elif [[ -n "$(git -C "$INSTALL_DIR" status --porcelain --untracked-files=no)" ]]; then
+    aviso "Há arquivos do repositório alterados nesta máquina: mantive o código como está (commit $antes)."
+  elif git -C "$INSTALL_DIR" pull --ff-only --quiet 2>/dev/null; then
+    depois="$(git -C "$INSTALL_DIR" rev-parse --short HEAD)"
+    if [[ $antes == "$depois" ]]; then ok "Repositório já em $INSTALL_DIR, na versão mais recente ($depois)"; else ok "Código atualizado em $INSTALL_DIR: $antes → $depois"; fi
+  else
+    aviso "Não consegui baixar o código novo (sem internet ou histórico divergente): sigo com o commit $antes."
+  fi
 else
   [[ ! -e $INSTALL_DIR || -z "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]] || morrer "$INSTALL_DIR existe e não é um repositório git. Mova-o ou use INSTALL_DIR=outra/pasta."
   clone=(git "${GIT_ARGS[@]}" clone --quiet)
@@ -573,6 +586,20 @@ if [[ $MODO == compartilhado && -n $DOMINIO_DEPOIS ]]; then
     aviso "O domínio não foi ligado agora (mensagens acima). O site segue instalado; tente de novo com: sudo $INSTALL_DIR/deploy/dominio.sh ${args[*]}"
 fi
 
+# ---- sem domínio ainda, numa VPS compartilhada: endereço próprio provisório (opcional) ---------------
+if [[ $MODO == compartilhado && -z $(ler_env DOMINIO) && -z $DOMINIO_DEPOIS ]]; then
+  previa=${PREVIA:-}
+  if [[ -z $previa ]]; then
+    perguntar "Publicar já num endereço PRÓPRIO do Sintonia, provisório e com HTTPS (https://sintonia.<ip>.sslip.io)? S/n" "s"
+    previa=$RESP
+  fi
+  if sim "$previa"; then
+    info "Endereço provisório do Sintonia"
+    "$INSTALL_DIR/deploy/dominio.sh" --previa ||
+      aviso "O endereço provisório não ficou pronto (mensagens acima). O site segue instalado; tente de novo com: sudo $INSTALL_DIR/deploy/dominio.sh --previa"
+  fi
+fi
+
 trap - ERR
 dominio_final="$(ler_env DOMINIO)"
 if [[ -n $dominio_final ]]; then
@@ -589,13 +616,18 @@ else
 
 ${C_OK}${C_NEG}Sintonia instalado (VPS compartilhada, ainda sem domínio).${C_FIM}
 
-  App:    http://127.0.0.1:$(ler_env PORTA_LOCAL)   (só dentro desta máquina; nada novo exposto na internet)
-  Portas 80/443: $PROXY_DESC — nada foi alterado
+  App:    http://127.0.0.1:$(ler_env PORTA_LOCAL)   (só dentro desta máquina)
+  Portas 80/443: $PROXY_DESC
+FIM
+  if [[ -n $(ler_env ENDERECO_PREVIA) ]]; then
+    printf '  %sSite (provisório, só do Sintonia): %s%s   (painel: %s/admin)\n' "$C_NEG" "$(ler_env ENDERECO_PREVIA)" "$C_FIM" "$(ler_env ENDERECO_PREVIA)"
+  else
+    printf '  Endereço próprio provisório com HTTPS (não aparece no Google):\n     sudo %s/deploy/dominio.sh --previa\n' "$INSTALL_DIR"
+  fi
+  cat <<FIM
 
   Quando o domínio apontar para esta VPS (registro A → ${ip_publico:-IP desta VPS}):
      sudo $INSTALL_DIR/deploy/dominio.sh seu-dominio.com.br
-  Para ver o site já, num endereço provisório com HTTPS (não aparece no Google):
-     sudo $INSTALL_DIR/deploy/dominio.sh --previa
 FIM
 fi
 if [[ -n $SENHA_GERADA ]]; then

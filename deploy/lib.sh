@@ -213,8 +213,9 @@ painel_hospedagem() {
 #   PROXY_DESC       descrição para mostrar
 #   PROXY_CONTEINER, PROXY_IMAGEM, PROXY_REDES (redes Docker do proxy), PROXY_REDE_HOST=1 (contêiner em network_mode host)
 #   PROXY_DOCKER     nginx-proxy | caddy-docker-proxy | npm | traefik | caddy | nginx | outro  (quando PROXY_TIPO=docker)
+#   PROXY_CADDYFILE  Caddyfile do Caddy do sistema (quando PROXY_TIPO=caddy)
 detectar_proxy() {
-  PROXY_TIPO=nenhum PROXY_DESC='' PROXY_CONTEINER='' PROXY_IMAGEM='' PROXY_REDES='' PROXY_REDE_HOST='' PROXY_DOCKER=''
+  PROXY_TIPO=nenhum PROXY_DESC='' PROXY_CONTEINER='' PROXY_IMAGEM='' PROXY_REDES='' PROXY_REDE_HOST='' PROXY_DOCKER='' PROXY_CADDYFILE=''
   local id nome imagem projeto portas linha proc pid exe cid painel tem_docker=''
   command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1 && tem_docker=1
 
@@ -249,8 +250,12 @@ detectar_proxy() {
           PROXY_DESC="nginx ($exe)"
           ;;
         caddy)
-          if [[ -f /etc/caddy/Caddyfile ]]; then PROXY_TIPO=caddy; else PROXY_TIPO=outro; fi
-          PROXY_DESC="Caddy ($exe)"
+          # Caddyfile em uso: o --config do processo (relativo à pasta dele) ou o padrão do pacote
+          PROXY_CADDYFILE="$(tr '\0' '\n' <"/proc/$pid/cmdline" 2>/dev/null | awk 'p { print; exit } $0 == "--config" { p = 1 } /^--config=/ { sub(/^--config=/, ""); print; exit }')"
+          if [[ -n $PROXY_CADDYFILE && $PROXY_CADDYFILE != /* ]]; then PROXY_CADDYFILE="$(readlink -f "/proc/$pid/cwd" 2>/dev/null)/$PROXY_CADDYFILE"; fi
+          PROXY_CADDYFILE=${PROXY_CADDYFILE:-/etc/caddy/Caddyfile}
+          if [[ -f $PROXY_CADDYFILE && $PROXY_CADDYFILE != *.json ]]; then PROXY_TIPO=caddy; else PROXY_TIPO=outro; fi
+          PROXY_DESC="Caddy ($exe, $PROXY_CADDYFILE)"
           ;;
         apache2 | httpd)
           if [[ $exe == /usr/sbin/apache2 && -d /etc/apache2/sites-available ]]; then PROXY_TIPO=apache; else PROXY_TIPO=painel; fi
