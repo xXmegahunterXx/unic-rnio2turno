@@ -185,6 +185,7 @@ args_certbot() { # → certificado para todos os HOSTS, sem perguntas, com redir
 configurar_nginx() {
   local dir link='' arq tmp ip6='' h cf=''
   nginx -t >/dev/null 2>&1 || morrer "A configuração atual do nginx já tem erro (nginx -t): corrija antes; não mexo em nada assim."
+  [[ -n ${SEM_CERTIFICADO:-} ]] || certbot_pronto nginx
   for h in "${HOSTS[@]}"; do
     if nginx -T 2>/dev/null | grep -vE '^\s*#' | grep -qE "server_name[^;]*[[:space:]]${h}[[:space:];]" &&
       ! grep -qsF "$MARCA" "/etc/nginx/sites-available/sintonia-$DOM.conf" "/etc/nginx/conf.d/sintonia-$DOM.conf"; then
@@ -210,7 +211,7 @@ configurar_nginx() {
     cat >"$tmp" <<NGINX
 $MARCA em $(date '+%d/%m/%Y %H:%M').
 # Para remover: sudo $RAIZ/deploy/dominio.sh --remover $DOM
-upstream sintonia_app_$PORTA {
+upstream sintonia_${DOM//[^a-z0-9]/_} {
     server 127.0.0.1:$PORTA;
     keepalive 32;
 }
@@ -219,6 +220,7 @@ server {
     listen 80;
 $([[ -n $ip6 ]] && echo "    listen [::]:80;")
     server_name ${HOSTS[*]};
+$([[ -n $WWW ]] && printf '\n    # www → domínio principal (mesmo caminho)\n    if ($host = www.%s) {\n        return 308 $scheme://%s$request_uri;\n    }\n' "$DOM" "$DOM")
 
     # IP real atrás da Cloudflare (só vale quando a conexão vem da Cloudflare)
 $cf    real_ip_header CF-Connecting-IP;
@@ -227,7 +229,7 @@ $([[ -n $PREVIA ]] && printf '\n    # endereço provisório: fora dos buscadores
     client_max_body_size 1m;
 
     location / {
-        proxy_pass http://sintonia_app_$PORTA;
+        proxy_pass http://sintonia_${DOM//[^a-z0-9]/_};
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_set_header Host \$host;
@@ -254,11 +256,14 @@ NGINX
     recarregar nginx
     ok "Site do Sintonia no nginx: $arq (os outros sites não foram tocados)"
   fi
-  certbot_pronto nginx
+  if [[ -n ${SEM_CERTIFICADO:-} ]]; then
+    aviso "SEM_CERTIFICADO: só HTTP (o HTTPS fica com quem está na frente, ex.: Cloudflare)."
+    return 0
+  fi
   args_certbot
   if ! certbot --nginx "${CERTBOT_ARGS[@]}"; then
-    aviso "O certificado não saiu (mensagens acima). O site continua em http://$DOM; rode este comando de novo depois de corrigir (DNS? porta 80 liberada no firewall do provedor?)."
-    return 1
+    remover_host "$DOM" >/dev/null 2>&1 || true
+    morrer "O certificado não saiu (mensagens acima). Desfeito: nada mudou para os outros sites. Confira o DNS e se a porta 80 está liberada no firewall do provedor, e rode de novo."
   fi
   nginx -t >/dev/null 2>&1 && recarregar nginx
   ok "Certificado HTTPS emitido (renovação automática pelo certbot)"
@@ -309,6 +314,7 @@ configurar_caddy_host() {
 configurar_apache() {
   local arq="/etc/apache2/sites-available/sintonia-$DOM.conf" tmp aliases=''
   apachectl configtest >/dev/null 2>&1 || morrer "A configuração atual do Apache já tem erro (apachectl configtest): corrija antes."
+  [[ -n ${SEM_CERTIFICADO:-} ]] || certbot_pronto apache
   [[ -n $WWW ]] && aliases="    ServerAlias www.$DOM"
   tmp="$(mktemp)"
   cat >"$tmp" <<APACHE
@@ -325,6 +331,7 @@ $aliases
     RequestHeader unset Fly-Client-IP
     RequestHeader unset True-Client-IP
 $([[ -n $PREVIA ]] && echo '    Header always set X-Robots-Tag "noindex, nofollow"')
+$([[ -n $WWW ]] && printf '    <If "%%{HTTP_HOST} == '"'"'www.%s'"'"'">\n        Redirect 308 / https://%s/\n    </If>\n' "$DOM" "$DOM")
 </VirtualHost>
 APACHE
   a2enmod -q proxy proxy_http headers >/dev/null
@@ -339,11 +346,14 @@ APACHE
   fi
   recarregar apache2
   ok "Site do Sintonia no Apache: $arq"
-  certbot_pronto apache
+  if [[ -n ${SEM_CERTIFICADO:-} ]]; then
+    aviso "SEM_CERTIFICADO: só HTTP (o HTTPS fica com quem está na frente, ex.: Cloudflare)."
+    return 0
+  fi
   args_certbot
   if ! certbot --apache "${CERTBOT_ARGS[@]}"; then
-    aviso "O certificado não saiu (mensagens acima). O site continua em http://$DOM; rode este comando de novo depois de corrigir."
-    return 1
+    remover_host "$DOM" >/dev/null 2>&1 || true
+    morrer "O certificado não saiu (mensagens acima). Desfeito: nada mudou para os outros sites. Confira o DNS e se a porta 80 está liberada no firewall do provedor, e rode de novo."
   fi
   ok "Certificado HTTPS emitido (renovação automática pelo certbot)"
 }
@@ -365,12 +375,27 @@ TXT
       echo "      Forward Port $(cfg PORT 8787), 'Block Common Exploits'; aba SSL: Request a new certificate + Force SSL + HTTP/2)"
       ;;
     traefik)
-      echo "     (Traefik: o app já está na rede do Traefik como 'sintonia-app'. Se o Traefik for de um painel —"
-      echo "      Coolify, Dokploy, EasyPanel — cadastre o domínio por lá; senão, veja 'Traefik' no DEPLOY.md)"
+      echo "     (Traefik: o app já está na rede do Traefik como 'sintonia-app'. Traefik de painel — Coolify, Dokploy,"
+      echo "      EasyPanel —: cadastre o domínio por lá. Traefik avulso: no arquivo dinâmico dele, um router"
+      echo "      Host(\`$DOM\`) com certResolver → serviço http://sintonia-app:$(cfg PORT 8787))"
       ;;
   esac
   echo "  Depois rode de novo este comando com --sem-rebuild para conferir."
 }
+
+# endereço provisório antigo sai quando chega o domínio de verdade (evita o mesmo site em dois endereços)
+if [[ -z $PREVIA ]]; then
+  for f in /etc/nginx/sites-available/sintonia-*.sslip.io.conf /etc/nginx/conf.d/sintonia-*.sslip.io.conf /etc/apache2/sites-available/sintonia-*.sslip.io.conf; do
+    [[ -e $f ]] || continue
+    h="$(basename "$f" .conf)"
+    h="${h#sintonia-}"
+    [[ $h == *-le-ssl ]] && continue
+    if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi
+  done
+  if [[ -f /etc/caddy/Caddyfile ]]; then
+    while read -r h; do if remover_host "$h"; then ok "Endereço provisório $h desligado"; fi; done < <(sed -n 's/^# >>> Sintonia: \(.*\.sslip\.io\)$/\1/p' /etc/caddy/Caddyfile)
+  fi
+fi
 
 # ---- 1. servidor web --------------------------------------------------------------------------------------
 PRONTO_HTTPS=1
@@ -386,9 +411,9 @@ if caddy_proprio || [[ $PROXY_TIPO == nenhum ]]; then
   MODO_PROXY=caddy-proprio
 else
   case $PROXY_TIPO in
-    nginx) configurar_nginx || PRONTO_HTTPS='' ;;
+    nginx) configurar_nginx ;;
     caddy) configurar_caddy_host ;;
-    apache) configurar_apache || PRONTO_HTTPS='' ;;
+    apache) configurar_apache ;;
     docker)
       if [[ $PROXY_DOCKER == nginx-proxy || $PROXY_DOCKER == caddy-docker-proxy ]] && [[ -n "$(cfg REDES_PROXY)" ]]; then
         definir_env HOSTS_PROXY "$(IFS=,; echo "${HOSTS[*]}")"
@@ -409,20 +434,6 @@ else
   esac
   definir_env ACME_EMAIL "$EMAIL"
   MODO_PROXY=$PROXY_TIPO
-fi
-
-# endereço provisório antigo sai quando chega o domínio de verdade (evita o mesmo site em dois endereços)
-if [[ -z $PREVIA ]]; then
-  for f in /etc/nginx/sites-available/sintonia-*.sslip.io.conf /etc/nginx/conf.d/sintonia-*.sslip.io.conf /etc/apache2/sites-available/sintonia-*.sslip.io.conf; do
-    [[ -e $f ]] || continue
-    h="$(basename "$f" .conf)"
-    h="${h#sintonia-}"
-    [[ $h == *-le-ssl ]] && continue
-    remover_host "$h" && ok "Endereço provisório $h desligado"
-  done
-  if [[ -f /etc/caddy/Caddyfile ]]; then
-    while read -r h; do remover_host "$h" && ok "Endereço provisório $h desligado"; done < <(sed -n 's/^# >>> Sintonia: \(.*\.sslip\.io\)$/\1/p' /etc/caddy/Caddyfile)
-  fi
 fi
 
 # ---- 2. .env e imagem -------------------------------------------------------------------------------------
@@ -449,19 +460,21 @@ fi
 
 # ---- 3. conferência ---------------------------------------------------------------------------------------
 if [[ -n $PRONTO_HTTPS ]]; then
-  info "Conferindo https://$DOM"
+  esquema=https porta_ver=443
+  if [[ -n ${SEM_CERTIFICADO:-} ]]; then esquema=http porta_ver=80; fi
+  info "Conferindo $esquema://$DOM"
   ok_https=''
   for _ in $(seq 1 40); do
-    if curl -fsS -o /dev/null --max-time 8 --resolve "$DOM:443:127.0.0.1" "https://$DOM/healthz" 2>/dev/null; then
+    if curl -fsS -o /dev/null --max-time 8 --resolve "$DOM:$porta_ver:127.0.0.1" "$esquema://$DOM/healthz" 2>/dev/null; then
       ok_https=1
       break
     fi
     sleep 3
   done
   if [[ -n $ok_https ]]; then
-    ok "No ar: https://$DOM   (painel: https://$DOM/admin)"
-    [[ -n $PREVIA ]] && aviso "Endereço PROVISÓRIO (fora do Google). Quando o domínio apontar: sudo $0 seu-dominio.com.br"
+    ok "No ar: $esquema://$DOM   (painel: $esquema://$DOM/admin)"
+    if [[ -n $PREVIA ]]; then aviso "Endereço PROVISÓRIO (fora do Google). Quando o domínio apontar: sudo $DIR_DEPLOY/dominio.sh seu-dominio.com.br"; fi
   else
-    aviso "https://$DOM ainda não respondeu com certificado válido. Se o certificado é recente, espere 1–2 min e confira: sudo $DIR_DEPLOY/status.sh"
+    aviso "$esquema://$DOM ainda não respondeu (com certificado válido). Se o certificado é recente, espere 1–2 min e confira: sudo $DIR_DEPLOY/status.sh"
   fi
 fi

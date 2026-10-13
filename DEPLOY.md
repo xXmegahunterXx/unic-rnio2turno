@@ -124,6 +124,63 @@ Sem perguntas (automação): `DOMINIO=sintonia.app ACME_EMAIL=voce@exemplo.com N
 > **SSH em outra porta?** O instalador libera a porta 22 e a que ele detectar. Se você usa outra, rode
 > `ufw allow SUA_PORTA/tcp` **antes** de fechar a sessão.
 
+### 3.4 VPS que já tem outros projetos (modo compartilhado)
+
+O instalador percebe sozinho quando a máquina já tem outros sites ou sistemas (outro servidor web nas portas
+80/443, contêineres de outros projetos ou um painel como cPanel, aaPanel, Coolify…) e entra no **modo
+compartilhado**. Nele, o que já existe **não é tocado**:
+
+| | Modo exclusivo (VPS só do Sintonia) | Modo compartilhado |
+|---|---|---|
+| Portas 80/443 | Caddy do Sintonia | continuam com o servidor web que já existe (nginx, Caddy, Apache, Nginx Proxy Manager…) |
+| Firewall (ufw) | ligado com SSH/80/443 | não mexe |
+| Docker | instala/atualiza | usa o que existe; se for antigo, para e explica (`ATUALIZAR_DOCKER=1` permite atualizar, o que reinicia os contêineres dos outros) |
+| Swap | cria 2 GB se faltar | só se faltar e a RAM livre for < 2 GB; não muda ajustes globais |
+| O app atende em | rede interna do Docker | `127.0.0.1:8787` (ou a próxima porta livre) — nada novo exposto na internet |
+| Limpeza nas atualizações | imagens antigas e cache de build | só as imagens do Sintonia |
+
+Instalação (uma linha, como root):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xXmegahunterXx/unic-rnio2turno/HEAD/deploy/install.sh | bash
+```
+
+O fim da instalação mostra o que foi encontrado nas portas 80/443, a porta local do app e a senha do painel.
+Forçar um modo: `MODO=compartilhado` ou `MODO=exclusivo` antes do `bash`.
+
+**Ligando o domínio depois** — crie o registro **A** do domínio para o IP da VPS, espere propagar e rode:
+
+```bash
+/opt/sintonia/deploy/dominio.sh seu-dominio.com.br            # --www para incluir o www (crie o DNS dele)
+```
+
+Conforme o que atende 80/443 na máquina:
+
+- **nginx, Caddy ou Apache instalados no sistema**: cria **um arquivo só do Sintonia**
+  (`/etc/nginx/sites-available/sintonia-DOMINIO.conf`, um bloco marcado no fim do `/etc/caddy/Caddyfile` ou
+  `/etc/apache2/sites-available/sintonia-DOMINIO.conf`), confere a configuração inteira (`nginx -t`,
+  `caddy validate`, `apachectl configtest`) **antes** de recarregar — se falhar, desfaz — e pede o certificado
+  (certbot, instalado se faltar, com renovação automática; no Caddy, ele mesmo). Recarregar não derruba conexões
+  dos outros sites. Também recusa um domínio que outro site da máquina já usa;
+- **ninguém usa 80/443**: o Caddy do Sintonia passa a atendê-las, com HTTPS automático;
+- **proxy em contêiner**: `nginx-proxy` e `caddy-docker-proxy` são configurados por rótulos; no **Nginx Proxy
+  Manager**, Traefik ou num painel, o script mostra o que cadastrar (destino `http://sintonia-app:8787`: o app já
+  entra na rede do proxy com esse nome; ou `http://127.0.0.1:PORTA` para painéis no próprio sistema);
+- no fim, reconstrói a imagem com o endereço novo (links de compartilhar) sem tirar o site do ar.
+
+**Ver o site antes de ter domínio**: `/opt/sintonia/deploy/dominio.sh --previa` publica num endereço provisório
+com HTTPS, `https://IP-COM-TRACOS.sslip.io` (ex.: `https://203-0-113-10.sslip.io`), marcado para ficar fora dos
+buscadores; ele sai sozinho quando o domínio de verdade for ligado. Sem mexer em nada público: do seu computador,
+`ssh -L 8787:127.0.0.1:8787 root@IP-DA-VPS` e abra `http://localhost:8787` (o painel `/admin` só entra por HTTPS).
+
+Desfazer: `/opt/sintonia/deploy/dominio.sh --remover seu-dominio.com.br` tira o site do Sintonia do servidor web
+da máquina (o app segue em `127.0.0.1`). Remover tudo: `cd /opt/sintonia && docker compose down` (os volumes
+`sintonia_*` guardam o estado; `docker compose down -v` apaga também), `rm /etc/cron.d/sintonia` e a pasta.
+
+> **Cloudflare na frente (seção 5)** funciona igual: os arquivos gerados para nginx/Caddy/Apache já pegam o IP
+> real do visitante só quando a conexão vem da Cloudflare. Para o primeiro certificado, deixe a nuvem **cinza**
+> (DNS only) ou use `--sem-dns` com o SSL da Cloudflare em *Full (strict)*.
+
 ## 4. Conferindo
 
 ```bash

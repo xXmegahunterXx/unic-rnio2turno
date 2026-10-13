@@ -219,13 +219,14 @@ detectar_proxy() {
 
   # 1) contêiner publicando 80 ou 443 no host
   if [[ -n $tem_docker ]]; then
-    while IFS=$'\t' read -r id nome imagem projeto portas; do
+    # separador "|" (tab é "espaço" para o read: campos vazios — contêiner sem projeto — sumiriam)
+    while IFS='|' read -r id nome imagem projeto portas; do
       [[ $projeto == sintonia ]] && continue
       if [[ $portas =~ (^|[ ,])([0-9.]+|\[::\]|::):(80|443)- ]]; then
         PROXY_TIPO=docker PROXY_CONTEINER=$nome PROXY_IMAGEM=$imagem
         break
       fi
-    done < <(docker ps --format '{{.ID}}{{"\t"}}{{.Names}}{{"\t"}}{{.Image}}{{"\t"}}{{.Label "com.docker.compose.project"}}{{"\t"}}{{.Ports}}' 2>/dev/null)
+    done < <(docker ps --format '{{.ID}}|{{.Names}}|{{.Image}}|{{.Label "com.docker.compose.project"}}|{{.Ports}}' 2>/dev/null)
   fi
 
   # 2) processo do host ouvindo 80/443 (ou contêiner em network_mode host)
