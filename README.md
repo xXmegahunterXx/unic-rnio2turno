@@ -81,7 +81,8 @@ ignorados com aviso no log da subida.
 ## Deploy
 
 **Produção numa VPS: siga o [`DEPLOY.md`](./DEPLOY.md).** Docker + Caddy (HTTPS automático com Let's Encrypt,
-HTTP/3) com poucos comandos: `deploy/install.sh` (Ubuntu 22.04/24.04: Docker, firewall, `.env` com senha e segredos,
+HTTP/3) com poucos comandos: `deploy/install.sh` (Ubuntu 22.04/24.04: Docker, firewall, `.env` com senha e segredos — numa VPS que já tem outros
+projetos, entra sozinho no modo compartilhado e o domínio é ligado depois com `deploy/dominio.sh`;
 build, subida e backup de hora em hora), `deploy/update.sh` (atualiza com o site no ar: ensaio da imagem nova,
 troca sem erro para o visitante e volta automática se falhar), `deploy/backup.sh`/`restore.sh`,
 `deploy/status.sh` e `deploy/painel.sh` (comandos do painel pelo terminal: estado, troca para o TSE, avisos), além

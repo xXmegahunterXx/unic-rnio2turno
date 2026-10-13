@@ -447,7 +447,9 @@ Teste local sem domínio: no `.env`, `SITE_ADDRESS=':80'`, `HTTP_PORT=8080`, `HT
 | `.env.example` | modelo comentado da configuração |
 | `deploy/caddy/Caddyfile` | HTTPS automático, HTTP/3, compressão, IP real do visitante, espera durante reinícios |
 | `deploy/healthcheck.mjs` | healthcheck do contêiner + vigia de travamento |
-| `deploy/install.sh` | instalação completa numa VPS Ubuntu/Debian |
+| `deploy/install.sh` | instalação completa numa VPS Ubuntu/Debian (detecta VPS com outros projetos → modo compartilhado, seção 3.4) |
+| `deploy/dominio.sh` | liga ou troca o domínio; numa VPS compartilhada, configura o nginx/Caddy/Apache da máquina com conferência e desfazer (seção 3.4) |
+| `docker-compose.vps.yml` | gerado no modo compartilhado (app em `127.0.0.1`, Caddy próprio desligado); não vai para o git |
 | `deploy/update.sh` | atualização com ensaio, troca sem erro e volta automática |
 | `deploy/backup.sh` / `deploy/restore.sh` | backup e restauração do estado e do `.env` |
 | `deploy/status.sh` | situação num relance |
