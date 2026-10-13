@@ -105,9 +105,10 @@ esperar_saude() {
   return 1
 }
 
-# /healthz de dentro do contêiner (não depende do Caddy nem do DNS); imprime o JSON
+# /healthz de dentro do contêiner (não depende do Caddy nem do DNS); imprime o JSON. Entrada fechada (</dev/null):
+# o "exec" nunca lê a entrada de quem chamou (ex.: um script vindo de "curl | bash")
 healthz() {
-  dc exec -T app node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/healthz',{signal:AbortSignal.timeout(5000)}).then(r=>r.text()).then(t=>{console.log(t)},e=>{console.error(e.message);process.exit(1)})"
+  dc exec -T app node -e "fetch('http://127.0.0.1:'+(process.env.PORT||8787)+'/healthz',{signal:AbortSignal.timeout(5000)}).then(r=>r.text()).then(t=>{console.log(t)},e=>{console.error(e.message);process.exit(1)})" </dev/null
 }
 
 # URL pública de verificação e argumentos do curl, conforme SITE_ADDRESS (domínio, :80 ou localhost)

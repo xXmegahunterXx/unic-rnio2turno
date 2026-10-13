@@ -34,6 +34,9 @@
 #   MODO=compartilhado|exclusivo (padrão: detecta)   PORTA_LOCAL=8787 (compartilhado: porta em 127.0.0.1)
 #   ATUALIZAR_DOCKER=1 (compartilhado: permite atualizar um Docker antigo — reinicia os contêineres dos outros)
 # =====================================================================================================
+# Tudo entre { e } é lido pelo bash ANTES de executar: com "curl … | bash", nenhum comando do meio (docker compose
+# exec, por exemplo) consegue "comer" o resto do script da entrada padrão.
+{
 set -Eeuo pipefail
 
 REPO_PADRAO="https://github.com/xXmegahunterXx/unic-rnio2turno.git"
@@ -610,3 +613,6 @@ cat <<FIM
 
   Próximos passos (DEPLOY.md): o CHECKLIST-LANCAMENTO.md antes de divulgar e o RUNBOOK-ELEICAO.md para 24 a 26/10.
 FIM
+
+exit 0
+}
