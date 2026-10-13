@@ -593,7 +593,7 @@ if [[ -n $PRONTO_HTTPS ]]; then
   for _ in $(seq 1 40); do
     # pelo 127.0.0.1 e, se o proxy só ouvir no IP público, por ele
     for destino in 127.0.0.1 ${IP:+"$IP"}; do
-      if curl -fsS -o /dev/null --max-time 8 --resolve "$DOM:$porta_ver:$destino" "$esquema://$DOM/healthz" 2>/dev/null; then
+      if curl -fsS -o /dev/null --max-time 8 --noproxy '*' --resolve "$DOM:$porta_ver:$destino" "$esquema://$DOM/healthz" 2>/dev/null; then
         ok_https=1
         break 2
       fi

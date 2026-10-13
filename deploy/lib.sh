@@ -134,7 +134,8 @@ url_publica() {
 
 # verificar_publico [segundos] → 0 se o /healthz responde pelo Caddy (HTTPS de verdade, salvo localhost)
 verificar_publico() {
-  local limite=$((SECONDS + ${1:-60})) url host porta args=(-fsS -o /dev/null --max-time 8)
+  # --noproxy: a conferência é local (127.0.0.1), nunca por um proxy de saída configurado na máquina
+  local limite=$((SECONDS + ${1:-60})) url host porta args=(-fsS -o /dev/null --max-time 8 --noproxy '*')
   url="$(url_publica)"
   if [[ $url == https://* ]]; then
     host="${url#https://}"
@@ -363,4 +364,4 @@ gerar_compose_vps() {
 }
 
 # /healthz direto na porta local (modo compartilhado)
-healthz_local() { curl -fsS --max-time 5 "http://127.0.0.1:$(cfg PORTA_LOCAL 8787)/healthz"; }
+healthz_local() { curl -fsS --max-time 5 --noproxy '*' "http://127.0.0.1:$(cfg PORTA_LOCAL 8787)/healthz"; }
