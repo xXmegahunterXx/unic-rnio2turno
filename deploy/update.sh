@@ -174,12 +174,13 @@ fi
 if verificar_publico 30; then
   ok "Acesso público OK ($(url_publica))"
 else
-  aviso "O app está saudável, mas $(url_publica) não respondeu pelo Caddy. Veja: $DIR_DEPLOY/status.sh"
+  aviso "O app está saudável, mas $(url_publica) não respondeu pelo servidor web. Veja: $DIR_DEPLOY/status.sh"
 fi
 
 # ---- 5. limpeza ---------------------------------------------------------------------------------------
 if [[ -n $TEM_NO_AR ]]; then docker image rm "$NO_AR" >/dev/null 2>&1 || true; fi # só tira a etiqueta
-docker image prune -f >/dev/null 2>&1 || true
-docker builder prune -f --filter until=168h >/dev/null 2>&1 || true
+# só imagens do Sintonia (numa VPS com outros projetos, as imagens e o cache de build deles ficam como estão)
+docker image prune -f --filter 'label=org.opencontainers.image.title=Sintonia' >/dev/null 2>&1 || true
+if ! compartilhado; then docker builder prune -f --filter until=168h >/dev/null 2>&1 || true; fi
 
 ok "Atualizado para o commit $COMMIT em $((SECONDS - T0)) s (anterior: ${REV_RODANDO:-?}; voltar: $0 --rollback)"

@@ -13,3 +13,5 @@ preview-out/
 .env.local
 __pycache__/
 *.pyc
+# gerado pelo deploy/install.sh numa VPS compartilhada
+docker-compose.vps.yml

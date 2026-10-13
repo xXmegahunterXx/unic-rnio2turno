@@ -17,6 +17,14 @@ exigir_env
 cd "$RAIZ"
 LINHAS=${LINHAS:-20}
 
+if compartilhado; then
+  detectar_proxy
+  info "VPS compartilhada"
+  echo "   app nesta máquina: http://127.0.0.1:$(cfg PORTA_LOCAL 8787) $(healthz_local >/dev/null 2>&1 && echo '(respondendo)' || echo '(SEM RESPOSTA)')"
+  echo "   portas 80/443:     $PROXY_DESC"
+  echo "   domínio:           $(cfg DOMINIO '(ainda nenhum — sudo '"$DIR_DEPLOY"'/dominio.sh seu-dominio.com.br)')"
+fi
+
 info "Contêineres"
 dc ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}' || true
 
@@ -73,14 +81,15 @@ echo "   máquina: $(nproc) vCPU · carga $(cut -d' ' -f1-3 /proc/loadavg) · me
 site="$(cfg SITE_ADDRESS "$(cfg DOMINIO)")"
 host="${site%%,*}"
 host="${host// /}"
+if compartilhado && [[ -z "$(cfg DOMINIO)" ]]; then host=''; fi
 if [[ -n $host && $host != :* && $host != localhost && $host != *.localhost && $host != http://* ]] && command -v openssl >/dev/null 2>&1; then
   info "Certificado HTTPS"
   porta="$(cfg HTTPS_PORT 443)"
   cert="$(echo | timeout 8 openssl s_client -connect "127.0.0.1:$porta" -servername "$host" 2>/dev/null | openssl x509 -noout -issuer -enddate 2>/dev/null || true)"
   if [[ -n $cert ]]; then
-    echo "   $host · emissor: $(sed -n 's/^issuer=.*O *= *\([^,]*\).*/\1/p' <<<"$cert") · válido até $(sed -n 's/^notAfter=//p' <<<"$cert") (o Caddy renova sozinho)"
+    echo "   $host · emissor: $(sed -n 's/^issuer=.*O *= *\([^,]*\).*/\1/p' <<<"$cert") · válido até $(sed -n 's/^notAfter=//p' <<<"$cert") ($(caddy_proprio && echo 'o Caddy renova sozinho' || echo 'renovação pelo servidor web da máquina'))"
   else
-    aviso "   Não consegui ler o certificado de $host (ainda sendo emitido? veja os logs do caddy)."
+    aviso "   Não consegui ler o certificado de $host (ainda sendo emitido? $(caddy_proprio && echo 'veja os logs do caddy' || echo 'veja o servidor web da máquina'))."
   fi
 fi
 
@@ -95,6 +104,7 @@ fi
 
 info "Últimos logs do app"
 dc logs --no-log-prefix --tail "$LINHAS" app 2>&1 | sed 's/^/   /' || true
+caddy_proprio || exit 0
 info "Avisos e erros recentes do Caddy"
 dc logs --no-log-prefix --tail 300 caddy 2>&1 | grep -E '"level":"(warn|error)"' |
   grep -v -e 'requires TLS' -e 'listening only on the HTTP port' | tail -n 5 | cut -c1-240 | sed 's/^/   /' || echo "   (nenhum)"
