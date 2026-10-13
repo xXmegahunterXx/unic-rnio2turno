@@ -270,7 +270,7 @@ detectar_proxy() {
           else
             PROXY_TIPO=outro
           fi
-          PROXY_DESC="Caddy ($exe${PROXY_CADDYFILE:+, $PROXY_CADDYFILE}${PROXY_CADDYFILE:- configurado pela API/--resume})"
+          if [[ -n $PROXY_CADDYFILE ]]; then PROXY_DESC="Caddy ($exe, $PROXY_CADDYFILE)"; else PROXY_DESC="Caddy ($exe, configurado pela API/--resume)"; fi
           ;;
         apache2 | httpd)
           if [[ $exe == /usr/sbin/apache2 && -d /etc/apache2/sites-available ]]; then PROXY_TIPO=apache; else PROXY_TIPO=painel; fi
