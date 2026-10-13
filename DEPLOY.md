@@ -139,14 +139,15 @@ compartilhado**. Nele, o que já existe **não é tocado**:
 | O app atende em | rede interna do Docker | `127.0.0.1:8787` (ou a próxima porta livre) — nada novo exposto na internet |
 | Limpeza nas atualizações | imagens antigas e cache de build | só as imagens do Sintonia |
 
-Instalação (uma linha, como root):
+Instalação (uma linha, como root) — já publicando num endereço **próprio** do Sintonia, provisório e com HTTPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/xXmegahunterXx/unic-rnio2turno/HEAD/deploy/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/xXmegahunterXx/unic-rnio2turno/HEAD/deploy/install.sh | PREVIA=1 bash
 ```
 
-O fim da instalação mostra o que foi encontrado nas portas 80/443, a porta local do app e a senha do painel.
-Forçar um modo: `MODO=compartilhado` ou `MODO=exclusivo` antes do `bash`.
+O fim da instalação mostra o que foi encontrado nas portas 80/443, o endereço do site, a porta local do app e a
+senha do painel. Rodar o mesmo comando de novo atualiza o código e mantém a configuração. Sem `PREVIA=1` ele
+pergunta; `PREVIA=0` não publica. Forçar um modo: `MODO=compartilhado` ou `MODO=exclusivo` antes do `bash`.
 
 **Ligando o domínio depois** — crie o registro **A** do domínio para o IP da VPS, espere propagar e rode:
 
@@ -156,22 +157,33 @@ Forçar um modo: `MODO=compartilhado` ou `MODO=exclusivo` antes do `bash`.
 
 Conforme o que atende 80/443 na máquina:
 
-- **nginx, Caddy ou Apache instalados no sistema**: cria **um arquivo só do Sintonia**
-  (`/etc/nginx/sites-available/sintonia-DOMINIO.conf`, um bloco marcado no fim do `/etc/caddy/Caddyfile` ou
-  `/etc/apache2/sites-available/sintonia-DOMINIO.conf`), confere a configuração inteira (`nginx -t`,
-  `caddy validate`, `apachectl configtest`) **antes** de recarregar — se falhar, desfaz — e pede o certificado
-  (certbot, instalado se faltar, com renovação automática; no Caddy, ele mesmo). Recarregar não derruba conexões
-  dos outros sites. Também recusa um domínio que outro site da máquina já usa;
+- **nginx ou Apache instalados no sistema**: cria **um arquivo só do Sintonia**
+  (`/etc/nginx/sites-available/sintonia-DOMINIO.conf` ou `/etc/apache2/sites-available/sintonia-DOMINIO.conf`);
+- **Caddy, no sistema ou em contêiner Docker** (com o Caddyfile montado do disco, como no `docker-compose` comum):
+  acrescenta **um bloco** marcado (`# >>> Sintonia: DOMINIO` … `# <<< Sintonia: DOMINIO`) no fim do Caddyfile em uso,
+  editando o arquivo no lugar (um arquivo montado no contêiner continua valendo) e guardando uma cópia em
+  `/var/backups/sintonia/proxy/`. Com o Caddy em contêiner, o app entra na rede dele com o nome `sintonia-app`;
+- em todos: confere a configuração inteira (`nginx -t`, `caddy validate`, `apachectl configtest`) **antes** de
+  recarregar — se falhar, desfaz —, recarrega **sem reiniciar** (os outros sites não caem) e pede o certificado
+  (certbot, instalado se faltar, com renovação automática; no Caddy, ele mesmo). Também recusa um endereço que
+  outro site da máquina já usa — nunca mexe no site de outro projeto;
 - **ninguém usa 80/443**: o Caddy do Sintonia passa a atendê-las, com HTTPS automático;
 - **proxy em contêiner**: `nginx-proxy` e `caddy-docker-proxy` são configurados por rótulos; no **Nginx Proxy
   Manager**, Traefik ou num painel, o script mostra o que cadastrar (destino `http://sintonia-app:8787`: o app já
   entra na rede do proxy com esse nome; ou `http://127.0.0.1:PORTA` para painéis no próprio sistema);
 - no fim, reconstrói a imagem com o endereço novo (links de compartilhar) sem tirar o site do ar.
 
-**Ver o site antes de ter domínio**: `/opt/sintonia/deploy/dominio.sh --previa` publica num endereço provisório
-com HTTPS, `https://IP-COM-TRACOS.sslip.io` (ex.: `https://203-0-113-10.sslip.io`), marcado para ficar fora dos
-buscadores; ele sai sozinho quando o domínio de verdade for ligado. Sem mexer em nada público: do seu computador,
+**Ver o site antes de ter domínio**: `/opt/sintonia/deploy/dominio.sh --previa` (ou `PREVIA=1` na instalação)
+publica num endereço provisório **só do Sintonia**, com HTTPS: `https://sintonia.IP-COM-TRACOS.sslip.io`
+(ex.: `https://sintonia.203-0-113-10.sslip.io`; o serviço gratuito sslip.io responde o IP que está no nome). O
+`IP-COM-TRACOS.sslip.io` "puro" costuma já ser o endereço de outro projeto da máquina e nunca é usado. Fica marcado
+para não aparecer nos buscadores e sai sozinho quando o domínio de verdade for ligado. O e-mail do certificado é
+opcional aqui (só o Caddy do próprio Sintonia exige). Sem mexer em nada público: do seu computador,
 `ssh -L 8787:127.0.0.1:8787 root@IP-DA-VPS` e abra `http://localhost:8787` (o painel `/admin` só entra por HTTPS).
+
+Algo não saiu como esperado? `/opt/sintonia/deploy/diagnostico.sh` mostra, sem senhas nem segredos, quem atende
+80/443, os contêineres, onde está o Caddyfile/nginx e os nomes de site de cada um — mande a saída para quem está
+ajudando.
 
 Desfazer: `/opt/sintonia/deploy/dominio.sh --remover seu-dominio.com.br` tira o site do Sintonia do servidor web
 da máquina (o app segue em `127.0.0.1`). Remover tudo: `cd /opt/sintonia && docker compose down` (os volumes
@@ -449,6 +461,7 @@ Teste local sem domínio: no `.env`, `SITE_ADDRESS=':80'`, `HTTP_PORT=8080`, `HT
 | `deploy/healthcheck.mjs` | healthcheck do contêiner + vigia de travamento |
 | `deploy/install.sh` | instalação completa numa VPS Ubuntu/Debian (detecta VPS com outros projetos → modo compartilhado, seção 3.4) |
 | `deploy/dominio.sh` | liga ou troca o domínio; numa VPS compartilhada, configura o nginx/Caddy/Apache da máquina com conferência e desfazer (seção 3.4) |
+| `deploy/diagnostico.sh` | diagnóstico só de leitura da máquina (portas 80/443, contêineres, Caddyfile/nginx e os sites que atendem, situação do Sintonia), sem senhas — para mandar a quem está ajudando |
 | `docker-compose.vps.yml` | gerado no modo compartilhado (app em `127.0.0.1`, Caddy próprio desligado); não vai para o git |
 | `deploy/update.sh` | atualização com ensaio, troca sem erro e volta automática |
 | `deploy/backup.sh` / `deploy/restore.sh` | backup e restauração do estado e do `.env` |
