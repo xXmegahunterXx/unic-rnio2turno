@@ -10,6 +10,7 @@
  *
  * Celular: placar → mapa → controles → estados (com mini-placar fixo enquanto o placar está fora da tela).
  * Desktop: controles à esquerda; placar e mapa fixos à direita.
+ * Publicidade: um cartão nativo depois da calculadora (fora da grade do placar/controles), antes da lista de estados.
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { UF } from '@/shared/types';
@@ -35,6 +36,7 @@ import { useCenario, usePresidenteT1 } from '@/app/components/pages/cenarios/dad
 import { ControleBrancos, ControleComparecimento, ControleTodos, ListaEliminados, Presets, nomesDe } from '@/app/components/pages/cenarios/Controles';
 import { BarraFixa, MiniPlacar, PlacarCenario, type CompartilharCenario } from '@/app/components/pages/cenarios/Placar';
 import { ListaUfs, PainelMapa } from '@/app/components/pages/cenarios/Estados';
+import { AnuncioNativo } from '@/app/components/anuncios';
 import { CartaoCenario } from '@/app/components/pages/cenarios/CartaoCenario';
 import { coresCenario } from '@/app/components/pages/cenarios/cores';
 import { HASHTAGS_CENARIO, NOME_ARQUIVO_CENARIO, textoCenario } from '@/app/components/pages/cenarios/textos';
@@ -169,6 +171,8 @@ function Calculadora({ ds }: { ds: PresidenteT1Dataset }) {
           </section>
         </div>
       </div>
+
+      <AnuncioNativo posicao={1} className="mt-10 sm:mt-14" />
 
       <div className="mt-10 sm:mt-14">
         <ListaUfs resultado={resultado} nomes={nomes} selecionada={selecionada} onSelect={setSelecionada} />

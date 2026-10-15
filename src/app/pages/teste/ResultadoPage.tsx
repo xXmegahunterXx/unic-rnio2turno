@@ -24,6 +24,7 @@ import { ListaAfirmacoes, TituloSecao, type LinhaAfirmacao } from '@/app/compone
 import { useCandidatosTeste } from '@/app/components/pages/teste/candidatos';
 import { caminhoTeste, codificar, decodificar, ehCodigoV1, novaSemente } from '@/app/components/pages/teste/codigo';
 import { PainelCompartilhar, PainelDuelo } from '@/app/components/pages/teste/Compartilhar';
+import { OferecimentoTeste } from '@/app/components/anuncios';
 import { SemResultado, VersaoAnterior } from '@/app/components/pages/teste/Estados';
 import { Aviso, EM_REVISAO } from '@/app/components/pages/teste/IntroTeste';
 import { PorTema } from '@/app/components/pages/teste/PorTema';
@@ -211,6 +212,9 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
           ) : null}
         </div>
       </section>
+
+      {/* publicidade: "Resultado oferecido por", FORA do cartão do resultado (que tem fotos, nomes e percentuais) */}
+      <OferecimentoTeste className="mt-6 md:mt-8" />
 
       {revelado ? (
         <motion.div initial={reduzir ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: reduzir ? 0 : 0.6 }}>

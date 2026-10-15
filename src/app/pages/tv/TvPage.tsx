@@ -3,7 +3,8 @@
  *
  *  - Placar gigante (fotos oficiais quando não anonimizado), mapa grande (estados ou municípios), ticker de
  *    eventos, relógio da apuração (Brasília), QR + endereço do site, faixa SIMULAÇÃO quando for o caso e o
- *    patrocínio discreto ("Oferecido por").
+ *    anunciante do formato 'tv' ("Oferecimento", logo grande, sem link — src/app/components/anuncios), num quadro
+ *    próprio ao lado do QR, longe do placar.
  *  - Rodízio opcional (padrão ligado): a cada 12 s o mapa mostra uma das UFs mais disputadas (menor diferença,
  *    com seções apuradas), alternando com o Brasil.
  *  - "Tela cheia" pela Fullscreen API (tolera recusa: o navegador pode não deixar); mantém a tela acesa (Wake Lock)
@@ -17,7 +18,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { MotionConfig } from 'framer-motion';
-import type { FeedEvent, Patrocinio, Race, RaceId, Summary, UF } from '@/shared/types';
+import type { FeedEvent, Race, RaceId, Summary, UF } from '@/shared/types';
 import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
 import { margem, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtHora, fmtHoraSeg, fmtInt, fmtPct, fmtPP } from '@/shared/format';
@@ -36,7 +37,7 @@ import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { UfMap } from '@/app/components/apuracao/UfMap';
 import { hachuraStyle } from '@/app/components/apuracao/MapHatch';
-import { PatrocinioSlot } from '@/app/components/apuracao/PatrocinioSlot';
+import { OferecimentoTv, ProvedorAnuncios } from '@/app/components/anuncios';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
 import { useElementSize } from '@/app/components/apuracao/MapHooks';
 import { gerarQr, qrPath } from '@/app/components/apuracao/qr';
@@ -136,6 +137,7 @@ export default function TvPage() {
 
   return (
     <MotionConfig reducedMotion="user">
+      <ProvedorAnuncios>
       <div className={cn('relative flex h-dvh w-full flex-col overflow-hidden bg-bg text-fg', UNIDADE, ocioso && cheia && 'cursor-none')}>
         <FundoTv />
         <BarraTopo
@@ -169,7 +171,7 @@ export default function TvPage() {
             ) : (
               <div className="flex-1 animate-pulse rounded-[calc(var(--u)*2.5)] bg-surface" />
             )}
-            <Rodape patrocinio={status?.patrocinio ?? null} />
+            <Rodape />
           </section>
 
           <section aria-label="Mapa" className="relative min-h-0 min-w-0">
@@ -199,6 +201,7 @@ export default function TvPage() {
           </div>
         ) : null}
       </div>
+      </ProvedorAnuncios>
     </MotionConfig>
   );
 }
@@ -593,7 +596,7 @@ function MiniPlacarUf({ race, resumo }: { race: Race; resumo: Summary }) {
   );
 }
 
-function Rodape({ patrocinio }: { patrocinio: Patrocinio | null }) {
+function Rodape() {
   const url = urlAbsoluta('/apuracao');
   const host = hostExibicao() || 'sintonia';
   const qr = useMemo(() => {
@@ -604,8 +607,9 @@ function Rodape({ patrocinio }: { patrocinio: Patrocinio | null }) {
     }
   }, [url]);
   return (
-    // Em retrato (tablet) o espaço vai para o mapa: o QR fica só na TV (paisagem).
-    <div className="mt-[calc(var(--u)*1.6)] flex shrink-0 items-center gap-[calc(var(--u)*2)] rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 p-[calc(var(--u)*1.4)] portrait:hidden">
+    <div className="mt-[calc(var(--u)*1.6)] flex shrink-0 items-stretch gap-[calc(var(--u)*1.6)]">
+    {/* Em retrato (tablet) o espaço vai para o mapa: o QR fica só na TV (paisagem). */}
+    <div className="flex min-w-0 flex-1 items-center gap-[calc(var(--u)*2)] rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 p-[calc(var(--u)*1.4)] portrait:hidden">
       {qr ? (
         <svg
           viewBox={`0 0 ${qr.tamanho + 4} ${qr.tamanho + 4}`}
@@ -623,8 +627,10 @@ function Rodape({ patrocinio }: { patrocinio: Patrocinio | null }) {
         <div className="text-[length:calc(var(--u)*1.6)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Acompanhe no celular</div>
         <div className="mt-[calc(var(--u)*0.4)] truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em]">{host}</div>
         <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">Estado, município e seção por seção · fonte TSE</div>
-        {patrocinio ? <PatrocinioSlot patrocinio={patrocinio} tv className="mt-[calc(var(--u)*1)]" /> : null}
       </div>
+    </div>
+    {/* Publicidade (formato 'tv'): quadro próprio, fora do placar; aparece também em retrato. */}
+    <OferecimentoTv className="max-w-[46%] shrink-0 rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 py-[calc(var(--u)*1.4)] pl-[calc(var(--u)*1.4)] pr-[calc(var(--u)*2.6)] portrait:max-w-none portrait:flex-1" />
     </div>
   );
 }

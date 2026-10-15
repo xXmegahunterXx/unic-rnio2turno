@@ -26,6 +26,7 @@ const ROTAS: [teste: (p: string) => boolean, carregar: Carregador][] = [
   [(p) => p === '/metodologia', () => import('@/app/pages/static/MetodologiaPage')],
   [(p) => p === '/privacidade', () => import('@/app/pages/static/PrivacidadePage')],
   [(p) => p === '/sobre', () => import('@/app/pages/static/SobrePage')],
+  [(p) => p === '/anuncie', () => import('@/app/pages/static/AnunciePage')],
   [(p) => p === '/tv', () => import('@/app/pages/tv/TvPage')],
 ];
 

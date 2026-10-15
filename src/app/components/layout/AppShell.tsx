@@ -4,6 +4,9 @@
  * Funciona sem API: se useStatus() falhar ou estiver carregando, nada quebra (só some o que depende dele).
  * Os links pré-carregam a página ao apontar/tocar (prefetch.ts). "Compartilhar o Sintonia" e "Incorporar" ficam
  * montados aqui (acoesGlobais.tsx), carregados só na 1ª abertura.
+ *
+ * Anúncios (src/app/components/anuncios): o provedor escolhe quem aparece em cada posição da página; a faixa do topo
+ * fica logo abaixo do cabeçalho (no desktop, dentro dele) e a barra do rodapé, no celular, acima da tab bar.
  */
 import { REGRA_CORES_CURTA } from '@/shared/cores';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
@@ -24,10 +27,13 @@ import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/
 import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompartilharSite, preCarregarIncorporar } from './acoesGlobais';
 import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
 import { propsPreCarregar } from './prefetch';
+import { BarraRodape, FaixaTopo, ProvedorAnuncios, rodapePermitido } from '../anuncios';
+import { useIsDesktop } from '@/app/lib/useMediaQuery';
 
 export function AppShell({ children }: { children?: ReactNode }) {
   return (
     <MotionConfig reducedMotion="user">
+    <ProvedorAnuncios>
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <FundoNoite />
       <Header />
@@ -35,12 +41,14 @@ export function AppShell({ children }: { children?: ReactNode }) {
         {children ?? <Outlet />}
       </main>
       <Footer />
+      <RodapeAnuncio />
       <TabBar />
       <BuscaRapida />
       <AcoesGlobais />
       <Toaster />
       <ScrollRestoration />
     </div>
+    </ProvedorAnuncios>
     </MotionConfig>
   );
 }
@@ -77,6 +85,12 @@ function dentroDoPainel(): boolean {
   }
 }
 
+/** Barra de anúncio do celular (fora do Teste Cego e do Duelo — `rodapePermitido`). */
+function RodapeAnuncio() {
+  const { pathname } = useLocation();
+  return rodapePermitido(pathname) ? <BarraRodape /> : null;
+}
+
 /** Rotas que exibem números da apuração (e, portanto, a faixa de SIMULAÇÃO quando for o caso). */
 const comNumeros = (pathname: string) =>
   pathname === '/' || pathname.startsWith('/apuracao') || pathname.startsWith('/governadores');
@@ -99,6 +113,9 @@ function Header() {
   // Página do 1º turno (?race=…-t1) durante a simulação: os números da página são OFICIAIS (a simulação é do 2º turno)
   const paginaT1 = /[?&]race=[a-z-]*-t1(?:&|$)/.test(search);
   const [rolou, setRolou] = useState(false);
+  // Faixa de anúncio do topo: no desktop dentro do cabeçalho fixo (sempre à vista, entra em --app-header-h); no
+  // celular logo abaixo dele, rolando com a página (o formato fixo do celular é a barra do rodapé).
+  const desktop = useIsDesktop();
 
   // Expõe a altura do header para elementos "sticky" (ex.: cabeçalho de DataTable).
   useLayoutEffect(() => {
@@ -200,7 +217,9 @@ function Header() {
             }
           />
         ) : null}
+        {desktop ? <FaixaTopo /> : null}
       </div>
+      {!desktop ? <FaixaTopo /> : null}
       <AvisoBanner aviso={status.data?.aviso ?? null} />
     </>
   );
@@ -332,7 +351,8 @@ function TabBar() {
 
 function Footer() {
   return (
-    <footer className="relative mt-12 border-t border-line bg-surface/40 pb-[calc(84px+env(safe-area-inset-bottom))] pt-10 md:mt-20 md:pb-12">
+    // No celular: espaço da tab bar + o da barra de anúncio, quando ela existe (--anuncio-rodape-h, BarraRodape).
+    <footer className="relative mt-12 border-t border-line bg-surface/40 pb-[calc(84px+var(--anuncio-rodape-h,0px)+env(safe-area-inset-bottom))] pt-10 md:mt-20 md:pb-12">
       <Container wide>
         <div className="grid grid-cols-2 gap-x-6 gap-y-9 md:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] lg:gap-10">
           <div className="col-span-2 max-w-sm md:col-span-4 lg:col-span-1">
@@ -396,6 +416,7 @@ function Footer() {
                 { to: '/metodologia', label: 'Metodologia' },
                 { to: '/privacidade', label: 'Privacidade' },
                 { to: '/sobre', label: 'Sobre o Sintonia' },
+                { to: '/anuncie', label: 'Anuncie no Sintonia' },
               ].map((l) => (
                 <li key={l.to}>
                   <Link to={l.to} className={LINK_RODAPE}>

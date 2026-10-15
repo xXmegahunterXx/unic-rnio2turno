@@ -1,6 +1,7 @@
 /**
  * /privacidade — LGPD em linguagem simples: não coletamos as respostas do Teste Cego (opinião política é dado
- * sensível), o que fica no navegador (com botão para apagar), sem cookies de rastreamento, dados técnicos
+ * sensível), o que fica no navegador (com botão para apagar), sem cookies de rastreamento, anúncios (contagem
+ * agregada de impressões e cliques, sem cookie, IP ou dado pessoal; UTMs nos links patrocinados), dados técnicos
  * mínimos, direitos e contato (provisório).
  */
 import { useState } from 'react';
@@ -23,6 +24,7 @@ const SUMARIO = [
   { id: 'navegador', titulo: 'O que fica no seu navegador' },
   { id: 'links', titulo: 'Links de resultado e Duelo' },
   { id: 'cookies', titulo: 'Cookies e analytics' },
+  { id: 'anuncios', titulo: 'Anúncios' },
   { id: 'tecnicos', titulo: 'Dados técnicos' },
   { id: 'direitos', titulo: 'Seus direitos' },
   { id: 'contato', titulo: 'Contato' },
@@ -69,7 +71,7 @@ export default function PrivacidadePage() {
       icone="olho-fechado"
       titulo="Sua opinião é só sua"
       lead="O Sintonia foi feito para funcionar sem saber quem você é. As respostas do Teste Cego nunca saem do seu aparelho, e não usamos cookies de rastreamento."
-      atualizado="9 de outubro de 2026"
+      atualizado="15 de outubro de 2026"
       sumario={SUMARIO}
       destaque={
         <Resumo
@@ -111,6 +113,8 @@ export default function PrivacidadePage() {
             ['Tema claro ou escuro', 'Armazenamento local (localStorage)', 'Até você apagar'],
             ['Preferências de exibição (visão do mapa, ordem das listas)', 'Armazenamento local', 'Até você apagar'],
             ['“Minha seção”, se você salvar a sua na consulta', 'Armazenamento local', 'Até você apagar'],
+            ['Número aleatório que alterna os anúncios entre as visitas (não identifica você e nunca é enviado)', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
+            ['Se você fechou a barra de anúncio do celular', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
           ]}
         />
         <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface-2/60 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
@@ -137,8 +141,39 @@ export default function PrivacidadePage() {
       <Secao id="cookies" titulo="Cookies e analytics">
         <p>
           O site público <strong>não usa cookies</strong> de rastreamento, de publicidade ou de redes sociais. O único cookie do Sintonia é o de
-          sessão do painel administrativo, usado só pela equipe. Se houver espaços de anúncio, eles aceitam apenas anunciantes não políticos e
-          nunca têm acesso às suas respostas.
+          sessão do painel administrativo, usado só pela equipe. Não há pixels de anunciantes nem scripts de terceiros nas páginas.
+        </p>
+      </Secao>
+
+      <Secao id="anuncios" titulo="Anúncios">
+        <p>
+          O Sintonia tem espaços de anúncio para <strong>anunciantes não políticos</strong>, sempre identificados como publicidade. Os anúncios
+          não são direcionados: não sabemos quem você é, e todo mundo vê a mesma rotação de anunciantes.
+        </p>
+        <Lista
+          itens={[
+            <>
+              <strong>Contagem agregada.</strong> Para o relatório dos anunciantes, contamos só totais: quantas vezes cada anúncio apareceu na
+              tela (pelo menos metade dele, por pelo menos 1 segundo) e quantas vezes foi tocado, por formato e por hora. O aviso enviado pelo seu
+              navegador leva apenas o código do anúncio e o formato.
+            </>,
+            <>
+              <strong>Sem cookie, sem IP e sem dado pessoal.</strong> Nenhum cookie é criado e o endereço IP não é guardado: o servidor usa, só
+              em memória e por alguns minutos, um código anônimo derivado da conexão para não contar a mesma visualização duas vezes. Esse código
+              nunca é gravado nem associado a você.
+            </>,
+            <>
+              <strong>Links patrocinados com UTM.</strong> Ao tocar num anúncio, o link passa pelo Sintonia (para somar o clique) e abre o site
+              do anunciante em nova aba com marcadores de campanha no endereço: <span className="font-mono text-[14px] text-fg">utm_source=sintonia</span>,
+              o formato em <span className="font-mono text-[14px] text-fg">utm_medium</span> e o anúncio em{' '}
+              <span className="font-mono text-[14px] text-fg">utm_campaign</span>. Eles dizem ao anunciante só que a visita veio do Sintonia e
+              de qual formato; nada sobre você. A partir dali vale a política de privacidade do site do anunciante.
+            </>,
+            <>Os anúncios nunca têm acesso às suas respostas do Teste Cego, que não saem do seu aparelho.</>,
+          ]}
+        />
+        <p>
+          Quer anunciar? Veja os formatos e as regras em <LinkInterno to="/anuncie">Anuncie no Sintonia</LinkInterno>.
         </p>
       </Secao>
 

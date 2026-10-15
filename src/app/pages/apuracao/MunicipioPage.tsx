@@ -51,6 +51,7 @@ import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { LocaisVotacao } from '@/app/components/pages/detalhe/LocaisVotacao';
 import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { AnuncioNativo } from '@/app/components/anuncios';
 
 type Agrupar = 'zona' | 'local';
 
@@ -325,6 +326,9 @@ export default function MunicipioPage() {
           )}
         </div>
       </Section>
+
+      {/* ------------------------------------------------------------ publicidade (depois do placar e do mosaico, nunca dentro) */}
+      <AnuncioNativo posicao={1} className="my-5 sm:my-7" />
 
       {/* ------------------------------------------------------------ zonas e seções */}
       {!t1 || t1PorSecao ? (

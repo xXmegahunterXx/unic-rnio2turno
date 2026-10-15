@@ -6,7 +6,7 @@ import type { IconName } from '@/app/ui/Icon';
 import { nEstadosGov } from '@/shared/gov2t';
 
 /** Ícones extras do menu "Mais" (desenhados em layout/IconesExtras.tsx). */
-export type IconeExtra = 'tv' | 'codigo';
+export type IconeExtra = 'tv' | 'codigo' | 'megafone' | 'carta';
 
 export interface ItemMais {
   /** Rota (react-router) ou ação ('incorporar' | 'compartilhar'). */
@@ -55,6 +55,7 @@ export const MAIS: GrupoMais[] = [
       { to: '/metodologia', label: 'Metodologia', icon: 'info', match: (p) => p.startsWith('/metodologia') },
       { to: '/privacidade', label: 'Privacidade', icon: 'olho-fechado', match: (p) => p.startsWith('/privacidade') },
       { to: '/sobre', label: 'Sobre o Sintonia', icon: 'selo', match: (p) => p.startsWith('/sobre') },
+      { to: '/anuncie', label: 'Anuncie no Sintonia', icon: 'megafone', match: (p) => p.startsWith('/anuncie') },
     ],
   },
 ];

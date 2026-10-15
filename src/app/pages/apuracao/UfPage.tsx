@@ -16,7 +16,7 @@ import { UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt } from '@/shared/format';
 import { useMunicipio, useStatus, useUf } from '@/app/data/hooks';
 import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
-import { PatrocinioSlot } from '@/app/components/apuracao/PatrocinioSlot';
+import { AnuncioNativo } from '@/app/components/anuncios';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
 import { Badge, ButtonLink, Combobox, Icon, IconButton, Segmented, Sheet, type ComboOption } from '@/app/ui';
@@ -265,7 +265,6 @@ export default function UfPage() {
         subtitle={subtitulo}
         actions={
           <>
-            {statusQ.data?.patrocinio ? <PatrocinioSlot patrocinio={statusQ.data.patrocinio} className="hidden sm:inline-flex" /> : null}
             {ctx.anonimizado ? <NomesOcultos /> : null}
             <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={exterior ? 'Exterior' : nomeUf} size="sm" />
           </>
@@ -410,6 +409,9 @@ export default function UfPage() {
 
       {lateralCelular}
 
+      {/* ------------------------------------------------------------ publicidade (depois do placar e do mapa, nunca dentro) */}
+      <AnuncioNativo posicao={1} className="my-5 sm:my-7" />
+
       {/* ------------------------------------------------------------ destaques */}
       {!unico ? (
         <Section
@@ -513,7 +515,7 @@ export default function UfPage() {
         <PerfilEleitorado uf={uf} nome={exterior ? 'Exterior' : nomeUf} />
       </Section>
 
-      {statusQ.data?.patrocinio ? <PatrocinioSlot patrocinio={statusQ.data.patrocinio} variant="cartao" className="mt-8" /> : null}
+      <AnuncioNativo posicao={2} className="mt-8 sm:mt-10" />
 
       {/* ------------------------------------------------------------ Sheet (celular/tablet) */}
       {!lg && selM ? (

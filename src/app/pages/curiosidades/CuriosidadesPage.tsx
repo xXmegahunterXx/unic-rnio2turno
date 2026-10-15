@@ -5,8 +5,9 @@
  *
  *  ?tema=finalistas|brasil|…  filtra por tema · ?fato=<id>  rola até o cartão e o realça (link dos posts).
  *  Números reais do 1º turno: nomes dos finalistas permitidos, sempre em par simétrico; sem fotos.
+ *  Publicidade: cartão nativo ENTRE os temas, a cada ~6 fatos (nunca no meio da grade de cartões).
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useReducedMotion } from 'framer-motion';
 import type { CuriosidadesDataset, TemaCuriosidade } from '@/shared/curiosidades';
@@ -28,6 +29,10 @@ import { FiltroTemas } from '@/app/components/pages/curiosidades/FiltroTemas';
 import { DestaquesCuriosidades, escolherDestaques } from '@/app/components/pages/curiosidades/DestaquesCuriosidades';
 import { CartaoResumoCuriosidades } from '@/app/components/pages/curiosidades/CartaoResumoCuriosidades';
 import { DESTAQUES_PADRAO, HASHTAGS_CURIOSIDADES, ICONE_TEMA, corFinalista, fatosDoTema, temaDoParam, temasComContagem, textoPagina } from '@/app/components/pages/curiosidades/formato';
+import { AnuncioNativo } from '@/app/components/anuncios';
+
+/** Um cartão de publicidade a cada ~N fatos (sempre entre temas). */
+const FATOS_POR_ANUNCIO = 6;
 
 export default function CuriosidadesPage() {
   useTitulo('Curiosidades do 1º turno');
@@ -176,10 +181,20 @@ function ListaFatos({ ds, tema, foco }: { ds: CuriosidadesDataset; tema: TemaCur
     .map((t) => ({ ...t, fatos: fatosDoTema(ds.fatos, t.id) }))
     .filter((g) => g.fatos.length);
   const { a, b } = ds.finalistas;
+  // posição do anúncio depois de cada tema (null = nenhum): a cada ~6 fatos desde o último
+  let desde = 0;
+  let posicao = 0;
+  const anuncioDepois = grupos.map((g) => {
+    desde += g.fatos.length;
+    if (desde < FATOS_POR_ANUNCIO) return null;
+    desde = 0;
+    return ++posicao;
+  });
   return (
     <>
-      {grupos.map((g) => (
-        <section key={g.id} aria-labelledby={`tema-${g.id}`} className="pt-7 sm:pt-10">
+      {grupos.map((g, gi) => (
+        <Fragment key={g.id}>
+        <section aria-labelledby={`tema-${g.id}`} className="pt-7 sm:pt-10">
           <header className="mb-3.5 sm:mb-4">
             <h2 id={`tema-${g.id}`} className="flex items-center gap-2 font-display text-[22px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[26px]">
               <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand-fg">
@@ -209,6 +224,8 @@ function ListaFatos({ ds, tema, foco }: { ds: CuriosidadesDataset; tema: TemaCur
             ))}
           </div>
         </section>
+        {anuncioDepois[gi] ? <AnuncioNativo posicao={anuncioDepois[gi]!} className="pt-9 sm:pt-12" /> : null}
+        </Fragment>
       ))}
     </>
   );

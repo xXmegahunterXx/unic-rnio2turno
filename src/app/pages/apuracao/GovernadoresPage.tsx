@@ -29,6 +29,7 @@ import { GovernadoresEleitosT1 } from '@/app/components/pages/cargos/Governadore
 import { cn } from '@/app/lib/cn';
 import { BotaoCompartilharGovernadores, type DisputaGov } from '@/app/components/share/cartoes/Governadores';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { AnuncioNativo } from '@/app/components/anuncios';
 
 type Ordem = 'apertadas' | 'apuradas' | 'az';
 const CHAVE_ORDEM = 'sintonia:governadores:ordem';
@@ -262,6 +263,9 @@ export default function GovernadoresPage() {
           )}
         </motion.li>
       </ul>
+
+      {/* publicidade: depois dos placares, fora da grade dos cartões */}
+      <AnuncioNativo posicao={1} className="mt-10 sm:mt-14" />
 
       {/* As demais UFs elegeram o governador no 1º turno (resultado oficial, dado real: fotos sempre). */}
       <GovernadoresEleitosT1

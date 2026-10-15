@@ -6,8 +6,10 @@
  * 'encerrada' → resultado final. `?race=gov-xx` redireciona para a página da UF.
  *
  * "Reveja a noite": `?t=18h42` mostra placar, mapa (estados e municípios), corrida e feed naquele instante
- * (LinhaDoTempo). Sem `t` = ao vivo. Também: link para o Modo TV, "N pessoas agora" (só no servidor) e o
- * patrocínio discreto quando configurado no admin.
+ * (LinhaDoTempo). Sem `t` = ao vivo. Também: link para o Modo TV e "N pessoas agora" (só no servidor).
+ *
+ * Publicidade (src/app/components/anuncios): cartão nativo DEPOIS do placar e do mapa (nunca dentro deles), como uma
+ * linha própria da grade, e outro no fim da página.
  */
 import { useCallback } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
@@ -31,7 +33,7 @@ import { EmptyState, ErrorState } from '@/app/components/apuracao/States';
 import { LinkModoTv, Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
 import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
 import { PessoasAgora } from '@/app/components/apuracao/PessoasAgora';
-import { PatrocinioSlot } from '@/app/components/apuracao/PatrocinioSlot';
+import { AnuncioNativo } from '@/app/components/anuncios';
 import { PreHero } from '@/app/components/pages/nacional/PreHero';
 import { MapaPanel } from '@/app/components/pages/nacional/MapaPanel';
 import { CorridaPanel } from '@/app/components/pages/nacional/CorridaPanel';
@@ -143,8 +145,6 @@ export default function NacionalPage() {
             <SeloFase status={status} resumo={resumo} t1={t1} revendo={t} />
             {!t ? <PessoasAgora status={status} /> : null}
             {anonimizado ? <SeloAnonimo /> : null}
-            {/* No celular, só o cartão no fim da página (discreto, sem empurrar o placar). */}
-            {status?.patrocinio ? <PatrocinioSlot patrocinio={status.patrocinio} className="hidden sm:ml-auto sm:inline-flex" /> : null}
           </>
         }
         seletor={<RaceSwitcher races={races} value={raceParam} onChange={trocarDisputa} size={desktop ? 'md' : 'sm'} />}
@@ -202,6 +202,9 @@ export default function NacionalPage() {
             <LiderancaCard className="order-4 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} />
           </div>
 
+          {/* publicidade: depois do placar e do mapa (celular: logo abaixo do mapa; desktop largo: linha inteira) */}
+          <AnuncioNativo posicao={1} className="order-2 my-5 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:my-2" />
+
           <ParticipacaoSecao className="order-6 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" t={resumo} t1 />
           <GovernadoresFaixa className="order-7 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" races={races} t1 linkT1={!pre} />
 
@@ -251,6 +254,9 @@ export default function NacionalPage() {
             )}
           </div>
 
+          {/* publicidade: depois do placar, do mapa e do "para virar" (celular: antes da corrida; desktop largo: linha inteira) */}
+          <AnuncioNativo posicao={1} className="order-3 my-5 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:my-2" />
+
           {/* Antes da 1ª seção totalizada as regiões não têm o que mostrar: o feed ocupa a linha inteira. */}
           <FeedPanel className={cn('order-5 min-[1360px]:order-none', semApuracao ? 'min-[1360px]:col-span-12' : 'min-[1360px]:col-span-5')} eventos={data.eventos} race={race} largo={semApuracao} />
           {!semApuracao ? <RegioesCard className="order-7 min-[1360px]:order-none min-[1360px]:col-span-7" race={race} regioes={data.regioes} /> : null}
@@ -267,7 +273,7 @@ export default function NacionalPage() {
         </div>
       )}
 
-      {status?.patrocinio ? <PatrocinioSlot patrocinio={status.patrocinio} variant="cartao" className="mt-8 sm:mt-10" /> : null}
+      <AnuncioNativo posicao={2} className="mt-10 sm:mt-14" />
     </Container>
   );
 }

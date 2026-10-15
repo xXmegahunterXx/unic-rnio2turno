@@ -1,6 +1,6 @@
 /**
  * /sobre — o que é o Sintonia, princípios (neutralidade, precisão, privacidade, beleza), apartidarismo,
- * sem anúncios políticos, equipe (placeholder) e contato (provisório).
+ * anúncios só de marcas não políticas (contagem agregada, sem dado pessoal), equipe (placeholder) e contato (provisório).
  */
 import { REGRA_CORES } from '@/shared/cores';
 import { ButtonLink } from '@/app/ui/Button';
@@ -89,7 +89,13 @@ export default function SobrePage() {
           itens={[
             <>Não temos vínculo com candidatos, partidos, coligações ou campanhas, e não recebemos recursos deles.</>,
             <>
-              <strong>Não exibimos propaganda política.</strong> Espaços de anúncio, quando houver, aceitam apenas anunciantes não políticos.
+              <strong>Não exibimos propaganda política.</strong> Os espaços de anúncio aceitam apenas anunciantes não políticos, sempre
+              identificados como publicidade e separados dos resultados: nunca dentro do placar nem ao lado de foto, nome ou número de candidato.
+            </>,
+            <>
+              Dos anúncios, medimos só totais de impressões e cliques, sem cookie, sem guardar IP e sem dado pessoal. Os links patrocinados levam
+              marcadores de campanha (UTM) que dizem ao anunciante apenas que a visita veio do Sintonia.{' '}
+              <LinkInterno to="/privacidade#anuncios">Como funciona</LinkInterno>.
             </>,
             <>Não fazemos enquetes nem mostramos preferência de usuários.</>,
             <>
@@ -132,6 +138,9 @@ export default function SobrePage() {
           </li>
           <li>
             Correções: <Email endereco={CONTATO.correcoes} />
+          </li>
+          <li>
+            Anunciar: veja os formatos em <LinkInterno to="/anuncie">Anuncie no Sintonia</LinkInterno>
           </li>
         </ul>
         <div className="flex flex-col gap-2.5 pt-2 sm:flex-row">

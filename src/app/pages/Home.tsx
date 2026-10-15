@@ -10,7 +10,8 @@
  * Neutralidade: corridas via `useRace` (anônimas na simulação), ordem da urna, cores por slot.
  *
  * Estrutura em SEÇÕES irmãs (hero · abaixo da dobra): blocos de publicidade entram ENTRE seções, nunca dentro do hero
- * (que tem placar, fotos e nomes de candidatos).
+ * (que tem placar, fotos e nomes de candidatos): posição 1 logo depois do hero (separada dele pelas entradas e por
+ * respiro próprio) e posição 2 no fim, depois de tudo.
  */
 import { lazy, Suspense, useEffect } from 'react';
 import { useAnonimizado, useNacional, useRace, useStatus } from '@/app/data/hooks';
@@ -19,6 +20,7 @@ import { Container } from '@/app/components/layout/Container';
 import { preCarregarQuandoOcioso } from '@/app/components/layout/prefetch';
 import { HeroHome } from '@/app/components/pages/home/HeroHome';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { AnuncioNativo } from '@/app/components/anuncios';
 
 const carregarAbaixo = () => import('@/app/components/pages/home/AbaixoDaDobra');
 const AbaixoDaDobra = lazy(carregarAbaixo);
@@ -56,6 +58,8 @@ export default function Home() {
     <>
       <HeroHome status={status} recebidoEm={statusQ.dataUpdatedAt} race={race} raceT1={raceT1} resumo={resumo} anonimizado={anonimizado} />
       <Container>
+        {/* publicidade: entre o hero e o resto, nunca dentro do hero */}
+        <AnuncioNativo posicao={1} className="mb-12 mt-4 sm:mb-16 sm:mt-2" />
         <div ref={sentinela} className="min-h-[60vh]">
           {perto ? (
             <Suspense fallback={<div className="min-h-[60vh]" aria-busy="true" />}>
@@ -63,6 +67,7 @@ export default function Home() {
             </Suspense>
           ) : null}
         </div>
+        <AnuncioNativo posicao={2} className="mt-12 sm:mt-16" />
       </Container>
     </>
   );
