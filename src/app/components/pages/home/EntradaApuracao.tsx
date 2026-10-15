@@ -129,7 +129,7 @@ function Linha({ c, pct, votos, semVotos }: { c: Candidate; pct: number; votos: 
   const agregado = !!c.agregado;
   return (
     <li>
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {agregado ? (
           <span aria-hidden className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-line/[2.5] text-fg-subtle">
             <Icon name="mais" size={14} />
@@ -137,31 +137,29 @@ function Linha({ c, pct, votos, semVotos }: { c: Candidate; pct: number; votos: 
         ) : (
           <CandidateAvatar candidato={c} size="sm" />
         )}
-        {/* o nome disputa a largura só com o percentual (os votos vão para a linha de baixo): os dois nomes aparecem
-            inteiros mesmo numa coluna estreita (até 2 linhas), sem cortar um e não o outro */}
+        {/* o nome ocupa a linha inteira (até 2 linhas) e o percentual vai para a linha de baixo, ao lado do partido: os
+            dois nomes aparecem inteiros mesmo na coluna estreita do desktop, sem cortar um e não o outro */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <div
-              className={cn(
-                'line-clamp-2 min-w-0 text-[14.5px] leading-tight [overflow-wrap:anywhere]',
-                agregado ? 'font-medium text-fg-muted' : 'font-semibold text-fg',
-              )}
-            >
-              {agregado ? 'Demais candidatos' : c.nomeUrna}
-            </div>
-            <div
+          <div
+            className={cn(
+              'line-clamp-2 text-[14.5px] leading-tight',
+              agregado ? 'font-medium text-fg-muted' : 'font-semibold text-fg',
+            )}
+          >
+            {agregado ? 'Demais candidatos' : c.nomeUrna}
+          </div>
+          <div className="mt-0.5 flex items-end justify-between gap-2">
+            <span className="num min-w-0 truncate pb-0.5 text-[12px] text-fg-muted">{agregado ? '' : partidoENumero(c)}</span>
+            <span
               className={cn(
                 'num shrink-0 font-display font-semibold leading-none tracking-[-0.03em]',
                 agregado ? 'text-[18px] text-fg-muted' : cn('text-[24px]', semVotos ? 'text-fg-subtle' : s.textDisplay),
               )}
             >
               {fmtPct(pct)}
-            </div>
+            </span>
           </div>
-          <div className="mt-1 flex items-baseline justify-between gap-2 text-[11.5px] text-fg-muted">
-            <span className="num min-w-0 truncate text-[12px]">{agregado ? '' : partidoENumero(c)}</span>
-            <span className="num shrink-0">{fmtInt(votos)} votos</span>
-          </div>
+          <div className="num mt-1 text-right text-[11.5px] text-fg-muted">{fmtInt(votos)} votos</div>
         </div>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3">

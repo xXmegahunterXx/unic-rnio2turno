@@ -77,10 +77,18 @@ function Hero({ chamada, zap, email }: { chamada?: string; zap: string | null; e
             >
               Sua marca <span className="text-grad">na noite da eleição.</span>
             </h1>
-            <p className="mt-4 max-w-[36rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:mt-5 sm:text-[18px]">
-              {chamada ? (
-                <span className="text-fg">{chamada} </span>
-              ) : null}
+            {/* a frase do painel (/admin → Anuncie) vem em destaque, numa linha própria, antes do texto padrão */}
+            {chamada ? (
+              <p className="mt-4 max-w-[36rem] text-pretty text-[18px] font-semibold leading-snug text-brand-fg sm:mt-5 sm:text-[21px]">
+                {chamada}
+              </p>
+            ) : null}
+            <p
+              className={cn(
+                'max-w-[36rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:text-[18px]',
+                chamada ? 'mt-2' : 'mt-4 sm:mt-5',
+              )}
+            >
               A apuração do 2º turno ao vivo, do Brasil inteiro até a seção, e o Teste Cego, feito para ser compartilhado.{' '}
               <span className="text-fg">Espaços para marcas não políticas, sempre identificados como publicidade.</span>
             </p>

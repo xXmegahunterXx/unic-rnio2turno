@@ -609,8 +609,16 @@ nos cartões, nas imagens de prévia, na TV e nos widgets.
 
 ### 11.9 Desempenho e limites conhecidos
 
-- JS inicial (build de produção, gzip): entrada **165,5 kB**; com o chunk da rota de entrada pré-carregado (`/` ou
-  `/teste`) ≈ **191 kB** (meta: < 200). Curiosidades, cenários, widgets e o kit de compartilhar são chunks sob demanda.
+- JS inicial (build de produção, gzip, out/2026 com anúncios e o hero com fotos): entrada **169,5 kB**; com os chunks da
+  rota de entrada pré-carregados `/` ≈ **198,7 kB** e `/teste` ≈ **195,2 kB** (meta: < 200). Curiosidades, cenários,
+  widgets e o kit de compartilhar são chunks sob demanda. Anúncios no JS inicial: só o provedor, as regras puras
+  (`nucleo.ts`, `anuncios-escolha.ts`) e a decisão da faixa do topo; as peças (`FaixaTopoPeca`, `AnuncioNativoPeca`,
+  `pecas.tsx`) e a barra do rodapé são chunks sob demanda — AppShell e páginas importam direto dos módulos, nunca do
+  `index.ts` de anúncios (reexportar de lá puxa todas as peças).
+- Pré-carga junto com o HTML (`preCarregamentoCritico` no vite.config.ts): módulos de `/`, `/teste` e `/apuracao` e, em
+  `/` e `/apuracao`, `presidente-hd.json`, `/api/status` e `/api/meta` (`<link rel=preload as=fetch crossorigin>`; os
+  `fetch()` do app usam credenciais 'same-origin' e reaproveitam). Celular emulado (CPU 4×, 150 ms, 1,6 Mbps): LCP da
+  Home (a foto) ≈ 2,45–2,7 s (antes 2,7–3,05 s); `/apuracao` ≈ 3,8 s (antes 4,5 s); CLS ≈ 0.
 - Barras ao vivo (`VoteSplitBar`, `ApuracaoProgress`, `StatsGrid`) animam só `transform` (antes `width`/`flex-grow`, que
   faziam layout a cada quadro) e o brilho da barra de progresso usa `translateX` em vez de `background-position`. Medido
   em `/apuracao` (build demo, CPU 4× mais lenta): layout −40% (≈ 258 → 158 ms a cada 3 s) e tarefas longas −23%.

@@ -15,13 +15,22 @@ import { fileURLToPath, URL } from 'node:url';
  */
 function preCarregamentoCritico(demo: boolean): Plugin {
   let base = '/';
-  const ROTAS: Record<string, string> = { '/': 'src/app/pages/Home.tsx', '/teste': 'src/app/pages/teste/TestePage.tsx' };
+  const ROTAS: Record<string, string> = {
+    '/': 'src/app/pages/Home.tsx',
+    '/teste': 'src/app/pages/teste/TestePage.tsx',
+    '/apuracao': 'src/app/pages/apuracao/NacionalPage.tsx',
+  };
   /**
    * Dados que a rota aberta precisa já na 1ª dobra, pedidos junto com o HTML (`<link rel=preload as=fetch crossorigin>`;
-   * o `fetch()` padrão do app — mesma origem, sem `credentials: 'omit'` — reaproveita a resposta). Home: as fotos
-   * oficiais em resolução original dos finalistas (o retrato é o maior elemento da tela: o LCP).
+   * o `fetch()` padrão do app — mesma origem, credenciais 'same-origin' — reaproveita a resposta). Home e /apuracao:
+   * as fotos oficiais em resolução original dos finalistas (o retrato é o maior elemento da tela: o LCP) e, fora do
+   * demo, o status (decide se a foto pode aparecer) e o meta: chegam enquanto o JS ainda baixa, em vez de depois dele.
    */
-  const DADOS: Record<string, string[]> = { '/': ['data/fotos/presidente-hd.json'] };
+  const api = demo ? [] : ['api/status', 'api/meta'];
+  const DADOS: Record<string, string[]> = {
+    '/': ['data/fotos/presidente-hd.json', ...api],
+    '/apuracao': ['data/fotos/presidente-hd.json', ...api],
+  };
   return {
     name: 'sintonia-precarregamento-critico',
     apply: 'build',
