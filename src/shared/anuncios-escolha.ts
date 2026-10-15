@@ -17,8 +17,8 @@ function fnv(s: string): number {
 
 /**
  * Escolhe o anúncio de um formato. Rotação ponderada pelo `peso`, determinística pela `semente` (ex.: id da visita
- * + posição na página: a mesma posição não troca a cada renderização, mas muda entre visitas). No 'topo', na 'tv' e
- * em 'compartilhamento', a cota MASTER vence quando existe. `evitar` tira ids já mostrados em outra posição da mesma
+ * + posição na página: a mesma posição não troca a cada renderização, mas muda entre visitas). No 'topo', na 'tv', na
+ * 'live' e em 'compartilhamento', a cota MASTER vence quando existe. `evitar` tira ids já mostrados em outra posição da mesma
  * página (se sobrar algum).
  */
 export function escolherAnuncio<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota'>>(
@@ -29,7 +29,7 @@ export function escolherAnuncio<T extends Pick<AnuncioPublico, 'id' | 'formatos'
 ): T | null {
   let pool = (anuncios ?? []).filter((a) => a.formatos.includes(formato));
   if (pool.length === 0) return null;
-  if (formato === 'topo' || formato === 'tv' || formato === 'compartilhamento') {
+  if (formato === 'topo' || formato === 'tv' || formato === 'live' || formato === 'compartilhamento') {
     const master = pool.filter((a) => a.cota === 'master');
     if (master.length) pool = master;
   }

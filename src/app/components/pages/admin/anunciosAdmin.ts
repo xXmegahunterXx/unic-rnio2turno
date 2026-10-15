@@ -22,6 +22,8 @@ export const ONDE_APARECE: Record<FormatoAnuncio, string> = {
   teste: '“Teste Cego oferecido por” na tela de resultado do Teste Cego, depois de revelar e longe do cartão do resultado.',
   tv: 'Logo grande no Modo TV (telões e transmissões ao vivo).',
   compartilhamento: '“Oferecimento: marca” no rodapé das imagens genéricas (Teste Cego, calculadora, curiosidades) que vão para o X e o WhatsApp; nunca nas de placar ou candidato. Não medido.',
+  chat: '“Sala oferecida por marca” no topo do chat ao vivo da apuração, fora das mensagens.',
+  live: '“Oferecido por marca” nos layouts do modo streamer (/live), usados por quem transmite a apuração no OBS. Sem link (é vídeo); a cota master tem prioridade.',
 };
 
 export const ROTULO_CURTO: Record<FormatoAnuncio, string> = {
@@ -31,6 +33,8 @@ export const ROTULO_CURTO: Record<FormatoAnuncio, string> = {
   teste: 'Teste Cego',
   tv: 'Modo TV',
   compartilhamento: 'Imagens',
+  chat: 'Chat',
+  live: 'Lives',
 };
 
 export { ROTULO_FORMATO, FORMATOS_ANUNCIO };

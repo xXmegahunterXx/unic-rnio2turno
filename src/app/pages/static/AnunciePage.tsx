@@ -235,16 +235,20 @@ const ONDE: Record<FormatoAnuncio, string> = {
   teste: 'Na tela de resultado do Teste Cego, depois que a pessoa revela e abaixo das ações de compartilhar: “Teste Cego oferecido por”.',
   tv: '“Oferecimento” com a sua logo na barra do topo do Modo TV, a tela cheia para transmissões e telões — fora do placar.',
   compartilhamento: '“Oferecimento: sua marca” no rodapé das imagens genéricas (Teste Cego, calculadora, capa das curiosidades) postadas no X e no WhatsApp. Nunca nas imagens de placar ou de candidato.',
+  chat: '“Sala oferecida por sua marca” no topo do chat ao vivo da apuração, onde o público comenta cada atualização — fora das mensagens.',
+  live: '“Oferecido por sua marca” no placar que streamers põem nas lives (Twitch, YouTube, Kick) pelo OBS: a sua marca na tela de quem transmite a apuração.',
 };
 
-const MASTER_PRIMEIRO: FormatoAnuncio[] = ['topo', 'tv', 'compartilhamento'];
+const QTD_FORMATOS = ['Um', 'Dois', 'Três', 'Quatro', 'Cinco', 'Seis', 'Sete', 'Oito', 'Nove', 'Dez'][FORMATOS_ANUNCIO.length - 1] ?? String(FORMATOS_ANUNCIO.length);
+
+const MASTER_PRIMEIRO: FormatoAnuncio[] = ['topo', 'tv', 'live', 'compartilhamento'];
 
 function Formatos() {
   return (
     <Bloco
       id="formatos"
       eyebrow="Formatos"
-      titulo="Seis formatos, todos identificados"
+      titulo={`${QTD_FORMATOS} formatos, todos identificados`}
       descricao="Estes são os componentes do próprio site, com um anúncio de exemplo. A sua marca aparece exatamente assim."
     >
       <ol className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-5">

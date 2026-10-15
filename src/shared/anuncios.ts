@@ -9,7 +9,10 @@
  *                       cartão do resultado (a marca fica com o Teste Cego, nunca com o resultado);
  *  - 'tv'               logo grande no Modo TV (transmissões), fora do placar;
  *  - 'compartilhamento' "Oferecimento: <marca>" no rodapé das imagens de compartilhamento GENÉRICAS (Teste Cego,
- *                       calculadora, capa das curiosidades) — nunca nas de placar, candidato ou resultado.
+ *                       calculadora, capa das curiosidades) — nunca nas de placar, candidato ou resultado;
+ *  - 'chat'             "Sala oferecida por <marca>" no topo do chat ao vivo da apuração (fora das mensagens);
+ *  - 'live'             "Oferecido por <marca>" nos layouts do modo streamer (/live, fonte de navegador do OBS) —
+ *                       sem link (a live é vídeo), fora do placar; a cota MASTER tem prioridade.
  *
  * Regras que valem em todo lugar: sempre rotulado ("Publicidade"/"Patrocinado"/"Oferecido por"); link com
  * rel="sponsored noopener"; nunca colado a número, foto ou nome de candidato (separação visual clara); nada
@@ -20,7 +23,7 @@
 
 import { motivoPolitico } from './anuncios-politica';
 
-export const FORMATOS_ANUNCIO = ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento'] as const;
+export const FORMATOS_ANUNCIO = ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento', 'chat', 'live'] as const;
 export type FormatoAnuncio = (typeof FORMATOS_ANUNCIO)[number];
 
 export const ROTULO_FORMATO: Record<FormatoAnuncio, string> = {
@@ -30,15 +33,17 @@ export const ROTULO_FORMATO: Record<FormatoAnuncio, string> = {
   teste: 'Tela de resultado do Teste Cego',
   tv: 'Modo TV',
   compartilhamento: 'Imagens de compartilhamento',
+  chat: 'Chat ao vivo da apuração',
+  live: 'Modo streamer (lives no OBS)',
 };
 
 /**
  * Formatos com impressão medida (o que aparece numa tela do site). 'compartilhamento' circula fora do site (a imagem
  * vai para o X/WhatsApp): não é medido — o painel diz "não medido".
  */
-export const FORMATOS_COM_IMPRESSAO: readonly FormatoAnuncio[] = ['topo', 'rodape', 'nativo', 'teste', 'tv'];
-/** Formatos com clique medido (têm link no site). O Modo TV é uma tela sem link; as imagens, idem. */
-export const FORMATOS_COM_CLIQUE: readonly FormatoAnuncio[] = ['topo', 'rodape', 'nativo', 'teste'];
+export const FORMATOS_COM_IMPRESSAO: readonly FormatoAnuncio[] = ['topo', 'rodape', 'nativo', 'teste', 'tv', 'chat', 'live'];
+/** Formatos com clique medido (têm link no site). O Modo TV e o modo streamer são telas sem link; as imagens, idem. */
+export const FORMATOS_COM_CLIQUE: readonly FormatoAnuncio[] = ['topo', 'rodape', 'nativo', 'teste', 'chat'];
 
 /** Cota: 'master' (patrocinador principal: prioridade no topo, na TV e nas imagens) ou 'apoio'. */
 export type CotaAnuncio = 'master' | 'apoio';
