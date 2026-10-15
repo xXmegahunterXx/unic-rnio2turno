@@ -250,7 +250,7 @@ export function PainelDuelo({ status, recebidoEm, race, raceT1, resumo, anonimiz
           <Cabecalho>
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <Icon name="check-circulo" size={14} className="shrink-0 text-brand-fg" />
-              <span className="truncate">1º turno · resultado oficial</span>
+              <span className="truncate">Resultado do 1º turno</span>
             </span>
             <BotaoCompartilharConfronto race={raceT1!} simulado={false} />
           </Cabecalho>
