@@ -465,6 +465,7 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
     metodologia: ['Metodologia', 'Como calculamos e exibimos a apuração: fontes (TSE e IBGE), regras de percentuais e simulação.'],
     privacidade: ['Privacidade', 'O que coletamos (quase nada) e por que suas respostas do Teste Cego nunca saem do seu aparelho.'],
     sobre: ['Sobre', 'O Sintonia é um projeto apartidário de visualização da apuração e de comparação de propostas.'],
+    anuncie: ['Anuncie no Sintonia', 'Formatos de anúncio para marcas não políticas na apuração do 2º turno e no Teste Cego: topo, rodapé no celular, cartões, Modo TV e imagens de compartilhamento.'],
   };
   if (seg.length === 1 && estaticas[s0]) {
     return pagina({ titulo: `${estaticas[s0][0]} · ${APP_NAME}`, descricao: estaticas[s0][1], imagem: ogApuracao(), imagemAlt: altPlacar(''), canonico: path });

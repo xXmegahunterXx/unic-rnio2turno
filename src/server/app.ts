@@ -130,6 +130,7 @@ export function rotasSitemap(): [string, string, string][] {
     ['/metodologia', 'monthly', '0.4'],
     ['/sobre', 'monthly', '0.3'],
     ['/privacidade', 'monthly', '0.3'],
+    ['/anuncie', 'monthly', '0.3'],
   ];
 }
 

@@ -66,6 +66,13 @@ describe('imagem específica por página', () => {
     expect(sp.imagem).toContain('race=pres&');
   });
 
+  it('/anuncie é página conhecida (200) com título e descrição próprios', () => {
+    const m = metaDaRota('/anuncie', q(), ctx);
+    expect(m.status).toBe(200);
+    expect(m.titulo).toBe('Anuncie no Sintonia · Sintonia');
+    expect(m.descricao).toContain('não políticas');
+  });
+
   it('/kit só existe quando o build tem a vitrine (dev/demo); em produção é 404', () => {
     expect(metaDaRota('/kit', q(), ctx).status).toBe(404);
     expect(metaDaRota('/kit/viz', q(), ctx).status).toBe(404);

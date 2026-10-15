@@ -237,6 +237,7 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
        or http.request.uri.path in {"/api/status" "/api/meta"}
        or starts_with(http.request.uri.path, "/api/og/")
        or starts_with(http.request.uri.path, "/api/patrocinio/")
+       or http.request.uri.path eq "/api/anuncio/img"
        or starts_with(http.request.uri.path, "/data/")
        or starts_with(http.request.uri.path, "/geo/")))
      ```
@@ -245,8 +246,9 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
      manter a **query string inteira** (padrão — a apuração usa `?race=`, `?t=` e `&v=`).
 
    **Regra 2 — "Sintonia: nunca guardar"**
-   - Quando: `starts_with(http.request.uri.path, "/api/admin") or http.request.uri.path eq "/healthz" or starts_with(http.request.uri.path, "/admin")`
-   - Então: **Ignorar cache** (*Bypass*).
+   - Quando: `starts_with(http.request.uri.path, "/api/admin") or http.request.uri.path eq "/healthz" or starts_with(http.request.uri.path, "/admin") or starts_with(http.request.uri.path, "/api/anuncio/ir/") or http.request.uri.path eq "/api/anuncio/evento"`
+   - Então: **Ignorar cache** (*Bypass*). Os cliques (`/api/anuncio/ir/…`) e as impressões (`/api/anuncio/evento`)
+     dos anúncios precisam chegar sempre à VPS, senão o relatório de entrega dos anunciantes fica errado.
 
    As páginas (HTML) não precisam de regra: o app manda `no-cache` e a Cloudflare não as guarda (cada link
    compartilhado precisa das meta tags da própria rota). Os arquivos `/assets/*` (JS/CSS com hash no nome) já são
