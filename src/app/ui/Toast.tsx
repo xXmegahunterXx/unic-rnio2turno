@@ -55,6 +55,8 @@ export function Toaster() {
       aria-atomic="false"
       className={cn(
         'pointer-events-none fixed inset-x-0 z-[90] flex flex-col items-center gap-2 px-4 md:bottom-6 md:top-auto',
+        // celular: desce 60 px quando a tab bar sai ao rolar (styles.css, barrasMoveis.ts)
+        !modalAberto && 'segue-tab',
         // acima da tab bar e, quando existe, da barra de anúncio do rodapé (--anuncio-rodape-h, BarraRodape)
         modalAberto
           ? 'top-[calc(12px+env(safe-area-inset-top))]'

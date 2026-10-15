@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { cn } from '@/app/lib/cn';
+import { instalarBarrasMoveis } from '@/app/lib/barrasMoveis';
 import { LogoMark } from '@/app/components/layout/Logo';
 import { Badge, buttonClasses, Dialog, Icon, IconButton, LiveDot, ThemeToggle, Toaster } from '@/app/ui';
 import { useAdmin } from './dados';
@@ -354,8 +355,10 @@ function CabecalhoMovel() {
 // ---- barra inferior (celular/tablet) ---------------------------------------------------------------------
 
 function BarraInferior() {
+  // teclado aberto num campo do painel (celular): a barra sai da frente (barrasMoveis.ts + .barra-teclado)
+  useEffect(() => instalarBarrasMoveis(), []);
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/[0.94] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden">
+    <div className="barra-teclado fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/[0.94] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl backdrop-saturate-150 lg:hidden">
       <div className="mx-auto flex h-[72px] max-w-3xl items-center gap-3 px-4">
         <div className="min-w-0 flex-1">
           <EstadoAoVivo compacto />

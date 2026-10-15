@@ -99,10 +99,12 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
   const tituloHero = revelado ? 'Sua sintonia com cada programa de governo' : analisando ? 'Comparando com os programas de governo…' : 'Pronto! Hora de descobrir.';
 
   return (
-    <Container className="pb-4 pt-4 sm:pt-8">
+    // Celular baixo (≤ 760 px de altura, ex.: 360 × 740): espaços menores no topo para o botão "Revelar minha sintonia"
+    // caber na 1ª tela, acima da tab bar.
+    <Container className="pb-4 pt-4 sm:pt-8 [@media(max-height:760px)]:max-sm:pt-3">
       <section
         aria-labelledby="titulo-resultado"
-        className="relative overflow-hidden rounded-[28px] border border-line bg-surface px-4 pb-6 pt-6 shadow-card sm:px-10 sm:pb-10 sm:pt-10"
+        className="relative overflow-hidden rounded-[28px] border border-line bg-surface px-4 pb-6 pt-6 shadow-card sm:px-10 sm:pb-10 sm:pt-10 [@media(max-height:760px)]:max-sm:pt-5"
       >
         {/* brilhos simétricos nos dois lados (ninguém em destaque). Antes da revelação, na cor da marca: as cores de
             identificação (vermelho/azul) diriam quem é quem antes da hora. */}
@@ -136,12 +138,12 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
           <h1
             id="titulo-resultado"
             aria-live="polite"
-            className="mx-auto mt-4 max-w-[22ch] text-balance text-center font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.035em] text-fg sm:text-[44px]"
+            className="mx-auto mt-4 max-w-[22ch] text-balance text-center font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.035em] text-fg sm:text-[44px] [@media(max-height:760px)]:max-sm:mt-3"
           >
             {tituloHero}
           </h1>
 
-          <div className="mx-auto mt-7 grid max-w-[720px] grid-cols-2 gap-3 sm:mt-10 sm:gap-10">
+          <div className="mx-auto mt-7 grid max-w-[720px] grid-cols-2 gap-3 sm:mt-10 sm:gap-10 [@media(max-height:760px)]:max-sm:mt-5">
             {lista.map((c) => (
               <MedidorSintonia
                 key={c.numero}
@@ -157,7 +159,7 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
           </div>
 
           {fase === 'pronto' ? (
-            <div className="mx-auto mt-6 flex max-w-[420px] flex-col items-center sm:mt-8">
+            <div className="mx-auto mt-6 flex max-w-[420px] flex-col items-center sm:mt-8 [@media(max-height:760px)]:max-sm:mt-4">
               <Button variant="primary" size="lg" icon="olho-fechado" onClick={revelar} className="w-full shadow-glow" data-acao="revelar">
                 Revelar minha sintonia
               </Button>

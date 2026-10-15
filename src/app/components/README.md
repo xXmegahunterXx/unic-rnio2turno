@@ -91,7 +91,7 @@ import { Placar } from '@/app/components/apuracao/Placar';                      
 
 | Componente | Props / notas |
 |---|---|
-| `AppShell` | Já é o `element` do router. Header de vidro fixo (logo, nav, `StatusPill`, `ThemeToggle`), `SimulationRibbon` quando `status.simulacao`, banner `status.aviso` (dispensável), rodapé (links, fontes TSE/IBGE, apartidarismo), tab bar no celular com safe-area, `Toaster`, `ScrollRestoration`. Funciona sem API. Define `--app-header-h` no `<html>` (para `sticky`). |
+| `AppShell` | Já é o `element` do router. Header de vidro fixo (logo, nav, `StatusPill`, `ThemeToggle`), `SimulationRibbon` quando `status.simulacao`, banner `status.aviso` (dispensável), rodapé (links, fontes TSE/IBGE, apartidarismo), tab bar no celular com safe-area, `Toaster`, `ScrollRestoration`. Funciona sem API. Define `--app-header-h` no `<html>` (para `sticky`). Celular: a tab bar sai ao rolar para baixo e volta ao rolar para cima, no topo e no fim da página; a barra de anúncio do rodapé desce para o pé da tela; com o teclado aberto as duas saem (`lib/barrasMoveis.ts` liga `data-tab-oculta`/`data-teclado` no `<html>`; CSS `.barra-tab`, `.barra-anuncio-desloc`, `.barra-teclado`, `.segue-tab` em `styles.css`). |
 | `StatusPill` / `StatusPillView` | `StatusPill({ compact? })` lê `useStatus()`. `StatusPillView({ v })` puro, com `statusVisual(status, recebidoEm, agora)`. |
 | `Logo` / `LogoMark` | `size`, `showText`. |
 | `Container` | largura máx. 1200 px (`wide` → 1440) + gutters 16/24/32 px. |
@@ -266,14 +266,17 @@ const vivo = useNacional(race).data; // marcos da régua
 - Play = 1 h em 30 s, passos de 1 min (instantes cacheáveis) e só avança quando o passo anterior chegou. Arrastar confirma no máximo a cada 350 ms. Teclado: ←/→ 1 min, Shift/PageUp/PageDown 10 min, Home início, End ao vivo, Espaço play. Some na fase `'pre'`.
 - Helpers: `formatarInstante(t)` → `"18h42"`, `lerInstante(s)`, `comInstante(caminho, t)` (links que levam o instante, ex.: `linkUf(uf, race, t)`), `agoraApuracao(status, recebidoEm)`.
 
-### `PessoasAgora`, `PatrocinioSlot`
+### `PessoasAgora` e anúncios (`components/anuncios`)
 
 | Componente | Props |
 |---|---|
 | `PessoasAgora` | `status` (usa `status.pessoasAgora`; ausente → não renderiza — o demo não tem e **nunca inventamos número**), `variant: 'pill' \| 'inline'`. `textoPessoas(n)` → "12,3 mil pessoas". A `StatusPill` completa mostra o número em ≥ 1280 px. |
-| `PatrocinioSlot` | `patrocinio` (`status.patrocinio`; nulo → nada), `variant: 'linha'` ("Oferecido por [logo] Marca", topo) ou `'cartao'` (marca + texto + link, fim da página), `tv?`. Link com `rel="sponsored noopener"`, rotulado como publicidade, sem modal. `urlPatrocinio`, `imagemPatrocinio` (data URI, https ou `/api/patrocinio/logo`). |
+| `ProvedorAnuncios` | No AppShell e no Modo TV: escolhe quem aparece em cada posição da página (`escolhaDaPagina` em `nucleo.ts`, semente `visita\|caminho`; um cartão nativo nunca repete o anunciante de outro da mesma página). |
+| `FaixaTopo` | Formato `topo`: no desktop dentro do cabeçalho fixo (entra em `--app-header-h`); no celular — e no celular deitado — logo abaixo dele, rolando com a página. |
+| `BarraRodape` | Formato `rodape`: barra fixa do celular acima da tab bar (fora de `/teste*` e `/duelo`, `rodapePermitido`); some com diálogo/folha aberta e com o teclado; desce para o pé da tela quando a tab bar sai ao rolar. Reserva `--anuncio-rodape-h` (rodapé do site e `Toaster` somam). |
+| `AnuncioNativo`, `Oferecimento`, `Vitrine` | Cartão "Patrocinado" entre seções (nunca dentro de placar nem colado a candidato), "Resultado oferecido por" (Teste Cego) e "Oferecimento" (TV); `Vitrine` = molduras da /anuncie e da prévia do admin. |
 
-Admin: seção **Patrocínio** (`components/pages/admin/SecaoPatrocinio.tsx`, atalho 5): marca (60), texto (140), link https, logo por upload (≤ 60 KB em data URI; rasters maiores são só redimensionados — `prepararLogo`), prévia (topo, cartão e TV), confirmação obrigatória "anunciante não político", Publicar/Remover (`AdminCommand 'patrocinio'`).
+Todo anúncio é rotulado ("Publicidade"/"Patrocinado"/"Oferecido por"), abre em nova aba com `rel="sponsored noopener noreferrer"` e conta impressão visível (≥ 50% por ≥ 1 s, `impressao.ts`) e clique só de forma agregada, sem cookie nem IP. Admin: seção **Anunciantes** (`components/pages/admin/SecaoAnuncios.tsx`, `FormAnuncio.tsx`, `PreviaAnuncio.tsx`).
 
 ### Modo TV (`/tv`, fora do AppShell)
 

@@ -296,7 +296,7 @@ export function Passo({
               onChange(lim(valor - passo));
             }
           }}
-          className="num w-8 bg-transparent text-center text-[13.5px] font-semibold text-fg focus:outline-none"
+          className="num w-8 bg-transparent text-center text-base font-semibold text-fg focus:outline-none sm:text-[13.5px]"
         />
         {sufixo ? <span className="text-[11px] text-fg-muted">{sufixo}</span> : null}
       </label>

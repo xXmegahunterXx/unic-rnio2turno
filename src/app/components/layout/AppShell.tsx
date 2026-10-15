@@ -479,11 +479,11 @@ function Footer() {
 }
 
 /**
- * Rodapé: no celular cada link tem 44 px de altura de toque (a lista perde o espaçamento entre itens, então o passo
- * visual quase não muda); do tablet em diante volta ao desenho compacto.
+ * Rodapé: no toque (celular e tablet) cada link tem 44 px de altura (a lista perde o espaçamento entre itens, então o
+ * passo visual quase não muda); com mouse, a partir de 768 px, volta ao desenho compacto.
  */
-const LISTA_RODAPE = 'mt-1 text-[14.5px] md:mt-3 md:text-[14px] md:space-y-2.5';
-const LINK_RODAPE = 'flex w-fit min-h-[44px] items-center text-fg transition-colors hover:text-brand-fg md:min-h-0';
+const LISTA_RODAPE = 'mt-1 text-[14.5px] md:mt-3 md:text-[14px] md:[@media(pointer:fine)]:space-y-2.5';
+const LINK_RODAPE = 'flex w-fit min-h-[44px] items-center text-fg transition-colors hover:text-brand-fg md:[@media(pointer:fine)]:min-h-0';
 
 function FooterCol({ titulo, links }: { titulo: string; links: { to: string; label: string }[] }) {
   return (

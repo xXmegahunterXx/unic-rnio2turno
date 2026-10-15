@@ -274,18 +274,21 @@
  * Barras fixas do celular (src/app/lib/barrasMoveis.ts liga os atributos no <html>):
  *  - `data-tab-oculta`: rolando para baixo, a tab bar desce e some; a barra de anúncio desce 60 px e ocupa o pé da
  *    tela (continua à vista). Qualquer rolagem para cima, o topo e o fim da página trazem a tab bar de volta.
- *  - `data-teclado`: teclado aberto (foco num campo de texto) — as duas saem para não cobrir o campo.
+ *  - `data-teclado`: teclado aberto (foco num campo de texto) — as duas saem para não cobrir o campo (e a barra do
+ *    painel admin no celular, `.barra-teclado`).
  * A visibilidade muda só no fim da saída (sem foco nem leitor de tela numa barra fora da tela) e na hora da volta.
  */
 @layer components {
   .barra-tab,
+  .barra-teclado,
   .barra-anuncio-desloc {
     transition:
       transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
       visibility 0s linear 0s;
   }
   html[data-tab-oculta] .barra-tab,
-  html[data-teclado] .barra-tab {
+  html[data-teclado] .barra-tab,
+  html[data-teclado] .barra-teclado {
     transform: translateY(calc(100% + 2px));
     visibility: hidden;
     transition:
@@ -294,6 +297,15 @@
   }
   html[data-tab-oculta] .barra-anuncio-desloc {
     transform: translateY(60px);
+  }
+  /* avisos (Toast) descem junto quando a tab bar sai — só no celular, onde ela existe */
+  .segue-tab {
+    transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  @media (max-width: 767px) {
+    html[data-tab-oculta] .segue-tab {
+      transform: translateY(60px);
+    }
   }
   html[data-teclado] .barra-anuncio-desloc {
     transform: translateY(calc(100% + 76px + env(safe-area-inset-bottom)));
