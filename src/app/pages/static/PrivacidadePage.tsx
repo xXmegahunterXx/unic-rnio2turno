@@ -158,9 +158,9 @@ export default function PrivacidadePage() {
               navegador leva apenas o código do anúncio e o formato.
             </>,
             <>
-              <strong>Sem cookie, sem IP e sem dado pessoal.</strong> Nenhum cookie é criado e o endereço IP não é guardado: o servidor usa, só
-              em memória e por alguns minutos, um código anônimo derivado da conexão para não contar a mesma visualização duas vezes. Esse código
-              nunca é gravado nem associado a você.
+              <strong>Sem cookie, sem IP e sem dado pessoal.</strong> Nenhum cookie é criado e a contagem não guarda o endereço IP: o servidor
+              usa, só em memória e por alguns minutos, um código anônimo derivado da conexão para não contar a mesma visualização duas vezes. Esse
+              código nunca é gravado nem associado a você.
             </>,
             <>
               <strong>Links patrocinados com UTM.</strong> Ao tocar num anúncio, o link passa pelo Sintonia (para somar o clique) e abre o site

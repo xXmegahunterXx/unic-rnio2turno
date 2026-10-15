@@ -21,9 +21,23 @@ export function OferecimentoTeste({ className }: { className?: string }) {
   return <OferecimentoTestePeca anuncio={escolha.teste} vista={vista} className={className} />;
 }
 
-export function OferecimentoTestePeca({ anuncio: a, vista = 'previa', previa, className }: { anuncio: AnuncioPublico; vista?: string; previa?: boolean; className?: string }) {
+export function OferecimentoTestePeca({
+  anuncio: a,
+  vista = 'previa',
+  previa,
+  compacta,
+  className,
+}: {
+  anuncio: AnuncioPublico;
+  vista?: string;
+  previa?: boolean;
+  /** força a versão empilhada do celular (prévia em coluna estreita) */
+  compacta?: boolean;
+  className?: string;
+}) {
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'teste', bloco: 'teste', vista, ativo: !previa });
+  const sm = (c: string) => (compacta ? '' : c);
   return (
     <aside aria-label="Publicidade" className={cn('relative', className)}>
       <LinkAnuncio
@@ -31,10 +45,13 @@ export function OferecimentoTestePeca({ anuncio: a, vista = 'previa', previa, cl
         anuncio={a}
         formato="teste"
         previa={previa}
-        className="relative isolate flex flex-col items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface px-4 py-5 text-center shadow-card sm:flex-row sm:gap-5 sm:px-6 sm:py-4 sm:text-left"
+        className={cn(
+          'relative isolate flex flex-col items-center gap-4 overflow-hidden rounded-3xl border border-line bg-surface px-4 py-5 text-center shadow-card',
+          sm('sm:flex-row sm:gap-5 sm:px-6 sm:py-4 sm:text-left'),
+        )}
       >
         <BrilhoMarca anuncio={a} className="-left-16 -top-20 -z-10 h-56 w-56 opacity-45 dark:opacity-30" />
-        <div className="flex min-w-0 flex-col items-center gap-3 sm:flex-1 sm:flex-row sm:gap-4">
+        <div className={cn('flex min-w-0 flex-col items-center gap-3', sm('sm:flex-1 sm:flex-row sm:gap-4'))}>
           <LogoMarca anuncio={a} tamanho="lg" />
           <div className="min-w-0">
             <RotuloAnuncio>Resultado oferecido por</RotuloAnuncio>
@@ -42,7 +59,7 @@ export function OferecimentoTestePeca({ anuncio: a, vista = 'previa', previa, cl
             <p className="mt-0.5 text-pretty text-[13.5px] leading-snug text-fg-muted">{a.titulo}</p>
           </div>
         </div>
-        <CtaAnuncio texto={a.cta} tamanho="md" className="w-full sm:w-auto" />
+        <CtaAnuncio texto={a.cta} tamanho="md" className={cn('w-full', sm('sm:w-auto'))} />
       </LinkAnuncio>
     </aside>
   );

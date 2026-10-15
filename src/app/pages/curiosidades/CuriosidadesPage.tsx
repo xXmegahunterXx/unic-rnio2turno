@@ -194,37 +194,37 @@ function ListaFatos({ ds, tema, foco }: { ds: CuriosidadesDataset; tema: TemaCur
     <>
       {grupos.map((g, gi) => (
         <Fragment key={g.id}>
-        <section aria-labelledby={`tema-${g.id}`} className="pt-7 sm:pt-10">
-          <header className="mb-3.5 sm:mb-4">
-            <h2 id={`tema-${g.id}`} className="flex items-center gap-2 font-display text-[22px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[26px]">
-              <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand-fg">
-                <Icon name={ICONE_TEMA[g.id]} size={18} />
-              </span>
-              {g.rotulo}
-              <span className="num ml-1 text-[15px] font-medium text-fg-subtle">{g.fatos.length}</span>
-            </h2>
-            <p className="mt-1 max-w-2xl text-[14px] leading-snug text-fg-muted sm:text-[15px]">{g.descricao}</p>
-            {g.id === 'finalistas' ? (
-              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-subtle">
-                <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(corFinalista(a)).bg)} />
-                  {a.nomeUrna} <span className="num">({a.numero})</span>
+          <section aria-labelledby={`tema-${g.id}`} className="pt-7 sm:pt-10">
+            <header className="mb-3.5 sm:mb-4">
+              <h2 id={`tema-${g.id}`} className="flex items-center gap-2 font-display text-[22px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[26px]">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand-fg">
+                  <Icon name={ICONE_TEMA[g.id]} size={18} />
                 </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(corFinalista(b)).bg)} />
-                  {b.nomeUrna} <span className="num">({b.numero})</span>
-                </span>
-                <span>Cores de identificação dos candidatos; o mesmo critério e o mesmo destaque para os dois.</span>
-              </p>
-            ) : null}
-          </header>
-          <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {g.fatos.map((f) => (
-              <CartaoFato key={f.id} fato={f} finalistas={ds.finalistas} emFoco={foco === f.id} />
-            ))}
-          </div>
-        </section>
-        {anuncioDepois[gi] ? <AnuncioNativo posicao={anuncioDepois[gi]!} className="pt-9 sm:pt-12" /> : null}
+                {g.rotulo}
+                <span className="num ml-1 text-[15px] font-medium text-fg-subtle">{g.fatos.length}</span>
+              </h2>
+              <p className="mt-1 max-w-2xl text-[14px] leading-snug text-fg-muted sm:text-[15px]">{g.descricao}</p>
+              {g.id === 'finalistas' ? (
+                <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-fg-subtle">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(corFinalista(a)).bg)} />
+                    {a.nomeUrna} <span className="num">({a.numero})</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className={cn('h-2.5 w-2.5 rounded-full', corSlot(corFinalista(b)).bg)} />
+                    {b.nomeUrna} <span className="num">({b.numero})</span>
+                  </span>
+                  <span>Cores de identificação dos candidatos; o mesmo critério e o mesmo destaque para os dois.</span>
+                </p>
+              ) : null}
+            </header>
+            <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {g.fatos.map((f) => (
+                <CartaoFato key={f.id} fato={f} finalistas={ds.finalistas} emFoco={foco === f.id} />
+              ))}
+            </div>
+          </section>
+          {anuncioDepois[gi] ? <AnuncioNativo posicao={anuncioDepois[gi]!} className="pt-9 sm:pt-12" /> : null}
         </Fragment>
       ))}
     </>

@@ -25,7 +25,11 @@ const Ctx = createContext<AnunciosDaPagina | null>(null);
 function useCalcular(): AnunciosDaPagina {
   const status = useStatus();
   const { pathname, key } = useLocation();
-  const anuncios = status.data?.anuncios;
+  // o status chega a cada 2 s com uma lista nova (mesmo conteúdo): referência estável enquanto o conteúdo não muda
+  const bruto = status.data?.anuncios;
+  const assinatura = bruto ? JSON.stringify(bruto) : '';
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const anuncios = useMemo(() => bruto, [assinatura]);
   const pronto = status.data !== undefined || status.isError;
   // a barra do rodapé só existe no celular (e fora das telas de pergunta): no desktop os cartões não a evitam
   const celular = !useMediaQuery('(min-width: 768px)', true);

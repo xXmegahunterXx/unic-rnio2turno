@@ -607,30 +607,31 @@ function Rodape() {
     }
   }, [url]);
   return (
-    <div className="mt-[calc(var(--u)*1.6)] flex shrink-0 items-stretch gap-[calc(var(--u)*1.6)]">
-    {/* Em retrato (tablet) o espaço vai para o mapa: o QR fica só na TV (paisagem). */}
-    <div className="flex min-w-0 flex-1 items-center gap-[calc(var(--u)*2)] rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 p-[calc(var(--u)*1.4)] portrait:hidden">
-      {qr ? (
-        <svg
-          viewBox={`0 0 ${qr.tamanho + 4} ${qr.tamanho + 4}`}
-          className="h-[calc(var(--u)*12)] w-[calc(var(--u)*12)] shrink-0 rounded-[calc(var(--u)*0.8)]"
-          role="img"
-          aria-label={`QR Code para ${url}`}
-          shapeRendering="crispEdges"
-        >
-          {/* QR sempre escuro sobre claro (as câmeras leem melhor), nos dois temas — só tokens */}
-          <rect width={qr.tamanho + 4} height={qr.tamanho + 4} className="fill-surface dark:fill-fg" />
-          <path d={qrPath(qr, 2)} className="fill-fg dark:fill-bg" />
-        </svg>
-      ) : null}
-      <div className="min-w-0 flex-1">
-        <div className="text-[length:calc(var(--u)*1.6)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Acompanhe no celular</div>
-        <div className="mt-[calc(var(--u)*0.4)] truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em]">{host}</div>
-        <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">Estado, município e seção por seção · fonte TSE</div>
+    // a margem fica nos quadros (sem anúncio, em retrato, nada sobra no pé da coluna)
+    <div className="flex shrink-0 items-stretch gap-[calc(var(--u)*1.6)]">
+      {/* Em retrato (tablet) o espaço vai para o mapa: o QR fica só na TV (paisagem). */}
+      <div className="mt-[calc(var(--u)*1.6)] flex min-w-0 flex-1 items-center gap-[calc(var(--u)*2)] rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 p-[calc(var(--u)*1.4)] portrait:hidden">
+        {qr ? (
+          <svg
+            viewBox={`0 0 ${qr.tamanho + 4} ${qr.tamanho + 4}`}
+            className="h-[calc(var(--u)*12)] w-[calc(var(--u)*12)] shrink-0 rounded-[calc(var(--u)*0.8)]"
+            role="img"
+            aria-label={`QR Code para ${url}`}
+            shapeRendering="crispEdges"
+          >
+            {/* QR sempre escuro sobre claro (as câmeras leem melhor), nos dois temas — só tokens */}
+            <rect width={qr.tamanho + 4} height={qr.tamanho + 4} className="fill-surface dark:fill-fg" />
+            <path d={qrPath(qr, 2)} className="fill-fg dark:fill-bg" />
+          </svg>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="text-[length:calc(var(--u)*1.6)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Acompanhe no celular</div>
+          <div className="mt-[calc(var(--u)*0.4)] truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em]">{host}</div>
+          <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">Estado, município e seção por seção · fonte TSE</div>
+        </div>
       </div>
-    </div>
-    {/* Publicidade (formato 'tv'): quadro próprio, fora do placar; aparece também em retrato. */}
-    <OferecimentoTv className="max-w-[46%] shrink-0 rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 py-[calc(var(--u)*1.4)] pl-[calc(var(--u)*1.4)] pr-[calc(var(--u)*2.6)] portrait:max-w-none portrait:flex-1" />
+      {/* Publicidade (formato 'tv'): quadro próprio, fora do placar; aparece também em retrato. */}
+      <OferecimentoTv className="mt-[calc(var(--u)*1.6)] max-w-[46%] shrink-0 rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 py-[calc(var(--u)*1.4)] pl-[calc(var(--u)*1.4)] pr-[calc(var(--u)*2.6)] portrait:max-w-none portrait:flex-1" />
     </div>
   );
 }

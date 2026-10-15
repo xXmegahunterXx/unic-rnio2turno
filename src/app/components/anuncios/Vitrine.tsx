@@ -108,7 +108,7 @@ export function VitrineFormato({
               <div className="mx-auto h-16 w-16 rounded-full border-[6px] border-surface-3" />
             </div>
           </div>
-          <OferecimentoTestePeca anuncio={anuncio} previa className="mt-3" />
+          <OferecimentoTestePeca anuncio={anuncio} previa compacta={estreita} className="mt-3" />
         </div>
       );
     case 'tv':

@@ -9,7 +9,7 @@
  * fica logo abaixo do cabeçalho (no desktop, dentro dele) e a barra do rodapé, no celular, acima da tab bar.
  */
 import { REGRA_CORES_CURTA } from '@/shared/cores';
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { useStatus } from '@/app/data/hooks';
@@ -27,7 +27,7 @@ import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/
 import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompartilharSite, preCarregarIncorporar } from './acoesGlobais';
 import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
 import { propsPreCarregar } from './prefetch';
-import { BarraRodape, FaixaTopo, ProvedorAnuncios, rodapePermitido } from '../anuncios';
+import { FaixaTopo, ProvedorAnuncios, rodapePermitido } from '../anuncios';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
 
 export function AppShell({ children }: { children?: ReactNode }) {
@@ -85,10 +85,20 @@ function dentroDoPainel(): boolean {
   }
 }
 
-/** Barra de anúncio do celular (fora do Teste Cego e do Duelo — `rodapePermitido`). */
+/**
+ * Barra de anúncio do celular (fora do Teste Cego e do Duelo — `rodapePermitido`). Chunk próprio: ela só aparece depois
+ * da 1ª rolagem ou de 2 s, então não precisa pesar no JS inicial.
+ */
+const BarraRodape = lazy(() => import('../anuncios/BarraRodape').then((m) => ({ default: m.BarraRodape })));
 function RodapeAnuncio() {
   const { pathname } = useLocation();
-  return rodapePermitido(pathname) ? <BarraRodape /> : null;
+  const celular = !useIsDesktop();
+  if (!celular || !rodapePermitido(pathname)) return null;
+  return (
+    <Suspense fallback={null}>
+      <BarraRodape />
+    </Suspense>
+  );
 }
 
 /** Rotas que exibem números da apuração (e, portanto, a faixa de SIMULAÇÃO quando for o caso). */

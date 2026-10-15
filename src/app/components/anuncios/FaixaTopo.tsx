@@ -18,8 +18,8 @@ import { tituloCurto } from './nucleo';
 import { BrilhoMarca, CtaAnuncio, LinkAnuncio, LogoMarca, RotuloAnuncio } from './pecas';
 import { topoEsperado } from './visita';
 
-/** Altura da faixa: 48 px no celular, 52 px a partir de 768 px. */
-export const ALTURA_TOPO = 'h-12 md:h-[52px]';
+/** Altura da faixa: 44 px no celular, 52 px a partir de 768 px. */
+export const ALTURA_TOPO = 'h-11 md:h-[52px]';
 
 const FUNDO = 'relative overflow-hidden border-b border-line bg-surface-2';
 
@@ -55,7 +55,7 @@ export function FaixaTopoPeca({
   // classes que só valem a partir de 768 px (ou nunca, na versão compacta)
   const md = (c: string) => (compacta ? '' : c);
   return (
-    <aside aria-label="Publicidade" className={cn(FUNDO, compacta ? 'h-12' : ALTURA_TOPO, className)}>
+    <aside aria-label="Publicidade" className={cn(FUNDO, compacta ? 'h-11' : ALTURA_TOPO, className)}>
       <BrilhoMarca anuncio={a} className="-left-10 -top-16 h-40 w-72 opacity-40 dark:opacity-30" />
       <Container wide className={cn('relative h-full', compacta && '!px-3')}>
         <LinkAnuncio ref={ref} anuncio={a} formato="topo" previa={previa} className={cn('flex h-full min-w-0 items-center gap-2.5 rounded-xl', md('md:gap-3'))}>
