@@ -49,7 +49,8 @@ export function PreHero({
   };
   // A corrida do 1º turno correspondente ('pres' → 'pres-t1'): mesmos finalistas, com o resultado oficial.
   const raceT1 = useRace(race ? `${race.id.replace(/-t1$/, '')}-t1` : undefined);
-  const duelo = race && raceT1 && raceT1.candidatos.filter((c) => !c.agregado).length === 2 ? raceT1 : undefined;
+  // O layout depende só de haver a disputa (nada pula quando o 1º turno chega: o confronto tem esqueleto próprio).
+  const comDuelo = !!race && race.candidatos.filter((c) => !c.agregado).length === 2;
 
   const sobrancelha = (
     <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-brand-fg">
@@ -92,7 +93,7 @@ export function PreHero({
         <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(rgb(var(--line)/var(--line-alpha))_1px,transparent_1px),linear-gradient(90deg,rgb(var(--line)/var(--line-alpha))_1px,transparent_1px)] [background-size:32px_32px] [mask-image:radial-gradient(ellipse_at_top_right,black_10%,transparent_65%)]" />
       </div>
 
-      {duelo ? (
+      {comDuelo ? (
         /*
           Com o confronto. Celular: título → fotos → contagem → texto e ações.
           Desktop: título, texto, contagem e ações à esquerda; as fotos à direita, centradas na altura do cartão.
@@ -103,7 +104,7 @@ export function PreHero({
             {tituloEl}
           </div>
           <DueloPrimeiroTurno
-            race={duelo}
+            race={raceT1}
             variante="compacto"
             retratoClassName="max-w-[168px] sm:max-w-[200px] lg:max-w-[210px]"
             className="lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-center"

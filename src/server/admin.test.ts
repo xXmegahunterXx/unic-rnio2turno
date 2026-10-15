@@ -141,10 +141,12 @@ describe('comandos', () => {
     expect(r.status).toBe(400);
   });
 
-  it('corpo grande demais → 413 (256 KB no /command, 64 KB no resto)', async () => {
+  it('corpo grande demais → 413 (1 MB no /command — anúncio com logo e peça —, 64 KB no resto)', async () => {
     const cookie = await login(m);
-    const r = await comando(m, cookie, { tipo: 'aviso', aviso: { nivel: 'info', texto: 'x'.repeat(300_000) } });
+    const r = await comando(m, cookie, { tipo: 'aviso', aviso: { nivel: 'info', texto: 'x'.repeat(1_100_000) } });
     expect(r.status).toBe(413);
+    // 300 KB no /command passa do limite de corpo (e cai na validação: aviso com mais de 280 caracteres)
+    expect((await comando(m, cookie, { tipo: 'aviso', aviso: { nivel: 'info', texto: 'x'.repeat(300_000) } })).status).toBe(400);
     const rLogin = await m.app.request('/api/admin/login', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

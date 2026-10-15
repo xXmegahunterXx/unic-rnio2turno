@@ -41,19 +41,22 @@ export const ORDEM_ROTULO: Record<OrdemRegional, string> = {
   'sul-primeiro': 'Sul e Sudeste bem antes',
 };
 
-export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'patrocinio' | 'fonte' | 'monitor';
+export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'fonte' | 'monitor';
 
 export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: string }[] = [
   { id: 'controle', rotulo: 'Controle', icone: 'ao-vivo', descricao: 'Relógio, linha do tempo e pré-visualização' },
   { id: 'cenario', rotulo: 'Cenário', icone: 'ajustes', descricao: 'Presets e parâmetros do modelo' },
   { id: 'estados', rotulo: 'Estados', icone: 'mapa', descricao: 'Viés e atraso por UF' },
   { id: 'comunicacao', rotulo: 'Comunicação', icone: 'alerta', descricao: 'Aviso global e congelamento' },
-  { id: 'patrocinio', rotulo: 'Patrocínio', icone: 'selo', descricao: '“Oferecido por” (só anunciante não político)' },
+  { id: 'anuncios', rotulo: 'Anunciantes', icone: 'selo', descricao: 'Anúncios, métricas de entrega e a página Anuncie (só anunciante não político)' },
   { id: 'fonte', rotulo: 'Fonte', icone: 'globo', descricao: 'Pré-eleição, simulação ou TSE' },
   { id: 'monitor', rotulo: 'Monitor', icone: 'grafico', descricao: 'Métricas e log operacional' },
 ];
 
 export const ehSecao = (s: string | null): s is SecaoId => !!s && SECOES.some((x) => x.id === s);
+
+/** Seção pedida na URL (`?s=`), aceitando o nome antigo 'patrocinio' (links e atalhos salvos antes dos anúncios). */
+export const secaoDaUrl = (s: string | null): SecaoId => (s === 'patrocinio' ? 'anuncios' : ehSecao(s) ? s : 'controle');
 
 /** simNow = ancoraSim + (rodando ? (wall − ancoraWall) × velocidade : 0) — mesma fórmula do motor. */
 export const simNowDe = (c: ClockState, wall: number) => c.ancoraSim + (c.rodando ? (wall - c.ancoraWall) * c.velocidade : 0);

@@ -24,6 +24,12 @@ import { BotaoCompartilharSite, BotaoLembrete, lembreteDisponivel } from './Acoe
 import { CtaApuracao, CtaBusca, CtaTeste } from './CtasHome';
 import { FundoHero } from './FundoHero';
 import { PainelDuelo } from './DueloPresidencia';
+import { anteciparFotosHd } from './fotosHero';
+
+// As fotos do confronto (~18 KB, o maior elemento da 1ª dobra) começam a baixar já na avaliação deste chunk, em
+// paralelo com meta/status — não depois deles. Na simulação elas não aparecem (useFotosHero), mas o custo é pequeno;
+// em produção (antes das 17h e na noite, fonte TSE) a foto sempre aparece.
+if (typeof window !== 'undefined') void anteciparFotosHd().catch(() => undefined);
 
 export interface HeroHomeProps {
   status: LiveStatus | undefined;

@@ -11,13 +11,51 @@
  * mostra um quadro neutro, sem o monograma piscar antes da foto), 'fotos' ou 'sem' (use o monograma).
  */
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import type { FotoPacote } from '@/shared/dataset';
 import type { LiveStatus, Race } from '@/shared/types';
 import { useStatus } from '@/app/data/hooks';
-import { useFotos } from '@/app/data/estatico';
+import { DadoIndisponivelError, useFotos } from '@/app/data/estatico';
+import { assetUrl } from '@/app/lib/assets';
 import { numerosSimulados, useFotosRace, type FotosOpts } from '@/app/components/apuracao/fotos';
 
 /** Pacote em resolução original dos finalistas a Presidente (scripts/data/py/fotos_build.py → public/data/fotos). */
 export const GRUPO_FOTOS_HD = 'presidente-hd';
+const CAMINHO_HD = `data/fotos/${GRUPO_FOTOS_HD}.json`;
+
+let antecipado: Promise<FotoPacote> | null = null;
+
+/**
+ * Baixa o pacote HD uma vez só (a promessa fica guardada; uma falha libera nova tentativa). A Home chama isto na
+ * avaliação do próprio chunk — em paralelo com meta/status, antes do 1º render —, porque a foto é o maior elemento
+ * da 1ª dobra (LCP). Baixar não é exibir: quem decide se a foto aparece é `useFotosHero`.
+ */
+export function anteciparFotosHd(): Promise<FotoPacote> {
+  if (!antecipado) {
+    antecipado = fetch(assetUrl(CAMINHO_HD), { credentials: 'omit' })
+      .then(async (r) => {
+        if (!r.ok) throw new DadoIndisponivelError(CAMINHO_HD, r.status);
+        return (await r.json()) as FotoPacote;
+      })
+      .catch((e) => {
+        antecipado = null;
+        throw e;
+      });
+  }
+  return antecipado;
+}
+
+/** O pacote HD no cache do React Query (mesma chave de `useFotos`/`useDadoEstatico`: um download só). */
+function useFotosHd(ligado: boolean) {
+  return useQuery({
+    queryKey: ['estatico', ligado ? CAMINHO_HD : null],
+    queryFn: anteciparFotosHd,
+    enabled: ligado,
+    staleTime: Infinity,
+    gcTime: 30 * 60 * 1000,
+    retry: (n, e) => !(e instanceof DadoIndisponivelError && e.status === 404) && n < 2,
+  });
+}
 
 export type EstadoFotos = 'carregando' | 'fotos' | 'sem';
 
@@ -49,7 +87,7 @@ export function useFotosHero(race: Race | undefined, opts: FotosOpts = {}): Foto
   const regra = regraFotos(status, race, opts);
   const finalistas = race ? race.candidatos.filter((c) => !c.agregado) : [];
   const elegivelHd = regra === 'liberada' && race?.cargo === 'Presidente' && finalistas.length > 0 && finalistas.every((c) => !!c.sqcand);
-  const hd = useFotos(elegivelHd ? GRUPO_FOTOS_HD : null);
+  const hd = useFotosHd(!!elegivelHd);
   const hdCompleto = !!hd.data?.fotos && finalistas.every((c) => !!hd.data!.fotos[c.sqcand!]);
   // Pacote normal só quando o HD não serve (corrida de governador, pacote ausente ou incompleto).
   const precisaNormal = regra === 'liberada' && (!elegivelHd || hd.isError || (!!hd.data && !hdCompleto));

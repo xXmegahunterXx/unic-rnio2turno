@@ -2,8 +2,8 @@
  * "Oferecimento: <marca>" nas imagens de compartilhamento (formato de anúncio 'compartilhamento', src/shared/anuncios.ts).
  *
  * Um rodapé discreto, só texto e sempre rotulado, numa faixa própria no pé da imagem (1200 × 32 px, com linha de
- * separação): nunca dentro do placar nem colado a foto, nome ou número de candidato. O conteúdo do cartão sobe 32 px
- * (os layouts têm o espaço sobrando no pé; o que passasse ficaria atrás da faixa, nunca por cima dela).
+ * separação): nunca dentro do placar nem colado a foto, nome ou número de candidato. O cartão fica 32 px mais baixo,
+ * com menos respiro em cima e embaixo (o conteúdo perde ~8 px; o que passasse ficaria atrás da faixa, nunca por cima).
  *
  * O anunciante de cada cartão sai de `escolherAnuncio` (o master vence; entre os demais, rotação pelo peso, fixa por
  * cartão). A chave de cache das imagens leva `tagOferecimento`: trocar/tirar o anunciante gera imagens novas (e a
@@ -38,11 +38,27 @@ export function tagOferecimento(anuncios: Anuncios): string {
 
 const ehAltura = (v: unknown) => v === OG_H || v === `${OG_H}px`;
 
+/**
+ * Padding "T R B [L]" (px) de uma coluna de altura cheia com menos respiro em cima (−8) e embaixo (−16): a faixa já
+ * separa o pé, e o conteúdo perde só ~8 px de altura útil.
+ */
+function paddingCompacto(p: unknown): string | undefined {
+  if (typeof p !== 'string') return undefined;
+  const v = p.trim().split(/\s+/).map((x) => (/^-?\d+(\.\d+)?(px)?$/.test(x) ? parseFloat(x) : NaN));
+  if (v.length < 3 || v.length > 4 || v.some((x) => Number.isNaN(x))) return undefined;
+  const [t, r, b, l = r] = v;
+  return `${Math.max(24, t - 8)}px ${r}px ${Math.max(16, b - 16)}px ${l}px`;
+}
+
 /** Encolhe para `alt` os nós de altura OG_H (raiz e os dois níveis abaixo: as colunas dos layouts). */
 function encolher(no: No, alt: number, nivel = 0): No {
   if (!no || typeof no !== 'object' || nivel > 2) return no;
   const style = no.props?.style;
-  const novoEstilo = style && ehAltura(style.height) ? { ...style, height: alt } : style;
+  let novoEstilo = style;
+  if (style && ehAltura(style.height)) {
+    const pad = paddingCompacto(style.padding);
+    novoEstilo = { ...style, height: alt, ...(pad ? { padding: pad } : {}) };
+  }
   const filhos = no.props?.children;
   const novosFilhos = Array.isArray(filhos)
     ? filhos.map((f) => (f && typeof f === 'object' ? encolher(f as No, alt, nivel + 1) : f))
@@ -70,12 +86,12 @@ export function comOferecimento(no: No, marca: string): No {
         background: C.surface,
         borderTop: `1px solid ${C.line}`,
         fontFamily: 'Inter',
-        fontSize: 16,
+        fontSize: 17,
         color: C.subtle,
-        gap: 6,
+        gap: 7,
       },
       h('div', { letterSpacing: 0.4 }, 'Oferecimento:'),
-      h('div', { color: C.muted, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 520 }, marca.slice(0, 40)),
+      h('div', { color: C.fg, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 520 }, marca.slice(0, 40)),
     ),
   );
 }

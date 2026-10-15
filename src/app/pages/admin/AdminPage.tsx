@@ -21,7 +21,7 @@ import {
 } from '@/app/components/pages/admin/dados';
 import { AdminLogin, Fundo } from '@/app/components/pages/admin/Login';
 import { DialogoAtalhos, SalaDeControle, useConfirmacao } from '@/app/components/pages/admin/SalaDeControle';
-import { ehSecao, mensagemErro, naoAutorizado, urlPublica, type SecaoId } from '@/app/components/pages/admin/rotulos';
+import { mensagemErro, naoAutorizado, secaoDaUrl, urlPublica, type SecaoId } from '@/app/components/pages/admin/rotulos';
 
 type Sessao = 'verificando' | 'fora' | 'dentro';
 
@@ -90,8 +90,7 @@ function Painel({
   const { confirmar, elemento: dialogo } = useConfirmacao();
   const [atalhos, setAtalhos] = useState(false);
   const [params, setParams] = useSearchParams();
-  const s = params.get('s');
-  const secao: SecaoId = ehSecao(s) ? s : 'controle';
+  const secao: SecaoId = secaoDaUrl(params.get('s'));
 
   const irPara = useCallback(
     (id: SecaoId) => {

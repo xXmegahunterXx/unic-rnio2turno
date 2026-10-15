@@ -21,7 +21,8 @@ import { SecaoControle } from './SecaoControle';
 import { SecaoEstados } from './SecaoEstados';
 import { SecaoFonte } from './SecaoFonte';
 import { SecaoMonitor } from './SecaoMonitor';
-import { SecaoPatrocinio } from './SecaoPatrocinio';
+import { SecaoAnuncios } from './SecaoAnuncios';
+import { situacaoDe } from './anunciosAdmin';
 
 export function SalaDeControle({ offline }: { offline: boolean }) {
   const { secao } = useAdmin();
@@ -64,8 +65,8 @@ function ConteudoSecao({ secao }: { secao: SecaoId }) {
       return <SecaoEstados />;
     case 'comunicacao':
       return <SecaoComunicacao />;
-    case 'patrocinio':
-      return <SecaoPatrocinio />;
+    case 'anuncios':
+      return <SecaoAnuncios />;
     case 'fonte':
       return <SecaoFonte />;
     case 'monitor':
@@ -93,9 +94,16 @@ function Marca({ compacta }: { compacta?: boolean }) {
 
 const FONTE_CURTA = { pre: 'Pré', simulacao: 'Simulação', tse: 'TSE' } as const;
 
+/** Anúncios no ar agora (relógio real do servidor). */
+function useAnunciosNoAr(): number {
+  const { snap } = useAdmin();
+  return (snap.state.anuncios ?? []).filter((a) => situacaoDe(a, snap.status.wallNow) === 'no-ar').length;
+}
+
 function useDicas(): Record<SecaoId, ReactNode> {
   const { snap } = useAdmin();
   const st = snap.state;
+  const noAr = useAnunciosNoAr();
   const ajustes = new Set([...Object.keys(st.cenario.ufVies), ...Object.keys(st.cenario.ufAtraso)]).size;
   return {
     controle:
@@ -114,9 +122,9 @@ function useDicas(): Record<SecaoId, ReactNode> {
           {st.congelado ? 'gelo' : 'no ar'}
         </Badge>
       ) : null,
-    patrocinio: st.patrocinio ? (
-      <Badge size="xs" tone="brand" caps>
-        no ar
+    anuncios: noAr ? (
+      <Badge size="xs" tone="ok">
+        <span className="num">{noAr}</span> no ar
       </Badge>
     ) : null,
     fonte:
@@ -135,13 +143,14 @@ function useDicas(): Record<SecaoId, ReactNode> {
 function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
   const { snap } = useAdmin();
   const st = snap.state;
+  const noAr = useAnunciosNoAr();
   const ajustes = Object.keys(st.cenario.ufVies).length + Object.keys(st.cenario.ufAtraso).length;
   return {
     controle: st.congelado ? 'alert' : null,
     cenario: st.cenario.preset === 'padrao' ? null : 'brand',
     estados: ajustes ? 'brand' : null,
     comunicacao: st.congelado || st.aviso?.nivel === 'alerta' ? 'alert' : st.aviso ? 'brand' : null,
-    patrocinio: st.patrocinio ? 'brand' : null,
+    anuncios: noAr ? 'brand' : null,
     fonte: st.fonte === 'simulacao' && st.nomesReais ? 'alert' : null,
     monitor: null,
   };

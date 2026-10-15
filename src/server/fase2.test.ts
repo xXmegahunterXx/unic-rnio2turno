@@ -193,7 +193,9 @@ describe('LiveStatus: pessoas agora e patrocínio', () => {
     });
     expect(r.status).toBe(200);
     const s = await status();
-    expect(s.patrocinio).toMatchObject({ marca: 'Café do Bairro', texto: 'Oferece a apuração ao vivo.', url: 'https://exemplo.com.br/cafe' });
+    // LEGADO: o patrocínio vira o anúncio master 'patrocinio'; o link passa pelo clique contado (formato 'topo')
+    expect(s.patrocinio).toMatchObject({ marca: 'Café do Bairro', texto: 'Oferece a apuração ao vivo.', url: 'http://localhost/api/anuncio/ir/patrocinio?f=topo' });
+    expect(s.anuncios?.map((a) => [a.id, a.cota, a.formatos.join('+')])).toEqual([['patrocinio', 'master', 'topo+nativo+tv']]);
     expect(s.patrocinio!.imagem).toMatch(/^http:\/\/localhost\/api\/patrocinio\/logo\?h=[a-z0-9]+$/);
     expect(JSON.stringify(s)).not.toContain('base64');
     const caminho = new URL(s.patrocinio!.imagem!).pathname + new URL(s.patrocinio!.imagem!).search;
@@ -203,12 +205,12 @@ describe('LiveStatus: pessoas agora e patrocínio', () => {
     expect(logo.headers.get('cache-control')).toBe(CC.imutavel);
     expect(logo.headers.get('content-security-policy')).toContain('sandbox');
     expect(Buffer.from(await logo.arrayBuffer()).equals(Buffer.from(PNG_1PX.split(',')[1], 'base64'))).toBe(true);
-    // logo por URL https segue como está
+    // logo por URL externa: aceita pelo comando antigo, mas não entra no anúncio (o site não carrega imagem de terceiros)
     await comando(m, cookie, {
       tipo: 'patrocinio',
       patrocinio: { marca: 'Café do Bairro', texto: 'Oferece a apuração.', url: 'https://exemplo.com.br', imagem: 'https://cdn.exemplo.com.br/logo.svg' },
     });
-    expect((await status()).patrocinio!.imagem).toBe('https://cdn.exemplo.com.br/logo.svg');
+    expect((await status()).patrocinio!.imagem).toBeUndefined();
     expect((await m.app.request('/api/patrocinio/logo')).status).toBe(404);
     // remover
     expect((await comando(m, cookie, { tipo: 'patrocinio', patrocinio: null })).status).toBe(200);
