@@ -23,16 +23,22 @@ export const FAIXA_BARRA_PX = 200;
 /** Espera com a faixa livre antes de mostrar a barra (ms). */
 export const ESPERA_LIVRE_MS = 250;
 
-/** `rootMargin` do observador: corta o topo da tela e deixa só a faixa de baixo (`alturaTela` em px). */
+/**
+ * A faixa continua um pouco ABAIXO da tela (px): a barra sai antes de o bloco começar a aparecer no pé da tela (ao
+ * rolar para baixo, a tab bar some e a barra encosta no pé).
+ */
+export const ANTECIPA_PX = 64;
+
+/** `rootMargin` do observador: corta o topo da tela e deixa só a faixa de baixo (`alturaTela` em px) + a antecipação. */
 export function margemDaFaixa(alturaTela: number, faixa = FAIXA_BARRA_PX): string {
   const corte = Math.max(0, Math.round(alturaTela - faixa));
-  return `-${corte}px 0px 0px 0px`;
+  return `-${corte}px 0px ${ANTECIPA_PX}px 0px`;
 }
 
-/** Retângulo (posição na tela) dentro da faixa de baixo? Reserva sem IntersectionObserver e testes. */
+/** Retângulo (posição na tela) dentro da faixa de baixo (ou logo abaixo da tela)? Reserva sem IntersectionObserver e testes. */
 export function naFaixa(r: { top: number; bottom: number }, alturaTela: number, faixa = FAIXA_BARRA_PX): boolean {
   const topoFaixa = Math.max(0, alturaTela - faixa);
-  return r.bottom > topoFaixa && r.top < alturaTela;
+  return r.bottom > topoFaixa && r.top < alturaTela + ANTECIPA_PX;
 }
 
 /**

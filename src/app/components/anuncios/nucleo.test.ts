@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AnuncioPublico } from '@/shared/anuncios';
-import { FAIXA_BARRA_PX, margemDaFaixa, naFaixa } from './faixaLivre';
+import { ANTECIPA_PX, FAIXA_BARRA_PX, margemDaFaixa, naFaixa } from './faixaLivre';
 import { CASA, escolhaDaPagina, fmtWhatsApp, hrefDoAnuncio, imagemDoAnuncio, iniciaisDaMarca, linkEmail, linkWhatsApp, temContato, tituloCurto } from './nucleo';
 
 const ad = (id: string, formatos: AnuncioPublico['formatos'], extra: Partial<AnuncioPublico> = {}): AnuncioPublico => ({
@@ -160,15 +160,16 @@ describe('textos e contato', () => {
 
 describe('barra fixa do rodapé: nunca sobre resultado ou candidato', () => {
   it('a raiz do observador é só a faixa de baixo da tela', () => {
-    expect(margemDaFaixa(844)).toBe(`-${844 - FAIXA_BARRA_PX}px 0px 0px 0px`);
-    expect(margemDaFaixa(150)).toBe('-0px 0px 0px 0px'); // tela mais baixa que a faixa: a tela toda
+    expect(margemDaFaixa(844)).toBe(`-${844 - FAIXA_BARRA_PX}px 0px ${ANTECIPA_PX}px 0px`);
+    expect(margemDaFaixa(150)).toBe(`-0px 0px ${ANTECIPA_PX}px 0px`); // tela mais baixa que a faixa: a tela toda
   });
   it('bloco na faixa de baixo → ocupado; acima dela → livre', () => {
     // 390×844: a faixa vai de 644 a 844
     expect(naFaixa({ top: 120, bottom: 760 }, 844)).toBe(true); // cartão do confronto descendo até a faixa
     expect(naFaixa({ top: 700, bottom: 1400 }, 844)).toBe(true); // placar começando no pé da tela
     expect(naFaixa({ top: -400, bottom: 600 }, 844)).toBe(false); // já subiu: só o topo dele na tela
-    expect(naFaixa({ top: 900, bottom: 1300 }, 844)).toBe(false); // ainda abaixo da tela
+    expect(naFaixa({ top: 848, bottom: 1300 }, 844)).toBe(true); // vai aparecer no pé da tela: a barra sai antes
+    expect(naFaixa({ top: 844 + ANTECIPA_PX + 1, bottom: 1300 }, 844)).toBe(false); // ainda longe, abaixo da tela
   });
   it('os blocos com resultado, foto, nome ou número de candidato levam a marca', () => {
     const arquivos = [

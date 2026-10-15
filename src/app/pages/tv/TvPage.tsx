@@ -333,6 +333,8 @@ function Controles({
 }) {
   const btn =
     'inline-flex h-10 items-center gap-2 rounded-xl border border-line bg-surface-2/90 px-3 text-[14px] font-semibold text-fg transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
+  // abaixo de 1600 px os botões ficam só com o ícone (o nome segue para o leitor de tela): sobra espaço na barra do topo
+  // para o "Oferecimento" sem cobrir a marca do anunciante
   return (
     <div className={cn('flex items-center gap-2 transition-opacity duration-500', visivel ? 'opacity-100' : 'pointer-events-none opacity-0')}>
       <div role="radiogroup" aria-label="Mapa" className={cn('inline-flex rounded-xl border border-line bg-surface-2/90 p-1', !podeMapa && 'hidden')}>
@@ -355,14 +357,14 @@ function Controles({
       {podeRodizio ? (
         <button type="button" aria-pressed={rodizio} onClick={() => setRodizio(!rodizio)} className={cn(btn, rodizio && 'border-brand/50 bg-brand/15')} title="Alterna o mapa entre o Brasil e as UFs mais disputadas a cada 12 s">
           <Icon name="troca" size={17} />
-          <span className="hidden min-[1100px]:inline">Rodízio {rodizio ? 'ligado' : 'desligado'}</span>
-          <span className="sr-only min-[1100px]:hidden">Rodízio {rodizio ? 'ligado' : 'desligado'}</span>
+          <span className="hidden min-[1600px]:inline">Rodízio {rodizio ? 'ligado' : 'desligado'}</span>
+          <span className="sr-only min-[1600px]:hidden">Rodízio {rodizio ? 'ligado' : 'desligado'}</span>
         </button>
       ) : null}
       <button type="button" onClick={alternarCheia} className={btn}>
         <Icon name={cheia ? 'recolher' : 'expandir'} size={17} />
-        <span className="hidden min-[1100px]:inline">{cheia ? 'Sair da tela cheia' : 'Tela cheia'}</span>
-        <span className="sr-only min-[1100px]:hidden">{cheia ? 'Sair da tela cheia' : 'Tela cheia'}</span>
+        <span className="hidden min-[1600px]:inline">{cheia ? 'Sair da tela cheia' : 'Tela cheia'}</span>
+        <span className="sr-only min-[1600px]:hidden">{cheia ? 'Sair da tela cheia' : 'Tela cheia'}</span>
       </button>
       <Link to="/apuracao" className={btn} aria-label="Sair do Modo TV">
         <Icon name="fechar" size={17} />

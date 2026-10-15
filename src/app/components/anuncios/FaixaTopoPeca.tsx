@@ -43,7 +43,8 @@ export function FaixaTopoPeca({
           formato="topo"
           previa={previa}
           anelDentro
-          className={cn('flex h-full min-w-0 items-center gap-2.5 rounded-xl', md('md:gap-3'))}
+          // -mx-2 px-2: o anel de foco (por dentro) ganha folga e não passa por cima do rótulo nem do botão
+          className={cn('-mx-2 flex h-full min-w-0 items-center gap-2.5 rounded-xl px-2', md('md:gap-3'))}
         >
           <RotuloAnuncio className={cn('hidden', md('lg:inline'))}>Oferecido por</RotuloAnuncio>
           <LogoMarca anuncio={a} tamanho="xs" className={cn('h-8 w-8', md('md:h-8 md:w-8'))} />
