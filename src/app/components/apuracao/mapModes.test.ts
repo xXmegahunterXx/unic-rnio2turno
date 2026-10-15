@@ -42,10 +42,14 @@ describe('valorModo', () => {
   it('margem e variação são divergentes (sinal escolhe o slot)', () => {
     expect(valorModo('margem', t(40, 60), { race }).fill).toMatch(/--cand-b/);
     expect(valorModo('margem', t(60, 40), { race }).valor).toBeCloseTo(20);
-    // 1º turno: A tinha 45% entre os finalistas; agora 50% → +5 p.p.
+    // 1º turno (sobre todos os válidos, 130): A 34,6%, B 42,3%; agora 50/50 → A +15,4 e B +7,7 p.p. → A cresceu 7,7 a mais
     const v = valorModo('variacao', t(50, 50), { race, primeiroTurno: { votos: [45, 55, 30] } });
-    expect(v.valor).toBeCloseTo(5);
+    expect(v.valor).toBeCloseTo(7.69, 1);
     expect(v.fill).toMatch(/--cand-a/);
+    expect(v.rotulo).toMatch(/^.+ \+15,4 · .+ \+7,7 p\.p\.$/);
+    expect(v.rotuloCurto).toBe('7,7 p.p.');
+    // B cresce mais → cor de B
+    expect(valorModo('variacao', t(40, 60), { race, primeiroTurno: { votos: [45, 55, 30] } }).fill).toMatch(/--cand-b/);
     expect(valorModo('variacao', t(50, 50), { race }).pendente).toBe(true);
   });
 

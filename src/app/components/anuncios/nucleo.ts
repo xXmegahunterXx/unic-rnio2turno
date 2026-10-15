@@ -75,7 +75,9 @@ export function escolhaDaPagina(
  * baixo da tela, e no resultado o botão "Revelar" também — a barra atrapalharia e geraria toques sem querer (o
  * resultado já tem o próprio espaço, "Teste Cego oferecido por").
  */
-export const rodapePermitido = (pathname: string): boolean => !pathname.startsWith('/teste') && !pathname.startsWith('/duelo');
+export const rodapePermitido = (pathname: string): boolean =>
+  // /ao-vivo: a sala ocupa a tela e já tem "Sala oferecida por" (com a faixa do topo, seriam 3 anúncios numa tela)
+  !pathname.startsWith('/teste') && !pathname.startsWith('/duelo') && pathname.replace(/\/+$/, '') !== '/ao-vivo';
 
 /** Link de clique contado pelo servidor: termina em /api/anuncio/ir/<id> (o app acrescenta ?f=<formato>). */
 const RE_IR = /\/api\/anuncio\/ir\/[a-z0-9-]{2,40}$/;

@@ -8,14 +8,16 @@
  *  - 'margem'         escala divergente contínua A ↔ B (diferença em p.p., satura em ±40)
  *  - 'apurado'        % de seções totalizadas, sequencial NEUTRA (cinza, sem matiz: ver fillEscalaNeutra)
  *  - 'comparecimento' % de comparecimento nas seções totalizadas, sequencial neutra (68% → 88%)
- *  - 'variacao'       variação do % do candidato 0 vs 1º turno (divergente, satura em ±10 p.p.).
- *                     Base do 1º turno: participação do candidato 0 entre os dois finalistas,
- *                     v0 / (v0 + v1) — comparável com o % de válidos do 2º turno.
+ *  - 'variacao'       "Desde o 1º turno — quem cresceu mais onde" (divergente, satura em ±VARIACAO_MAX_PP): a variação
+ *                     de cada finalista em p.p. dos votos válidos (no 1º turno, sobre TODOS os candidatos, como o TSE)
+ *                     e a diferença entre as duas — > 0, o candidato 0 cresceu mais ali; < 0, o candidato 1. Percentuais
+ *                     (e não votos) para valer também com a apuração em andamento: comparar votos só faz sentido onde
+ *                     100% das seções foram totalizadas (painel "Desde o 1º turno", desdeT1.ts).
  *
  * Território sem nenhuma seção totalizada é sempre 'pendente' (hachurado no mapa).
  */
 import type { CorCandidato, MunicipiosNacionalSnapshot, Race, Tally } from '@/shared/types';
-import { bucketMargem, margem, pctComparecimento, pctTotalizadas, pctValidos } from '@/shared/calc';
+import { bucketMargem, margem, pctComparecimento, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtPct, fmtPP } from '@/shared/format';
 import {
   FILL_EMPATE,
@@ -63,9 +65,9 @@ export const MAP_MODES: readonly MapModeInfo[] = [
   },
   {
     id: 'variacao',
-    label: 'Variação vs 1º turno',
-    curto: '1º turno',
-    descricao: 'Quanto o primeiro candidato ganhou ou perdeu em relação ao 1º turno (entre os dois finalistas).',
+    label: 'Desde o 1º turno',
+    curto: 'Desde o 1º',
+    descricao: 'Quem cresceu mais desde o 1º turno: a variação de cada finalista em pontos percentuais dos votos válidos.',
   },
 ];
 
@@ -85,8 +87,10 @@ export interface ModeValue {
   fill: string;
   /** Sem seções totalizadas (ou sem base de comparação) → hachura. */
   pendente: boolean;
-  /** Rótulo curto para o mapa (ex.: "52,3%", "+4,1 p.p."). null quando não se aplica. */
+  /** Rótulo para o mapa/tooltip (ex.: "52,3%", "4,1 p.p."). null quando não se aplica. */
   rotulo: string | null;
+  /** Rótulo menor para desenhar DENTRO do mapa quando o `rotulo` é longo (modo 'variacao'). */
+  rotuloCurto?: string;
   /** Valor numérico do modo (p.p., % etc.), para tabelas/ordenação. */
   valor: number | null;
 }
@@ -98,6 +102,37 @@ const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 
 /** Intensidade (0–1) → opacidade da escala contínua. O piso mantém o tom visível sobre a superfície. */
 export const alphaEscala = (t: number) => 0.12 + 0.88 * Math.pow(clamp01(t), 0.85);
+
+/**
+ * "Quem cresceu mais desde o 1º turno" numa área: variação de cada finalista em p.p. dos válidos (2º turno − 1º turno,
+ * o 1º sobre todos os candidatos) e `v = d0 − d1` (> 0: o candidato 0 cresceu mais). Índices 0 e 1 = os mesmos dois
+ * finalistas nos dois turnos. null sem base (sem votos válidos em algum dos turnos).
+ */
+export function crescimentoDesdeT1(
+  t2: Pick<Tally, 'votos'>,
+  t1: Pick<Tally, 'votos'> | null | undefined,
+): { d0: number; d1: number; v: number } | null {
+  if (!t1 || t1.votos.length < 2 || validos(t1) <= 0) return null;
+  if (t2.votos.length < 2 || t2.votos[0] + t2.votos[1] <= 0) return null;
+  const d0 = pctValidos(t2, 0) - pctValidos(t1, 0);
+  const d1 = pctValidos(t2, 1) - pctValidos(t1, 1);
+  return { d0, d1, v: d0 - d1 };
+}
+
+/** Rótulo da camada "Desde o 1º turno": a variação de cada um, na ordem da urna ("Lula +5,1 · Flávio +2,0 p.p."). */
+export function rotuloCrescimento(race: Pick<Race, 'candidatos'>, d0: number, d1: number): string {
+  const n0 = race.candidatos[0]?.nomeUrna ?? 'Candidato 1';
+  const n1 = race.candidatos[1]?.nomeUrna ?? 'Candidato 2';
+  return `${n0} ${fmtPP(d0).replace(' p.p.', '')} · ${n1} ${fmtPP(d1)}`;
+}
+
+/** Linha extra do tooltip dos mapas nos modos com valor próprio (variação desde o 1º turno, comparecimento). */
+export function extraTooltip(modo: MapMode, rotulo: string | null | undefined): string | undefined {
+  if (!rotulo) return undefined;
+  if (modo === 'variacao') return `Desde o 1º turno: ${rotulo}`;
+  if (modo === 'comparecimento') return `Comparecimento: ${rotulo}`;
+  return undefined;
+}
 
 /** Participação (0–100) do candidato 0 entre os dois finalistas no 1º turno. */
 export function baseFinalistas(pt: Pick<Tally, 'votos'> | null | undefined): number | null {
@@ -137,15 +172,16 @@ export function valorModo(modo: MapMode, t: T | undefined | null, ctx: ModeCtx):
       };
     }
     case 'variacao': {
-      const base = baseFinalistas(ctx.primeiroTurno);
-      if (base === null || t.votos.length < 2 || t.votos[0] + t.votos[1] <= 0) return PEND;
-      const v = pctValidos(t, 0) - base;
-      const cor = slotDe(ctx.race, v >= 0 ? 0 : 1);
+      const c = crescimentoDesdeT1(t, ctx.primeiroTurno);
+      if (!c) return PEND;
+      const cor = slotDe(ctx.race, c.v >= 0 ? 0 : 1);
       return {
-        fill: rgbSlot(cor, alphaEscala(Math.abs(v) / VARIACAO_MAX_PP)),
+        fill: rgbSlot(cor, alphaEscala(Math.abs(c.v) / VARIACAO_MAX_PP)),
         pendente: false,
-        rotulo: fmtPP(v),
-        valor: v,
+        rotulo: rotuloCrescimento(ctx.race, c.d0, c.d1),
+        // no mapa: a diferença entre as duas variações (a cor diz quem cresceu mais)
+        rotuloCurto: fmtPP(Math.abs(c.v)).replace(/^\+/, ''),
+        valor: c.v,
       };
     }
     case 'vencedor':
@@ -240,18 +276,19 @@ export function legendaModo(modo: MapMode, race: Pick<Race, 'candidatos'>): Lege
         ...amostras((t) => rgbSlot(cor1, alphaEscala(1 - t)), 6).slice(0, 5),
         ...amostras((t) => rgbSlot(cor0, alphaEscala(t)), 6),
       ];
+      // simétrica: cada lado na cor de quem cresceu mais ali (diferença entre as variações, em p.p.)
       return {
         tipo: 'escala',
-        titulo: `Variação de ${nome0} vs 1º turno`,
+        titulo: 'Quem cresceu mais desde o 1º turno',
         stops,
         ticks: [
-          { pos: 0, label: `−${VARIACAO_MAX_PP}` },
-          { pos: 0.25, label: `−${VARIACAO_MAX_PP / 2}` },
+          { pos: 0, label: `${VARIACAO_MAX_PP}+` },
+          { pos: 0.25, label: `${VARIACAO_MAX_PP / 2}` },
           { pos: 0.5, label: '0' },
-          { pos: 0.75, label: `+${VARIACAO_MAX_PP / 2}` },
-          { pos: 1, label: `+${VARIACAO_MAX_PP} p.p.` },
+          { pos: 0.75, label: `${VARIACAO_MAX_PP / 2}` },
+          { pos: 1, label: `${VARIACAO_MAX_PP}+ p.p.` },
         ],
-        polos: { esquerda: { nome: `${nome0} perde`, cor: cor1 }, direita: { nome: `${nome0} ganha`, cor: cor0 } },
+        polos: { esquerda: { nome: `${nome1} cresceu mais`, cor: cor1 }, direita: { nome: `${nome0} cresceu mais`, cor: cor0 } },
         extras: [PENDENTE_ITEM],
       };
     }
@@ -369,9 +406,11 @@ export function valorMunBr(modo: MapMode, s: MunicipiosNacionalSnapshot, i: numb
     }
     case 'variacao': {
       if (!ctx.t1 || lider < 0) return { fill: FILL_PENDENTE, pendente: true };
-      const base = baseFinalistasMunBr(ctx.t1, i);
-      if (base === null) return { fill: FILL_PENDENTE, pendente: true };
-      const v = s.pct0[i] / 100 - base;
+      const p1 = pctsMunBr(ctx.t1, i, 3);
+      if (!p1) return { fill: FILL_PENDENTE, pendente: true };
+      // mesma conta de `crescimentoDesdeT1`: (p0₂ − p0₁) − (p1₂ − p1₁), com p1₂ = 100 − p0₂
+      const p0 = s.pct0[i] / 100;
+      const v = p0 - p1[0] - (100 - p0 - p1[1]);
       return { fill: rgbSlot(slotDe(ctx.race, v >= 0 ? 0 : 1), alphaQ(Math.abs(v) / VARIACAO_MAX_PP)), pendente: false };
     }
     case 'vencedor':

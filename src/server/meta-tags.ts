@@ -265,6 +265,28 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       canonico: '/teste',
     });
   }
+  // ---- Palpite (src/app/pages/palpite/PalpitePage.tsx): o palpite vai depois do "#" do link e nunca chega aqui ----------
+  if (s0 === 'palpite' && seg.length === 1) {
+    return pagina({
+      titulo: `Palpite do 2º turno · Qual é o seu? · ${APP_NAME}`,
+      descricao:
+        'Crave o percentual dos votos válidos de cada candidato a presidente até as 23h59 de 24/10 e, depois do resultado oficial, veja por quantos pontos errou. Individual: o palpite fica só no seu aparelho. Não é pesquisa.',
+      imagem: '/api/og/palpite.png',
+      imagemAlt: 'Palpite do 2º turno · Sintonia',
+      imagemVersao: 'v1',
+      canonico: '/palpite',
+    });
+  }
+  // ---- chat ao vivo moderado (src/app/pages/chat/AoVivoPage.tsx) ------------------------------------------------------
+  if (s0 === 'ao-vivo' && seg.length === 1) {
+    return pagina({
+      titulo: `Sala da apuração · Chat ao vivo · ${APP_NAME}`,
+      descricao: 'Chat ao vivo moderado da apuração do 2º turno: comente a contagem dos votos com quem está acompanhando agora. Sem propaganda.',
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar('Brasil'),
+      canonico: '/ao-vivo',
+    });
+  }
   // ---- fase 2: modo TV, 1º turno de todos os cargos e ficha do candidato -------------------------
   if (s0 === 'tv' && seg.length === 1) {
     return pagina({
@@ -272,6 +294,26 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       descricao: comPlacar('Tela cheia com mapa, placar e os eventos da apuração do 2º turno, feita para transmissão.'),
       imagem: ogApuracao(),
       imagemAlt: altPlacar('Brasil'),
+    });
+  }
+  // ---- modo streamer: a fonte de navegador do OBS (/live, fora dos buscadores) e a página para streamers ----------
+  if (s0 === 'live' && seg.length === 1) {
+    return pagina({
+      titulo: `Modo streamer · Apuração ao vivo · ${APP_NAME}`,
+      descricao: comPlacar('Placar da apuração do 2º turno para lives: fonte de navegador do OBS e do Streamlabs.'),
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar('Brasil'),
+      canonico: '/streamers',
+      noindex: true,
+    });
+  }
+  if (s0 === 'streamers' && seg.length === 1) {
+    return pagina({
+      titulo: `Use o Sintonia na sua live · Para streamers · ${APP_NAME}`,
+      descricao: 'A apuração do 2º turno com os dados do TSE na sua live: placar, barra, canto ou mapa para o OBS e o Streamlabs, com fundo transparente. Grátis.',
+      imagem: ogApuracao(),
+      imagemAlt: altPlacar(''),
+      canonico: '/streamers',
     });
   }
   if (s0 === 'senado' && seg.length === 1) {

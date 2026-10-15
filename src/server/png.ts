@@ -97,10 +97,38 @@ export function codificarPng(img: ImagemRgb): Buffer {
   return montarPng(w, h, deflateSync(bruto, { level: 9 }));
 }
 
-/** RGBA (opaco) → PNG RGB com filtro "Sub" e deflate assíncrono. */
-export async function pngDeRgba(rgba: Uint8Array, w: number, h: number): Promise<Buffer> {
+/**
+ * RGBA (opaco) → PNG RGB com filtro "Sub" (ou "Paeth", melhor para fotos grandes e degradês) e deflate assíncrono
+ * (nível 9 por padrão).
+ */
+export async function pngDeRgba(rgba: Uint8Array, w: number, h: number, nivel = 9, filtro: 'sub' | 'paeth' = 'sub'): Promise<Buffer> {
   const lin = w * 3;
   const bruto = new Uint8Array((lin + 1) * h);
+  if (filtro === 'paeth') {
+    // linha anterior já em RGB (sem alfa) para o preditor
+    let ant = new Uint8Array(lin);
+    let cur = new Uint8Array(lin);
+    for (let y = 0; y < h; y++) {
+      let src = y * w * 4;
+      for (let x = 0; x < lin; x += 3, src += 4) {
+        cur[x] = rgba[src];
+        cur[x + 1] = rgba[src + 1];
+        cur[x + 2] = rgba[src + 2];
+      }
+      const o = y * (lin + 1);
+      bruto[o] = 4; // Paeth
+      for (let i = 0; i < lin; i++) {
+        const a = i >= 3 ? cur[i - 3] : 0;
+        const b = y > 0 ? ant[i] : 0;
+        const c = y > 0 && i >= 3 ? ant[i - 3] : 0;
+        bruto[o + 1 + i] = (cur[i] - paeth(a, b, c)) & 0xff;
+      }
+      const t = ant;
+      ant = cur;
+      cur = t;
+    }
+    return montarPng(w, h, await deflateP(bruto, { level: nivel, memLevel: 9 }));
+  }
   for (let y = 0; y < h; y++) {
     const o = y * (lin + 1);
     bruto[o] = 1; // Sub
@@ -121,5 +149,5 @@ export async function pngDeRgba(rgba: Uint8Array, w: number, h: number): Promise
       ab = b;
     }
   }
-  return montarPng(w, h, await deflateP(bruto, { level: 9, memLevel: 9 }));
+  return montarPng(w, h, await deflateP(bruto, { level: nivel, memLevel: 9 }));
 }

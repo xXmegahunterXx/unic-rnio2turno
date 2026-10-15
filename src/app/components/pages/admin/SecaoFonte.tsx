@@ -24,21 +24,21 @@ const DESCRICAO: Record<FonteDados, string> = {
   tse: 'Dados oficiais do feed do TSE (resultados.tse.jus.br), consultados no intervalo configurado.',
 };
 
-function impacto(f: FonteDados, intervalo: number): ReactNode {
+function impacto(f: FonteDados, intervalo: number, prioritario: number): ReactNode {
   if (f === 'pre')
     return 'Os visitantes deixam de ver a apuração do 2º turno: as páginas voltam a mostrar o 1º turno real e a contagem regressiva. A simulação e o relógio deste painel deixam de aparecer no site.';
   if (f === 'simulacao')
     return 'Todos os visitantes passam a ver números SIMULADOS (com a faixa “SIMULAÇÃO · dados fictícios”), conforme o relógio e o cenário deste painel.';
   return (
     <>
-      Todos os visitantes passam a ver os dados oficiais do TSE, consultados a cada {intervalo} s. Antes das 17h de 25/10 as disputas do 2º turno
-      aparecem zeradas.
+      Todos os visitantes passam a ver os dados oficiais do TSE: o resumo nacional de Presidente consultado a cada {prioritario} s e os demais
+      arquivos a cada {intervalo} s. Antes das 17h de 25/10 as disputas do 2º turno aparecem zeradas.
       {__DEMO__ ? ' Na demonstração não há servidor para consultar o TSE: as páginas mostram o 2º turno zerado.' : ''}
     </>
   );
 }
 
-type CampoTse = Exclude<keyof TseConfig, 'intervaloSeg'>;
+type CampoTse = Exclude<keyof TseConfig, 'intervaloSeg' | 'intervaloPrioritarioSeg'>;
 const CAMPOS: { k: CampoTse; rotulo: string; dica?: string }[] = [
   { k: 'ciclo', rotulo: 'Ciclo', dica: 'ele2026' },
   { k: 'pleito', rotulo: 'Pleito (2º turno)', dica: '3221' },
@@ -65,7 +65,7 @@ export function SecaoFonte() {
     const ok = await confirmar({
       titulo: `Trocar a fonte para “${FONTE_ROTULO[f]}”?`,
       descricao: `Hoje: ${FONTE_ROTULO[atual]}. A mudança vale na hora para todos os visitantes.`,
-      corpo: impacto(f, tse.intervaloSeg),
+      corpo: impacto(f, tse.intervaloSeg, tse.intervaloPrioritarioSeg ?? 5),
       confirmar: `Usar ${FONTE_ROTULO[f]}`,
       perigo: true,
     });
@@ -76,6 +76,9 @@ export function SecaoFonte() {
   const valor = <K extends keyof TseConfig>(k: K): TseConfig[K] => (ed[k] ?? tse[k]) as TseConfig[K];
   const alterados = (Object.keys(ed) as (keyof TseConfig)[]).filter((k) => ed[k] !== undefined && ed[k] !== tse[k]);
   const intervaloInvalido = !(valor('intervaloSeg') >= 5 && valor('intervaloSeg') <= 600);
+  // resumo nacional de Presidente (arquivo prioritário): padrão 5 s; ausente em estados antigos
+  const prioritario = valor('intervaloPrioritarioSeg') ?? 5;
+  const prioritarioInvalido = !(prioritario >= 3 && prioritario <= 600);
   const vazio = (['baseUrl', ...CAMPOS.map((c) => c.k)] as CampoTse[]).some((k) => !String(valor(k)).trim());
 
   async function salvar() {
@@ -171,7 +174,7 @@ export function SecaoFonte() {
                   </div>
                 ) : (
                   <div className="truncate rounded-xl border border-line bg-surface-2/70 px-3 py-2.5 font-mono text-[11.5px] text-fg-muted">
-                    {tse.baseUrl.replace(/^https?:\/\//, '')} · {tse.intervaloSeg} s
+                    {tse.baseUrl.replace(/^https?:\/\//, '')} · {tse.intervaloPrioritarioSeg ?? 5} s / {tse.intervaloSeg} s
                   </div>
                 )}
               </div>
@@ -209,16 +212,26 @@ export function SecaoFonte() {
                 />
               ))}
             </div>
-            <Campo
-              rotulo="Intervalo de consulta"
-              inputMode="numeric"
-              sufixo="s"
-              value={String(valor('intervaloSeg'))}
-              onChange={(e) => setEd((x) => ({ ...x, intervaloSeg: Number(e.target.value.replace(/\D/g, '').slice(0, 3)) || 0 }))}
-              erro={intervaloInvalido ? 'Entre 5 e 600 segundos.' : undefined}
-              dica="Entre 5 e 600 s. O servidor guarda em cache e faz backoff se o TSE falhar."
-              wrapperClassName="max-w-[220px]"
-            />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Campo
+                rotulo="Placar nacional (Presidente)"
+                inputMode="numeric"
+                sufixo="s"
+                value={String(prioritario)}
+                onChange={(e) => setEd((x) => ({ ...x, intervaloPrioritarioSeg: Number(e.target.value.replace(/\D/g, '').slice(0, 3)) || 0 }))}
+                erro={prioritarioInvalido ? 'Entre 3 e 600 segundos.' : undefined}
+                dica="Só o resumo Brasil (arquivo pequeno, pedido condicional). Entre 3 e 600 s; padrão 5 s."
+              />
+              <Campo
+                rotulo="Demais arquivos"
+                inputMode="numeric"
+                sufixo="s"
+                value={String(valor('intervaloSeg'))}
+                onChange={(e) => setEd((x) => ({ ...x, intervaloSeg: Number(e.target.value.replace(/\D/g, '').slice(0, 3)) || 0 }))}
+                erro={intervaloInvalido ? 'Entre 5 e 600 segundos.' : undefined}
+                dica="Estados e governadores. Entre 5 e 600 s; com o TSE falhando, o servidor espera mais (backoff)."
+              />
+            </div>
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
               {alterados.length ? (
                 <Button variant="ghost" onClick={() => setEd({})} className="mr-auto">
@@ -228,7 +241,7 @@ export function SecaoFonte() {
               <Button variant="outline" icon="ao-vivo" onClick={testar} loading={testando}>
                 Testar conexão
               </Button>
-              <Button variant="primary" icon="check" onClick={salvar} disabled={!alterados.length || intervaloInvalido || vazio} loading={pendente('tse')}>
+              <Button variant="primary" icon="check" onClick={salvar} disabled={!alterados.length || intervaloInvalido || prioritarioInvalido || vazio} loading={pendente('tse')}>
                 Salvar
               </Button>
             </div>

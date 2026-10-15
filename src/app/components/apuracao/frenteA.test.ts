@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import type { MunicipiosNacionalSnapshot, Race } from '@/shared/types';
 import { INICIO_APURACAO } from '@/shared/constants';
 import { gerarQr, qrPath } from './qr';
-import { comInstante, formatarInstante, lerInstante } from './LinhaDoTempo';
+import { DIST_ELEITO_PX, comInstante, formatarInstante, lerInstante, posicionarRotulos } from './LinhaDoTempo';
 import { baseFinalistasMunBr, pctsMunBr, valorMunBr } from './mapModes';
 import { FILL_EMPATE, FILL_PENDENTE, fillMargem } from '@/app/lib/raceUi';
 
@@ -140,7 +140,7 @@ describe('valorMunBr', () => {
     expect(baseFinalistasMunBr(t1, 1)).toBeCloseTo(44.44, 1);
     const v = valorMunBr('variacao', snap({}), 1, { race, t1 });
     expect(v.pendente).toBe(false);
-    expect(v.fill).toContain('--cand-a'); // 51,6% agora > 44,4% → candidato 0 ganhou
+    expect(v.fill).toContain('--cand-a'); // 0: 40 → 51,6 (+11,6); 1: 50 → 48,4 (−1,6) → o candidato 0 cresceu mais
   });
 });
 
@@ -157,5 +157,38 @@ describe('pctsMunBr', () => {
   });
   it('sem votos → null', () => {
     expect(pctsMunBr(snap({}), 0, 2)).toBeNull();
+  });
+});
+
+describe('Reveja a noite: rótulos dos marcos sem sobreposição (achado da revisão)', () => {
+  const MIN = 60_000;
+  const ini = 0;
+  const fim = 240 * MIN;
+  const marcos = [
+    { t: 30 * MIN, rotulo: '25%' },
+    { t: 60 * MIN, rotulo: '50%' },
+    { t: 100 * MIN, rotulo: '75%' },
+    { t: 170 * MIN, rotulo: '90%', eleito: true },
+    { t: 176 * MIN, rotulo: '95%' },
+    { t: 182 * MIN, rotulo: '99%' },
+    { t: 230 * MIN, rotulo: '100%' },
+  ];
+  it('"✓ Eleito" sempre aparece e nenhum rótulo fica a menos de 56 px dele (régua estreita, chat aberto)', () => {
+    for (const largura of [300, 420, 560, 760]) {
+      const r = posicionarRotulos(marcos, ini, fim, largura);
+      const eleito = r.find((x) => x.m.eleito)!;
+      expect(eleito.mostra).toBe(true);
+      for (const x of r.filter((y) => y.mostra && !y.m.eleito)) expect(Math.abs(x.x - eleito.x), `${largura}px ${x.m.rotulo}`).toBeGreaterThanOrEqual(DIST_ELEITO_PX - 0.001);
+    }
+    // a 420 px: "95%" e "99%" (a 10 e 21 px do Eleito) somem; "100%" (105 px) aparece
+    const vis = posicionarRotulos(marcos, ini, fim, 420).filter((x) => x.mostra).map((x) => x.m.rotulo);
+    expect(vis).not.toContain('99%');
+    expect(vis).toContain('90%');
+    expect(vis).toContain('100%');
+  });
+  it('fora da janela não entra; régua larga mostra todos os que cabem', () => {
+    const r = posicionarRotulos([...marcos, { t: fim + MIN, rotulo: 'depois' }], ini, fim, 3000);
+    expect(r.map((x) => x.m.rotulo)).not.toContain('depois');
+    expect(r.filter((x) => x.mostra)).toHaveLength(marcos.length);
   });
 });

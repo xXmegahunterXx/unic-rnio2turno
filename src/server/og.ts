@@ -1,12 +1,11 @@
 /**
  * Imagens de link preview (Open Graph, 1200×630) com satori (layout → SVG) + resvg (SVG → PNG).
  *
- *  - /api/og/apuracao.png?race=pres[&uf=sp]: placar atual (nomes, % válidos, % de seções, horário),
- *    faixa "SIMULAÇÃO · dados fictícios" quando simulado; antes das 17h, o 1º turno como referência.
+ *  - /api/og/apuracao.png?race=pres[&uf=sp][&formato=x|feed|story]: placar atual — layout em og-placar.ts (retratos
+ *    grandes, números gigantes, faixa "SIMULAÇÃO · dados fictícios" quando simulado; antes das 17h, o 1º turno).
  *  - /api/og/teste.png: cartão do Teste Cego (sem nenhum dado de preferência — LGPD/sem enquetes).
- *  - Fotos oficiais do TSE (opcionais, `fotos`): mesmo tamanho e tratamento para os dois (retrato 3:4, sem
- *    recorte nem filtro, com o contorno da cor do slot). Quem chama só passa fotos quando NÃO anonimizado e
- *    quando há foto dos dois finalistas; senão, o monograma (iniciais) de sempre.
+ *  - Fotos oficiais do TSE: ver og-placar.ts (placar) e og-cartoes.ts (demais cartões). Quem chama só passa fotos
+ *    quando NÃO anonimizado, com número real e com a foto de todos os finalistas; senão, o monograma (iniciais).
  *
  * Fontes (satori não lê woff2): TTF estáticos de Inter e Bricolage Grotesque em src/server/assets/fonts
  * (Google Fonts, SIL Open Font License 1.1 — ver OFL-*.txt). Reserva: JetBrains Mono .woff do @fontsource.
@@ -21,11 +20,7 @@ import { fileURLToPath } from 'node:url';
 import satori from 'satori';
 import { renderAsync } from '@resvg/resvg-js';
 import { pngDeRgba } from './png';
-import { partidoENumero } from '../shared/anon';
-import { pctTotalizadas, pctValidos } from '../shared/calc';
-import { UF_NOMES } from '../shared/constants';
-import { fmtHora, fmtInt, fmtPct } from '../shared/format';
-import type { Candidate, CorCandidato, Race, Summary, UF } from '../shared/types';
+import type { CorCandidato } from '../shared/types';
 
 export const OG_W = 1200;
 export const OG_H = 630;
@@ -225,231 +220,8 @@ export const iniciais = (nome: string) => {
 };
 
 // ---------------------------------------------------------------------------------------------
-// Placar
+// Placar: og-placar.ts (retratos grandes; formatos og/x/feed/story)
 // ---------------------------------------------------------------------------------------------
-
-export interface OgPlacarInput {
-  race: Race;
-  uf?: UF;
-  resumo: Summary;
-  simulacao: boolean;
-  /** Relógio exibido ("Atualizado às …"): simNow na simulação, hora oficial/atual no TSE. */
-  horario: number;
-  /** true antes do início (nenhuma seção totalizada numa corrida de 2º turno). */
-  pre: boolean;
-  /**
-   * Fotos oficiais (data URI JPEG/PNG) na ordem de `race.candidatos`. Só usadas se TODOS os finalistas
-   * tiverem foto (tratamento igual); ausente/incompleto → monograma.
-   */
-  fotos?: (string | null | undefined)[];
-  /** Título no lugar do da corrida (ex.: o nome do município). */
-  titulo?: string;
-  /** Linha acima do título no lugar de "APURAÇÃO · Nº TURNO 2026". */
-  kicker?: string;
-  /** Recorte local (município): nunca mostra "ELEITO" (o resumo local só diz quem venceu ali). */
-  local?: boolean;
-}
-
-/** Índices dos finalistas (candidatos não agregados) na ordem da urna. */
-export const finalistas = (race: Race) => race.candidatos.map((c, i) => (c.agregado ? -1 : i)).filter((i) => i >= 0);
-
-/** Fotos utilizáveis para o placar (todas as dos finalistas) ou null. */
-export function fotosDoPlacar(inp: Pick<OgPlacarInput, 'race' | 'fotos'>): Map<number, string> | null {
-  if (!inp.fotos) return null;
-  const idx = finalistas(inp.race).slice(0, 2);
-  if (idx.length < 2) return null;
-  const m = new Map<number, string>();
-  for (const i of idx) {
-    const f = inp.fotos[i];
-    if (typeof f !== 'string' || !/^data:image\/(jpeg|png);base64,/.test(f)) return null;
-    m.set(i, f);
-  }
-  return m;
-}
-
-const FOTO_W = 60;
-const FOTO_H = 80;
-
-function colunaCandidato(c: Candidate, idx: number, inp: OgPlacarInput, alinhar: 'left' | 'right', foto: string | null): No {
-  const cor = corOg(c.cor);
-  const ink = tintaOg(c.cor);
-  const lado = alinhar === 'right' ? 'flex-end' : 'flex-start';
-  const r = inp.resumo;
-  const temVotos = r.votos.reduce((a, b) => a + b, 0) > 0;
-  const pct = temVotos ? pctValidos(r, idx) : null;
-  // "eleito" só no 2º turno e na abrangência da própria disputa (no recorte de uma UF, `eleito` do resumo
-  // significa apenas "vencedor ali"; no 1º turno ninguém foi eleito para estes cargos)
-  const escopoDaDisputa = !inp.local && (!inp.uf || inp.race.abrangencia === inp.uf);
-  const eleito = r.eleito === idx && inp.race.turno === 2 && escopoDaDisputa;
-  const retrato: No = foto
-    ? h(
-        'div',
-        { width: FOTO_W + 6, height: FOTO_H + 6, borderRadius: 14, background: cor, alignItems: 'center', justifyContent: 'center' },
-        { type: 'img', props: { src: foto, width: FOTO_W, height: FOTO_H, style: { width: FOTO_W, height: FOTO_H, borderRadius: 11, objectFit: 'cover' } } },
-      )
-    : h(
-        'div',
-        { width: 64, height: 64, borderRadius: 32, background: cor, color: ink, alignItems: 'center', justifyContent: 'center', fontFamily: 'Bricolage', fontWeight: 800, fontSize: 26 },
-        iniciais(c.nomeUrna),
-      );
-  const cabecalho = [
-    retrato,
-    h(
-      'div',
-      { flexDirection: 'column', alignItems: lado, maxWidth: 420 },
-      h(
-        'div',
-        { fontFamily: 'Bricolage', fontWeight: 700, fontSize: tamNome(c.nomeUrna), color: C.fg, lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 420 },
-        c.nomeUrna,
-      ),
-      // 1º turno é resultado OFICIAL: com os nomes ocultos, `anonimizarRace` põe "nome oculto" no partido e
-      // `partidoENumero` não mostra o número fictício da anonimização num cartão de dado real
-      h('div', { fontSize: 22, color: C.muted, marginTop: 4 }, partidoENumero(c)),
-    ),
-  ];
-  if (alinhar === 'right') cabecalho.reverse();
-
-  let corpo: No;
-  if (inp.pre) {
-    const t1 = c.primeiroTurno;
-    corpo = h(
-      'div',
-      { flexDirection: 'column', alignItems: lado, marginTop: 20 },
-      h('div', { fontSize: 20, color: C.muted, fontWeight: 600, letterSpacing: 2 }, 'NO 1º TURNO'),
-      h('div', { fontFamily: 'Bricolage', fontWeight: 800, fontSize: 72, color: cor, lineHeight: 1, marginTop: 6 }, t1 ? fmtPct(t1.pct) : '—'),
-      h('div', { fontSize: 22, color: C.muted, marginTop: 8 }, t1 ? `${fmtInt(t1.votos)} votos` : ''),
-    );
-  } else {
-    corpo = h(
-      'div',
-      { flexDirection: 'column', alignItems: lado, marginTop: 14 },
-      h('div', { fontFamily: 'Bricolage', fontWeight: 800, fontSize: 104, color: cor, lineHeight: 1, letterSpacing: -3 }, pct === null ? '—' : fmtPct(pct)),
-      h(
-        'div',
-        { alignItems: 'center', gap: 12, marginTop: 6, height: 44 },
-        h('div', { fontSize: 24, color: C.muted }, `${fmtInt(r.votos[idx] ?? 0)} votos`),
-        eleito ? pill(r.status === 'encerrada' ? 'ELEITO' : 'MATEMATICAMENTE ELEITO', cor, ink) : null,
-      ),
-    );
-  }
-  return h(
-    'div',
-    { flexDirection: 'column', alignItems: lado, width: 520 },
-    h('div', { alignItems: 'center', gap: 18, height: foto ? FOTO_H + 6 : 76 }, ...cabecalho),
-    corpo,
-  );
-}
-
-function barra(inp: OgPlacarInput, ia: number, ib: number): No {
-  const r = inp.resumo;
-  const va = r.votos[ia] ?? 0;
-  const vb = r.votos[ib] ?? 0;
-  const tot = va + vb;
-  const W = OG_W - 128;
-  if (inp.pre || tot === 0) {
-    return h(
-      'div',
-      { width: W, height: 16, borderRadius: 8, background: C.pending, marginTop: 26 },
-    );
-  }
-  const wa = Math.round(((W - 6) * va) / tot);
-  return h(
-    'div',
-    { width: W, height: 16, marginTop: 26, position: 'relative' },
-    h('div', { width: wa, height: 16, background: corOg(inp.race.candidatos[ia]?.cor), borderRadius: '8px 0 0 8px' }),
-    h('div', { width: 6, height: 16 }),
-    h('div', { width: W - 6 - wa, height: 16, background: corOg(inp.race.candidatos[ib]?.cor), borderRadius: '0 8px 8px 0' }),
-    h('div', { position: 'absolute', left: W / 2 - 1, top: -7, width: 2, height: 30, background: 'rgba(244,244,250,0.85)' }),
-  );
-}
-
-export function layoutPlacar(inp: OgPlacarInput): No {
-  const { race, resumo: r } = inp;
-  // finalistas: candidatos não agregados ("Outros" fica fora do placar), na ordem da urna
-  const idx = finalistas(race);
-  const [ia, ib] = [idx[0] ?? 0, idx[1] ?? 1];
-  const fotos = fotosDoPlacar(inp);
-  const titulo =
-    inp.titulo ??
-    (race.cargo === 'Presidente'
-      ? inp.uf
-        ? `Presidente · ${UF_NOMES[inp.uf]}`
-        : 'Presidente'
-      : race.titulo);
-  const kicker = inp.kicker ?? `APURAÇÃO · ${race.turno}º TURNO 2026`;
-  const pctSec = pctTotalizadas(r);
-
-  let selo: No;
-  if (inp.simulacao) selo = pill('SIMULAÇÃO · DADOS FICTÍCIOS', C.brand, '#ffffff');
-  else if (inp.pre) selo = pill('25/10 · A PARTIR DAS 17H', 'rgba(255,255,255,0.06)', C.fg, C.line);
-  else if (race.turno === 1) selo = pill('RESULTADO OFICIAL · TSE', 'rgba(255,255,255,0.06)', C.fg, C.line);
-  else if (r.status === 'encerrada') selo = pill('APURAÇÃO ENCERRADA', 'rgba(255,255,255,0.06)', C.fg, C.line);
-  else selo = pill('AO VIVO', 'rgba(255,255,255,0.06)', C.fg, C.line);
-
-  const outrosIdx = race.candidatos.findIndex((c) => c.agregado);
-  const temOutros = outrosIdx >= 0 && r.votos.reduce((a, b) => a + b, 0) > 0;
-
-  const rodapeEsq: No = inp.pre
-    ? h(
-        'div',
-        { flexDirection: 'column' },
-        h('div', { fontSize: 28, fontWeight: 700, color: C.fg }, 'Resultados a partir das 17h de 25/10'),
-        h('div', { fontSize: 20, color: C.muted, marginTop: 6 }, 'Horário de Brasília · fonte: TSE'),
-      )
-    : h(
-        'div',
-        { flexDirection: 'column' },
-        h(
-          'div',
-          { alignItems: 'center', gap: 16 },
-          h('div', { fontSize: 28, fontWeight: 700, color: C.fg }, `${fmtPct(pctSec)} das seções totalizadas`),
-        ),
-        h(
-          'div',
-          { width: 420, height: 8, borderRadius: 4, background: C.pending, marginTop: 12 },
-          h('div', { width: Math.max(4, Math.round((420 * pctSec) / 100)), height: 8, borderRadius: 4, background: C.brand2 }),
-        ),
-      );
-
-  const rodapeDir: No = h(
-    'div',
-    { flexDirection: 'column', alignItems: 'flex-end' },
-    inp.pre
-      ? h('div', { fontSize: 22, color: C.muted }, inp.uf || race.abrangencia !== 'BR' ? 'Placar ao vivo, cidade por cidade' : 'Placar ao vivo, estado por estado')
-      : race.turno === 1
-        ? h('div', { fontSize: 22, color: C.muted }, 'Resultado oficial · fonte: TSE')
-        : h('div', { fontSize: 22, color: C.muted }, `${inp.simulacao ? 'Horário simulado' : 'Atualizado às'} ${fmtHora(inp.horario)} (Brasília)`),
-    temOutros
-      ? h('div', { fontSize: 20, color: C.subtle, marginTop: 6 }, `Outros candidatos: ${fmtPct(pctValidos(r, outrosIdx))}`)
-      : h('div', { fontSize: 20, color: C.subtle, marginTop: 6 }, '% dos votos válidos'),
-  );
-
-  return fundo(
-    inp.simulacao
-      ? h('div', { position: 'absolute', left: 0, top: 0, width: OG_W, height: 10, background: C.brand })
-      : null,
-    h(
-      'div',
-      { flexDirection: 'column', padding: '44px 64px 40px', width: OG_W, height: OG_H },
-      h('div', { justifyContent: 'space-between', alignItems: 'center' }, marca(), selo),
-      h('div', { fontSize: 20, fontWeight: 600, color: C.brand2, letterSpacing: 3, marginTop: 24 }, kicker),
-      h(
-        'div',
-        { fontFamily: 'Bricolage', fontWeight: 700, fontSize: 46, color: C.fg, marginTop: 2, letterSpacing: -1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: OG_W - 128 },
-        titulo,
-      ),
-      h(
-        'div',
-        { justifyContent: 'space-between', marginTop: fotos ? 14 : 22 },
-        colunaCandidato(race.candidatos[ia], ia, inp, 'left', fotos?.get(ia) ?? null),
-        colunaCandidato(race.candidatos[ib], ib, inp, 'right', fotos?.get(ib) ?? null),
-      ),
-      barra(inp, ia, ib),
-      h('div', { flexGrow: 1 }),
-      h('div', { justifyContent: 'space-between', alignItems: 'flex-end' }, rodapeEsq, rodapeDir),
-    ),
-  );
-}
 
 export function layoutTeste(): No {
   const cartao = (rot: number, x: number, y: number, cor: string, rotulo: string) =>
@@ -497,10 +269,11 @@ export function layoutTeste(): No {
 // Renderização
 // ---------------------------------------------------------------------------------------------
 
-export async function renderPng(no: No): Promise<Buffer> {
-  const svg = await satori(no as unknown as Parameters<typeof satori>[0], { width: OG_W, height: OG_H, fonts: carregarFontes() });
-  const img = await renderAsync(svg, { fitTo: { mode: 'width', value: OG_W }, font: { loadSystemFonts: false } });
+/** PNG do layout. Padrão 1200×630 (prévia de link); os cartões do placar também saem em 1200×675, 1080×1350 e 1080×1920. */
+export async function renderPng(no: No, w: number = OG_W, alt: number = OG_H): Promise<Buffer> {
+  const svg = await satori(no as unknown as Parameters<typeof satori>[0], { width: w, height: alt, fonts: carregarFontes() });
+  const img = await renderAsync(svg, { fitTo: { mode: 'width', value: w }, font: { loadSystemFonts: false } });
   // PNG RGB próprio (sem alfa, filtro Sub, deflate 9 fora da thread principal): ~30% menor que o do resvg
-  if (img.width === OG_W && img.height === OG_H && img.pixels.length === OG_W * OG_H * 4) return pngDeRgba(img.pixels, OG_W, OG_H);
+  if (img.width === w && img.height === alt && img.pixels.length === w * alt * 4) return pngDeRgba(img.pixels, w, alt);
   return Buffer.from(img.asPng());
 }

@@ -12,10 +12,24 @@ import { useMunicipiosBrOrdem } from '@/app/data/estatico';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { Spinner } from '@/app/ui/Button';
-import { itensMunicipios, itensUfs, type ItemBusca, type MunicipioBase } from '@/app/components/busca/indice';
-import { gravarRecente, lerRecentes, type Recente } from '@/app/components/busca/recentes';
+import type { ItemBusca, MunicipioBase } from '@/app/components/busca/indice';
+import type { Recente } from '@/app/components/busca/recentes';
 import { preCarregarRota, propsPreCarregar } from '@/app/components/layout/prefetch';
-import { resultadosInline } from './buscaInline';
+
+/**
+ * Índice, recentes e regras da busca: baixados só quando a pessoa toca no campo (fora do JS da Home — o campo vazio
+ * não precisa deles; ~2 kB a menos antes da 1ª pintura).
+ */
+interface ModBusca {
+  indice: typeof import('@/app/components/busca/indice');
+  recentes: typeof import('@/app/components/busca/recentes');
+  inline: typeof import('./buscaInline');
+}
+let modBusca: Promise<ModBusca> | null = null;
+const carregarBusca = () =>
+  (modBusca ??= Promise.all([import('@/app/components/busca/indice'), import('@/app/components/busca/recentes'), import('./buscaInline')]).then(
+    ([indice, recentes, inline]) => ({ indice, recentes, inline }),
+  ));
 
 const fmt4 = (n: number) => String(n).padStart(4, '0');
 
@@ -28,6 +42,7 @@ export function BuscaInline({ className, placeholder = 'Digite sua cidade' }: { 
   const [ativado, setAtivado] = useState(false);
   const [ativo, setAtivo] = useState(0);
   const [recentes, setRecentes] = useState<Recente[]>([]);
+  const [mod, setMod] = useState<ModBusca | null>(null);
 
   const munQ = useMunicipiosBrOrdem(ativado);
   const { data: meta } = useMeta();
@@ -37,15 +52,18 @@ export function BuscaInline({ className, placeholder = 'Digite sua cidade' }: { 
     const capitais = new Set((meta?.ufs ?? []).map((u) => u.capitalCod).filter(Boolean) as string[]);
     const lista: MunicipioBase[] = [];
     for (let i = 0; i < m.cod.length; i++) lista.push({ uf: m.uf[i] as UF, cod: m.cod[i], nome: m.nome[i], capital: capitais.has(m.cod[i]) });
-    return itensMunicipios(lista);
-  }, [munQ.data, meta]);
-  const itensUf = useMemo(() => itensUfs(), []);
+    return mod ? mod.indice.itensMunicipios(lista) : [];
+  }, [munQ.data, meta, mod]);
+  const itensUf = useMemo(() => (mod ? mod.indice.itensUfs() : []), [mod]);
 
-  const { opcoes, faltaCidade } = useMemo(() => resultadosInline(q, itensMun, itensUf), [q, itensMun, itensUf]);
+  const { opcoes, faltaCidade } = useMemo(
+    () => (mod ? mod.inline.resultadosInline(q, itensMun, itensUf) : { opcoes: [] as ItemBusca[], faltaCidade: null }),
+    [q, itensMun, itensUf, mod],
+  );
   const vazio = !q.trim();
   const lista: (ItemBusca | Recente)[] = vazio ? recentes : opcoes;
   const idx = Math.min(ativo, Math.max(0, lista.length - 1));
-  const carregando = !vazio && ativado && munQ.isLoading;
+  const carregando = !vazio && ativado && (munQ.isLoading || !mod);
   const mostrar = foco && (lista.length > 0 || (!vazio && (carregando || !!faltaCidade || itensMun.length > 0)));
   const idLista = `${id}-lista`;
   const idOp = (i: number) => `${id}-op-${i}`;
@@ -54,7 +72,10 @@ export function BuscaInline({ className, placeholder = 'Digite sua cidade' }: { 
 
   function ativar() {
     if (!ativado) setAtivado(true);
-    setRecentes(lerRecentes().filter((r) => r.tipo === 'municipio' || r.tipo === 'secao' || r.tipo === 'uf').slice(0, 4));
+    void carregarBusca().then((m) => {
+      setMod(m);
+      setRecentes(m.recentes.lerRecentes().filter((r) => r.tipo === 'municipio' || r.tipo === 'secao' || r.tipo === 'uf').slice(0, 4));
+    });
   }
 
   function aoFocar() {
@@ -73,7 +94,7 @@ export function BuscaInline({ className, placeholder = 'Digite sua cidade' }: { 
   }
 
   function ir(it: ItemBusca | Recente) {
-    gravarRecente(it);
+    mod?.recentes.gravarRecente(it);
     setFoco(false);
     input.current?.blur();
     navigate(it.to);

@@ -282,7 +282,7 @@ function Relatorio({ anuncios, resposta, erro, agora }: { anuncios: AnuncioConfi
         __DEMO__
           ? 'Disponível no servidor: o demo não conta impressões nem cliques.'
           : resposta
-            ? `Impressões visíveis e cliques desde ${fmtDataHora(resposta.desde)} (agregados, sem dado pessoal).`
+            ? `Impressões visíveis e cliques desde ${fmtDataHora(resposta.desde)} (agregados, sem cookie e sem guardar IP).`
             : 'Impressões visíveis e cliques, agregados por anúncio e formato.'
       }
       acoes={
@@ -387,7 +387,8 @@ function Relatorio({ anuncios, resposta, erro, agora }: { anuncios: AnuncioConfi
       {resposta ? (
         <p className="mt-3 text-[12px] leading-snug text-fg-subtle">
           Não medidos: imagens de compartilhamento (circulam fora do site) e cliques no Modo TV (a tela não tem link). Cliques contam só quando
-          o visitante toca no anúncio dentro do site, uma vez a cada 30 min por conexão.
+          o visitante toca no anúncio dentro do site, uma vez a cada 30 min por conexão. Lives (modo streamer): cada impressão é uma fonte de
+          navegador do OBS que exibiu a marca (uma por carregamento), não a audiência da transmissão — essa só a plataforma da live mede.
         </p>
       ) : null}
     </Painel>

@@ -15,6 +15,13 @@
  * Estratégia (detalhes e URLs em src/tse/README.md):
  *  - Polling: arquivo Brasil + 28 UFs de Presidente e a UF de cada Governador (requisição condicional: o
  *    CDN do TSE responde 304). A cada mudança: ponto de série + eventos por diferença (eventos.ts).
+ *  - Arquivo prioritário: o resumo Brasil de Presidente (o menor e o mais olhado) tem um laço próprio, mais curto
+ *    (`intervaloPrioritarioSeg`, padrão 5 s), com 1 tentativa por vez, prioridade alta na fila do cliente e backoff
+ *    exponencial quando o TSE falha; o laço normal deixa de pedi-lo enquanto o prioritário está em dia. Cópia mais
+ *    ANTIGA vinda de outro servidor do CDN do TSE (geração `dg/hg` anterior à que já temos) é descartada: o placar
+ *    nunca "volta" por causa do cache deles.
+ *  - Marca (`marca()`/`frescor()`): hash do conteúdo de cada corrida, muda quando o TSE publica dado novo; o servidor
+ *    publica no /api/status e usa no ETag, e o app reconsulta o placar na hora.
  *  - Não existe arquivo com os votos de todos os municípios de uma UF. O `-ab.json` da UF (1 arquivo) diz
  *    quantas seções cada município já totalizou; só os municípios que mudaram são baixados, por uma fila com
  *    prioridade (UFs consultadas nos últimos minutos primeiro), no máximo 1 vez por `municipioTtlMs`.
@@ -116,11 +123,36 @@ export interface TseCorridaHealth {
   ausentes: Abr[];
 }
 
+/** Laço do arquivo prioritário (resumo Brasil de Presidente). */
+export interface TsePrioritarioHealth {
+  race: RaceId;
+  /** false quando o intervalo prioritário não é menor que o normal (o laço normal cuida do arquivo) */
+  ativo: boolean;
+  intervaloSeg: number;
+  /** espera atual até a próxima leitura (s), já com o backoff */
+  esperaSeg: number;
+  ultimaLeitura: number | null;
+  ultimaLeituraOk: number | null;
+  ultimaLeituraMs: number | null;
+  falhasConsecutivas: number;
+  erro: string | null;
+  /** leituras com dado novo (200), sem mudança (304), cópias antigas descartadas e erros */
+  contagem: { novos: number; naoModificados: number; antigosDescartados: number; erros: number };
+  /**
+   * Atraso entre a geração do arquivo no TSE (`dg/hg`, relógio deles) e a nossa leitura, nas últimas mudanças (ms).
+   * Inclui o cache do CDN do TSE (fora do nosso controle) e o intervalo de consulta.
+   */
+  atrasoMs: { ultimo: number | null; mediana: number | null; max: number | null; amostras: number };
+}
+
 export interface TseHealth {
   /** true quando o arquivo principal de todas as corridas de 2º turno foi lido nos últimos 3 intervalos */
   ok: boolean;
   rodando: boolean;
   intervaloSeg: number;
+  /** espera atual do laço normal (s), com o backoff quando todas as corridas falham */
+  esperaSeg: number;
+  prioritario: TsePrioritarioHealth | null;
   config: TseConfig;
   ultimoCiclo: { inicio: number; ms: number; erros: number } | null;
   corridas: TseCorridaHealth[];
@@ -160,6 +192,9 @@ class Corrida {
   falhas = 0;
   erro: string | null = null;
   emVoo: Promise<void> | null = null;
+  /** hash do conteúdo (ver `TseSource.marca`); recalculado sob demanda quando `sujo` */
+  marca: string | null = null;
+  sujo = true;
 
   constructor(
     readonly race: Race,
@@ -282,6 +317,16 @@ class FilaMunicipios {
 }
 
 const QUENTE_MS = 3 * 60_000;
+/** Arquivo prioritário: padrão e limites do intervalo (s). */
+export const PRIORITARIO_PADRAO_S = 5;
+export const PRIORITARIO_MIN_S = 3;
+/** Teto do backoff do laço prioritário e do laço normal quando o TSE falha. */
+const PRIORITARIO_BACKOFF_MAX_MS = 30_000;
+const CICLO_BACKOFF_MAX_MS = 120_000;
+/** Tempo-limite de uma leitura do arquivo prioritário (1 tentativa; a próxima vem logo). */
+const PRIORITARIO_TIMEOUT_MS = 8_000;
+/** Amostras guardadas do atraso TSE → servidor. */
+const ATRASO_AMOSTRAS = 30;
 const CM_TTL_MS = 60 * 60_000;
 const PT_TTL_MS = 6 * 60 * 60_000;
 
@@ -316,6 +361,24 @@ export class TseSource {
   private rodando = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private ultimoCiclo: TseHealth['ultimoCiclo'] = null;
+  /** ciclos seguidos em que TODAS as corridas falharam (backoff do laço normal) */
+  private falhasCiclo = 0;
+  /** espera do laço normal em vigor (ms), com o backoff */
+  private esperaCicloMs = 0;
+  /** laço do arquivo prioritário (resumo Brasil de Presidente) */
+  private timerPrio: ReturnType<typeof setTimeout> | null = null;
+  private prio = {
+    ultimaLeitura: null as number | null,
+    ultimaLeituraOk: null as number | null,
+    ultimaLeituraMs: null as number | null,
+    falhas: 0,
+    erro: null as string | null,
+    esperaMs: 0,
+    retryAfterMs: 0,
+    contagem: { novos: 0, naoModificados: 0, antigosDescartados: 0, erros: 0 },
+  };
+  /** atraso (ms) entre a geração do arquivo prioritário no TSE e a nossa leitura, nas últimas mudanças */
+  private atrasos: number[] = [];
 
   constructor(opts: TseSourceOptions) {
     if (!opts.races?.length) throw new Error('TseSource: lista de corridas vazia');
@@ -352,17 +415,51 @@ export class TseSource {
     return Math.max(5, this.config.intervaloSeg || 15) * 1000;
   }
 
+  /** Intervalo do arquivo prioritário (resumo Brasil de Presidente). */
+  private get intervaloPrioritarioMs() {
+    const v = Number(this.config.intervaloPrioritarioSeg);
+    return Math.max(PRIORITARIO_MIN_S, Number.isFinite(v) && v > 0 ? v : PRIORITARIO_PADRAO_S) * 1000;
+  }
+
+  /** Corrida do arquivo prioritário: Presidente do 2º turno (abrangência Brasil). */
+  private get racePrioritaria(): Race | undefined {
+    return this.races.find((r) => r.turno === 2 && r.cargo === 'Presidente' && r.abrangencia === 'BR');
+  }
+
+  /**
+   * TSE falhando (a última leitura prioritária falhou, ou um ciclo normal inteiro falhou): a fila de municípios em
+   * segundo plano para (são milhares de arquivos; com o TSE fora, cada um viraria 3 tentativas). Volta sozinha no
+   * próximo ciclo bom. Consultas de quem abre uma página continuam (sob demanda, 1 por município por minuto).
+   */
+  private get tseFalhando() {
+    return this.prio.falhas > 0 || this.falhasCiclo > 0;
+  }
+
+  /** O laço prioritário só existe se for mais frequente que o normal. */
+  private get prioritarioAtivo() {
+    return !!this.racePrioritaria && this.intervaloPrioritarioMs < this.intervaloMs;
+  }
+
   start() {
     if (this.rodando) return;
     this.rodando = true;
-    this.log(`TSE: polling iniciado (${this.config.baseUrl}, a cada ${this.intervaloMs / 1000} s)`);
+    this.falhasCiclo = 0;
+    this.prio.falhas = 0;
+    this.log(
+      `TSE: polling iniciado (${this.config.baseUrl}, a cada ${this.intervaloMs / 1000} s` +
+        (this.prioritarioAtivo ? `; resumo nacional de Presidente a cada ${this.intervaloPrioritarioMs / 1000} s)` : ')'),
+    );
     void this.ciclo();
+    // o 1º ciclo normal já lê o arquivo Brasil; o prioritário entra depois de um intervalo
+    this.agendarPrioritario(this.intervaloPrioritarioMs);
   }
 
   stop() {
     this.rodando = false;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    if (this.timerPrio) clearTimeout(this.timerPrio);
+    this.timerPrio = null;
     this.fila.limpar();
     this.log('TSE: polling parado');
   }
@@ -383,6 +480,11 @@ export class TseSource {
       this.secoesCache.clear();
       this.fila.limpar();
     }
+    if (this.rodando && (this.config.intervaloPrioritarioSeg !== antes.intervaloPrioritarioSeg || this.config.intervaloSeg !== antes.intervaloSeg)) {
+      // vale já (o timer em curso pode estar num intervalo longo ou em backoff)
+      this.prio.falhas = 0;
+      this.agendarPrioritario(1_000);
+    }
     if (this.config.baseUrl !== antes.baseUrl) {
       this.client.setBaseUrl(this.config.baseUrl);
       this.corridas.clear();
@@ -401,6 +503,8 @@ export class TseSource {
 
   private async ciclo() {
     if (!this.rodando) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
     const t0 = this.now();
     try {
       await this.pollOnce();
@@ -408,7 +512,13 @@ export class TseSource {
       this.log(`TSE: erro inesperado no ciclo: ${msgDe(err)}`);
     }
     if (!this.rodando) return;
-    const espera = Math.max(1_000, this.intervaloMs - (this.now() - t0));
+    // backoff do laço normal: com TODAS as corridas falhando, o intervalo dobra (até 2 min); volta ao normal na
+    // 1ª leitura boa (ou antes, quando o laço prioritário vê o TSE responder de novo)
+    const base = this.falhasCiclo
+      ? Math.min(CICLO_BACKOFF_MAX_MS, this.intervaloMs * 2 ** Math.min(this.falhasCiclo, 4)) * (0.9 + 0.2 * Math.random())
+      : this.intervaloMs;
+    this.esperaCicloMs = Math.round(base);
+    const espera = Math.max(1_000, this.esperaCicloMs - (this.now() - t0));
     this.timer = setTimeout(() => void this.ciclo(), espera);
     (this.timer as { unref?: () => void }).unref?.();
   }
@@ -420,7 +530,105 @@ export class TseSource {
     await Promise.all(corridas.map((c) => this.pollCorrida(c, 'normal')));
     const erros = corridas.filter((c) => c.erro).length;
     this.ultimoCiclo = { inicio, ms: this.now() - inicio, erros };
+    // todas as disputas falharam: o laço normal se espaça (ver `ciclo`) e a fila de municípios esvazia (`tseFalhando`)
+    this.falhasCiclo = erros > 0 && erros >= corridas.length ? this.falhasCiclo + 1 : 0;
+    if (this.falhasCiclo === 1) this.fila.limpar();
     if (this.aquecer) this.aquecerMunicipios(corridas);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Arquivo prioritário: resumo Brasil de Presidente
+  // -------------------------------------------------------------------------------------------
+
+  private agendarPrioritario(ms: number) {
+    if (!this.rodando) return;
+    if (this.timerPrio) clearTimeout(this.timerPrio);
+    this.prio.esperaMs = Math.round(ms);
+    this.timerPrio = setTimeout(() => void this.cicloPrioritario(), Math.max(0, ms));
+    (this.timerPrio as { unref?: () => void }).unref?.();
+  }
+
+  private async cicloPrioritario() {
+    this.timerPrio = null;
+    if (!this.rodando) return;
+    if (!this.prioritarioAtivo) {
+      // desligado pela configuração: confere de novo mais tarde (o admin pode baixar o intervalo)
+      this.agendarPrioritario(this.intervaloMs);
+      return;
+    }
+    const t0 = this.now();
+    try {
+      await this.pollPrioritario();
+    } catch (err) {
+      this.log(`TSE: erro inesperado no laço prioritário: ${msgDe(err)}`);
+    }
+    if (!this.rodando || this.timerPrio) return;
+    this.agendarPrioritario(Math.max(500, this.esperaPrioritarioMs() - (this.now() - t0)));
+  }
+
+  /** Espera até a próxima leitura prioritária: o intervalo, ou o backoff (×2 por falha, até 30 s, ±20%) / Retry-After. */
+  private esperaPrioritarioMs(): number {
+    const base = this.intervaloPrioritarioMs;
+    if (!this.prio.falhas) return base;
+    const exp = Math.min(PRIORITARIO_BACKOFF_MAX_MS, base * 2 ** this.prio.falhas) * (0.8 + 0.4 * Math.random());
+    return Math.max(exp, this.prio.retryAfterMs);
+  }
+
+  /**
+   * Uma leitura do arquivo prioritário (público para testes). Requisição condicional, 1 tentativa, prioridade alta;
+   * se o laço normal estiver baixando o mesmo arquivo agora, não repete o pedido.
+   */
+  async pollPrioritario(): Promise<'novo' | 'nao-modificado' | 'ausente' | 'antigo' | 'em-andamento' | 'erro' | 'inativo'> {
+    const race = this.racePrioritaria;
+    if (!race) return 'inativo';
+    const c = this.corrida(race.id);
+    const chave = this.chaveResultado(c, c.principal);
+    if (this.voo.has(chave)) return 'em-andamento';
+    const t0 = this.now();
+    this.prio.ultimaLeitura = t0;
+    try {
+      const r = await this.umaVez(chave, () =>
+        this.buscarResultado(c, c.principal, 'alta', { tentativas: 1, timeoutMs: PRIORITARIO_TIMEOUT_MS }),
+      );
+      const agora = this.now();
+      this.prio.ultimaLeituraMs = agora - t0;
+      this.prio.ultimaLeituraOk = agora;
+      c.ultimoPollOk = agora;
+      if (this.prio.falhas > 0) {
+        this.log(`TSE ${c.race.id}/BR: leitura prioritária normalizada após ${this.prio.falhas} falha(s)`);
+        // o TSE voltou: se o laço normal está em backoff, antecipa o próximo ciclo
+        if (this.falhasCiclo > 0 && this.timer) {
+          clearTimeout(this.timer);
+          this.timer = setTimeout(() => void this.ciclo(), 1_000);
+          (this.timer as { unref?: () => void }).unref?.();
+        }
+      }
+      this.prio.falhas = 0;
+      this.prio.erro = null;
+      this.prio.retryAfterMs = 0;
+      if (r.status === 'ok' && r.mudou) {
+        this.prio.contagem.novos++;
+        this.registrarHistorico(c, [c.principal]);
+        return 'novo';
+      }
+      if (r.status === 'antigo') {
+        this.prio.contagem.antigosDescartados++;
+        return 'antigo';
+      }
+      if (r.status === 'ausente') return 'ausente';
+      this.prio.contagem.naoModificados++;
+      return 'nao-modificado';
+    } catch (err) {
+      this.prio.ultimaLeituraMs = this.now() - t0;
+      if (this.prio.falhas === 0) this.log(`TSE ${c.race.id}/BR: falha na leitura prioritária — ${msgDe(err)} (backoff)`);
+      this.prio.falhas++;
+      if (this.prio.falhas === 1) this.fila.limpar(); // TSE fora: esvazia a fila de municípios (ver `tseFalhando`)
+      this.prio.erro = msgDe(err);
+      this.prio.contagem.erros++;
+      const ra = (err as { retryAfterMs?: number }).retryAfterMs;
+      this.prio.retryAfterMs = typeof ra === 'number' && ra > 0 ? ra : 0;
+      return 'erro';
+    }
   }
 
   // -------------------------------------------------------------------------------------------
@@ -458,6 +666,22 @@ export class TseSource {
     return uf;
   }
 
+  private chaveResultado(c: Corrida, abr: Abr) {
+    return `res|${c.chave}|${abr}`;
+  }
+
+  /**
+   * O arquivo é do laço prioritário (rodando, ativo e tentando no ritmo dele — inclusive em backoff, quando o TSE
+   * falha): o laço normal não pede o mesmo arquivo (nem com as retentativas dele). Se o prioritário parar de tentar
+   * por algum motivo, o laço normal volta a ler o arquivo.
+   */
+  private cobertoPeloPrioritario(c: Corrida, abr: Abr): boolean {
+    if (!this.rodando || !this.prioritarioAtivo || abr !== c.principal || c.race.id !== this.racePrioritaria?.id) return false;
+    if (this.voo.has(this.chaveResultado(c, abr))) return true;
+    const ult = this.prio.ultimaLeitura;
+    return ult !== null && this.now() - ult < 2 * Math.max(this.intervaloPrioritarioMs, this.prio.esperaMs) + 1_000;
+  }
+
   private pollCorrida(c: Corrida, prioridade: Prioridade): Promise<void> {
     if (c.emVoo) return c.emVoo;
     c.emVoo = (async () => {
@@ -468,7 +692,10 @@ export class TseSource {
       await Promise.all(
         c.abrs.map(async (abr) => {
           try {
-            if (await this.buscarResultado(c, abr, prioridade)) mudaram.push(abr);
+            // o prioritário marca a leitura boa (ultimoPollOk) por conta própria
+            if (this.cobertoPeloPrioritario(c, abr)) return;
+            const r = await this.umaVez(this.chaveResultado(c, abr), () => this.buscarResultado(c, abr, prioridade));
+            if (r.mudou) mudaram.push(abr);
             if (abr === c.principal) principalOk = true;
           } catch (err) {
             erros.push(`${abr}: ${msgDe(err)}`);
@@ -495,22 +722,35 @@ export class TseSource {
     return c.emVoo;
   }
 
-  /** Baixa o resultado de uma abrangência. true se o conteúdo mudou. */
-  private async buscarResultado(c: Corrida, abr: Abr, prioridade: Prioridade): Promise<boolean> {
+  /**
+   * Baixa o resultado de uma abrangência. `mudou` = os números mudaram (ponto de série/eventos). `antigo` = o CDN do
+   * TSE entregou uma cópia gerada ANTES da que já temos (outro servidor dele, cache atrasado): descartada.
+   */
+  private async buscarResultado(
+    c: Corrida,
+    abr: Abr,
+    prioridade: Prioridade,
+    extra: { tentativas?: number; timeoutMs?: number } = {},
+  ): Promise<{ mudou: boolean; status: 'ok' | 'nao-modificado' | 'ausente' | 'antigo' }> {
     const prev = c.resultados.get(abr);
     const path = tsePaths.resultado(c.cod.ciclo, c.cod.eleicao, c.cod.cargo, abr === 'BR' ? 'br' : abr);
-    const resp = await this.client.getJson<TseResultadoArquivo>(path, { validadores: prev?.validadores, prioridade });
+    const resp = await this.client.getJson<TseResultadoArquivo>(path, { validadores: prev?.validadores, prioridade, ...extra });
     if (resp.status === 'nao-modificado') {
       if (prev) prev.em = this.now();
-      return false;
+      return { mudou: false, status: 'nao-modificado' };
     }
     if (resp.status === 'ausente') {
       c.ausentes.add(abr);
-      return false;
+      return { mudou: false, status: 'ausente' };
     }
     c.ausentes.delete(abr);
     validarResultado(resp.data, path);
     const r = map.resumoDoResultado(resp.data, c.race, this.races, abr === c.principal, abr);
+    if (prev && maisAntigo(r.geradoEm, prev.r.geradoEm)) {
+      // mantém o dado mais novo e os validadores dele (o próximo pedido condicional segue valendo)
+      prev.em = this.now();
+      return { mudou: false, status: 'antigo' };
+    }
     this.limitarAoRelogio(r.resumo);
     const a = prev?.r.resumo;
     const b = r.resumo;
@@ -527,7 +767,46 @@ export class TseSource {
       this.log(`TSE ${c.race.id}/${abr}: seções totalizadas recuaram (${a.secoesTotalizadas} → ${b.secoesTotalizadas}); seguindo o TSE`);
     }
     c.resultados.set(abr, { r, validadores: resp.validadores, em: this.now() });
-    return mudou;
+    c.sujo = true;
+    if (mudou && abr === c.principal && c.race.id === this.racePrioritaria?.id && r.geradoEm !== null) {
+      // atraso TSE → nós (relógio deles na geração do arquivo; o CDN deles e o intervalo de consulta entram aqui)
+      const atraso = this.now() - r.geradoEm;
+      if (atraso >= -5_000 && atraso < 6 * 3600_000) {
+        this.atrasos.push(Math.max(0, atraso));
+        if (this.atrasos.length > ATRASO_AMOSTRAS) this.atrasos.shift();
+      }
+    }
+    return { mudou, status: 'ok' };
+  }
+
+  /**
+   * Marca dos números de uma corrida (hash do conteúdo de todos os arquivos dela): igual enquanto nada muda e
+   * a mesma em qualquer instância/reinício com os mesmos dados. Usada no ETag e no `/api/status` (`frescor`).
+   */
+  marca(raceId: RaceId): string {
+    const c = this.corrida(raceId);
+    if (c.sujo || c.marca === null) {
+      let txt = c.chave;
+      for (const abr of c.abrs) {
+        const e = c.resultados.get(abr);
+        txt += `|${abr}`;
+        if (e) txt += `:${e.r.race.id}:${JSON.stringify(e.r.resumo)}`;
+      }
+      c.marca = hash53(txt);
+      c.sujo = false;
+    }
+    return c.marca;
+  }
+
+  /** Frescor de cada corrida do 2º turno (marca + última leitura boa do arquivo principal), para o `/api/status`. */
+  frescor(): Partial<Record<RaceId, { marca: string; conferidoEm: number | null }>> {
+    const out: Partial<Record<RaceId, { marca: string; conferidoEm: number | null }>> = {};
+    for (const r of this.races) {
+      if (r.turno !== 2) continue;
+      const c = this.corrida(r.id);
+      out[r.id] = { marca: this.marca(r.id), conferidoEm: c.ultimoPollOk };
+    }
+    return out;
   }
 
   /** Histórico da corrida mapeada (criado sob demanda; restaura o salvo na 1ª vez). */
@@ -561,7 +840,8 @@ export class TseSource {
 
   /** Garante dados da corrida: espera o 1º download; depois só renova em segundo plano. */
   private async garantir(c: Corrida) {
-    const ttl = c.race.turno === 1 ? this.t1Ttl : this.intervaloMs;
+    // corrida do 2º turno: respeita o intervalo em vigor (com o backoff, se o TSE estiver falhando)
+    const ttl = c.race.turno === 1 ? this.t1Ttl : Math.max(this.intervaloMs, this.esperaCicloMs);
     if (c.resultados.size === 0 && (c.ultimoPoll === null || this.now() - c.ultimoPoll > Math.min(ttl, 5_000))) {
       await this.comLimite(this.pollCorrida(c, 'alta'));
       return;
@@ -801,6 +1081,23 @@ export class TseSource {
     return map.municipiosNacionalDe(race.id, race.candidatos.length, resumos, agora, tq ?? agora);
   }
 
+  /**
+   * Resumos municipais do 2º turno JÁ EM CACHE (nada é baixado, nenhuma prioridade da fila muda): base do "desde o 1º
+   * turno" por município no Brasil (src/server/desde-t1.ts). Município ainda não lido fica de fora.
+   */
+  resumosMunicipaisEmCache(raceId: RaceId): { uf: UF; cod: string; resumo: Summary }[] {
+    const c = this.corridas.get(String(raceId).toLowerCase());
+    if (!c) return [];
+    const race = c.mapeada;
+    const out: { uf: UF; cod: string; resumo: Summary }[] = [];
+    for (const uf of race.ufs) {
+      const mu = this.munUf.get(`${c.chave}|${uf}`);
+      if (!mu) continue;
+      for (const [cod, e] of mu.mun) if (e.r.race.id === race.id) out.push({ uf, cod, resumo: e.r.resumo });
+    }
+    return out;
+  }
+
   private nacionalEm(c: Corrida, race: Race, t: number, agora: number): NationalSnapshot {
     const hist = this.histSe(c, race);
     const em = (abr: Abr) => hist?.resumoEm(abr, t) ?? map.resumoZerado(this.resumoAbr(c, abr, race));
@@ -958,12 +1255,14 @@ export class TseSource {
       if (e && agora - e.em < this.munTtl) continue;
       if (this.ausenteRecente(mu, cod)) continue;
       this.fila.add(`${c.chave}|${uf}|${cod}`, nivel, async () => {
+        if (this.tseFalhando) return; // reagendado pelo próximo aquecimento, com o TSE de volta
         await this.buscarMunicipio(c, uf, cod, 'baixa');
       });
     }
   }
 
   private aquecerMunicipios(corridas: Corrida[]) {
+    if (this.tseFalhando) return;
     for (const c of corridas) {
       for (const abr of c.abrs) {
         if (abr === 'BR') continue;
@@ -994,6 +1293,10 @@ export class TseSource {
         if (r.status === 'ok') {
           validarResultado(r.data, r.url);
           const res = map.resumoDoResultado(r.data, c.race, this.races, false, uf);
+          if (prev && maisAntigo(res.geradoEm, prev.r.geradoEm)) {
+            prev.em = this.now(); // cópia mais antiga do CDN do TSE: fica a mais nova
+            return;
+          }
           this.limitarAoRelogio(res.resumo);
           mu.mun.set(cod, { r: res, validadores: r.validadores, em: this.now() });
           mu.ausentes.delete(cod);
@@ -1188,10 +1491,34 @@ export class TseSource {
     }
     let munCache = 0;
     for (const m of this.munUf.values()) munCache += m.mun.size + m.zonas.size;
+    const rp = this.racePrioritaria;
+    const ord = [...this.atrasos].sort((a, b) => a - b);
+    const prioritario: TsePrioritarioHealth | null = rp
+      ? {
+          race: rp.id,
+          ativo: this.prioritarioAtivo,
+          intervaloSeg: this.intervaloPrioritarioMs / 1000,
+          esperaSeg: Math.round(this.prio.esperaMs / 100) / 10,
+          ultimaLeitura: this.prio.ultimaLeitura,
+          ultimaLeituraOk: this.prio.ultimaLeituraOk,
+          ultimaLeituraMs: this.prio.ultimaLeituraMs,
+          falhasConsecutivas: this.prio.falhas,
+          erro: this.prio.erro,
+          contagem: { ...this.prio.contagem },
+          atrasoMs: {
+            ultimo: this.atrasos.length ? this.atrasos[this.atrasos.length - 1] : null,
+            mediana: ord.length ? ord[Math.floor((ord.length - 1) / 2)] : null,
+            max: ord.length ? ord[ord.length - 1] : null,
+            amostras: ord.length,
+          },
+        }
+      : null;
     return {
       ok,
       rodando: this.rodando,
       intervaloSeg: this.intervaloMs / 1000,
+      esperaSeg: Math.round((this.esperaCicloMs || this.intervaloMs) / 100) / 10,
+      prioritario,
       config: { ...this.config },
       ultimoCiclo: this.ultimoCiclo,
       corridas,
@@ -1320,6 +1647,25 @@ function ehNode() {
 
 function msgDe(err: unknown) {
   return err instanceof Error ? err.message : String(err);
+}
+
+/** O arquivo novo foi gerado ANTES do que já temos (`dg/hg`)? Sem data em algum dos dois: não dá para dizer (false). */
+function maisAntigo(novo: number | null, atual: number | null): boolean {
+  return novo !== null && atual !== null && novo < atual;
+}
+
+/** cyrb53 (domínio público): hash de 53 bits em base 36, para a marca dos dados (não é segurança). */
+function hash53(str: string, seed = 0): string {
+  let h1 = 0xdeadbeef ^ seed;
+  let h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 /** Rejeita arquivo malformado (o último dado bom é mantido). */

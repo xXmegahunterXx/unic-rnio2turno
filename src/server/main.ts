@@ -81,7 +81,16 @@ async function main() {
     debounceMs: 0,
     onErro: (e) => log.erro('Falha ao salvar as métricas dos anúncios', e),
   });
-  const sintonia = createApp({ config, dataset: ds, controller, tse, log, metricasAnunciosStore });
+  // audiência agregada (a cada 60 s e no encerramento), pedidos de anunciantes e redes do Sintonia (a cada mudança)
+  const storeCrescimento = (arquivo: string, debounceMs: number, oque: string) =>
+    createJsonStore(config.stateDir, arquivo, { debounceMs, onErro: (e) => log.erro(`Falha ao salvar ${oque}`, e) });
+  const crescimentoStores = {
+    audiencia: storeCrescimento('audiencia.json', 0, 'a audiência'),
+    leads: storeCrescimento('leads.json', 250, 'os pedidos de anunciantes'),
+    divulgacao: storeCrescimento('divulgacao.json', 0, 'as redes do Sintonia'),
+  };
+  const sintonia = createApp({ config, dataset: ds, controller, tse, log, metricasAnunciosStore, crescimentoStores });
+  sintonia.crescimento.iniciar();
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
   sintonia.agendador.iniciar();
@@ -147,6 +156,7 @@ async function main() {
     const r = sintonia.resumoMinuto();
     if (r) log.info(r.msg, r.campos);
     void sintonia.persistirMetricasAnuncios();
+    void sintonia.crescimento.persistir();
   }, 60_000);
   resumo.unref();
 
@@ -195,6 +205,8 @@ async function main() {
       // sobrescrever um estado mais novo escrito por outra instância no mesmo STATE_DIR
       await store.flush();
       await sintonia.persistirMetricasAnuncios();
+      sintonia.crescimento.parar();
+      await sintonia.crescimento.persistir();
     } catch (e) {
       log.erro('Erro ao gravar o estado no encerramento', e);
     }

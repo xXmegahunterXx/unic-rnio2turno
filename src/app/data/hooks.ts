@@ -5,6 +5,10 @@
  * "Reveja a noite" (contrato `Instante`): os hooks de apuração aceitam `t` (epoch ms, opcional) no fim. Ausente =
  * agora (com polling). Com `t`: o instante truncado ao segundo entra na chave e NÃO há polling — o passado não
  * muda; uma mudança de `versao` no admin invalida tudo (useStatus). Instante futuro é limitado ao agora pela fonte.
+ *
+ * Fonte 'tse' ("mais rápido que a TV"): o status (a cada 2 s, CDN de 1 s) traz a marca dos números de cada disputa
+ * (`LiveStatus.frescor`, ver `frescor.ts`); quando ela muda, o placar da disputa é reconsultado NA HORA, com a marca
+ * nova no endereço. O polling do placar vira só uma rede de segurança.
  */
 import { useQuery, useQueryClient, keepPreviousData, type QueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
@@ -16,6 +20,24 @@ export { anonimizarRace, anonimizarTexto };
 import { getClient } from './client';
 
 const STATUS_MS = 2000;
+
+/**
+ * Prévia da /live dentro da /streamers (`?previa=1`, num iframe): busca os dados uma vez e não fica consultando — cinco
+ * cópias do app na mesma página multiplicavam os pedidos ao servidor (e o trabalho do navegador). Na fonte do OBS de
+ * verdade (sem `previa`), o polling é o de sempre.
+ */
+const SEM_POLLING = (() => {
+  if (typeof window === 'undefined') return false;
+  try {
+    const q = window.location.search || window.location.hash.split('?')[1] || '';
+    return new URLSearchParams(q).get('previa') === '1';
+  } catch {
+    return false;
+  }
+})();
+
+/** Marcas dos números já vistas nesta aba (uma reconsulta por mudança, não uma por componente que lê o status). */
+const marcasVistas = new Map<string, string>();
 
 /** Instante pedido, truncado ao segundo (chave estável, igual ao `?t=` do cliente HTTP), ou undefined (agora). */
 export function instanteChave(t?: number | null): number | undefined {
@@ -33,7 +55,7 @@ export function useStatus() {
   const q = useQuery({
     queryKey: ['status'],
     queryFn: async () => (await getClient()).status(),
-    refetchInterval: STATUS_MS,
+    refetchInterval: SEM_POLLING ? false : STATUS_MS,
     refetchIntervalInBackground: false,
     staleTime: 1000,
   });
@@ -46,13 +68,33 @@ export function useStatus() {
     }
     versao.current = v;
   }, [q.data?.versao, qc]);
+  // dado novo do TSE: reconsulta o placar da disputa já (cancelRefetch: o pedido em voo levava a marca anterior). As
+  // regras (frescor.ts) só são baixadas quando o status traz a marca — fonte TSE —, fora do JS inicial.
+  const frescor = q.data?.frescor;
+  useEffect(() => {
+    if (!frescor) return;
+    let vivo = true;
+    void import('./frescor').then(({ marcasQueMudaram }) => {
+      if (!vivo) return;
+      for (const race of marcasQueMudaram(marcasVistas, { frescor })) {
+        void qc.invalidateQueries({ queryKey: ['nacional', race], exact: true });
+        // governador: o placar da UF é o da disputa (página da UF)
+        if (race.startsWith('gov-')) void qc.invalidateQueries({ queryKey: ['uf', race] });
+      }
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [frescor, qc]);
   return q;
 }
 
 /** Intervalo de polling por nível de detalhe, conforme a fase. */
 export function pollMs(status: LiveStatus | undefined, nivel: 'br' | 'uf' | 'mun' | 'zona'): number | false {
-  if (!status) return false;
+  if (!status || SEM_POLLING) return false;
   if (status.fase !== 'apurando' || status.pausado || status.congelado) return nivel === 'br' ? 15000 : 30000;
+  // fonte 'tse' com marca no status: o placar é reconsultado quando a marca muda (useStatus); o polling só garante
+  if (nivel === 'br' && status.frescor) return 6000;
   const base = { br: 2500, uf: 4000, mun: 6000, zona: 8000 }[nivel];
   return status.velocidade >= 20 ? Math.max(1500, base / 2) : base;
 }

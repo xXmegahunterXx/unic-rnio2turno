@@ -7,9 +7,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { AnuncioConfig, AnuncioPublico } from '../shared/anuncios';
-import { OG_H, OG_W, layoutPlacar, layoutTeste, renderPng, type No } from './og';
+import { OG_H, OG_W, layoutTeste, renderPng, type No } from './og';
+import { layoutPlacar } from './og-placar';
 import { layoutCalculadora } from './og-cartoes';
-import { FAIXA_OFERECIMENTO, comOferecimento, oferecimentoDe, tagOferecimento } from './og-oferecimento';
+import { FAIXA_OFERECIMENTO, OFERECIMENTO_NO_PLACAR, comOferecimento, oferecimentoDe, tagOferecimento } from './og-oferecimento';
 import { comando, login, montar } from './test-helpers';
 
 const SAIDA = process.env.OG_PREVIA_DIR;
@@ -119,7 +120,7 @@ describe('faixa no pé', () => {
 });
 
 describe('rotas', () => {
-  it('só os cartões genéricos levam a faixa; trocar/tirar o anunciante gera imagens novas; meta tags com o anunciante no &v=', async () => {
+  it('genéricos levam a faixa (placar só com OFERECIMENTO_NO_PLACAR; ficha, bancadas e governadores nunca); trocar/tirar o anunciante gera imagens novas; meta tags com o anunciante no &v=', async () => {
     const dist = mkdtempSync(join(tmpdir(), 'sintonia-dist-of-'));
     writeFileSync(join(dist, 'index.html'), '<!doctype html><html><head><!--app-meta--></head><body></body></html>');
     const m = await montar({ env: { SERVE_STATIC: '1', DIST_DIR: dist } });
@@ -127,15 +128,12 @@ describe('rotas', () => {
     const bytes = async (u: string) => Buffer.from(await (await m.app.request(u)).arrayBuffer());
     const vDe = async (p: string) => /og:image" content="[^"]*[?&]v=([^"&]+)"/.exec(await (await m.app.request(p)).text())?.[1];
 
-    /** cartões com candidato, foto, número ou resultado: NUNCA levam a faixa */
-    const comCandidato = [
-      '/api/og/candidato.png?sq=280002542548',
-      '/api/og/apuracao.png',
-      '/api/og/senado.png',
-      '/api/og/camara.png',
-      '/api/og/governadores.png',
-    ];
-    const genericos = ['/api/og/teste.png', '/api/og/cenario.png'];
+    /** placar: só com OFERECIMENTO_NO_PLACAR (hoje desligado — src/shared/oferecimento.ts; regra §1.5) */
+    const placar = ['/api/og/apuracao.png?race=pres-t1', '/api/og/apuracao.png?race=pres-t1&formato=story'];
+    /** cartões centrados numa pessoa, em bancadas ou nos governadores (e o placar, desligado): NUNCA levam a faixa */
+    const comCandidato = ['/api/og/candidato.png?sq=280002542548', '/api/og/senado.png', '/api/og/camara.png', '/api/og/governadores.png', ...(OFERECIMENTO_NO_PLACAR ? [] : placar)];
+    /** genéricos (+ placar, se ligado) */
+    const genericos = ['/api/og/teste.png', '/api/og/cenario.png', ...(OFERECIMENTO_NO_PLACAR ? placar : [])];
     const sem = new Map<string, Buffer>();
     for (const u of [...comCandidato, ...genericos]) sem.set(u, await bytes(u));
     const vSem = await vDe('/curiosidades');
@@ -154,6 +152,13 @@ describe('rotas', () => {
     expect(vCom).toContain('-of');
     // página com a ficha do candidato: a imagem não tem anúncio, então a URL não muda com o anunciante
     expect(await vDe('/candidato/280002542548')).toBe(vCandSem);
+    // a faixa do placar sai abaixo do rodapé do Sintonia (layout: último filho, depois do conteúdo)
+    const race = m.ds.meta.races.find((r) => r.id === 'pres-t1')!;
+    const no = layoutPlacar({ race, resumo: m.controller.nacional('pres-t1').resumo, simulacao: false, horario: 0, pre: false, oferecimento: 'Lynx' });
+    const txt = textos(no);
+    expect(txt).toContain('Oferecimento:');
+    expect(txt.indexOf('Oferecimento:')).toBeGreaterThan(txt.indexOf('sintonia2026.com.br'));
+    expect(textos(layoutPlacar({ race, resumo: m.controller.nacional('pres-t1').resumo, simulacao: false, horario: 0, pre: false }))).not.toContain('Oferecimento:');
 
     // outro anunciante (marca): imagem nova de novo nos genéricos; os com candidato seguem iguais
     await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { marca: 'Lynx Pay', cota: 'master' }) });

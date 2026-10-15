@@ -22,8 +22,11 @@ import { NotFoundError } from '../engine/api';
 import { anuncioDoLegado } from '../engine/controller';
 import { LimiteJanela, MetricasAnuncios, TabelaAnuncios, ehRobo } from './anuncios';
 import { imagemComOferecimento, tagOferecimento } from './og-oferecimento';
+import { SalaChat, registrarChatAdmin, registrarChatPublico } from './chat';
+import { RegistroEnvios } from './chat-registro';
+import { registrarCrescimento, type StoresCrescimento } from './crescimento';
 import type { JsonStore } from './state-store';
-import { COOKIE_SESSAO, LimiteTaxa, Sessoes, chaveCliente, senhaConfere } from './auth';
+import { COOKIE_SESSAO, LimiteTaxa, Sessoes, chaveCliente, redeDoCliente, senhaConfere } from './auth';
 import { motivoSemSimulacao, type ServerConfig } from './config';
 import { Dados, type InstanteNormalizado, type NivelApuracao } from './dados';
 import { PacotesFotos } from './fotos';
@@ -42,6 +45,7 @@ import { consultaNormalizada, injetarMeta, metaDaRota, type ContextoMeta } from 
 import { MAX_CODIGO, calcularCenario, codificarCenario, decodificarCenario, placarCenarioTexto } from '../shared/cenarios';
 import { Metricas } from './metrics';
 import { CC_OG, registrarOg } from './og-rotas';
+import { registrarDesdeT1 } from './desde-t1';
 import { ServicoOg } from './og-servico';
 import { DadosEstaticos } from './dados-estaticos';
 import { anonimizarRace } from '../shared/anon';
@@ -74,6 +78,8 @@ export interface AppDeps {
    * `persistirMetricasAnuncios()` grava (main.ts: a cada 60 s e no encerramento). Ausente = só em memória.
    */
   metricasAnunciosStore?: JsonStore;
+  /** STATE_DIR/audiencia.json, leads.json e divulgacao.json (crescimento.ts). Ausentes = só em memória. */
+  crescimentoStores?: StoresCrescimento;
 }
 
 /** Permissions-Policy das páginas: nada de câmera, microfone, localização, pagamentos, USB nem "tópicos" de anúncio. */
@@ -84,6 +90,10 @@ export const CC = {
   status: 'public, max-age=0, s-maxage=1',
   meta: 'public, max-age=60, s-maxage=300',
   snapshot: 'public, max-age=0, s-maxage=2, stale-while-revalidate=10',
+  /** fonte TSE ao vivo: a CDN guarda 1 s e serve cópia vencida por no máximo mais 1 s (ou 60 s se a origem falhar) */
+  tseVivo: 'public, max-age=0, s-maxage=1, stale-while-revalidate=1, stale-if-error=60',
+  /** placar nacional com `?d=<marca atual>`: o conteúdo daquela marca não muda (dado novo = marca nova = outra URL) */
+  tseMarca: 'public, max-age=0, s-maxage=60, stale-while-revalidate=60',
   /** 1º turno: resultado final, não muda */
   t1: 'public, max-age=60, s-maxage=300, stale-while-revalidate=600',
   /**
@@ -131,6 +141,9 @@ export function rotasSitemap(): [string, string, string][] {
     ['/sobre', 'monthly', '0.3'],
     ['/privacidade', 'monthly', '0.3'],
     ['/anuncie', 'monthly', '0.3'],
+    ['/streamers', 'weekly', '0.5'],
+    ['/palpite', 'daily', '0.7'],
+    ['/ao-vivo', 'hourly', '0.6'],
   ];
 }
 
@@ -192,6 +205,9 @@ const ehQuente = (p: string) =>
   p === '/api/status' ||
   p.startsWith('/api/apuracao/') ||
   p.startsWith('/api/anuncio/') ||
+  p.startsWith('/api/chat') ||
+  p === '/api/audiencia' ||
+  p === '/api/divulgacao' ||
   p.startsWith('/assets/') ||
   p.startsWith('/data/') ||
   p.startsWith('/geo/');
@@ -317,6 +333,8 @@ export function createApp(deps: AppDeps) {
     return c.env?.incoming?.socket?.remoteAddress ?? 'desconhecido';
   };
   const clienteDe = (c: Ctx) => chaveCliente(ipDe(c), salCliente);
+  /** Rede LARGA (IPv6 /56 na audiência vendável e nos pedidos de anunciantes, /48 nas denúncias do chat; IPv4 inteiro). */
+  const redeLargaDe = (prefixo: 56 | 48) => (c: Ctx) => chaveCliente(ipDe(c), salCliente, prefixo);
 
   /** Host da requisição (X-Forwarded-Host com TRUST_PROXY), validado; null se malformado. */
   const hostDe = (c: Ctx): string | null =>
@@ -391,9 +409,10 @@ export function createApp(deps: AppDeps) {
     const r = dados.race(race);
     const st = dados.status();
     const passado = inst.t !== undefined;
-    const etag = etagFraco(`v${st.versao}`, passado ? dados.baldeHistorico(race, inst) : dados.balde(race), hashCurto(rota));
+    const etag = etagFraco(`v${st.versao}`, passado ? dados.baldeHistorico(race, inst) : dados.balde(race, inst.nivel), hashCurto(rota));
     let cc: string = r.turno === 1 ? CC.t1 : CC.snapshot;
     if (passado && inst.consolidado) cc = parseVersaoUrl(c.req.query('v')) === st.versao ? CC.historico : CC.historicoSemVersao;
+    else if (r.turno === 2 && dados.fonteDe(race) === 'tse') cc = !passado && inst.nivel === 'br' && dados.marcaConfere(race, c.req.query('d')) ? CC.tseMarca : CC.tseVivo;
     const headers = {
       'cache-control': cc,
       etag,
@@ -477,7 +496,9 @@ export function createApp(deps: AppDeps) {
       } else if (Number(c.req.header('content-length') ?? 0) > (path === '/api/admin/command' ? MAX_CORPO_COMANDO : MAX_CORPO)) {
         c.res = c.json({ erro: 'Corpo grande demais.' }, 413, { 'cache-control': CC.privado, connection: 'close' });
       } else {
-        if (api) metricas.clientes.registrar(ipDe(c)); // vira 1 bit com sal (ClientesAtivos); o IP não é guardado
+        // vira 1 bit com sal (ClientesAtivos); o IP não é guardado. IPv6 pela /64: trocar o endereço dentro da faixa não
+        // multiplica "pessoas agora"
+        if (api) metricas.clientes.registrar(redeDoCliente(ipDe(c)));
         await next();
       }
     } finally {
@@ -629,6 +650,8 @@ export function createApp(deps: AppDeps) {
     if (st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado()) out.fase = 'encerrada';
     // troca automática esperando o TSE responder: aviso discreto (só se o admin não publicou um aviso próprio)
     if (!st.aviso && agendador.avisoPublico()) out.aviso = { nivel: 'info', texto: AVISO_AGUARDANDO_TSE };
+    const frescor = dados.frescor(); // fonte 'tse': marca dos números + última leitura boa (o app reconsulta na hora)
+    if (frescor) out.frescor = frescor;
     return out;
   };
 
@@ -759,6 +782,32 @@ export function createApp(deps: AppDeps) {
     },
   );
 
+  // chat ao vivo moderado (src/server/chat.ts): GET com cache de 1 s na CDN; POSTs só do próprio site; memória só.
+  // Registro cifrado dos envios (chat-registro.ts): DESLIGADO sem CHAT_REGISTRO_CHAVE (decisão do dono e do advogado).
+  const registroChat = config.chatRegistroChave
+    ? new RegistroEnvios({
+        dir: join(config.stateDir, 'chat-registro'),
+        chavePublicaPem: readFileSync(config.chatRegistroChave, 'utf8'),
+        now,
+        aoFalhar: (e) => log.erro('Chat: falha ao gravar o registro de envios', e),
+      })
+    : null;
+  if (registroChat) log.aviso('Chat: registro cifrado dos envios LIGADO (CHAT_REGISTRO_CHAVE) — confira a /privacidade');
+  const portaDe = (c: Ctx): number | null => {
+    const h = config.chatRegistroHeaderPorta && config.trustProxy ? c.req.header(config.chatRegistroHeaderPorta) : undefined;
+    const p = h !== undefined ? Number(h) : config.trustProxy ? NaN : Number(c.env?.incoming?.socket?.remotePort);
+    return Number.isInteger(p) && p > 0 && p < 65536 ? p : null;
+  };
+  const salaChat = SalaChat.doDataset(deps.dataset, { now, producao: config.producao, registro: !!registroChat });
+  registrarChatPublico(app, {
+    sala: salaChat,
+    clienteDe,
+    redeDenunciaDe: redeLargaDe(48),
+    origemPermitida,
+    log,
+    aoPublicar: registroChat ? (c, id, em) => registroChat.registrar({ id, em, ip: ipDe(c), porta: portaDe(c) }) : undefined,
+  });
+
   app.get('/api/meta', async (c) => {
     const etag = etagFraco('meta', deps.dataset.meta.versao, hashCurto(deps.dataset.meta.geradoEm));
     const headers = { 'cache-control': CC.meta, etag, 'access-control-allow-origin': '*' };
@@ -780,6 +829,9 @@ export function createApp(deps: AppDeps) {
     const inst = instanteDe(c, race, 'brmun');
     return snapshot(c, race, `${race}/br/municipios`, inst, () => dados.municipiosBr(race, inst.t));
   });
+
+  // "Desde o 1º turno" no Brasil por município (src/server/desde-t1.ts): agregado com cache de 5 s, nunca baixa do TSE
+  registrarDesdeT1(app, { dados, tse: deps.tse, races, now });
 
   app.get('/api/apuracao/:race/uf/:uf', (c) => {
     const race = parseRace(c.req.param('race'));
@@ -983,6 +1035,17 @@ export function createApp(deps: AppDeps) {
   });
 
   admin.get('/tse/health', (c) => c.json(deps.tse.health()));
+  registrarChatAdmin(admin, { sala: salaChat, log });
+  // audiência agregada, "Siga o Sintonia" e pedidos de anunciantes (src/server/crescimento.ts): rotas públicas e do painel
+  const crescimento = registrarCrescimento(app, admin, {
+    now,
+    log,
+    clienteDe,
+    redeLargaDe: redeLargaDe(56),
+    origemPermitida,
+    pessoasAgora: () => metricas.pessoasAgora(),
+    stores: deps.crescimentoStores,
+  });
 
   app.route('/api/admin', admin);
 
@@ -1150,6 +1213,7 @@ export function createApp(deps: AppDeps) {
     prontidao,
     metricasAnuncios,
     persistirMetricasAnuncios,
+    crescimento,
   };
 }
 

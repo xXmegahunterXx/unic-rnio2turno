@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { AnuncioPublico } from '@/shared/anuncios';
-import { ANTECIPA_PX, FAIXA_BARRA_PX, margemDaFaixa, naFaixa } from './faixaLivre';
+import { ANTECIPA_PX, FAIXA_BARRA_PX, alturaTela, margemDaFaixa, naFaixa } from './faixaLivre';
 import { CASA, escolhaDaPagina, fmtWhatsApp, hrefDoAnuncio, imagemDoAnuncio, iniciaisDaMarca, linkEmail, linkWhatsApp, temContato, tituloCurto } from './nucleo';
 
 const ad = (id: string, formatos: AnuncioPublico['formatos'], extra: Partial<AnuncioPublico> = {}): AnuncioPublico => ({
@@ -162,6 +162,14 @@ describe('barra fixa do rodapé: nunca sobre resultado ou candidato', () => {
   it('a raiz do observador é só a faixa de baixo da tela', () => {
     expect(margemDaFaixa(844)).toBe(`-${844 - FAIXA_BARRA_PX}px 0px ${ANTECIPA_PX}px 0px`);
     expect(margemDaFaixa(150)).toBe(`-0px 0px ${ANTECIPA_PX}px 0px`); // tela mais baixa que a faixa: a tela toda
+  });
+  it('altura da tela: o zoom reduzido do carregamento (innerHeight ~3.400 no celular) não vale — vale a tela do aparelho', () => {
+    // durante o carregamento, antes do CSS, o celular reduz o zoom para caber uma página larga (achado da revisão)
+    expect(alturaTela({ innerHeight: 3376, visualViewport: { height: 3376 }, screen: { height: 844 } })).toBe(844);
+    expect(margemDaFaixa(alturaTela({ innerHeight: 3376, visualViewport: { height: 3376 }, screen: { height: 844 } }))).toBe(`-${844 - FAIXA_BARRA_PX}px 0px ${ANTECIPA_PX}px 0px`);
+    // normal: a menor entre janela e visualViewport (teclado aberto, barra de endereço)
+    expect(alturaTela({ innerHeight: 844, visualViewport: { height: 780 }, screen: { height: 844 } })).toBe(780);
+    expect(alturaTela({ innerHeight: 900 })).toBe(900);
   });
   it('bloco na faixa de baixo → ocupado; acima dela → livre', () => {
     // 390×844: a faixa vai de 644 a 844

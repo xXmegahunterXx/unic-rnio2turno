@@ -41,8 +41,10 @@ import { cargoExibicao, ehEleito, situacaoCurta, type DadosEstaticos } from './d
 import type { PacotesFotos } from './fotos';
 import { casaEtag, etagFraco, hashCurto } from './http-cache';
 import type { Logger } from './log';
-import { layoutPlacar, layoutTeste, renderPng, type No } from './og';
-import { comOferecimento, oferecimentoDe, tagOferecimento, type CartaoComOferecimento } from './og-oferecimento';
+import { layoutTeste, renderPng, type No } from './og';
+import { OFERECIMENTO_NO_PLACAR, comOferecimento, oferecimentoDe, tagOferecimento, type CartaoComOferecimento } from './og-oferecimento';
+import { FORMATOS_OG, renderPlacarPng, type FormatoOg, type OgPlacarInput } from './og-placar';
+import { registrarOgPalpite } from './og-palpite';
 import {
   layoutCalculadora,
   layoutCandidato,
@@ -80,6 +82,17 @@ const OG_TTL_MS = 30_000;
 const OG_STALE_MS = 90_000;
 /** Grupo padrão do pacote de fotos oficiais (public/data/fotos/{grupo}.json) quando o candidato não diz. */
 const GRUPO_FOTOS_PADRAO = 'segundo-turno';
+/** Retratos de Presidente em resolução original do TSE (161×225, sem edição): os cartões do placar os mostram grandes. */
+const GRUPO_FOTOS_HD = 'presidente-hd';
+
+/** `?formato=` dos cartões do placar: og (1200×630, padrão), x (1200×675), feed (1080×1350), story (1080×1920). */
+export function formatoOg(v: string | undefined): FormatoOg {
+  if (v === undefined || v === '') return 'og';
+  if ((FORMATOS_OG as readonly string[]).includes(v)) return v as FormatoOg;
+  throw new ErroValidacao('Parâmetro formato: og, x, feed ou story.');
+}
+/** Sufixo da chave de cache por formato (o 1200×630 mantém a chave de sempre). */
+const sufixoFormato = (f: FormatoOg) => (f === 'og' ? '' : `|${f}`);
 
 type App = Hono<{ Bindings: HttpBindings }>;
 type Ctx = Context<{ Bindings: HttpBindings }>;
@@ -153,6 +166,8 @@ const ufBr = (u: string | undefined): UF | undefined => {
 
 export function registrarOg(app: App, d: DepsOg): void {
   const { dados, races, fotos, estaticos, log, servico } = d;
+  // Palpite (/api/og/palpite.png): genérico, nunca lê palpite algum (o palpite vai depois do "#" do link)
+  registrarOgPalpite(app, { status: () => dados.status(), log });
   const dominio = d.dominio ?? undefined;
 
   /** Conjunto de anunciantes das imagens ('' = nenhum; '|of…' entra no modo do cache). */
@@ -214,16 +229,25 @@ export function registrarOg(app: App, d: DepsOg): void {
     return servico.obter(pd);
   };
 
-  /** Imagem ao vivo (depende do estado da apuração). */
-  const vivo = async (c: Ctx, chave: string, montar: (st: LiveStatus) => Promise<OgPronta>) => {
+  /**
+   * "versão|modo" dos cartões do placar: com a faixa de oferecimento ligada (`OFERECIMENTO_NO_PLACAR`), o conjunto de
+   * anunciantes entra no modo — trocar/tirar o anunciante espera a imagem nova.
+   */
+  const subPlacar = (st: LiveStatus) => `${subVivo(st)}${OFERECIMENTO_NO_PLACAR ? tagOf(st) : ''}`;
+
+  /** Imagem ao vivo (depende do estado da apuração). `placar`: o modo leva o anunciante (ver `subPlacar`). */
+  const vivo = async (c: Ctx, chave: string, montar: (st: LiveStatus) => Promise<OgPronta>, placar = false) => {
     const st = dados.status();
     const s = await obterLimitado(c, {
       chave,
-      sub: subVivo(st),
+      sub: placar ? subPlacar(st) : subVivo(st),
       ttlMs: OG_TTL_MS,
       staleMs: OG_STALE_MS,
       montar: () => montar(dados.status()),
-      modoAtual: () => modoOg(dados.status()),
+      modoAtual: () => {
+        const agora = dados.status();
+        return `${modoOg(agora)}${placar && OFERECIMENTO_NO_PLACAR ? tagOf(agora) : ''}`;
+      },
     });
     return enviarPng(c, chave, s, CC_OG.vivo);
   };
@@ -255,14 +279,33 @@ export function registrarOg(app: App, d: DepsOg): void {
   };
 
   /**
-   * Fotos oficiais para o placar: nunca com nomes ocultos; só quando há foto de TODOS os finalistas. Quem chama
+   * Fotos oficiais para o placar: nunca com nomes ocultos; só quando há foto de TODOS os finalistas (do MESMO pacote:
+   * tratamento igual). Presidente: os originais do TSE (`presidente-hd`); sem eles, o pacote da corrida. Quem chama
    * também nunca pede foto para números simulados.
    */
   const fotosOg = (race: Race, anonimizado: boolean): string[] | undefined => {
     if (anonimizado) return undefined;
-    const lista = race.candidatos.map((cd) => (cd.agregado || !cd.sqcand ? null : fotos.fotoOg(cd.fotoGrupo || GRUPO_FOTOS_PADRAO, cd.sqcand)));
     const fin = race.candidatos.map((cd, i) => (cd.agregado ? -1 : i)).filter((i) => i >= 0);
-    return fin.length >= 2 && fin.every((i) => lista[i]) ? lista.map((f) => f ?? '') : undefined;
+    const doPacote = (grupo?: string) => {
+      const lista = race.candidatos.map((cd) => (cd.agregado || !cd.sqcand ? null : fotos.fotoOg(grupo ?? (cd.fotoGrupo || GRUPO_FOTOS_PADRAO), cd.sqcand)));
+      return fin.length >= 2 && fin.every((i) => lista[i]) ? lista.map((f) => f ?? '') : undefined;
+    };
+    return (race.cargo === 'Presidente' ? doPacote(GRUPO_FOTOS_HD) : undefined) ?? doPacote();
+  };
+
+  /** Anunciante da faixa "Oferecimento" do cartão do placar `base` (mesmo anunciante nos quatro formatos). */
+  const oferecimentoPlacar = (st: Pick<LiveStatus, 'anuncios'>, base: string): string | null =>
+    OFERECIMENTO_NO_PLACAR ? (oferecimentoDe(st.anuncios, base)?.marca ?? null) : null;
+
+  /** PNG do placar no formato pedido, com o registro de tempo e tamanho. */
+  const gerarPlacar = async (rotulo: string, inp: OgPlacarInput): Promise<Buffer> => {
+    const t0 = perf();
+    const png = await renderPlacarPng(inp);
+    log.info(
+      `OG ${rotulo}${inp.formato && inp.formato !== 'og' ? ` [${inp.formato}]` : ''} gerada em ${Math.round(perf() - t0)} ms ` +
+        `(${Math.round(png.length / 1024)} KB${inp.fotos ? ', com fotos oficiais' : ''}${inp.oferecimento ? ', com oferecimento' : ''})`,
+    );
+    return png;
   };
 
   const exibir = (r: Race, anon: boolean) => (anon ? anonimizarRace(r) : r);
@@ -284,9 +327,13 @@ export function registrarOg(app: App, d: DepsOg): void {
     const ufQ = c.req.query('uf');
     const uf = ufQ ? parseUf(ufQ) : undefined;
     if (uf && !r.ufs.includes(uf)) throw new NotFoundError(`A UF ${uf} não participa da corrida ${r.id}.`);
-    const chave = `${r.id}|${uf ?? 'br'}`;
-    return vivo(c, chave, async (st) => {
-      const t0 = perf();
+    const formato = formatoOg(c.req.query('formato'));
+    const base = `${r.id}|${uf ?? 'br'}`;
+    const chave = `${base}${sufixoFormato(formato)}`;
+    return vivo(
+      c,
+      chave,
+      async (st) => {
       const snap = uf ? await dados.uf(r.id, uf) : await dados.nacional(r.id);
       const resumo = snap.resumo;
       const simulacao = st.simulacao && r.turno === 2;
@@ -298,25 +345,24 @@ export function registrarOg(app: App, d: DepsOg): void {
       const raceOg = pre && uf ? await comPrimeiroTurnoDaUf(races.get(snap.race) ?? r, uf) : (races.get(snap.race) ?? r);
       // foto oficial só com número real: nunca na simulação (nem com os nomes reais ligados no admin)
       const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
-      // placar: nunca leva anúncio (og-oferecimento.ts)
-      const png = await renderPng(
-        layoutPlacar({
-          // simulação anônima: nada de nome nem foto real em imagem com números fictícios
-          race: exibir(raceOg, anon),
-          uf,
-          resumo,
-          simulacao,
-          horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
-          pre,
-          fotos: fotosPlacar,
-        }),
-      );
-      log.info(
-        `OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB` +
-          `${fotosPlacar ? ', com fotos oficiais' : ''})`,
-      );
-      return { png, sub: subVivo(st), headers: { 'x-og-fotos': fotosPlacar ? '1' : '0' } };
-    });
+      const png = await gerarPlacar(`${r.id}${uf ? `/${uf}` : ''}`, {
+        // simulação anônima: nada de nome nem foto real em imagem com números fictícios
+        race: exibir(raceOg, anon),
+        uf,
+        resumo,
+        simulacao,
+        horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
+        pre,
+        fotos: fotosPlacar,
+        formato,
+        dominio: d.dominio,
+        // faixa própria no pé, abaixo da marca do Sintonia (og-oferecimento.ts › OFERECIMENTO_NO_PLACAR)
+        oferecimento: oferecimentoPlacar(st, base),
+      });
+      return { png, sub: subPlacar(st), headers: { 'x-og-fotos': fotosPlacar ? '1' : '0' } };
+      },
+      true,
+    );
   });
 
   // ---- município ------------------------------------------------------------------------------------
@@ -331,7 +377,9 @@ export function registrarOg(app: App, d: DepsOg): void {
     const st = dados.status();
     // a mesma corrida que a página mostra: o 1º turno quando pedido (-t1) ou antes da apuração (fase 'pre')
     const exib = r.turno === 1 || st.fase !== 'pre' ? r : (t1De(r) ?? r);
-    const chave = `mun|${exib.id}|${uf}|${cod}`;
+    const formato = formatoOg(c.req.query('formato'));
+    const base = `mun|${exib.id}|${uf}|${cod}`;
+    const chave = `${base}${sufixoFormato(formato)}`;
     const titulo = onde(nome, uf);
     const cargo = exib.cargo === 'Presidente' ? 'PRESIDENTE' : 'GOVERNADOR';
     const montar = async (stM: LiveStatus, sub: string): Promise<OgPronta> => {
@@ -340,30 +388,36 @@ export function registrarOg(app: App, d: DepsOg): void {
       const simulacao = stM.simulacao && exib.turno === 2;
       const raceOg = races.get(snap.race) ?? exib;
       const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
-      return gerar(
-        chave,
-        () =>
-          layoutPlacar({
-            race: exibir(raceOg, anon),
-            uf,
-            resumo: snap.resumo,
-            simulacao,
-            horario: simulacao ? snap.simNow : (snap.resumo.ultimaAtualizacao ?? snap.geradoEm),
-            pre: false,
-            fotos: fotosPlacar,
-            titulo,
-            kicker: exib.turno === 1 ? `1º TURNO 2026 · ${cargo} · RESULTADO NO MUNICÍPIO` : `APURAÇÃO · 2º TURNO 2026 · ${cargo}`,
-            local: true,
-          }),
-        sub,
-        { 'x-og-fotos': fotosPlacar ? '1' : '0' },
-      );
+      const png = await gerarPlacar(chave, {
+        race: exibir(raceOg, anon),
+        uf,
+        resumo: snap.resumo,
+        simulacao,
+        horario: simulacao ? snap.simNow : (snap.resumo.ultimaAtualizacao ?? snap.geradoEm),
+        pre: false,
+        fotos: fotosPlacar,
+        titulo,
+        kicker: exib.turno === 1 ? `1º TURNO 2026 · ${cargo} · NO MUNICÍPIO` : `APURAÇÃO · 2º TURNO 2026 · ${cargo}`,
+        local: true,
+        formato,
+        dominio: d.dominio,
+        oferecimento: oferecimentoPlacar(stM, base),
+      });
+      return { png, sub, headers: { 'x-og-fotos': fotosPlacar ? '1' : '0' } };
     };
     if (exib.turno === 1) {
       const modo = `t1${st.anonimizado ? '-anon' : ''}`;
-      return estatica(c, chave, d.versaoDataset, modo, (sub) => montar(dados.status(), sub), () => `t1${dados.status().anonimizado ? '-anon' : ''}`);
+      return estatica(
+        c,
+        chave,
+        d.versaoDataset,
+        modo,
+        (sub) => montar(dados.status(), sub),
+        () => `t1${dados.status().anonimizado ? '-anon' : ''}`,
+        OFERECIMENTO_NO_PLACAR,
+      );
     }
-    return vivo(c, chave, (stM) => montar(stM, subVivo(stM)));
+    return vivo(c, chave, (stM) => montar(stM, subPlacar(stM)), true);
   });
 
   // ---- seção (boletim de urna) ----------------------------------------------------------------------

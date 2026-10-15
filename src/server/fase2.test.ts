@@ -11,7 +11,7 @@ import type { LiveStatus, MunicipiosNacionalSnapshot, MunicipioSnapshot, Nationa
 import { pctTotalizadas } from '../shared/calc';
 import { CC } from './app';
 import { arredondarPessoas } from './metrics';
-import { fotosDoPlacar, layoutPlacar } from './og';
+import { fotosDoPlacar, layoutPlacar } from './og-placar';
 import { comando, login, montar, type Montado } from './test-helpers';
 
 /** Retratos JPEG mínimos (30×40), só para teste. */

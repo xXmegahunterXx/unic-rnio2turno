@@ -1,26 +1,33 @@
 /**
  * ShareCard: cartão do placar (nacional, UF ou município) nos 3 formatos do kit de compartilhamento
  * (`@/app/components/share`): 'x' 1200×675 (16:9), 'feed' 1080×1350 e 'story' 1080×1920. Moldura = `CartaoBase`
- * (logo, URL, data/hora de Brasília e o selo SIMULAÇÃO quando simulado); aqui só o miolo: local, % apurado, números
- * gigantes, barra com a marca dos 50% e o selo de resultado definido.
+ * (logo, URL, data/hora de Brasília e o selo SIMULAÇÃO quando simulado); aqui o miolo, no espírito do topo da Home
+ * (`DueloPresidencia`): os dois retratos oficiais GRANDES lado a lado, do mesmo tamanho e tratamento (quadro 4:5, moldura
+ * e brilho na cor de identidade que vem dos dados), o "×", os números gigantes, a barra com a marca dos 50%, o % apurado
+ * e o selo de resultado definido. Faixa "Oferecimento: <marca>" no PÉ só com `OFERECIMENTO_COM_CANDIDATOS`
+ * (src/shared/oferecimento.ts — hoje desligado; mesma regra das imagens do servidor, og-placar.ts).
  * ShareButton: mesma API de antes (usado em várias páginas), agora sobre o `BotaoCompartilhar` do kit.
- * Fotos oficiais no cartão só com dados reais (nunca na imagem de uma SIMULAÇÃO, nem anonimizada: uma imagem
- * com rosto real e números fictícios não pode circular).
+ * Fotos oficiais no cartão só com dados reais (nunca na imagem de uma SIMULAÇÃO, nem anonimizada: uma imagem com rosto
+ * real e números fictícios não pode circular); Presidente com os originais do TSE (`presidente-hd`, via `useFotosHero`).
  */
-import { forwardRef, type ReactNode } from 'react';
-import type { Race, Summary } from '@/shared/types';
+import { forwardRef, useMemo, type CSSProperties, type ReactNode } from 'react';
+import type { Candidate, Race, Summary } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
+import { escolherAnuncio } from '@/shared/anuncios-escolha';
+import { OFERECIMENTO_COM_CANDIDATOS } from '@/shared/oferecimento';
 import { margem, pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtInt, fmtPP, fmtPct } from '@/shared/format';
+import { partidoENumero } from '@/shared/anon';
 import { cn } from '@/app/lib/cn';
-import { corSlot } from '@/app/lib/raceUi';
+import { corSlot, rgbSlot } from '@/app/lib/raceUi';
+import { useStatus } from '@/app/data/hooks';
 import { type ButtonSize, type ButtonVariant } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
 import { BotaoCompartilhar, CartaoBase, DIMENSOES_CARTAO, brilhoDe, PreviaCartao, SeloOficial, useCartao, type FormatoCartao } from '@/app/components/share';
-import { AvatarCartao, BarraDuelo, PctGigante, PilulaApurado, RotuloCartao } from '@/app/components/share/cartoes/partes';
+import { BarraDuelo, PctGigante, PilulaApurado, RotuloCartao } from '@/app/components/share/cartoes/partes';
 import { hashtags, textoPlacar } from '@/app/components/share/textos';
-import { useFotosRace } from './fotos';
-import { partidoENumero } from '@/shared/anon';
+import { useFotosHero } from '@/app/components/pages/home/fotosHero';
+import { iniciais } from './CandidateAvatar';
 
 /** Formatos do cartão do placar (= `FormatoCartao` do kit; 'x' é o 16:9 do X/WhatsApp). */
 export type ShareFormato = FormatoCartao;
@@ -48,19 +55,37 @@ function localPadrao(race: Race): string {
   return race.abrangencia === 'BR' ? 'Brasil' : (UF_NOMES[race.abrangencia] ?? race.titulo.split('·').pop()?.trim() ?? '');
 }
 
+/** Faixa do anúncio por formato: altura, o espaço livre abaixo dela (story: área da interface dos apps) e o respiro. */
+const FAIXA: Record<FormatoCartao, { alt: number; abaixo: number; fonte: number; pb: number }> = {
+  x: { alt: 38, abaixo: 0, fonte: 17, pb: 20 },
+  feed: { alt: 52, abaixo: 0, fonte: 22, pb: 30 },
+  story: { alt: 60, abaixo: 120, fonte: 24, pb: 30 },
+};
+
+/**
+ * Anunciante do rodapé "Oferecimento" (formato 'compartilhamento'; o master vence, como nas imagens do servidor). Só com
+ * `OFERECIMENTO_COM_CANDIDATOS` (hoje desligado: anúncio nunca colado a placar, foto ou número de candidato).
+ */
+function useOferecimento(semente: string): string | null {
+  const { data: status } = useStatus();
+  const anuncios = OFERECIMENTO_COM_CANDIDATOS ? status?.anuncios : undefined;
+  return useMemo(() => escolherAnuncio(anuncios, 'compartilhamento', `og|${semente}`)?.marca.trim().slice(0, 40) || null, [anuncios, semente]);
+}
+
 export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function ShareCard(
   { race, resumo, formato = 'feed', simulado, local, caminho = '/apuracao', className },
   ref,
 ) {
   const onde = local ?? localPadrao(race);
   const t1 = race.turno === 1;
-  const fotos = useFotosRace(race, { desligado: simulado });
-  return (
+  const { fotos } = useFotosHero(race, { desligado: simulado });
+  const marca = useOferecimento(`${race.id}|${onde}`);
+  const base = (
     <CartaoBase
-      ref={ref}
+      ref={marca ? undefined : ref}
       formato={formato}
       simulado={simulado}
-      className={className}
+      className={cn(marca && '![height:var(--cartao-alt)] ![padding-bottom:var(--cartao-pb)]', !marca && className)}
       sobrancelha={t1 ? 'Resultado oficial · 1º turno' : `Apuração · ${race.turno}º turno`}
       caminho={caminho}
       instante={t1 ? null : (resumo.ultimaAtualizacao ?? undefined)}
@@ -72,6 +97,23 @@ export const ShareCard = forwardRef<HTMLDivElement, ShareCardProps>(function Sha
       <MioloPlacar race={race} resumo={resumo} onde={onde} fotos={fotos} />
     </CartaoBase>
   );
+  if (!marca) return base;
+  const { w, h } = DIMENSOES_CARTAO[formato];
+  const f = FAIXA[formato];
+  // com simulação, a moldura reserva embaixo a faixa "SIMULAÇÃO · dados fictícios" (34 px × k)
+  const faixaSim = simulado ? Math.round(34 * { x: 1, feed: 1.3, story: 1.42 }[formato]) : 0;
+  const estilo = { width: w, height: h, '--cartao-alt': `${h - f.alt - f.abaixo}px`, '--cartao-pb': `${f.pb + faixaSim}px` } as CSSProperties;
+  return (
+    <div ref={ref} data-cartao={formato} style={estilo} className={cn('relative flex flex-col overflow-hidden bg-bg font-sans text-fg antialiased', className)}>
+      {base}
+      {/* faixa própria, só texto, DEPOIS do rodapé com o endereço do Sintonia: nunca encostada em foto, nome ou número */}
+      <div className="flex shrink-0 items-center justify-center border-t border-line bg-surface px-16 text-fg-subtle" style={{ height: f.alt, fontSize: f.fonte, gap: f.fonte * 0.4 }}>
+        <span className="tracking-[0.02em]">Oferecimento:</span>
+        <span className="max-w-[60%] truncate font-semibold text-fg">{marca}</span>
+      </div>
+      {f.abaixo ? <div aria-hidden className="bg-bg" style={{ height: f.abaixo }} /> : null}
+    </div>
+  );
 });
 
 interface MioloProps {
@@ -82,23 +124,18 @@ interface MioloProps {
 }
 
 function Cabecalho({ race, resumo, onde }: Pick<MioloProps, 'race' | 'resumo' | 'onde'>) {
-  const { k, retrato } = useCartao();
+  const { k, retrato, formato } = useCartao();
   const t1 = race.turno === 1;
   return (
-    <div className={cn('flex justify-between', retrato ? 'flex-col items-start' : 'items-end')} style={{ gap: 14 * k, marginTop: (retrato ? 44 : 22) * k }}>
+    <div className={cn('flex justify-between', formato === 'story' ? 'flex-col items-start' : 'items-end')} style={{ gap: 14 * k, marginTop: (retrato ? 30 : 18) * k }}>
       <div className="min-w-0">
         <RotuloCartao>{onde}</RotuloCartao>
-        <div className="font-display font-semibold leading-none tracking-[-0.035em]" style={{ fontSize: (retrato ? 66 : 46) * k, marginTop: 10 * k }}>
+        <div className="font-display font-semibold leading-none tracking-[-0.035em]" style={{ fontSize: (retrato ? 50 : 40) * k, marginTop: 10 * k }}>
           {race.cargo}
           <span className="text-fg-muted"> · {race.turno}º turno</span>
         </div>
       </div>
-      {t1 ? null : (
-        <div className="flex flex-wrap items-center" style={{ gap: 12 * k }}>
-          <PilulaApurado pct={pctTotalizadas(resumo)} />
-          {retrato ? <PilulaDiferenca race={race} resumo={resumo} /> : null}
-        </div>
-      )}
+      {t1 ? null : <PilulaApurado pct={pctTotalizadas(resumo)} />}
     </div>
   );
 }
@@ -129,27 +166,6 @@ function PilulaDiferenca({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) 
   );
 }
 
-/** Bloco central do 16:9: a diferença entre os dois. */
-function CentroDiferenca({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) {
-  const d = diferenca(race, resumo);
-  if (!d) return <div />;
-  return (
-    <div className="flex flex-col items-center justify-center self-center text-center" style={{ paddingTop: 70 }}>
-      <RotuloCartao>Diferença</RotuloCartao>
-      <div className="num font-display font-semibold leading-none tracking-[-0.03em] text-fg" style={{ fontSize: 40, marginTop: 10 }}>
-        {fmtPP(d.pp, 2).replace('+', '').replace(' p.p.', '')}
-        <span className="text-fg-muted" style={{ fontSize: 20 }}>
-          {' '}
-          p.p.
-        </span>
-      </div>
-      <div className="num text-fg-muted" style={{ fontSize: 16, marginTop: 8 }}>
-        {fmtInt(d.votos)} votos
-      </div>
-    </div>
-  );
-}
-
 function SeloEleito({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) {
   const { k } = useCartao();
   const eleito = race.turno === 2 && resumo.eleito !== null ? race.candidatos[resumo.eleito] : null;
@@ -157,7 +173,7 @@ function SeloEleito({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) {
   const s = corSlot(eleito.cor);
   return (
     <div
-      className={cn('inline-flex items-center self-start rounded-full font-bold uppercase tracking-[0.08em]', s.bgSoft, s.text)}
+      className={cn('inline-flex items-center self-center rounded-full font-bold uppercase tracking-[0.08em]', s.bgSoft, s.text)}
       style={{ gap: 12 * k, padding: `${10 * k}px ${22 * k}px`, fontSize: 19 * k }}
     >
       <Icon name="check-circulo" size={26 * k} strokeWidth={2.25} />
@@ -166,140 +182,178 @@ function SeloEleito({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) {
   );
 }
 
-function Demais({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) {
+function Demais({ race, resumo, centro }: Pick<MioloProps, 'race' | 'resumo'> & { centro?: boolean }) {
   const { k } = useCartao();
   const i = race.candidatos.findIndex((c) => c.agregado);
   if (i < 0) return null;
   return (
-    <div className="num text-fg-muted" style={{ fontSize: 18 * k }}>
+    <div className={cn('num text-fg-muted', centro && 'text-center')} style={{ fontSize: 18 * k }}>
       Demais candidatos: <span className="font-semibold text-fg">{fmtPct(pctValidos(resumo, i))}</span> · <span>{fmtInt(resumo.votos[i] ?? 0)} votos</span>
     </div>
   );
 }
 
-/** Coluna de um candidato (16:9 e feed). */
-function Coluna({ race, resumo, i, foto, direita }: { race: Race; resumo: Summary; i: number; foto?: string; direita?: boolean }) {
-  const { k, formato } = useCartao();
-  const c = race.candidatos[i];
-  const tem = validos(resumo) > 0;
-  const eleito = race.turno === 2 && resumo.eleito === i;
-  const x = formato === 'x';
-  const nome = (
-    <div className={cn('min-w-0', direita && 'text-right')}>
-      <div className="truncate font-display font-semibold leading-[1.05] tracking-[-0.025em]" style={{ fontSize: (x ? 32 : 40) * k }}>
+/**
+ * Retrato 4:5 do cartão (sem animação: o PNG sai do DOM): moldura em degradê e brilho atrás na cor do candidato, como o
+ * `CandidateRetrato` do topo da Home. Sem foto: monograma no MESMO quadro.
+ */
+function RetratoCartao({ c, foto, w, eleito, brilhoX }: { c: Candidate; foto?: string; w: number; eleito?: boolean; brilhoX: number }) {
+  const h = Math.round(w * 1.25);
+  const s = corSlot(c.cor);
+  const borda = Math.max(4, Math.round(w * 0.016));
+  const raio = Math.round(w * 0.1);
+  const selo = Math.round(w * 0.2);
+  return (
+    <div className="relative shrink-0" style={{ width: w, height: h }}>
+      <div
+        aria-hidden
+        className="absolute"
+        // o brilho não pode passar da área do miolo (overflow-hidden da moldura cortaria a borda em linha reta)
+        style={{ left: -brilhoX, right: -brilhoX, top: -h * 0.18, bottom: -h * 0.18, background: `radial-gradient(closest-side, ${rgbSlot(c.cor, 0.42)}, ${rgbSlot(c.cor, 0.14)} 58%, ${rgbSlot(c.cor, 0)})` }}
+      />
+      <div
+        className="relative h-full w-full"
+        style={{ borderRadius: raio, padding: borda, backgroundImage: `linear-gradient(165deg, ${rgbSlot(c.cor)} 0%, ${rgbSlot(c.cor, 0.5)} 48%, ${rgbSlot(c.cor, 0.92)} 100%)` }}
+      >
+        <div className="h-full w-full overflow-hidden bg-surface-2" style={{ borderRadius: raio - borda }}>
+          {foto ? (
+            <img src={foto} alt="" className="h-full w-full object-cover object-[50%_18%]" />
+          ) : (
+            <div className={cn('flex h-full w-full items-center justify-center font-display font-semibold leading-none tracking-[-0.04em]', s.bgSoft, s.text)} style={{ fontSize: w * 0.34 }}>
+              {iniciais(c.nomeUrna)}
+            </div>
+          )}
+        </div>
+      </div>
+      {eleito ? (
+        <span
+          className={cn('absolute flex items-center justify-center rounded-full', s.bg, s.ink)}
+          style={{ width: selo, height: selo, right: -selo * 0.22, bottom: -selo * 0.22, boxShadow: `0 0 0 ${Math.max(3, Math.round(w * 0.016))}px rgb(var(--bg))` }}
+        >
+          <Icon name="check" size={selo * 0.6} strokeWidth={3} />
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+/** Nome e partido · número de um finalista. */
+function Cabeca({ c, alinhar, nome }: { c: Candidate; alinhar: 'esq' | 'dir' | 'centro'; nome: number }) {
+  const { k } = useCartao();
+  return (
+    <div className={cn('min-w-0', alinhar === 'dir' && 'text-right', alinhar === 'centro' && 'text-center')}>
+      <div className="text-balance font-display font-semibold leading-[1.05] tracking-[-0.025em]" style={{ fontSize: nome * k }}>
         {c.nomeUrna}
       </div>
-      <div className="num truncate text-fg-muted" style={{ fontSize: (x ? 17 : 19) * k, marginTop: 4 * k }}>
+      <div className={cn('num truncate font-semibold', corSlot(c.cor).text)} style={{ fontSize: 19 * k, marginTop: 6 * k }}>
         {partidoENumero(c)}
       </div>
     </div>
   );
+}
+
+/** % gigante e votos de um finalista. */
+function Numeros({ race, resumo, i, alinhar, pct }: { race: Race; resumo: Summary; i: number; alinhar: 'esq' | 'dir' | 'centro'; pct: number }) {
+  const { k } = useCartao();
+  const c = race.candidatos[i];
+  const tem = validos(resumo) > 0;
   return (
-    <div className={cn('flex min-w-0 flex-col', direita && 'items-end text-right')}>
-      {x ? (
-        <div className={cn('flex max-w-full items-center', direita && 'flex-row-reverse')} style={{ gap: 18 * k }}>
-          <AvatarCartao cor={c.cor} nome={c.nomeUrna} size={74} foto={foto} eleito={eleito} />
-          {nome}
-        </div>
-      ) : (
-        <>
-          <AvatarCartao cor={c.cor} nome={c.nomeUrna} size={Math.round(96 * k)} foto={foto} eleito={eleito} />
-          <div className="max-w-full" style={{ marginTop: 22 * k }}>
-            {nome}
-          </div>
-        </>
-      )}
-      <div style={{ marginTop: (x ? 18 : 26) * k }}>
-        <PctGigante valor={pctValidos(resumo, i)} size={(x ? 116 : 108) * k} cor={c.cor} apagado={!tem} />
-      </div>
-      <div className="num text-fg-muted" style={{ fontSize: (x ? 19 : 21) * k, marginTop: 10 * k }}>
+    <div className={cn('flex min-w-0 flex-col', alinhar === 'dir' ? 'items-end' : alinhar === 'centro' ? 'items-center' : 'items-start')}>
+      <PctGigante valor={pctValidos(resumo, i)} size={pct * k} cor={c.cor} apagado={!tem} />
+      <div className="num text-fg-muted" style={{ fontSize: 20 * k, marginTop: 10 * k }}>
         <span className="font-semibold text-fg">{fmtInt(resumo.votos[i] ?? 0)}</span> votos
       </div>
     </div>
   );
 }
 
-/** Linha de um candidato (story). */
-function LinhaStory({ race, resumo, i, foto }: { race: Race; resumo: Summary; i: number; foto?: string }) {
-  const { k } = useCartao();
-  const c = race.candidatos[i];
-  const tem = validos(resumo) > 0;
-  return (
-    <div>
-      <div className="flex items-center" style={{ gap: 26 * k }}>
-        <AvatarCartao cor={c.cor} nome={c.nomeUrna} size={Math.round(84 * k)} foto={foto} eleito={race.turno === 2 && resumo.eleito === i} />
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-display font-semibold leading-[1.05] tracking-[-0.025em]" style={{ fontSize: 40 * k }}>
-            {c.nomeUrna}
-          </div>
-          <div className="num text-fg-muted" style={{ fontSize: 20 * k, marginTop: 4 * k }}>
-            {partidoENumero(c)}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-end justify-between" style={{ marginTop: 18 * k, gap: 20 * k }}>
-        <PctGigante valor={pctValidos(resumo, i)} size={140 * k} cor={c.cor} apagado={!tem} />
-        <div className="num text-right text-fg-muted" style={{ fontSize: 21 * k, paddingBottom: 10 * k }}>
-          <span className="block font-semibold text-fg">{fmtInt(resumo.votos[i] ?? 0)}</span>
-          votos
-        </div>
-      </div>
-    </div>
-  );
-}
+/** Tamanho do nome por comprimento (nomes de urna longos quebram em duas linhas; nunca são cortados). */
+const corpoNome = (nome: string, base: number) => (nome.length <= 12 ? base : nome.length <= 17 ? base * 0.9 : base * 0.78);
 
 function MioloPlacar({ race, resumo, onde, fotos }: MioloProps) {
-  const { k, formato } = useCartao();
+  const { k, formato, w } = useCartao();
   const fin = race.candidatos.map((c, i) => ({ c, i })).filter(({ c }) => !c.agregado);
-  if (formato === 'story') {
+  if (fin.length < 2) return null;
+  const [ia, ib] = [fin[0].i, fin[1].i];
+  const eleito = race.turno === 2 && resumo.eleito !== null ? resumo.eleito : null;
+  if (formato === 'x') {
+    // 16:9: retratos no centro, cada candidato no seu lado (nome em cima, número embaixo)
+    const rw = 196;
+    const lateral = Math.floor((w - 112 - (2 * rw + 22)) / 2) - 20;
+    const coluna = (j: number, lado: 'esq' | 'dir') => (
+      <div className={cn('flex flex-col justify-between', lado === 'dir' && 'items-end')} style={{ width: lateral, height: Math.round(rw * 1.25), paddingTop: 4 }}>
+        <Cabeca c={race.candidatos[j]} alinhar={lado} nome={corpoNome(race.candidatos[j].nomeUrna, 32)} />
+        <Numeros race={race} resumo={resumo} i={j} alinhar={lado} pct={88} />
+      </div>
+    );
     return (
       <>
         <Cabecalho race={race} resumo={resumo} onde={onde} />
-        <div className="flex flex-1 flex-col justify-center" style={{ gap: 56 * k }}>
-          {fin.map(({ i }) => (
-            <LinhaStory key={i} race={race} resumo={resumo} i={i} foto={fotos[i]} />
-          ))}
-          <BarraDuelo race={race} votos={resumo.votos} alto={36 * k} />
-          <Demais race={race} resumo={resumo} />
+        <div className="flex flex-1 items-center justify-between" style={{ marginTop: 10 }}>
+          {coluna(ia, 'esq')}
+          <DueloComEleito race={race} ia={ia} ib={ib} fotos={fotos} w={rw} vao={22} eleito={eleito} folga={lateral} />
+          {coluna(ib, 'dir')}
         </div>
-        <Rodapezinho race={race} resumo={resumo} />
+        <div style={{ marginTop: 10, marginBottom: 12 }}>
+          <BarraDuelo race={race} votos={resumo.votos} alto={20} rotulo={false} />
+          {eleito !== null ? (
+            <div className="flex justify-center" style={{ marginTop: 12 }}>
+              <SeloEleito race={race} resumo={resumo} />
+            </div>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <Demais race={race} resumo={resumo} />
+            </div>
+          )}
+        </div>
       </>
     );
   }
+  // feed / story: como o topo da Home — retratos lado a lado e, embaixo de cada um, nome, partido e número
+  const story = formato === 'story';
+  const rw = story ? 380 : 318;
+  const vao = Math.round(30 * k);
+  // espaço livre de cada lado do par de retratos dentro do miolo (largura menos os respiros da moldura)
+  const folga = (w - (story ? 160 : 144) - (2 * rw + vao)) / 2;
   return (
     <>
       <Cabecalho race={race} resumo={resumo} onde={onde} />
-      {formato === 'x' && fin.length === 2 && race.turno === 2 ? (
-        <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] content-center" style={{ columnGap: 28, marginTop: 14 }}>
-          <Coluna race={race} resumo={resumo} i={fin[0].i} foto={fotos[fin[0].i]} />
-          <CentroDiferenca race={race} resumo={resumo} />
-          <Coluna race={race} resumo={resumo} i={fin[1].i} foto={fotos[fin[1].i]} direita />
+      <div className="flex flex-1 flex-col items-center justify-center" style={{ gap: (story ? 30 : 18) * k }}>
+        <DueloComEleito race={race} ia={ia} ib={ib} fotos={fotos} w={rw} vao={vao} eleito={eleito} folga={folga} />
+        <div className="grid w-full grid-cols-2" style={{ columnGap: 40 * k }}>
+          <Cabeca c={race.candidatos[ia]} alinhar="centro" nome={corpoNome(race.candidatos[ia].nomeUrna, 40)} />
+          <Cabeca c={race.candidatos[ib]} alinhar="centro" nome={corpoNome(race.candidatos[ib].nomeUrna, 40)} />
         </div>
-      ) : (
-        <div className="grid flex-1 grid-cols-2 content-center" style={{ columnGap: 48 * k, marginTop: (formato === 'x' ? 14 : 30) * k }}>
-          {fin.slice(0, 2).map(({ i }, n) => (
-            <Coluna key={i} race={race} resumo={resumo} i={i} foto={fotos[i]} direita={n === 1} />
-          ))}
+        <div className="grid w-full grid-cols-2" style={{ columnGap: 40 * k }}>
+          <Numeros race={race} resumo={resumo} i={ia} alinhar="centro" pct={story ? 100 : 86} />
+          <Numeros race={race} resumo={resumo} i={ib} alinhar="centro" pct={story ? 100 : 86} />
         </div>
-      )}
-      <div style={{ marginTop: (formato === 'x' ? 8 : 26) * k, marginBottom: (formato === 'x' ? 14 : 28) * k }}>
-        <BarraDuelo race={race} votos={resumo.votos} alto={(formato === 'x' ? 22 : 28) * k} rotulo={formato !== 'x'} />
-        <div style={{ marginTop: 12 * k }}>
-          <Demais race={race} resumo={resumo} />
+        <div className="w-full">
+          <BarraDuelo race={race} votos={resumo.votos} alto={(story ? 26 : 22) * k} rotulo={story} />
         </div>
+        {eleito !== null ? <SeloEleito race={race} resumo={resumo} /> : story ? <PilulaDiferenca race={race} resumo={resumo} /> : null}
+        {race.candidatos.some((c) => c.agregado) ? <Demais race={race} resumo={resumo} centro /> : null}
       </div>
-      <Rodapezinho race={race} resumo={resumo} />
     </>
   );
 }
 
-function Rodapezinho({ race, resumo }: Pick<MioloProps, 'race' | 'resumo'>) {
+/** Os dois retratos lado a lado com o "×" sobre o vão (como no topo da Home) e o selo no retrato de quem está eleito. */
+function DueloComEleito({ race, ia, ib, fotos, w, vao, eleito, folga }: { race: Race; ia: number; ib: number; fotos: (string | undefined)[]; w: number; vao: number; eleito: number | null; folga: number }) {
   const { k } = useCartao();
-  const eleito = race.turno === 2 && resumo.eleito !== null;
-  if (!eleito) return null;
+  const x = Math.round(54 * k);
+  const brilhoX = Math.max(0, Math.min(w * 0.32, folga - 2));
   return (
-    <div className="flex" style={{ marginBottom: 20 * k }}>
-      <SeloEleito race={race} resumo={resumo} />
+    <div className="relative flex shrink-0" style={{ gap: vao }}>
+      <RetratoCartao c={race.candidatos[ia]} foto={fotos[ia]} w={w} eleito={eleito === ia} brilhoX={brilhoX} />
+      <RetratoCartao c={race.candidatos[ib]} foto={fotos[ib]} w={w} eleito={eleito === ib} brilhoX={brilhoX} />
+      <span
+        aria-hidden
+        className="absolute left-1/2 top-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-line/[2] bg-surface font-display font-semibold leading-none text-fg shadow-card"
+        style={{ width: x, height: x, fontSize: x * 0.48 }}
+      >
+        ×
+      </span>
     </div>
   );
 }

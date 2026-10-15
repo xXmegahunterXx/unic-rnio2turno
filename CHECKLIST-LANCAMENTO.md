@@ -61,6 +61,8 @@ deploy/painel.sh estado
 | A3.4 | **Regras de cache** 1 (API pública e dados) e 2 (nunca guardar `/api/admin`, `/admin`, `/healthz`) | `curl -sI https://seu-dominio/api/status \| grep -iE 'cf-cache-status\|cache-control'` duas vezes → `HIT`/`EXPIRED`/`REVALIDATED`; em `/api/admin/state` → `BYPASS`/`DYNAMIC` | Técnico | sim (para a noite) |
 | A3.5 | Se ligar "Bot Fight Mode" ou regras de WAF: conferir que o monitor de uptime (A6) e os cartões do X (A7) continuam funcionando | A6 e A7 de novo | Técnico | não |
 | A3.6 | Depois de toda atualização que mude `public/data` ou `public/geo`: **limpar o cache** do prefixo `/data/` (e `/geo/`) | DEPLOY §5, último parágrafo | Técnico | não |
+| A3.7 | Regra 3 (chat sem query: `/api/chat` com a query ignorada na chave de cache) | `curl -s -o /dev/null -w '%{http_code}' 'https://seu-dominio/api/chat?x=1'` → 200 (vem da borda) | Técnico | não |
+| A3.8 | **Antes de vender anúncio:** *Painel → Audiência → Zerar medição* depois do deploy final (tira os testes) e conferir a concentração por rede no pico | painel | Técnico + Dono | não |
 
 ### A4. Senhas e acessos
 
@@ -121,7 +123,7 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 
 | # | Arquivo | O que trocar | Depende de |
 |---|---|---|---|
-| A9.1 | `src/app/components/pages/home/Institucional.tsx` (`CONTATO`) | os e-mails `@sintonia.example` pelos reais | B4 |
+| A9.1 | `src/app/components/pages/home/Institucional.tsx` (`CONTATO`) | os e-mails `@sintonia.example` pelos reais (enquanto o de privacidade for `.example`, o formulário "Quero anunciar" fica fechado em produção) | B4 |
 | A9.2 | `src/app/pages/static/SobrePage.tsx` (`EQUIPE`) | "Nome a definir" pelos nomes (ou tirar a seção) | B4 |
 | A9.3 | `src/app/pages/static/PrivacidadePage.tsx` | controlador, encarregado, operadores (provedor da VPS, Cloudflare), retenção de registros, data "atualizado em" | B3 e B1.7 |
 | A9.4 | `src/app/content/afirmacoes.ts` (+ `afirmacoes.test.ts` e a validação no fim do arquivo) | depois da revisão: `revisado: true` em cada afirmação aprovada (o tipo hoje é o literal `false`, de propósito) e as correções de texto | B2.1 |
@@ -143,6 +145,10 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | B1.6 | **Divulgação e impulsionamento** | Impulsionamento pago de conteúdo eleitoral é exclusivo de candidatos e partidos (Lei 9.504/97, art. 57-C): **não** pagar anúncio de post com nome ou número de candidato. Regras para posts do perfil do Sintonia no dia 25 | Jurídico + Dono | sim |
 | B1.7 | **Registros de acesso (Marco Civil, art. 15)** | Por desenho, o app e o Caddy **não registram IP**; a Cloudflare registra do lado dela. A política de privacidade diz que os registros técnicos "são guardados pelo prazo exigido pelo Marco Civil". Se o responsável for pessoa jurídica com fins econômicos, a guarda de 6 meses é obrigação: ligar log de acesso com retenção segura, ou ajustar o texto | Jurídico + Dono | sim |
 | B1.8 | **Patrocínio** | Só anunciante não político, com contrato que diga isso. Desligado por padrão | Jurídico + Dono | não |
+| B1.9 | **Chat ao vivo** (`/apuracao`, `/ao-vivo`) | Conteúdo de terceiros num site com anúncio: filtros, moderação e denúncia bastam (Marco Civil art. 19; Lei 9.504/97 art. 57-D, anonimato)? Ligar o **registro cifrado dos envios** (`CHAT_REGISTRO_CHAVE`, DEPLOY §5.1, desligado), quem guarda a chave privada? A sala fica fechada de 0h às 17h de 25/10 (art. 39 §5º) | Jurídico + Dono | sim |
+| B1.10 | **Anúncio em imagem com candidato** | Hoje DESLIGADO (`OFERECIMENTO_COM_CANDIDATOS = false`): placar e palpite com nomes saem sem "Oferecimento". Ligar só com parecer (a imagem circula sem o site em volta, com foto e número) | Jurídico + Dono | não |
+| B1.11 | **Palpite do 2º turno** | Prazo até 23h59 de 24/10, palpite travado e sem compartilhar no dia da votação, sem número agregado. Basta para não ser lido como pesquisa/prognóstico? | Jurídico | sim |
+| B1.12 | **Números de audiência na /anuncie** (interruptor desligado) | Só o pico do sinal das páginas, maior dia em únicos e páginas vistas, "desde <data>". A forma de medir (conservadora) está descrita; ligar depois de zerar a medição (A3.8) | Dono | não |
 
 ### B2. Revisão editorial
 

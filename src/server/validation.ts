@@ -112,6 +112,7 @@ const tse = z
     eleicaoGov: z.string().trim().regex(/^\d{1,6}$/, 'código de eleição inválido'),
     pleito: z.string().trim().regex(/^\d{1,6}$/, 'código de pleito inválido'),
     intervaloSeg: finito.min(5).max(600),
+    intervaloPrioritarioSeg: finito.min(3).max(600),
   })
   .partial()
   .strict();

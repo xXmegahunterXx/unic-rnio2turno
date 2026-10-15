@@ -11,7 +11,7 @@ import { margem, pctTotalizadas, pctValidos } from '@/shared/calc';
 import { fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { rgbSlot, slotDe } from '@/app/lib/raceUi';
-import { valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapModes';
+import { extraTooltip, valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapModes';
 import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { hachuraStyle } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
@@ -253,7 +253,7 @@ export function TileMap({
                   </span>
                   {valores && v.rotulo ? (
                     <span className="num mt-1 font-medium leading-none" style={{ fontSize: fontValor }}>
-                      {v.rotulo}
+                      {v.rotuloCurto ?? v.rotulo}
                     </span>
                   ) : null}
                   {encerrada ? (
@@ -286,13 +286,7 @@ export function TileMap({
               ? { label: rotuloAcao?.(tip.uf) ?? `Ver ${UF_NOMES[tip.uf]}`, onClick: () => onSelect(tip.uf) }
               : undefined
           }
-          extra={
-            modo === 'variacao' && vals[tip.uf]?.rotulo
-              ? `Variação de ${race.candidatos[0]?.nomeUrna} vs 1º turno: ${vals[tip.uf].rotulo}`
-              : modo === 'comparecimento' && vals[tip.uf]?.rotulo
-                ? `Comparecimento: ${vals[tip.uf].rotulo}`
-                : undefined
-          }
+          extra={extraTooltip(modo, vals[tip.uf]?.rotulo)}
         />
       ) : null}
     </div>

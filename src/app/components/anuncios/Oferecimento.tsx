@@ -31,6 +31,7 @@ export function OferecimentoTestePeca({
   previa,
   compacta,
   className,
+  rotulo = 'Teste Cego oferecido por',
 }: {
   anuncio: AnuncioPublico;
   vista?: string;
@@ -38,6 +39,8 @@ export function OferecimentoTestePeca({
   /** força a versão empilhada do celular (prévia em coluna estreita) */
   compacta?: boolean;
   className?: string;
+  /** rótulo da peça (o Palpite reaproveita o formato: "Palpite oferecido por") */
+  rotulo?: string;
 }) {
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'teste', bloco: 'teste', vista, ativo: !previa });
@@ -58,7 +61,7 @@ export function OferecimentoTestePeca({
         <div className={cn('flex min-w-0 flex-col items-center gap-3', sm('sm:flex-1 sm:flex-row sm:gap-4'))}>
           <LogoMarca anuncio={a} tamanho="lg" />
           <div className="min-w-0">
-            <RotuloAnuncio>Teste Cego oferecido por</RotuloAnuncio>
+            <RotuloAnuncio>{rotulo}</RotuloAnuncio>
             <p className="mt-1.5 truncate font-display text-[20px] font-semibold leading-tight tracking-[-0.02em] text-fg">{a.marca}</p>
             <p className="mt-0.5 text-pretty text-[13.5px] leading-snug text-fg-muted">{a.titulo}</p>
           </div>

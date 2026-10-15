@@ -53,6 +53,7 @@ import { PanoramaMunicipios } from '@/app/components/pages/detalhe/PanoramaMunic
 import { Destaques } from '@/app/components/pages/detalhe/Destaques';
 import { MunicipioPainel } from '@/app/components/pages/detalhe/MunicipioPainel';
 import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
+import { DesdePrimeiroTurno } from '@/app/components/apuracao/DesdePrimeiroTurno';
 import { ExteriorTabela, usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
 import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
 import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
@@ -104,6 +105,9 @@ export default function UfPage() {
   const t1PorCod = useMemo(() => new Map((snapT1?.municipios ?? []).map((m) => [m.cod, m])), [snapT1]);
   const primeiroTurno = useMemo(() => (snapT1 ? votosPorIbge(snapT1.municipios) : undefined), [snapT1]);
   const porCod = useMemo(() => new Map((snap?.municipios ?? []).map((m) => [m.cod, m])), [snap]);
+  // "Desde o 1º turno": municípios dos dois turnos pelo código TSE
+  const areasT2 = useMemo(() => Object.fromEntries((snap?.municipios ?? []).map((m) => [m.cod, m])), [snap]);
+  const areasT1 = useMemo(() => Object.fromEntries((snapT1?.municipios ?? []).map((m) => [m.cod, m])), [snapT1]);
   const opcoes: ComboOption[] = useMemo(() => {
     const lista = [...(snap?.municipios ?? [])].sort((a, b) => Number(b.capital) - Number(a.capital) || b.eleitorado - a.eleitorado);
     return lista.map((m) => ({
@@ -408,6 +412,23 @@ export default function UfPage() {
       ) : null}
 
       {lateralCelular}
+
+      {/* ------------------------------------------------------------ desde o 1º turno (% e votos; onde cada um cresceu mais) */}
+      {!t1 && ctx.fase !== 'pre' && raceT1 && snapT1 && !ctx.anonimizado ? (
+        <DesdePrimeiroTurno
+          race={race}
+          raceT1={raceT1}
+          resumo={r}
+          resumoT1={snapT1.resumo}
+          areas={unico ? undefined : areasT2}
+          areasT1={unico ? undefined : areasT1}
+          nomeArea={(cod) => porCod.get(cod)?.nome ?? cod}
+          rotuloArea={exterior ? { um: 'cidade', varios: 'cidades', feminino: true } : { um: 'município', varios: 'municípios' }}
+          ondeEleitoradoMin={exterior ? 0 : 5000}
+          simulado={simulado}
+          className={cn('mt-5 sm:mt-7', atualizando && 'opacity-60')}
+        />
+      ) : null}
 
       {/* ------------------------------------------------------------ publicidade (depois do placar e do mapa, nunca dentro) */}
       <AnuncioNativo posicao={1} className="my-5 sm:my-7" />

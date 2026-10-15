@@ -149,13 +149,23 @@ export function linhasRelatorio(
 
 /**
  * Campo do CSV. Texto que começa com = + - @ TAB ou CR (a marca é texto livre do anunciante) ganha um apóstrofo na
- * frente: o Excel/Planilhas trataria como fórmula mesmo entre aspas (=HYPERLINK(…) vira link clicável). Números vêm do
- * código e seguem como estão.
+ * frente: o Excel/Planilhas trataria como fórmula mesmo entre aspas (=HYPERLINK(…) vira link clicável). O mesmo vale
+ * para um trecho que começa logo depois de "," ";" TAB ou quebra de linha (uma planilha que separe por VÍRGULA — Excel
+ * em inglês, importação automática — leria "ACME,=cmd|…" como duas células). Campo com " ; , TAB ou quebra de linha
+ * vai entre aspas. Números vêm do código e seguem como estão.
  */
 export const csvCampo = (v: string | number) => {
   const s0 = String(v);
-  const s = typeof v === 'string' && /^[=+\-@\t\r]/.test(s0) ? `'${s0}` : s0;
-  return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  if (typeof v !== 'string') return s0;
+  const s = (/^[=+\-@\t\r]/.test(s0) ? `'${s0}` : s0).replace(/([,;\t\r\n][ \t]*)([=+\-@])/g, "$1'$2");
+  // número com vírgula decimal ("1,20", gerado pelo código) fica sem aspas: a planilha em pt-BR lê como número
+  return /[";\n\r\t]/.test(s) || (s.includes(',') && !/^-?\d+(,\d+)?$/.test(s)) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+/** Campo de TEXTO LIVRE (escrito por visitante): sempre entre aspas, além das proteções de `csvCampo`. */
+export const csvTexto = (v: string) => {
+  const c = csvCampo(v);
+  return c.startsWith('"') ? c : `"${c.replace(/"/g, '""')}"`;
 };
 
 /** CSV (separador ";", decimal com vírgula — abre direto no Excel/Planilhas em pt-BR) com BOM UTF-8. */

@@ -30,6 +30,26 @@
             } catch (e) {}
           }
         }
+        // Modo streamer (/live, fonte de navegador do OBS): tema e fundo pela URL antes da 1ª pintura — sem isso, a fonte
+        // "piscaria" com o fundo do site ao ativar a cena. Nunca usa a preferência salva. Padrões = components/live/opcoes.ts.
+        var rota = location.hash.charAt(1) === '/' ? location.hash.slice(1) : location.pathname + location.search;
+        if (/^\/live\/?(\?|$)/.test(rota)) {
+          var q = rota.split('?')[1] || '';
+          var ler = function (k) {
+            var r = new RegExp('(?:^|&)' + k + '=([a-z]+)').exec(q.toLowerCase());
+            return r ? r[1] : '';
+          };
+          var f = { dark: 'escuro', light: 'claro', transparent: 'transparente', nenhum: 'transparente' }[ler('fundo')] || ler('fundo');
+          if (f !== 'escuro' && f !== 'claro' && f !== 'transparente') f = /^(barra|canto)$/.test(ler('layout')) ? 'transparente' : 'escuro';
+          var tm = ler('tema');
+          t = f === 'claro' ? 'light' : f === 'escuro' ? 'dark' : tm === 'claro' || tm === 'light' ? 'light' : 'dark';
+          if (f === 'transparente') {
+            d.setAttribute('data-fundo', 'transparente');
+            var st = document.createElement('style');
+            st.textContent = 'html[data-fundo=transparente],html[data-fundo=transparente] body{background:transparent!important}';
+            document.head.appendChild(st);
+          }
+        }
         if (t === 'light' || t === 'dark') d.setAttribute('data-theme', t);
         // Barra do navegador (Safari, Chrome e navegadores embutidos como o do X) na cor do fundo do tema.
         if (d.getAttribute('data-theme') === 'light') {

@@ -234,7 +234,7 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
    - Quando: *Expressão personalizada*
      ```
      (http.host eq "seu-dominio" and (starts_with(http.request.uri.path, "/api/apuracao/")
-       or http.request.uri.path in {"/api/status" "/api/meta"}
+       or http.request.uri.path in {"/api/status" "/api/meta" "/api/chat" "/api/divulgacao"}
        or starts_with(http.request.uri.path, "/api/og/")
        or starts_with(http.request.uri.path, "/api/patrocinio/")
        or http.request.uri.path eq "/api/anuncio/img"
@@ -243,12 +243,28 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
      ```
    - Então: **Elegível para cache**; *TTL do cache de borda*: **"Usar o cabeçalho Cache-Control se presente,
      ignorar o cache se não"**; *TTL do navegador*: **"Respeitar os cabeçalhos existentes"**; *Chave de cache*:
-     manter a **query string inteira** (padrão — a apuração usa `?race=`, `?t=` e `&v=`).
+     manter a **query string inteira** (padrão — a apuração usa `?race=`, `?t=`, `&v=` e `?d=`, a marca dos números na
+     noite: cada dado novo do TSE vira um endereço novo, sem cópia velha na borda).
 
    **Regra 2 — "Sintonia: nunca guardar"**
-   - Quando: `starts_with(http.request.uri.path, "/api/admin") or http.request.uri.path eq "/healthz" or starts_with(http.request.uri.path, "/admin") or starts_with(http.request.uri.path, "/api/anuncio/ir/") or http.request.uri.path eq "/api/anuncio/evento"`
+   - Quando: `starts_with(http.request.uri.path, "/api/admin") or http.request.uri.path eq "/healthz" or starts_with(http.request.uri.path, "/admin") or starts_with(http.request.uri.path, "/api/anuncio/ir/") or http.request.uri.path eq "/api/anuncio/evento" or starts_with(http.request.uri.path, "/api/chat/") or http.request.uri.path eq "/api/audiencia" or starts_with(http.request.uri.path, "/api/anuncie/")`
    - Então: **Ignorar cache** (*Bypass*). Os cliques (`/api/anuncio/ir/…`) e as impressões (`/api/anuncio/evento`)
      dos anúncios precisam chegar sempre à VPS, senão o relatório de entrega dos anunciantes fica errado.
+
+   **Chat ao vivo** (`/api/chat`): o `GET` está na Regra 1 de propósito — é a MESMA URL para todo mundo, guardada 1 s na
+   borda (sem a regra, cada pessoa com a sala aberta consultaria a VPS a cada 2,5 s). Os envios, denúncias, reações e o
+   sinal de presença (`POST /api/chat` e `/api/chat/…`) nunca são guardados (a Cloudflare não guarda POST; a Regra 2 deixa
+   explícito). O chat fica na memória do processo: use **1 instância** (com réplicas, cada uma teria a sua sala).
+   O app responde 400 a `GET /api/chat` com query string (`?x=…` só serviria para furar a cópia da borda). Para nem
+   isso chegar à VPS, crie uma **Regra 3 — "Sintonia: chat sem query"** (depois das duas): quando
+   `http.request.uri.path eq "/api/chat"`, *Elegível para cache* com *Chave de cache → Query string → Ignorar tudo*
+   (o resto como na Regra 1).
+
+   **Audiência e "Quero anunciar"**: `/api/divulgacao` (redes do Sintonia e os números da página Anuncie) é a mesma URL
+   para todos e entra na Regra 1 (a borda guarda 1 min). O sinal de audiência (`POST /api/audiencia`) e o formulário
+   (`POST /api/anuncie/lead`) precisam chegar SEMPRE à VPS (Regra 2): é isso que conta as pessoas mesmo com a borda
+   guardando o `/api/status`. Na noite, o sinal de presença fica mais espaçado sozinho com mais gente (até 1 a cada 4 min
+   por aba visível).
 
    As páginas (HTML) não precisam de regra: o app manda `no-cache` e a Cloudflare não as guarda (cada link
    compartilhado precisa das meta tags da própria rota). Os arquivos `/assets/*` (JS/CSS com hash no nome) já são
@@ -267,7 +283,33 @@ ficam em cache).
 
 Com a Cloudflare, o IP real do visitante chega ao app pelo cabeçalho `CF-Connecting-IP`, que o Caddy só aceita
 quando a conexão vem de um IP da própria Cloudflare (lista em `deploy/caddy/Caddyfile`). "Pessoas agora" conta
-quem chega à VPS — com cache na borda, o número fica menor que a audiência real (ver README).
+quem chega à VPS — com cache na borda, o número fica menor que a audiência real (ver README); o pico da página
+Anuncie usa só o sinal das páginas (*Painel → Audiência*). **Depois do deploy final, antes de vender anúncio:**
+*Painel → Audiência → Zerar medição* (tira os acessos de teste) e confira a concentração por rede no pico.
+
+### 5.1 Registro dos envios do chat (opcional, desligado)
+
+Só ligue se o dono, com o advogado, decidir guardar os dados de conexão de quem escreve no chat (Marco Civil,
+art. 15). O servidor grava, para cada mensagem publicada, id, hora, IP e porta, **cifrados** com uma chave pública;
+a chave privada fica **fora da VPS** (só com ela dá para ler). Os arquivos ficam 6 meses no volume e não entram no
+backup comum. Com o registro ligado, a sala e a página de privacidade avisam sozinhas.
+
+```bash
+# no SEU computador (não na VPS): par de chaves; guarde privada.pem em lugar seguro (cofre, pendrive)
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out privada.pem
+openssl pkey -in privada.pem -pubout -out publica.pem
+# leve só a PÚBLICA para dentro do volume do app (na VPS, em /opt/sintonia)
+docker compose exec -T app sh -c 'cat > /var/lib/sintonia/registro-publica.pem' < publica.pem
+echo "CHAT_REGISTRO_CHAVE=/var/lib/sintonia/registro-publica.pem" >> .env
+# opcional, com Cloudflare: uma Transform Rule que mande a porta do visitante (cf.edge.client_port) num cabeçalho,
+# por exemplo x-porta-cliente, e:  echo "CHAT_REGISTRO_HEADER_PORTA=x-porta-cliente" >> .env
+docker compose up -d
+```
+
+Para atender uma ordem judicial: copie a pasta `/var/lib/sintonia/chat-registro` (ou só o arquivo do dia,
+`AAAA-MM-DD.reg`, em UTC) para o computador que tem a chave privada e rode, na pasta do projeto,
+`npx tsx scripts/chat-registro-abrir.ts --chave privada.pem --dir ./chat-registro --dia AAAA-MM-DD --id <id da mensagem>`
+(o painel mostra o id de cada mensagem).
 
 ## 6. Atualizando
 

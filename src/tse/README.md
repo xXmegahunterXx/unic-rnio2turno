@@ -143,7 +143,11 @@ Horas gravadas no BU (abertura/encerramento) são locais da urna.
 
 - `ETag` + `Last-Modified`; `If-None-Match` e `If-Modified-Since` respondem **304** (verificado).
 - gzip: `br-c0001-…-u.json` 9,3 KB → 2,4 KB.
-- `cache-control: max-age≈58` (Akamai): no ar, um arquivo pode chegar até ~1 min atrasado ao nosso servidor.
+- `cache-control: max-age≈58` (Akamai): no ar, um arquivo pode chegar até ~1 min atrasado ao nosso servidor. Em
+  15/10/2026 o arquivo Brasil do 2º turno veio com `max-age` de 1 e de 39 s em dois pedidos seguidos (servidores
+  diferentes do CDN deles, `cdn-cache-status: RefreshHit`): por isso uma cópia mais ANTIGA pode chegar depois de uma
+  mais nova, e o adaptador a descarta pela geração (`dg/hg`). Furar esse cache (query aleatória) bateria na origem do
+  TSE: não fazemos.
 - `x-ratelimit-limit: 2000` por segundo. Mesmo assim limitamos a ≤ 8 conexões simultâneas.
 - Arquivo ainda não publicado: **404 com XML `NoSuchKey`** (S3/Ceph) → tratado como "ausente", não erro.
 
@@ -226,6 +230,18 @@ salvarJson('.server-state/tse-historico.json', tse.exportarHistorico()); // peri
   quando nem o `cs` confirma a seção; seção existente sem BU ⇒ `totalizada: false`.
 - Polling (padrão 15 s, mínimo 5 s): Brasil + 28 UFs de Presidente + 1 arquivo por Governador
   (36 requisições condicionais; 304 quando nada mudou). Corridas `-t1` são lidas sob demanda (TTL 10 min).
+- **Arquivo prioritário** (`intervaloPrioritarioSeg`, padrão 5 s, 3–600): o resumo Brasil de Presidente tem um laço
+  próprio (`pollPrioritario`): pedido condicional, 1 tentativa, prioridade alta na fila do cliente, tempo-limite de 8 s;
+  com falha, espera ×2 a cada falha seguida (até 30 s, ±20%, ou o `Retry-After`) e loga só a primeira e a volta. Enquanto
+  ele roda, o laço normal não pede o arquivo Brasil (nem com as retentativas dele). O laço normal também se espaça
+  (×2 até 2 min) quando TODAS as disputas falham num ciclo, e o prioritário o antecipa quando o TSE volta. Enquanto o
+  TSE falha (última leitura prioritária com erro ou um ciclo inteiro com erro), a fila de municípios em segundo plano
+  esvazia e não recebe novos (`tseFalhando`); consultas de quem abre uma página continuam. Intervalo
+  prioritário ≥ `intervaloSeg` desliga o laço à parte. `health().prioritario`: leituras (novos, 304, cópias antigas
+  descartadas, erros), espera atual e o atraso TSE → servidor (`agora − dg/hg`) das últimas mudanças.
+- **Marca** (`marca(race)`, `frescor()`): hash (cyrb53) do conteúdo de todos os arquivos da corrida; igual enquanto nada
+  muda e igual em qualquer instância/reinício com os mesmos dados. O servidor usa no ETag (fonte `tse`) e publica no
+  `/api/status` (`frescor`) com a última leitura boa (`conferidoEm`); o app reconsulta o placar quando ela muda.
 - `simNow` = `geradoEm` = relógio de parede (o "relógio oficial" é o real). Série/eventos usam
   `ultimaAtualizacao` do arquivo (Brasil: Brasília exato).
 - Eventos (textos neutros): início; marcos 1/5/10/25/50/75/90/95/99/100% (só o maior de cada salto);

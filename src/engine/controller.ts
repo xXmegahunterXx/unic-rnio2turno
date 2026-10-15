@@ -584,6 +584,11 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
           if (!Number.isFinite(n) || n < 5 || n > 600) throw new CommandError('tse.intervaloSeg deve estar entre 5 e 600.');
           next.intervaloSeg = n;
         }
+        if (t.intervaloPrioritarioSeg !== undefined) {
+          const n = Number(t.intervaloPrioritarioSeg);
+          if (!Number.isFinite(n) || n < 3 || n > 600) throw new CommandError('tse.intervaloPrioritarioSeg deve estar entre 3 e 600.');
+          next.intervaloPrioritarioSeg = n;
+        }
         state = { ...state, tse: next };
         log('Configuração do TSE atualizada');
         break;

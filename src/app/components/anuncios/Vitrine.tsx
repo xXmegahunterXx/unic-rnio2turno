@@ -11,6 +11,8 @@ import { BarraRodapePeca } from './BarraRodape';
 import { FaixaTopoPeca } from './FaixaTopoPeca';
 import { imagemDoAnuncio } from './nucleo';
 import { OferecimentoTestePeca, OferecimentoTvPeca } from './Oferecimento';
+import { MolduraChatVitrine } from './OferecimentoChat';
+import { MolduraLiveVitrine } from '@/app/components/live/Cena';
 
 /** Linhas cinzas que fazem as vezes do conteúdo do site em volta da peça. */
 function Conteudo({ linhas = 2, className }: { linhas?: number; className?: string }) {
@@ -141,6 +143,20 @@ export function VitrineFormato({
               <div className="rounded-xl bg-surface-2" />
             </div>
           </div>
+        </div>
+      );
+    case 'live':
+      // modo streamer (/live no OBS): tela 16:9 de uma live com a peça real "Oferecido por" presa à marca do Sintonia
+      return (
+        <div className="overflow-hidden rounded-2xl border border-line bg-bg p-2 sm:p-3">
+          <MolduraLiveVitrine anuncio={anuncio} />
+        </div>
+      );
+    case 'chat':
+      // chat ao vivo da apuração: a faixa real "Sala oferecida por" no topo de uma sala desenhada (sem mensagens reais)
+      return (
+        <div className="rounded-2xl border border-line bg-bg p-3 sm:p-4">
+          <MolduraChatVitrine anuncio={anuncio} estreita={estreita} />
         </div>
       );
     case 'compartilhamento':

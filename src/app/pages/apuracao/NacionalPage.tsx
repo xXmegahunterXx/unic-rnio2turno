@@ -11,7 +11,7 @@
  * Publicidade (src/app/components/anuncios): cartão nativo DEPOIS do placar e do mapa (nunca dentro deles), como uma
  * linha própria da grade, e outro no fim da página.
  */
-import { useCallback } from 'react';
+import { Suspense, lazy, useCallback, type ComponentProps } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import type { LiveStatus, NationalSnapshot, Race, RaceId } from '@/shared/types';
 import type { PublicMeta } from '@/shared/api';
@@ -47,6 +47,32 @@ import { EstadosSecao, LiderancaCard, ParticipacaoSecao, RegioesCard } from '@/a
 import { NacionalEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
 import { ehSimulado, ehT1, raceExibida, semT1, ufDaRace } from '@/app/components/pages/nacional/fase';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { useNaTela } from '@/app/lib/useNaTela';
+
+// Fora do pedaço da página (LCP e peso de /apuracao): a chamada do Palpite só existe na fase 'pre'; o "Desde o 1º turno"
+// fica no fim da página e só monta perto da tela.
+const ChamadaPalpite = lazy(() => import('@/app/components/palpite/ChamadaPalpite').then((m) => ({ default: m.ChamadaPalpite })));
+const DesdePrimeiroTurnoBrasil = lazy(() => import('@/app/components/apuracao/DesdePrimeiroTurno').then((m) => ({ default: m.DesdePrimeiroTurnoBrasil })));
+
+/**
+ * "Desde o 1º turno" só quando chega perto da tela (useNaTela), com a altura reservada antes: assim ele nunca pinta no
+ * topo durante o carregamento (virava o elemento do LCP) nem empurra a página quando aparece.
+ */
+function DesdeT1Adiado({ className, ...props }: ComponentProps<typeof DesdePrimeiroTurnoBrasil>) {
+  const [ref, visto] = useNaTela<HTMLDivElement>('400px');
+  const reserva = <div aria-hidden className="min-h-[420px] rounded-3xl border border-line bg-surface/60" />;
+  return (
+    <div ref={ref} className={className}>
+      {visto ? (
+        <Suspense fallback={reserva}>
+          <DesdePrimeiroTurnoBrasil {...props} />
+        </Suspense>
+      ) : (
+        reserva
+      )}
+    </div>
+  );
+}
 
 /** Coluna do desktop largo (≥ 1360 px); abaixo disso os filhos entram direto na grade (ordem por `order-*`). */
 const COLUNA = 'contents min-[1360px]:flex min-[1360px]:min-w-0 min-[1360px]:flex-col min-[1360px]:gap-6';
@@ -142,7 +168,7 @@ export default function NacionalPage() {
         contexto={t1 ? '1º turno' : '2º turno'}
         selos={
           <>
-            <SeloFase status={status} resumo={resumo} t1={t1} revendo={t} />
+            <SeloFase status={status} resumo={resumo} t1={t1} revendo={t} race={raceId} instante={data.simNow} />
             {!t ? <PessoasAgora status={status} /> : null}
             {anonimizado ? <SeloAnonimo /> : null}
           </>
@@ -167,6 +193,9 @@ export default function NacionalPage() {
       {pre ? (
         <>
           <PreHeroVivo status={status} race={race2T} />
+          <Suspense fallback={null}>
+            <ChamadaPalpite variante="faixa" className="mt-6 sm:mt-8" />
+          </Suspense>
           <div id="primeiro-turno" className="mb-4 mt-8 scroll-mt-28 sm:mb-5 sm:mt-12">
             <Badge tone="brand" size="sm" icon="check-circulo" caps>
               Resultado oficial do 1º turno · TSE
@@ -267,7 +296,12 @@ export default function NacionalPage() {
           <EstadosSecao className="order-10 pt-2 min-[1360px]:order-none min-[1360px]:col-span-8 min-[1360px]:pt-4" race={race} ufs={data.ufs} raceLink={raceParam} t={t} />
           <div className={cn(COLUNA, 'min-[1360px]:col-span-4 min-[1360px]:pt-[5.25rem]')}>
             <ExteriorResumo className="order-11 min-[1360px]:order-none" race={race} data={data} meta={meta} raceLink={raceParam} t={t} />
-            <ComparacaoT1 className="order-6 min-[1360px]:order-none" race={race} resumo={resumo} raceT1={raceT1} anonimizado={anonimizado} />
+            {/* "Desde o 1º turno" (% e votos por finalista, onde cada um cresceu mais); com nomes ocultos, a explicação */}
+            {!anonimizado && raceT1 && dataT1 ? (
+              <DesdeT1Adiado className="order-6 min-[1360px]:order-none" race={race} raceT1={raceT1} resumo={resumo} resumoT1={dataT1.resumo} ufs={data.ufs} ufsT1={dataT1.ufs} aoVivo={!t} simulado={simulado} />
+            ) : (
+              <ComparacaoT1 className="order-6 min-[1360px]:order-none" race={race} resumo={resumo} raceT1={raceT1} anonimizado={anonimizado} />
+            )}
             <LiderancaCard className="order-12 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} t={t} />
           </div>
         </div>

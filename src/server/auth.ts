@@ -101,12 +101,16 @@ export class LimiteTaxa {
   }
 }
 
+/** Prefixos IPv6 usados para agrupar: /64 (limites comuns), /56 (audiência vendável), /48 (denúncias do chat). */
+export type PrefixoV6 = 64 | 56 | 48;
+
 /**
- * Rede do cliente para limites e contagem: IPv4 inteiro; IPv6 só o prefixo /64 (uma casa ou um servidor recebe uma
- * faixa /64 inteira — trocar o endereço dentro dela não pode zerar os limites). IPv4 dentro de IPv6 (::ffff:1.2.3.4)
- * vira o IPv4. Endereço que não parece IP segue como está.
+ * Rede do cliente para limites e contagem: IPv4 inteiro; IPv6 só o prefixo (padrão /64: uma casa ou um servidor recebe
+ * uma faixa /64 inteira — trocar o endereço dentro dela não pode zerar os limites; /56 e /48 agrupam mais, para números
+ * que não podem ser inflados por quem tem muitas /64, como a audiência que vai para material de venda e as denúncias).
+ * IPv4 dentro de IPv6 (::ffff:1.2.3.4) vira o IPv4. Endereço que não parece IP segue como está.
  */
-export function redeDoCliente(ip: string): string {
+export function redeDoCliente(ip: string, prefixo: PrefixoV6 = 64): string {
   let x = ip.trim().toLowerCase();
   const zona = x.indexOf('%');
   if (zona >= 0) x = x.slice(0, zona);
@@ -127,13 +131,16 @@ export function redeDoCliente(ip: string): string {
   const meio = dir !== undefined ? Array(Math.max(0, 8 - ge.length - gd.length)).fill('0') : [];
   const grupos = [...ge, ...meio, ...gd];
   if (grupos.length !== 8 || grupos.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return x;
-  return `${grupos
-    .slice(0, 4)
-    .map((g) => parseInt(g, 16).toString(16))
-    .join(':')}::/64`;
+  const n = grupos.slice(0, 4).map((g) => parseInt(g, 16));
+  if (prefixo === 56) n[3] &= 0xff00;
+  if (prefixo === 48) n.length = 3;
+  return `${n.map((g) => g.toString(16)).join(':')}::/${prefixo}`;
 }
 
-/** Identificador do cliente para limites/contagem: hash curto da rede (IPv4 inteiro, IPv6 /64), nunca o IP em claro. */
-export function chaveCliente(ip: string, sal: Buffer): string {
-  return createHash('sha256').update(sal).update(redeDoCliente(ip)).digest('base64url').slice(0, 16);
+/**
+ * Identificador do cliente para limites/contagem: hash curto da rede (IPv4 inteiro, IPv6 /64 — ou o prefixo pedido),
+ * nunca o IP em claro.
+ */
+export function chaveCliente(ip: string, sal: Buffer, prefixo: PrefixoV6 = 64): string {
+  return createHash('sha256').update(sal).update(redeDoCliente(ip, prefixo)).digest('base64url').slice(0, 16);
 }

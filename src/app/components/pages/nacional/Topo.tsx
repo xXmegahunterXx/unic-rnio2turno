@@ -5,10 +5,11 @@
  */
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import type { LiveStatus, Summary } from '@/shared/types';
+import type { LiveStatus, RaceId, Summary } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { NomesOcultos } from '@/app/components/apuracao/NomesOcultos';
+import { SeloAtualizacao, type ResumoSelo } from '@/app/components/apuracao/SeloAtualizacao';
 import { BotaoIncorporar } from '@/app/components/embed/BotaoIncorporar';
 import { Badge } from '@/app/ui/Badge';
 import { Icon } from '@/app/ui/Icon';
@@ -39,9 +40,23 @@ export function Topo({ eyebrow, titulo, contexto, selos, seletor, acoes, classNa
             {contexto ? <span className="sm:hidden">{contexto} · </span> : null}
             {eyebrow}
           </div>
-          <h1 className="text-balance font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg sm:text-[42px]">
-            {titulo}
-            {contexto ? <span className="hidden text-fg-muted sm:inline"> · {contexto}</span> : null}
+          {/* "Presidente · 2º turno": o contexto quebra INTEIRO ("2º turno" junto) e, quando cai na linha de baixo (página
+              estreita, chat aberto ao lado), o "·" fica de fora — cada pedaço começa com um prefixo de 0,6em e o recorte
+              (clip-path) esconde o prefixo de quem começa a linha. */}
+          <h1 className="text-balance font-display text-[30px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg sm:-ml-[0.6em] sm:text-[42px] sm:[clip-path:inset(-0.5em_-1em_-0.5em_0.6em)]">
+            {/* o recuo de 0,6em fica preso à 1ª palavra (padding do próprio texto): nunca sobra sozinho numa linha */}
+            <span className="sm:pl-[0.6em]">{titulo}</span>
+            {contexto ? (
+              <>
+                {' '}
+                <span className="hidden whitespace-nowrap text-fg-muted sm:inline-block">
+                  <span aria-hidden className="inline-block w-[0.6em] text-left">
+                    ·
+                  </span>
+                  {contexto}
+                </span>
+              </>
+            ) : null}
           </h1>
         </div>
         {seletor || acoes ? (
@@ -63,18 +78,27 @@ export function Topo({ eyebrow, titulo, contexto, selos, seletor, acoes, classNa
   );
 }
 
-/** Selo com o estado da apuração (complementa a pílula do cabeçalho do app, sem repetir o relógio). */
+/**
+ * Selo com o estado da apuração (complementa a pílula do cabeçalho do app, sem repetir o relógio). Apurando, com a
+ * disputa e o resumo completos: o selo de atualização (% apurado, "Atualizado às … · dado do TSE das …", "novo").
+ */
 export function SeloFase({
   status,
   resumo,
   t1,
   revendo,
+  race,
+  instante,
 }: {
   status: LiveStatus | undefined;
-  resumo?: Pick<Summary, 'status' | 'ultimaAtualizacao'>;
+  resumo?: Pick<Summary, 'status' | 'ultimaAtualizacao'> & Partial<Pick<Summary, 'secoes' | 'secoesTotalizadas' | 'votos'>>;
   t1?: boolean;
   /** "Reveja a noite": instante exibido (os números não atualizam sozinhos). */
   revendo?: number;
+  /** disputa exibida (frescor do TSE) */
+  race?: RaceId;
+  /** instante dos números exibidos (snapshot `simNow`): "Atualizado às" fora da fonte TSE */
+  instante?: number;
 }) {
   if (revendo !== undefined && !t1) {
     return (
@@ -117,6 +141,9 @@ export function SeloFase({
     );
   }
   if (status.fase === 'apurando') {
+    if (race && resumo && typeof resumo.secoes === 'number' && typeof resumo.secoesTotalizadas === 'number' && resumo.votos) {
+      return <SeloAtualizacao status={status} race={race} resumo={resumo as ResumoSelo} instante={instante} />;
+    }
     return (
       <span className="inline-flex h-6 items-center gap-2 rounded-lg bg-surface-3 px-2 text-xs font-semibold text-fg-muted">
         <LiveDot tone={status.simulacao ? 'brand' : 'live'} size={7} />

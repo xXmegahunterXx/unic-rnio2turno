@@ -40,8 +40,12 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
 5. **Sem deepfake e sem propaganda paga.** Nenhuma imagem gerada de candidato. Os espaços de anúncio aceitam só
    anunciantes não políticos (declaração obrigatória no cadastro), sempre rotulados ("Publicidade", "Patrocinado",
    "Oferecido por"), com link `rel="sponsored noopener noreferrer"` em nova aba, nunca dentro de placar/resultado nem
-   colados a foto, nome ou número de candidato, sem pop-up, intersticial, som ou animação piscante. Métricas de anúncio só
-   agregadas, sem cookie, sem IP e sem dado pessoal (§10.2, item 10).
+   colados a foto, nome ou número de candidato, sem pop-up, intersticial, som ou animação piscante. Exceção prevista,
+   hoje DESLIGADA (revisão final, out/2026): a imagem do PLACAR e o cartão do palpite com nomes poderiam levar
+   "Oferecimento: <marca>" numa faixa própria no pé — uma chave só, `OFERECIMENTO_COM_CANDIDATOS` em
+   `src/shared/oferecimento.ts` (servidor OG, ShareCard do app, cartões do palpite e os textos de /anuncie e /sobre a
+   seguem). Ligar é decisão do dono com o advogado: a imagem circula sem o site em volta, com foto e número de candidato.
+   Métricas de anúncio só agregadas, sem cookie, sem IP e sem dado pessoal (§10.2, item 10).
 6. **Fonte.** Dados reais vêm do TSE (resultados.tse.jus.br) e do IBGE (malhas). Cite as fontes na
    página `/metodologia`.
 
@@ -273,14 +277,16 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 - O motor é construído na subida (log com tempo) e reconstruído quando o cenário muda, sem bloquear:
   enquanto reconstrói, continua servindo o anterior.
 - **Cache HTTP** pensado para CDN: `status` com `s-maxage=1`; snapshots com `s-maxage=2,
-  stale-while-revalidate=10`; ETag por (versão, bucket de `simNow`). Comprime com gzip/br.
+  stale-while-revalidate=10`; ETag por (versão, bucket de `simNow`). Comprime com gzip/br. Na fonte `tse`: ETag pela
+  MARCA dos números (hash do conteúdo da corrida, muda no instante em que o TSE publica), `s-maxage=1,
+  stale-while-revalidate=1, stale-if-error=60`, e o placar nacional com `?d=<marca atual>` com `s-maxage=60` (§12.2).
 - **Admin**:
   - senha no env `ADMIN_PASSWORD`; em dev, se ausente, o padrão é `sintonia` com aviso no log;
   - cookie de sessão HMAC (`ADMIN_SECRET`), httpOnly, SameSite=Strict;
   - rate limit no login;
   - todos os comandos são validados com zod.
 - **Fonte `tse`**: polling do feed oficial (`src/tse`) no intervalo configurado, com cache e backoff,
-  mapeado para os mesmos snapshots. Detalhe por município sob demanda, com cache de 60 s. Mosaico e
+  mapeado para os mesmos snapshots; o resumo Brasil de Presidente tem laço próprio, mais curto (§12.2). Detalhe por município sob demanda, com cache de 60 s. Mosaico e
   seção na fonte TSE, se indisponíveis: o mosaico fica vazio e a seção dá 404 coerente.
 - **OG image**: `/api/og/apuracao.png` (satori + resvg) com o placar atual e a faixa "SIMULAÇÃO"
   quando for o caso. Na fase 3, uma imagem por tipo de página (município, seção, candidato, cargos, governadores,
@@ -292,6 +298,11 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
   `x-sintonia-versao`), `GET /sitemap.xml` e `GET /robots.txt` (gerados com `PUBLIC_URL`).
 - **Anúncios** (`anuncios.ts`, §10.2 item 10): `/api/status` com as imagens por `/api/anuncio/img?h=<hash>` e o link
   por `/api/anuncio/ir/<id>`; clique contado + 302; `POST /api/anuncio/evento` (impressão visível); relatório no admin.
+- **Chat ao vivo** (`chat.ts`, §11.11): `GET /api/chat` com `s-maxage=1` (mesma URL para todos); POSTs do próprio site;
+  admin em `/api/admin/chat`; tudo em memória (nada em disco, nada de IP).
+- **Crescimento** (`crescimento.ts`, §11.12): `POST /api/audiencia` (sinal agregado do app), `GET /api/divulgacao` (redes
+  do Sintonia + audiência medida, se o painel ligar), `POST /api/anuncie/lead` ("Quero anunciar"); admin em
+  `/api/admin/{audiencia,divulgacao,leads}`; `STATE_DIR/audiencia.json`, `leads.json` e `divulgacao.json`.
 - **Produção** (`NODE_ENV=production`): troca automática `pre` → `tse` às 17h de 25/10 (`troca-auto.ts`), simulação
   travada sem `ALLOW_SIMULACAO=1`, CSP/HSTS, CSRF no admin, logs em JSON e `/kit` = 404. Ver §12.
 
@@ -318,7 +329,8 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 - **Mapa**: coroplético pelo líder, com intensidade por margem em 4 buckets (<5, 5–15, 15–30, ≥30 p.p.).
   - Território sem seção apurada usa `pending`.
   - Hover/toque mostra um tooltip com o placar; clique navega.
-  - Modos: Vencedor · Margem · % apurado · Comparecimento · Variação vs 1º turno.
+  - Modos: Vencedor · Margem · % apurado · Comparecimento · Desde o 1º turno ("quem cresceu mais onde": variação de cada
+    finalista em p.p. dos válidos e a diferença entre as duas, na cor de quem cresceu mais; legenda simétrica — §11.14).
     "% apurado" e "Comparecimento" usam escala neutra (cinza, `fillEscalaNeutra`), nunca a marca: violeta ao lado
     do azul de Flávio Bolsonaro seria lido como cor de candidato.
   - O DF precisa de alvo de toque acessível (callout).
@@ -348,6 +360,10 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 | `/cenarios?c=` | "E se…? Monte seu cenário": calculadora do 2º turno a partir do 1º turno oficial (§11.4) |
 | `/candidato/:sqcand`, `/senado`, `/camara`, `/assembleias/:uf` | Cargos do 1º turno e fichas (§10.2) |
 | `/tv` | Modo TV (fora do AppShell) |
+| `/ao-vivo` | Sala da apuração em tela cheia: chat ao vivo moderado (§11.11) |
+| `/live?layout=&fundo=&tema=&race=&posicao=` | Modo streamer: fonte de navegador do OBS/Streamlabs (fora do AppShell, fundo transparente; §11.10) |
+| `/streamers` | "Use o Sintonia na sua live": layouts com prévia, URL para copiar, passo a passo do OBS, regras e contato (§11.10) |
+| `/palpite`, `/palpite#<código>` | Palpite do 2º turno: a pessoa crava o % dos válidos de cada finalista até as 17h de 25/10; depois, a diferença para o resultado oficial (§11.13) |
 | `/embed/placar`, `/embed/mapa`, `/embed/uf` | Widgets para incorporar em outros sites (§11.6) |
 | `/kit` | Vitrine do design system (QA visual): só no `npm run dev` e no build demo; em produção, 404 |
 
@@ -419,8 +435,9 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
       `rodape` (barra fixa do celular, pode ser fechada), `nativo` (cartão "Patrocinado" entre seções), `teste` ("Teste Cego
       oferecido por", só depois de revelar e longe do cartão do resultado), `tv` ("Oferecimento" na barra do topo do Modo TV;
       em retrato, faixa acima do letreiro) e `compartilhamento` ("Oferecimento: <marca>" no pé SÓ das imagens OG genéricas:
-      Teste Cego, calculadora sem código e capa das curiosidades — nunca placar, município, seção, ficha, eleitos, bancadas,
-      governadores, fato isolado ou cenário). `escolherAnuncio` (módulo próprio `anuncios-escolha.ts`, o único que entra no
+      Teste Cego, calculadora sem código, capa das curiosidades e o convite do Palpite; no app, os cartões do Palpite (§11.13);
+      e — `OFERECIMENTO_NO_PLACAR`, §11.14 — os cartões do PLACAR (Brasil/UF/município, servidor e app), abaixo da marca do
+      Sintonia; nunca seção, ficha, eleitos, bancadas, governadores, fato isolado ou cenário). `escolherAnuncio` (módulo próprio `anuncios-escolha.ts`, o único que entra no
       JS inicial do site; reexportado pelo contrato) faz a rotação ponderada pelo `peso`, fixa por semente, com o master
       vencendo em `topo`, `tv` e `compartilhamento`.
     - **Posição (regra dura)**: nada dentro de placar/resultado nem encostado em foto, nome ou número de candidato. A barra
@@ -462,10 +479,11 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
       limitar abusos (60 eventos/min; no máximo 100 mil visitantes por janela em memória); nunca é gravada. Robôs de
       prévia/busca não contam. Atrás de uma mesma rede (CGNAT), várias pessoas contam como uma: a contagem é conservadora.
     - **Imagens OG**: com anúncio `compartilhamento` no ar, faixa própria de 32 px no pé, centralizada ("Oferecimento:
-      <marca>", só texto, separada por linha), só nos cartões genéricos (`CARTOES_COM_OFERECIMENTO` em
-      `og-oferecimento.ts`); o cartão perde ~8 px de altura útil. Nesses cartões o conjunto de anunciantes entra na chave
-      de cache e no `&v=` das meta tags (`tagOferecimento`): trocar o anunciante gera imagens novas; as demais imagens
-      não mudam com o anunciante.
+      <marca>", só texto, separada por linha), nos cartões genéricos (`CARTOES_COM_OFERECIMENTO` em
+      `og-oferecimento.ts`; o cartão perde ~8 px de altura útil) e no placar (og-placar.ts, faixa desenhada no próprio
+      layout, abaixo do rodapé do Sintonia). Nesses cartões o conjunto de anunciantes entra na chave de cache e no `&v=` das
+      meta tags (`tagOferecimento`/`imagemComOferecimento`): trocar o anunciante gera imagens novas; as demais imagens não
+      mudam com o anunciante.
 
 ---
 
@@ -505,7 +523,7 @@ de usuários; as respostas do Teste Cego nunca saem do aparelho (exceto o link d
 
 | Tela | Cartão | Dado | Foto |
 |---|---|---|---|
-| Nacional, UF, município | placar (`apuracao/ShareCard`), com 16:9 de números gigantes, diferença e % apurado | 2º turno (simulado ou TSE) ou 1º turno oficial | só com dado real e nome real |
+| Nacional, UF, município | placar (`apuracao/ShareCard`): retratos oficiais GRANDES lado a lado com o "×" (como o topo da Home), números gigantes, barra dos 50%, % apurado e diferença; "Oferecimento" no pé (§11.14) | 2º turno (simulado ou TSE) ou 1º turno oficial | só com dado real e nome real (Presidente: `presidente-hd`); senão monograma no mesmo quadro |
 | Seção | "Como votou a minha seção" (`cartoes/Secao`): recibo do 2º turno (carimbo de simulação) + 1º turno oficial | misto | nunca |
 | Município | "Minha cidade no 1º turno" (`cartoes/MunicipioT1`) | oficial | oficial (nunca com nomes ocultos) |
 | Candidato | ficha (`cartoes/Candidato`) | oficial | oficial |
@@ -516,6 +534,7 @@ de usuários; as respostas do Teste Cego nunca saem do aparelho (exceto o link d
 | Curiosidades | fato (par simétrico dos finalistas) e resumo de 3 destaques | oficial | nunca |
 | Cenários | cenário hipotético + premissas; marca "Cenário hipotético · não é pesquisa nem previsão" em três camadas | hipotético | nunca |
 | Home | convite "Compartilhar o Sintonia" (data e contagem, sem número nem candidato) | — | — |
+| Palpite | "Meu palpite" e "Errei por Z p.p."/"Na mosca" (`palpite/CartaoPalpite`, §11.13), com a faixa "Oferecimento" | palpite da pessoa (sem placar oficial) | nunca |
 
 O cartão de cenários ajusta as premissas ao espaço (layout effect, antes da prévia e do PNG): começa com as mais
 informativas (2 no 16:9, 4 no feed/story) e tira as menos informativas até nada transbordar — nunca corta uma premissa ao
@@ -579,8 +598,8 @@ meio; só se nem uma couber inteira ela vai em linha única com reticências.
 
 | Rota | Conteúdo |
 |---|---|
-| `/api/og/apuracao.png?race=&uf=` | placar (Brasil ou UF) |
-| `/api/og/municipio.png?race=&uf=&cod=` | município: 1º turno oficial antes da apuração, placar ao vivo durante |
+| `/api/og/apuracao.png?race=&uf=[&formato=]` | placar (Brasil ou UF), retratos grandes (og-placar.ts); `formato` = `og` (1200×630, padrão), `x` (1200×675), `feed` (1080×1350), `story` (1080×1920) |
+| `/api/og/municipio.png?race=&uf=&cod=[&formato=]` | município: 1º turno oficial antes da apuração, placar ao vivo durante (mesmo layout e formatos) |
 | `/api/og/secao.png?race=&uf=&cod=&zona=&secao=` | boletim de urna (2º turno, se houver, + 1º turno oficial) e local |
 | `/api/og/candidato.png?sq=` | ficha com foto oficial (candidato inexistente → 404) |
 | `/api/og/senado.png`, `/camara.png`, `/assembleia.png` (`?uf=`) | hemiciclo e maiores bancadas; Senado por UF com os eleitos |
@@ -588,6 +607,7 @@ meio; só se nem uma couber inteira ela vai em linha única com reticências.
 | `/api/og/curiosidade.png?f=` | fato (ou capa com 3 destaques) |
 | `/api/og/cenario.png?c=` | cenário recalculado do código validado (inválido → cartão genérico da calculadora) |
 | `/api/og/teste.png` | Teste Cego (genérico; o código de um Duelo nunca é lido) |
+| `/api/og/palpite.png` | Palpite (genérico, sem candidato; nunca lê palpite: ele vai depois do `#` do link) — `og-palpite.ts` |
 
 - `summary_large_image` 1200×630 em todas as rotas; títulos e descrições neutros por rota, `og:locale`, largura/altura,
   canônico só com os parâmetros que mudam a página (`utm_*` não multiplica o cache), `twitter:site` por `TWITTER_SITE`.
@@ -609,8 +629,11 @@ nos cartões, nas imagens de prévia, na TV e nos widgets.
 
 ### 11.9 Desempenho e limites conhecidos
 
-- JS inicial (build de produção, gzip, out/2026 com anúncios e o hero com fotos): entrada **169,5 kB**; com os chunks da
-  rota de entrada pré-carregados `/` ≈ **198,7 kB** e `/teste` ≈ **195,2 kB** (meta: < 200). Curiosidades, cenários,
+- JS inicial (build de produção, gzip, revisão final de out/2026 com chat, modo streamer, audiência e palpite): entrada
+  **171,1 kB**; com os chunks da rota de entrada pré-carregados `/` ≈ **197,9 kB**, `/teste` ≈ **196,8 kB** (meta: < 200) e
+  `/apuracao` ≈ **289,9 kB**. Para caber: o "frescor" do selo de atualização, o índice da busca da Home (`BuscaInline`
+  carrega índice/recentes só ao ativar), a `ChamadaPalpite` e o "Desde o 1º turno" da página nacional (montado perto da
+  tela, `useNaTela`, com altura reservada) são chunks sob demanda. Curiosidades, cenários,
   widgets e o kit de compartilhar são chunks sob demanda. Anúncios no JS inicial: só o provedor, as regras puras
   (`nucleo.ts`, `anuncios-escolha.ts`) e a decisão da faixa do topo; as peças (`FaixaTopoPeca`, `AnuncioNativoPeca`,
   `pecas.tsx`) e a barra do rodapé são chunks sob demanda — AppShell e páginas importam direto dos módulos, nunca do
@@ -632,6 +655,227 @@ nos cartões, nas imagens de prévia, na TV e nos widgets.
 
 ---
 
+### 11.10 Modo streamer (`/live`) e página para streamers (`/streamers`)
+
+Objetivo: o Sintonia nas lives (Twitch, YouTube, Kick) com a marca do site sempre visível — é o que traz o público
+das transmissões — e um espaço de anúncio próprio (formato `live`).
+
+- **`/live`** (fora do AppShell; `src/app/pages/live/LivePage.tsx`, peças em `src/app/components/live`): layouts
+  `placar` (tela cheia), `barra` (GC/lower-third, `posicao=baixo|topo`), `canto` (`posicao=topo-direita|topo-esquerda|
+  baixo-direita|baixo-esquerda`) e `mapa` (Brasil por estado, `mapa=municipios`, ou a UF por município); `fundo=
+  transparente|escuro|claro` (padrão: escuro nos de tela cheia, transparente nos sobrepostos), `tema=escuro|claro`
+  (painéis; com fundo sólido acompanha o fundo), `race=pres|gov-xx` (`UFS_GOV_2T`). Opções e URL em `live/opcoes.ts`
+  (valor inválido → padrão). Medidas em `--u = min(1vh, 0,5625vw)` (1% da altura de uma tela 16:9: o mesmo desenho em
+  1920×1080 e 1280×720; `vh`, não `dvh`, por causa do navegador do OBS em versões antigas). Sem controles nem cursor;
+  o mesmo polling da apuração (`useStatus`/`useNacional`); números rolam (`NumberRoll`); antes do 1º dado não desenha
+  nada (transparente). Fase `pre`: 1º turno oficial + contagem regressiva. Simulação: faixa "Simulação · dados
+  fictícios", nunca "Fonte: TSE", nunca foto. Fotos por `useFotosRace`; cores por `corSlot(c.cor)`; nomes nunca cortados.
+- **Fundo transparente de verdade**: o script inline do `index.html` lê `fundo`/`tema` da URL da `/live` (BrowserRouter
+  e HashRouter) antes da 1ª pintura — marca `html[data-fundo=transparente]` e injeta um `<style>` que zera o fundo de
+  html/body — e nunca usa a preferência de tema salva. Sem isso a fonte "piscaria" com o fundo do site ao ativar a cena.
+  `live/preTinta.test.ts` roda o script e confere que ele concorda com `lerOpcoesLive`. O CSP já autoriza o script pelo
+  hash (calculado do template a cada build).
+- **Cabeçalhos**: a fonte de navegador do OBS/Streamlabs abre a `/live` como página principal (não é iframe):
+  `frame-ancestors 'self'`/`X-Frame-Options: SAMEORIGIN` não a afetam e continuam valendo (as prévias da `/streamers`
+  são iframes na mesma origem). `/embed/*` segue com `frame-ancestors *`. Estúdios web que carregam a fonte em iframe de
+  outra origem não funcionam (decisão consciente; abrir seria uma linha em `app.ts`). Meta: `/live` com `noindex` e
+  canônico na `/streamers`; `/streamers` no sitemap.
+- **Anúncio `live`** ("Oferecido por <marca>", `anuncios/OferecimentoLive.tsx`, contrato inalterado): sem link, fora do
+  placar — na barra do topo (placar, mapa) ao lado da marca, separado por um filete; na barra e no canto, numa aba presa
+  à faixa da marca do Sintonia (no canto, a faixa da marca troca de lado conforme o canto para ficar sempre entre o
+  anúncio e as linhas dos candidatos). Escolha por `escolherAnuncio(…, 'live', …)` (master primeiro) com revezamento
+  a cada 5 min entre os elegíveis. Impressão = a mesma regra dos outros formatos, uma por anúncio por carregamento da
+  página: no OBS, uma fonte ligada (não é audiência da live; o painel diz isso). `?previa=1` (só as prévias da
+  `/streamers`) não conta. Vitrine: `VitrineFormato` caso `live` (`live/Cena.tsx`, `MolduraLiveVitrine`: canto inferior
+  de uma live 16:9 ampliado, barra em esboço neutro e a peça real em prévia).
+- **`/streamers`** (no AppShell; link no rodapé e no menu "Mais"): prévia de cada layout (a própria `/live` num iframe
+  1280×720 reduzido, `loading=lazy`, `color-scheme` igual ao da página de dentro para o iframe ficar transparente),
+  opções, "Copiar URL" (`urlAbsoluta` → endereço público com `VITE_SITE_URL`), passo a passo do OBS/Streamlabs, regras
+  (créditos "via sintonia2026.com.br", não editar números, apartidário, simulação não é resultado) e contato de parceria
+  (`status.anuncie`, mensagem pronta para streamers). Sem número de audiência.
+- **Live em pé** (TikTok, Shorts, Kick no celular): com a fonte em retrato (1080×1920 ou 720×1280; media query
+  `orientation: portrait`), a `/live` troca `--u` para `min(1,8vw, 1vh)` e o layout `placar` vira `LayoutPlacarVertical`
+  (um candidato em cima do outro, barra e "apurado · diferença" numa linha, mesmo rodapé com QR e o anúncio no
+  cabeçalho, fora do placar). A mesma URL serve deitada e em pé; na `/streamers`, o cartão do placar tem "Tela da live:
+  Deitada 16:9 / Em pé 9:16" (prévia 720×1280) e o passo a passo cita 1080×1920.
+- **Prévias da `/streamers`** só montam perto da tela (`useNaTela`), com `src` estável (trocar opção navega dentro do
+  iframe, sem recarregar a página toda) e `previa=1`: sem polling, sem medição de audiência e sem impressão de anúncio
+  (números do momento em que abriu). Medido: ~8 consultas a `/api/status` em 15 s com a página parada (as da própria
+  página), nenhuma das prévias.
+
+### 11.11 Chat ao vivo moderado ("Sala da apuração")
+
+- **Contrato e filtros**: `src/shared/chat.ts` (isomórfico). Recusa links/domínios/perfis (@), e-mail, telefone, CPF e
+  números com ≥ 10 dígitos; palavrões, ofensas, preconceito, xingamentos partidários e ameaças (acentos, leetspeak, letras
+  repetidas e soltas; nomes de município como "Gado Bravo"/"Ponta Porã" são exceção); pedido de voto/propaganda
+  (número de urna com nome, "vote em", hashtags de campanha, "fora X", "X lá", "faz o L"/"faz arminha", "L13"/"B22", coro
+  "13 13 13"); "fraude nas urnas" e variantes (eleição roubada, urna hackeada, TSE manipulou). Letras de outros alfabetos
+  e larguras (cirílico, grego, fullwidth, versalete) são lidas como latinas (`paraLatim`: NFKC + tabela de parecidas)
+  antes de todos os filtros; link também com espaço antes do ponto, ponto largo ou vírgula ("golpe , com"). CAIXA ALTA
+  vira minúscula; repetições são encurtadas. Listas SIMÉTRICAS entre os finalistas (`chat.test.ts` confere os pares).
+  Apelido 2–20, só letras latinas (acentos do português incluídos), sem candidato (dataset + fixos, em par: Lula/Bolsonaro,
+  Jair, os vices pelo nome completo, Janja/Michelle…), partido, 13/22 (também por extenso) ou nome reservado (moderador, TSE, STF, tribunal,
+  juiz, ministro, Justiça Eleitoral, Sintonia…, também com leet e espaços). Texto 1–140.
+- **Servidor** (`src/server/chat.ts`, `SalaChat` + `registrarChatPublico`/`registrarChatAdmin`, 2 linhas em `app.ts`):
+  FECHADA por padrão; buffer das últimas 300 (no máximo 12 h), 60 no GET; visitante = número de 53 bits do hash
+  (`clienteDe` + token aleatório do navegador), rede = só `clienteDe`. Limites: modo lento (padrão 10 s, 3–300),
+  30/hora, 20 tentativas/min por visitante e 60 por rede (trocar o token não multiplica), 12 mensagens publicadas/min por
+  rede, autores novos (1ª mensagem há < 10 min) da mesma rede dividem um modo lento e no máximo 8 autores novos por rede
+  por hora; sem duplicada do autor (10 min) e no máximo 3 iguais de todos em 2 min (raid). Denúncia: só conta de quem
+  está com a sala na tela há ≥ 2 min (sinal de presença), por rede LARGA (/48 no IPv6); 3 redes diferentes escondem até
+  o admin decidir — o número sobe com a sala cheia (1 a cada mil pessoas, até 25) — e cada rede ajuda a esconder no
+  máximo 5 por hora (com 3, entra no aviso do painel). Silenciar pelo código do autor ou a REDE inteira por 1 h (as
+  mensagens saem). Presença: sinal só com a sala na tela, até 10 visitantes por rede (conservador),
+  intervalo de 30–180 s que sobe com a sala cheia; estimativa arredondada como "pessoas agora". Reações neutras
+  (🔥 😮 👏 👀): o público vê só o TOTAL do último minuto (nunca por emoji: quatro contadores lado a lado viram
+  termômetro de torcida); o painel vê por emoji. Presença e reações também param com a sala fechada pelo horário. `intervaloS` sobe sozinho se a origem receber
+  muitas consultas (sem CDN). Em produção, de 0h às 17h de 25/10 a sala não recebe mensagens (Lei 9.504/97, art. 39,
+  § 5º). `GET /api/chat` com query → 400 (a CDN guarda uma URL só; ignore a query na regra de cache); POST só do próprio
+  site (`Sec-Fetch-Site: same-origin` ou `Origin`). Log: só a ação do admin, nunca texto nem apelido. **Registro de
+  envios** (Marco Civil art. 15; DESLIGADO por padrão, `src/server/chat-registro.ts`): com `CHAT_REGISTRO_CHAVE` (chave
+  PÚBLICA RSA), cada mensagem publicada vira uma linha cifrada (id, hora, IP, porta) em `STATE_DIR/chat-registro`, 6 meses,
+  fora do backup; o servidor não consegue ler; a sala e a /privacidade avisam (`registro` no GET). Ligar é decisão do dono
+  com o advogado; abrir: `scripts/chat-registro-abrir.ts` com a chave privada, fora da VPS.
+- **App** (`src/app/components/chat`): estado único por aba (`sala.ts`: consulta só com interesse — sala na tela a cada
+  `intervaloS`, só o botão a cada ≥ 10 s, sala fechada 15–30 s, aba escondida parado —, junta por id, `removidas` e
+  `limpaEm`). `SalaDaApuracao` (montada pelo AppShell só em `/apuracao` e `/apuracao/:uf`; aparece com a sala aberta):
+  desktop = aba vertical na borda + painel que empurra a página (`--sala-lateral`, padding do `main` e do rodapé) quando
+  o layout continua o mesmo (`modoPainelDesktop` → `doca`: nacional em 1200–1359 e ≥ 1760 px; UF ≥ 1100), gaveta NÃO
+  modal abaixo do cabeçalho (nacional 1360–1759; Esc fecha) ou, em tela estreita (nacional < 1200, UF < 1100), `folha`
+  centralizada embaixo (até 440 px de altura: os dois percentuais do placar continuam à vista);
+  celular = botão flutuante acima da tab bar e da barra de anúncio (recolhe para uma alça na margem quando há bloco
+  `data-sem-anuncio-fixo` na faixa de baixo) e folha inferior NÃO modal de ~58% (rola o placar para ficar à vista acima;
+  a folha leva `data-sem-anuncio-fixo`, então a barra de anúncio some; o anúncio da sala fica no PÉ da folha). Regras
+  compactas no pé (popover com as regras inteiras e "Trocar apelido"); quem digita antes de ter apelido escreve a mensagem
+  e o apelido é pedido no envio. Mensagem enviada que o servidor não devolveu some depois da janela de consulta (não fica
+  "fantasma" na tela). Demo: sala desligada com aviso.
+- **Anúncio `chat`** (`anuncios/OferecimentoChat.tsx`, contrato inalterado): "Sala oferecida por <marca>" no topo da
+  sala (no pé, na folha do celular), só com a sala aberta, faixa própria fora das mensagens; rotação pelo peso fixa na visita, evitando
+  o anunciante do topo/rodapé; impressão visível e clique (`?f=chat`) como os demais. Vitrine: `MolduraChatVitrine`.
+- **Admin**: seção "Chat ao vivo" (`SecaoChat.tsx`, pensada para 390 px).
+
+### 11.12 Audiência real, "Siga o Sintonia" e pedidos de anunciantes
+
+Objetivo: números REAIS (medidos pelo próprio site) para vender anúncio, reter o público depois da eleição e receber
+pedidos de anunciantes. Contratos em `src/shared/audiencia.ts` e `src/shared/leads.ts`; servidor em
+`src/server/audiencia.ts`, `leads.ts` e `crescimento.ts` (rotas públicas e do painel, 2 linhas em `app.ts`; stores no
+`main.ts`).
+
+- **Sinal do app** (`src/app/lib/audiencia.ts`, chunk carregado pelo `main.tsx` depois da 1ª pintura; nunca no demo):
+  `POST /api/audiencia` (text/plain, sem cookie) com `{ g }` = GRUPO da rota (`grupoDaRota`: nunca caminho, query ou
+  código de Duelo) a cada troca de caminho (só a query mudar não conta), `{ o }` = origem da ENTRADA (1ª página da aba,
+  marcada em `sessionStorage`: `utm_source` ou família do referrer — X/t.co, WhatsApp, Instagram, Twitch, YouTube, Kick,
+  Google… — ou o domínio registrável; nunca a URL) e `{ p: 1 }` (presença) enquanto a aba está VISÍVEL, no intervalo que
+  o servidor devolve (`{ s }`: 60 s até 15 mil pessoas, 120 / 180 / 240 s acima — teto de ~600–800 sinais/s na origem a
+  ~150 mil pessoas; a presença leva o grupo, `{ p: 1, g }`). Página aberta escondida só conta quando aparece. Não manda
+  nada com `navigator.webdriver`, Global Privacy Control ou Do Not Track. `/admin`, `/kit`, widgets, `/live` e as prévias
+  (`?previa=1`) não mandam presença (`GRUPOS_FORA_DE_PESSOAS`); o servidor ignora presença desses grupos.
+- **Servidor** (`Audiencia`): pessoa = hash(rede LARGA + User-Agent) — rede = IPv4 inteiro ou IPv6 /56 (`chaveCliente(…,
+  56)`: uma casa costuma receber um /56, e trocar de /64 não multiplica ninguém). Só aceita sinal com
+  `Sec-Fetch-Site: same-origin` (Origin forjado por script não basta). Únicos/dia = conjunto em memória de chaves
+  de 32 bits com sal DIÁRIO aleatório, nunca gravado, descartado à meia-noite de Brasília (fica só a contagem);
+  reinício no meio do dia → os únicos do dia ficam pelo maior trecho (conservador; o painel mostra os reinícios).
+  Presença = linear counting em baldes de 30 s, janela = intervalo + 60 s. **Pico** (com data/hora, total, por dia e por
+  hora) = a cada 10 s SÓ a presença (sinal das páginas, que exige JavaScript e navegador e passa pela CDN). O
+  `pessoasAgora` do servidor (quem chegou à origem em ~30 s) aparece no painel só como referência: um único host o infla
+  com pedidos que furam o cache, então ele nunca entra no pico nem na /anuncie (CDC, art. 37). Widgets (`/embed/*`) e
+  `/live` contam no grupo, mas ficam fora de páginas, únicos e pico. Limites contra inflar: 600 sinais/min por rede, 20
+  páginas/min por pessoa, 50 pessoas novas por rede por dia e 10 por balde de presença; robôs/automação fora. O painel
+  mostra a **concentração** (quanto as 10 maiores redes somam, agora e no pico) para conferir antes de vender. Grava `audiencia.json` (atômico) a cada 60 s
+  e no encerramento: só contagens (até 400 dias, 48 h por hora, 300 origens por dia).
+- **Painel → Audiência** (`SecaoAudiencia.tsx`): agora, pico, únicos e páginas de hoje, 48 h em barras, por dia, seções e
+  origens (7 dias), concentração por rede, CSV (dia, hora, origens), "Zerar medição" (zere depois do deploy, antes de
+  vender: tira os testes), o interruptor **"Mostrar audiência na página /anuncie"**
+  (padrão DESLIGADO; `divulgacao.json`) com prévia, e os links **"Siga o Sintonia"** (X, Instagram, TikTok, canal do
+  WhatsApp, Telegram, YouTube; só https no domínio da própria rede).
+- **Público**: `GET /api/divulgacao` (`public, max-age=120, s-maxage=60` + ETag) → `{ redes, audiencia }`. `/anuncie`
+  mostra os números medidos (pico com data/hora, maior dia em únicos, páginas vistas "desde <data>") só com o interruptor
+  ligado e só os que forem > 0. "Siga o Sintonia" no rodapé (chunk próprio, fora do JS inicial), no fim do resultado do
+  Teste Cego e no fim de `/anuncie`; sem rede configurada (ou no demo), nada aparece.
+- **"Quero anunciar"** (`crescimento/FormLead.tsx` em `/anuncie#contato`; WhatsApp/e-mail do painel continuam ao lado):
+  nome, empresa, e-mail de trabalho, WhatsApp (opcional), formatos, mensagem e consentimento obrigatório ("uso só para
+  responder ao seu contato"). Campo-isca + tempo mínimo de 3 s (o app espera o que faltar; robô recebe "ok" e nada é
+  guardado), 3 por rede (/56) por hora, repetido em 24 h não duplica; acima de 120 no total por hora (enxurrada), o pedido
+  entra em QUARENTENA (guardado com selo no painel; cheio, a quarentena sai antes) em vez de recusar todo mundo.
+  Cada pedido guarda a prova do consentimento (`consentimento: { versao, em }`, `VERSAO_CONSENTIMENTO` e o texto em
+  `TEXTOS_CONSENTIMENTO`). `leads.json` (permissão 600, sem IP, no máximo 2.000; cheio, sai o respondido mais antigo;
+  respondidos saem depois de 180 dias e os sem resposta depois de 1 ano). Em produção o formulário fica FECHADO ("abre
+  em breve") enquanto o contato de privacidade for o provisório `.example` (`contatoProvisorio`): sem canal real para o
+  titular, não se coleta. Log: só "novo pedido".
+  **Painel → Interessados** (`SecaoInteressados.tsx`): lista, responder por e-mail/WhatsApp com mensagem pronta,
+  marcar respondido, apagar, CSV com `csvCampo`/`csvTexto` (neutraliza fórmula também depois de vírgula, ponto e vírgula,
+  tab ou quebra de linha; colunas de consentimento e quarentena), selo com o número de não respondidos no menu.
+
+### 11.13 Palpite do 2º turno (`/palpite`)
+
+Motor viral INDIVIDUAL: até as 23h59 de 24/10 (véspera; `FIM_PALPITES`) a pessoa crava o % dos votos válidos de cada finalista de Presidente e
+posta o cartão "Meu palpite"; depois do resultado oficial, a página mostra "Você errou por Z p.p." / "Na mosca" e o
+cartão do resultado. Código em `src/app/components/palpite` (`nucleo.ts` puro e testado), página
+`src/app/pages/palpite/PalpitePage.tsx`.
+
+- **Nunca é enquete nem sai do aparelho** (§1.2, §1.3): nada de POST, log ou analytics com o palpite; nenhum número
+  agregado de palpites existe. Fica no `localStorage` (`sintonia:palpite` = `{ v: 1, a, em }`, só conveniência) e só sai no
+  link que a pessoa compartilhar, DEPOIS do `#` (`/palpite#1e0`, "1" + décimos em base 36), e na imagem gerada no
+  navegador. O servidor nunca vê o código: meta tags e `/api/og/palpite.png` são genéricas.
+- **Valor**: décimos de p.p. do candidato de MENOR número (ordem da urna), inteiro de 300 a 700 (30,0%–70,0%, simétrico);
+  os dois lados somam 100. Divisor único com a metáfora da calculadora (arrastar na direção de um candidato aumenta a
+  parte dele), trilha só de 30% a 70% (precisão de 0,1 no celular), botões simétricos de +0,1 para cada lado e "50% ·
+  50%"; teclado e leitor de tela pelo `<input range>` nativo.
+- **Prazo**: `FIM_PALPITES` = 0h de 25/10 em Brasília (o palpite com nomes e percentuais circulando no dia da votação
+  pareceria pesquisa de boca de urna), pelo relógio do SERVIDOR (`LiveStatus.wallNow`, deslocamento do aparelho).
+  `fasePalpite`: `aberto` → `votacao` (0h–17h de 25/10: palpite travado, sem compartilhar, sem chamada na Home/apuração,
+  aviso na página) → `fechado` (comparação com o resultado). Sem palpite, a página só convida a acompanhar a apuração.
+- **Comparação** (`resultadoOficial`): só fonte `tse`, sem simulação, fora da fase `pre`, corrida `pres` do 2º turno com
+  votos; parcial ("até agora, com X% das seções…") e final (100% das seções ou `encerrada`). Diferença arredondada a 1 casa;
+  abaixo de 0,5 p.p. = "Na mosca". Números simulados nunca entram (no demo a comparação não aparece).
+- **Link recebido**: mostra o palpite de quem mandou, a distância para o seu e, com o resultado final, quem ficou mais perto
+  (só as duas pessoas, como o Duelo). O seu palpite começa em 50/50 (sem âncora no palpite recebido).
+- **Cartões** (`CartaoPalpite`, x/feed/story sobre `CartaoBase`): "Meu palpite" (lado a lado no 16:9; um em cima e outro
+  embaixo no retrato, com números maiores) e "Errei por Z p.p." / "Na mosca" (com o palpite embaixo; SEM o placar oficial).
+  Sem foto (números hipotéticos) e SEM número de urna (só nome e partido: nome + número circulando é a cara de um santinho),
+  cores dos dados. Textos (`textos.ts`) neutros, ordem da urna, ≤ 220 de peso no X, convite "Faça o seu até 24/10".
+- **Anúncios**: página = formato `teste` com o rótulo "Palpite oferecido por" (`OferecimentoPalpite`), no FIM, depois de
+  "Como funciona". Cartões "Meu palpite"/resultado (nomes + percentuais): faixa "Oferecimento" só com
+  `OFERECIMENTO_COM_CANDIDATOS` (hoje DESLIGADO, §1.5). A imagem-convite genérica `/api/og/palpite.png` (sem candidato)
+  continua em `CARTOES_COM_OFERECIMENTO`/`imagemComOferecimento` (anunciante no `&v=`).
+- **Chamadas**: `ChamadaPalpite` (chunk sob demanda) na home (1ª seção abaixo da dobra, fora do hero) e na apuração na fase
+  `pre` (faixa entre a contagem e o 1º turno); some na janela da votação; depois das 17h só aparece para quem cravou. Menu
+  "Mais" e sitemap.
+
+### 11.14 Cartões do placar com retratos grandes e "Desde o 1º turno"
+
+- **Cartão do placar no servidor** (`src/server/og-placar.ts`, substitui o antigo `layoutPlacar` de og.ts): no espírito do topo
+  da Home (`DueloPresidencia`) — os dois retratos oficiais GRANDES lado a lado (quadro 4:5, moldura em degradê e brilho na cor
+  de identidade que vem dos dados), o "×", números gigantes, barra dividida (os demais no meio no 1º turno, marca dos 50%), %
+  apurado e horário de Brasília, `sintonia2026.com.br` (ou o host de `PUBLIC_URL`) e, só com `OFERECIMENTO_NO_PLACAR` (=
+  `OFERECIMENTO_COM_CANDIDATOS`, hoje DESLIGADO, §1.5), a faixa "Oferecimento" abaixo do rodapé (no story, etiqueta acima
+  da faixa livre de 150 px). 16:9: retratos no centro e cada candidato
+  no seu lado; feed/story: retratos em cima e nome/partido/número embaixo; story com a pílula da diferença. Presidente usa
+  `presidente-hd` (originais do TSE, 161×225, sem edição); sem ele (ou governador), o pacote da corrida; tudo ou nada.
+  Simulação: monograma no MESMO quadro, selo, faixa e marca-d'água; nunca "Fonte: TSE". Nomes nunca cortados (quebram em duas
+  linhas).
+- **Desempenho**: satori + resvg com fundo TRANSPARENTE, e o fundo com o brilho dos cantos composto em JS (`comporSobreFundo`:
+  um `radial-gradient` do tamanho do cartão custava ~200 ms no resvg); PNG RGB com filtro Paeth e deflate 6 (`pngDeRgba(…,
+  6, 'paeth')`). Medido (mesma máquina, 24 imagens seguidas): antigo 1200×630 mediana 337 ms, 113 KB, RSS 303 MB → novo
+  1200×630 152 ms, 262 KB (abaixo dos ~300 KB em que o WhatsApp deixa de mostrar a prévia; sem foto ≈ 130 KB), RSS 331 MB;
+  story 390 ms, 520 KB. Cache e fila: os mesmos (ServicoOg); cada formato tem a sua chave (`|x`, `|feed`, `|story`).
+- **Cartão no app** (`apuracao/ShareCard`, x/feed/story sobre `CartaoBase`): o mesmo desenho em DOM (html-to-image), retratos via
+  `useFotosHero` (HD), o brilho limitado à área do miolo (o `overflow-hidden` da moldura cortaria em linha reta) e, só com a
+  mesma chave ligada, a faixa "Oferecimento" fora da moldura (`escolherAnuncio(…, 'compartilhamento', 'og|<corrida>|<local>')`).
+- **"Desde o 1º turno"** (contrato `src/shared/desde-t1.ts`, puro e isomórfico; painel `apuracao/DesdePrimeiroTurno.tsx` na
+  página nacional — no lugar da antiga comparação — e na da UF): para cada finalista, a variação em p.p. dos válidos (o 1º turno
+  sobre todos os candidatos, regra do TSE) e em VOTOS só onde a comparação é justa — a abrangência inteira concluída (exato) ou a
+  soma das subáreas com 100% das seções (municípios), com quantas são e quanto do eleitorado cobrem. Sem nenhuma concluída, os
+  votos de agora (nunca o parcial contra o total do 1º turno). "Onde cada um cresceu mais que o outro": as subáreas concluídas
+  com a maior diferença entre as variações (mesma conta da camada do mapa), 3 para cada um, piso de 5 mil eleitores na UF e
+  10 mil no Brasil. Brasil por município: `GET /api/apuracao/:race/br/desde-t1` (`src/server/desde-t1.ts`; só Presidente no 2º
+  turno; 1º turno do dataset; 2º turno do motor ou, na fonte TSE, SÓ do cache de municípios — `TseSource.resumosMunicipaisEmCache`,
+  sem baixar nada nem mexer na fila —; recalculado no máximo a cada 5 s, `s-maxage=5`, ETag; nomes ocultos → 404). No build demo
+  o painel do Brasil compara por estado. Simulação: selo no bloco; nomes ocultos: o bloco não aparece (a explicação de antes).
+- **Camada do mapa "Desde o 1º turno"** (`mapModes.ts`, modo `variacao`): `crescimentoDesdeT1` = (p0₂ − p0₁) − (p1₂ − p1₁),
+  na cor de quem cresceu mais, saturando em ±10 p.p.; tooltip "Desde o 1º turno: Lula +5,1 · Flávio +2,0 p.p."; no mapa, a
+  diferença (`rotuloCurto`). Mapa por UF, por município da UF e nacional por município (canvas).
+
 ## 12. Produção
 
 Guia de instalação para leigos: [`DEPLOY.md`](./DEPLOY.md). Antes de divulgar: [`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md).
@@ -648,7 +892,7 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
                         │  rede interna do Docker (porta do app não publicada)
                         ▼
                app: 1 processo Node 22 (dist/ + dist-server/main.js): SPA, API, motor, adaptador do TSE, imagens OG
-                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json
+                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json + audiencia.json + leads.json + divulgacao.json
 ```
 
 - **Imagem** (`Dockerfile`): multi-stage em `node:22-bookworm-slim` (glibc, por causa do binário do resvg); a final leva
@@ -683,6 +927,19 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
   Presidente e nenhuma disputa de governador segue apurando (`tseTudoEncerrado`).
 - Na noite, o adaptador mantém o último dado bom quando o feed falha (sem aviso automático ao público; o operador
   publica um, `RUNBOOK-ELEICAO.md` §3.1).
+- **"Mais rápido que a TV"** (out/2026): o resumo Brasil de Presidente (o menor arquivo e o mais olhado) é lido num laço
+  próprio a cada `tse.intervaloPrioritarioSeg` (padrão 5 s, 3–600, painel → Fonte → "Placar nacional"), com pedido
+  condicional (304), 1 tentativa por vez, prioridade alta na fila do cliente (≤ 8 conexões) e backoff ×2 até 30 s quando
+  o TSE falha (o laço normal também se espaça até 2 min quando TODAS as disputas falham, e volta assim que o prioritário
+  vê o TSE responder; a fila de municípios em segundo plano para enquanto o TSE falha — TSE falso com 503 por 90 s:
+  1.062 → 224 pedidos); o laço normal (15 s) não repete o arquivo. Cópia mais antiga do CDN do TSE (geração `dg/hg`
+  anterior) é descartada. A marca dos números de cada disputa vai no `/api/status` (`frescor`, com a última leitura
+  boa); o app reconsulta o placar na hora em que ela muda, pede `…/br?d=<marca>` (endereço novo = nada velho no
+  navegador nem na CDN) e mostra "Atualizado às HH:MM:SS · dado do TSE das HH:MM:SS" com o % apurado e uma etiqueta
+  "novo" (`SeloAtualizacao`). Medido com o TSE falso (publicação a cada 7 s, CDN emulada): TSE → tela de 11,4 s em média
+  (máx. 19 s; 32,6 s com pouco tráfego, pelo `stale-while-revalidate=10`) para 3,6 s (máx. 6,4 s). O cache do CDN do
+  próprio TSE (`max-age` de até ~60 s) fica fora do nosso alcance; o atraso TSE → servidor medido aparece no
+  `/api/admin/tse/health` (`prioritario.atrasoMs`).
 
 ### 12.3 Segurança
 
@@ -698,7 +955,8 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
 - **Limites**: URL ≤ 8 KB (414), corpo ≤ 512 KB (413), imagens OG novas ≤ `OG_LIMITE_MIN`/min por cliente (429) e fila
   de geração limitada (503); estáticos nunca servem arquivos ocultos; erros sem pilha para o cliente.
 - **Privacidade**: nenhum log de IP, cookie, senha, query string ou código de Duelo (o Caddy não tem log de acesso);
-  respostas do Teste Cego nunca chegam ao servidor (§1.3); métricas de anúncio só agregadas (§10.2, item 10). Ver
+  respostas do Teste Cego nunca chegam ao servidor (§1.3); métricas de anúncio só agregadas (§10.2, item 10); audiência só
+  agregada, com sal diário nunca gravado, e pedidos de anunciantes sem IP (§11.12). Ver
   `CHECKLIST-LANCAMENTO.md` B1.7 sobre o Marco Civil.
 - **Anúncios**: imagens do admin com CSP `sandbox` + `nosniff`; páginas com `img-src 'self'` (+ origem do `PUBLIC_URL`),
   `data:` e `blob:` (nenhum pixel de terceiro); clique só para o link cadastrado e só contado em navegação vinda do site

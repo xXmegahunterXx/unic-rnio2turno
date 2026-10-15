@@ -28,7 +28,7 @@ import { STROKE_DIVISA } from '@/app/lib/raceUi';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { bboxes, parseViewBox, useGeo, type GeoUfExt } from './geo';
-import { MAP_MODES, valorModo, type MapMode } from './mapModes';
+import { MAP_MODES, extraTooltip, valorModo, type MapMode } from './mapModes';
 import { MapHatchPattern } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
 import { useClickOutside, useElementSize } from './MapHooks';
@@ -428,12 +428,7 @@ export function UfMap({
           }
           extra={
             tipMun && (modo === 'variacao' || modo === 'comparecimento')
-              ? (() => {
-                  const v = valorModo(modo, tipMun, { race, primeiroTurno: primeiroTurno?.[tipMun.ibge] });
-                  return v.rotulo
-                    ? `${modo === 'variacao' ? `Variação de ${race.candidatos[0]?.nomeUrna} vs 1º turno` : 'Comparecimento'}: ${v.rotulo}`
-                    : undefined;
-                })()
+              ? extraTooltip(modo, valorModo(modo, tipMun, { race, primeiroTurno: primeiroTurno?.[tipMun.ibge] }).rotulo)
               : undefined
           }
         />

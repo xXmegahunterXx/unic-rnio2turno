@@ -32,7 +32,7 @@ import { fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { STROKE_DIVISA, rgbSlot, slotDe } from '@/app/lib/raceUi';
 import { bboxes, parseViewBox, pontoMaisLeste, useGeo, type BBox } from './geo';
-import { MAP_MODES, valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapModes';
+import { MAP_MODES, extraTooltip, valorModo, rotuloApurado, type MapMode, type ModeValue } from './mapModes';
 import { inkToken, useTokenColors } from '@/app/lib/tokens';
 import { MapHatchPattern } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
@@ -468,7 +468,7 @@ export function BrazilMap({
                           className="num"
                           style={{ fontWeight: 500, fontSize: fs * 0.88, opacity: 0.85 }}
                         >
-                          {vals[uf].rotulo}
+                          {vals[uf].rotuloCurto ?? vals[uf].rotulo}
                         </tspan>
                       </>
                     ) : (
@@ -606,13 +606,7 @@ export function BrazilMap({
               ? { label: rotuloAcao?.(tip.uf) ?? `Ver ${UF_NOMES[tip.uf]}`, onClick: () => onSelect(tip.uf) }
               : undefined
           }
-          extra={
-            modo === 'variacao' && vals[tip.uf].rotulo
-              ? `Variação de ${race.candidatos[0]?.nomeUrna} vs 1º turno: ${vals[tip.uf].rotulo}`
-              : modo === 'comparecimento' && vals[tip.uf].rotulo
-                ? `Comparecimento: ${vals[tip.uf].rotulo}`
-                : undefined
-          }
+          extra={extraTooltip(modo, vals[tip.uf].rotulo)}
         />
       ) : null}
 

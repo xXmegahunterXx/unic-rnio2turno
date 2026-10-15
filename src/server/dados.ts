@@ -8,7 +8,11 @@
  * antes de responder, e na fonte 'tse' (o feed oficial não traz o local) eles são acrescentados aqui.
  *
  * Também calcula o "balde" do instante dos dados, que entra no ETag: enquanto o balde não muda, os números
- * não mudam (pausado, congelado, antes das 17h, encerrada, 1º turno…), e o cliente/CDN recebe 304.
+ * não mudam (pausado, congelado, antes das 17h, encerrada, 1º turno…), e o cliente/CDN recebe 304. Na fonte 'tse'
+ * o balde é a MARCA dos números da corrida (hash do conteúdo, `TseSource.marca`): o ETag muda no instante em que o
+ * TSE publica dado novo (antes era um balde de 5 s de relógio, que segurava o dado velho por até 5 s) e fica igual
+ * enquanto nada muda (304). Abaixo do Brasil (UF, município, mapa por município) entra também o balde de 5 s, porque
+ * os municípios chegam pela fila em segundo plano.
  *
  * "Reveja a noite" (`?t=`, contrato `Instante`): `instante()` normaliza o t pedido — undefined quando a
  * resposta é a mesma do agora (1º turno, fonte 'pre', t ≥ instante atual dos dados, ou município/zona/seção na
@@ -35,7 +39,7 @@ import type { TseManager } from './tse';
 
 /** Começo da "noite" para o `?t=` (= INICIO_SIMULACAO do motor): 30 s antes da divulgação. */
 const INICIO_NOITE = INICIO_APURACAO - 30_000;
-/** Balde do TSE: o feed é lido a cada ≥ 5 s, os municípios chegam em segundo plano. */
+/** Balde do TSE abaixo do Brasil: os municípios chegam em segundo plano pela fila. */
 const BALDE_TSE_MS = 5_000;
 /**
  * Um instante passado é "consolidado" (não muda mais; pode ir para a CDN por 1 h) quando está ao menos
@@ -52,6 +56,8 @@ export interface InstanteNormalizado {
   t: number | undefined;
   /** true quando t está consolidado (pode ter cache longo, com a versão na URL) */
   consolidado: boolean;
+  /** nível pedido (o balde do Brasil na fonte 'tse' é só a marca dos números) */
+  nivel?: NivelApuracao;
 }
 
 /** Erro com status HTTP (o onError do app responde `{ erro }`). */
@@ -115,7 +121,7 @@ export class Dados {
 
   /** Normaliza o `?t=` pedido (ver o cabeçalho do arquivo). */
   instante(race: RaceId, t: number | undefined, nivel: NivelApuracao): InstanteNormalizado {
-    const agora: InstanteNormalizado = { t: undefined, consolidado: false };
+    const agora: InstanteNormalizado = { t: undefined, consolidado: false, nivel };
     if (t === undefined) return agora;
     const r = this.race(race);
     if (r.turno === 1) return agora;
@@ -128,28 +134,46 @@ export class Dados {
     // vez de um por segundo pedido (o motor limitaria igual, mas cada t viraria uma entrada de cache diferente)
     const tq = Math.max(INICIO_NOITE, Math.floor(t / 1000) * 1000);
     if (tq >= Math.floor(ref / 1000) * 1000) return agora;
-    return { t: tq, consolidado: tq <= ref - (tse ? MARGEM_CONSOLIDADO_TSE_MS : MARGEM_CONSOLIDADO_SIM_MS) };
+    return { t: tq, consolidado: tq <= ref - (tse ? MARGEM_CONSOLIDADO_TSE_MS : MARGEM_CONSOLIDADO_SIM_MS), nivel };
   }
 
   /** Balde de um instante passado (ETag). TSE recente: acompanha também o balde do agora (chegam dados). */
   baldeHistorico(race: RaceId, inst: InstanteNormalizado): string {
     const base = `h${Math.floor(inst.t! / 1000).toString(36)}`;
-    return this.fonteDe(race) === 'tse' && !inst.consolidado ? `${base}-${this.balde(race)}` : base;
+    return this.fonteDe(race) === 'tse' && !inst.consolidado ? `${base}-${this.balde(race, inst.nivel)}` : base;
   }
 
   /** Identifica o estado dos dados (sem a versão do admin) para o ETag. */
-  balde(race: RaceId): string {
+  balde(race: RaceId, nivel?: NivelApuracao): string {
     const r = this.race(race);
     if (r.turno === 1) return 't1';
     const s = this.controller.status();
     if (s.fonte === 'pre') return 'pre';
-    if (s.fonte === 'tse') return `tse${Math.floor(this.now() / BALDE_TSE_MS)}`;
+    if (s.fonte === 'tse') {
+      const m = this.tse.marca(r.id);
+      return nivel === 'br' ? `tse${m}` : `tse${m}-${Math.floor(this.now() / BALDE_TSE_MS).toString(36)}`;
+    }
     if (s.congelado) return `c${this.controller.state().congeladoEm ?? 0}`;
     if (s.fase === 'pre') return 'zero';
     if (s.fase === 'encerrada') return 'fim';
     // 1 balde por segundo de parede (a 20×, 20 s simulados): os clientes consultam a cada 1,5–8 s, e a origem
     // não precisa remontar/comprimir a mesma rota 20×/s
     return `s${Math.floor(s.simNow / (1000 * Math.max(1, s.velocidade)))}`;
+  }
+
+  /**
+   * `?d=<marca>` do placar nacional confere com a marca atual da corrida (fonte 'tse')? Então o conteúdo daquela URL
+   * não muda mais (dado novo = marca nova = outra URL) e a CDN pode guardá-la por mais tempo (CC.tseMarca).
+   */
+  marcaConfere(race: RaceId, d: string | undefined): boolean {
+    if (!d || d.length > 16 || this.fonteDe(race) !== 'tse') return false;
+    return this.tse.marca(this.race(race).id) === d;
+  }
+
+  /** Frescor do feed para o `/api/status` (só na fonte 'tse'). */
+  frescor(): LiveStatus['frescor'] | undefined {
+    if (this.controller.status().fonte !== 'tse') return undefined;
+    return this.tse.frescor() ?? undefined;
   }
 
   // `t` = instante JÁ normalizado por `instante()` (undefined = agora). Na fonte 'tse', município, zona e

@@ -119,7 +119,14 @@ function linhaTroca(t) {
 function resumoTse(h) {
   if (!h) return ['   (o feed do TSE só é lido com a fonte "TSE ao vivo")'];
   const linhas = [`   feed: ${h.ok ? 'ok' : 'COM FALHAS'} · ${h.rodando ? 'consultando' : 'parado'} a cada ${h.intervaloSeg} s` +
-    (h.ultimoCiclo ? ` · último ciclo ${hora(h.ultimoCiclo.inicio)} (${h.ultimoCiclo.ms} ms, ${h.ultimoCiclo.erros} erro(s))` : '')];
+    (h.ultimoCiclo ? ` · último ciclo ${hora(h.ultimoCiclo.inicio)} (${h.ultimoCiclo.ms} ms, ${h.ultimoCiclo.erros} erro(s))` : '') +
+    (h.esperaSeg && h.esperaSeg > h.intervaloSeg ? ` · ESPAÇADO para ${h.esperaSeg} s (TSE falhando)` : '')];
+  const p = h.prioritario;
+  if (p) {
+    linhas.push(`   placar nacional (Presidente): ${p.ativo ? `a cada ${p.intervaloSeg} s` : 'no ciclo normal'} · lido às ${hora(p.ultimaLeituraOk)}` +
+      (p.falhasConsecutivas ? ` · ${p.falhasConsecutivas} falha(s) seguida(s), próxima em ${p.esperaSeg} s` : '') +
+      (p.atrasoMs && p.atrasoMs.mediana != null ? ` · atraso TSE→servidor ~${(p.atrasoMs.mediana / 1000).toFixed(1).replace('.', ',')} s` : ''));
+  }
   for (const c of h.corridas ?? []) {
     const pct = c.secoes ? ((100 * c.secoesTotalizadas) / c.secoes).toFixed(2).replace('.', ',') + '%' : '—';
     let l = `   ${c.race.padEnd(7)} ${pct.padStart(8)} das seções · TSE às ${hora(c.ultimaAtualizacao)} · lido às ${hora(c.ultimoPollOk)}`;

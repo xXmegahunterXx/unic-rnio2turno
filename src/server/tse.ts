@@ -2,7 +2,9 @@
  * Ciclo de vida da fonte 'tse' no servidor (adaptador em src/tse):
  *  - o TseSource é criado sob demanda (troca de fonte para 'tse' ou "testar conexão");
  *  - polling só enquanto a fonte for 'tse'; ao sair, para (caches e histórico ficam);
- *  - a TseConfig acompanha o AdminState (comando 'tse');
+ *  - a TseConfig acompanha o AdminState (comando 'tse'), inclusive o intervalo do arquivo prioritário (resumo
+ *    nacional de Presidente, `intervaloPrioritarioSeg`);
+ *  - `marca`/`frescor` expõem a marca dos números de cada corrida (ETag e `/api/status`);
  *  - a série/eventos do feed são persistidos em STATE_DIR/tse-historico.json (sobrevivem a reinícios).
  */
 import type { Race, TseConfig, UF } from '../shared/types';
@@ -86,6 +88,16 @@ export class TseManager {
 
   health(): TseHealth | null {
     return this.src ? this.src.health() : null;
+  }
+
+  /** Marca dos números da corrida (muda quando o TSE publica dado novo); '0' sem a fonte criada. */
+  marca(race: string): string {
+    return this.src ? this.src.marca(race) : '0';
+  }
+
+  /** Frescor das corridas do 2º turno (`LiveStatus.frescor`); null sem a fonte criada. */
+  frescor(): Partial<Record<string, { marca: string; conferidoEm: number | null }>> | null {
+    return this.src ? this.src.frescor() : null;
   }
 
   private agendarHistorico() {

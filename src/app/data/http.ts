@@ -9,6 +9,8 @@
  *  - "Reveja a noite" (`opts.t`, contrato `Instante`): `?t=<epoch ms>` truncado ao segundo, mais `&v=<versão>`
  *    (a última `versao` vista em `status()`): com a versão na URL, o servidor/CDN pode guardar o passado por
  *    muito mais tempo, e uma mudança de cenário no admin troca a URL.
+ *  - Fonte 'tse': o placar nacional ao vivo leva `?d=<marca>` (a última marca da disputa vista em `status()`,
+ *    `LiveStatus.frescor`; ver `frescor.ts`): dado novo do TSE = endereço novo, sem cópia velha no navegador nem na CDN.
  */
 import type { AdminCommand, AdminSnapshot, ApuracaoClient, Instante, PublicMeta } from '@/shared/api';
 import type {
@@ -24,6 +26,7 @@ import type {
   ZonaSnapshot,
 } from '@/shared/types';
 import { CommandError, NotFoundError } from '@/engine/api';
+import { marcasDoStatus, queryMarca } from './frescor';
 
 /** Falha HTTP genérica (5xx, 429, 503…) ou de rede (`status` 0). */
 export class HttpError extends Error {
@@ -118,6 +121,8 @@ export function createHttpClient(opts: HttpClientOptions = {}): ApuracaoClient {
 
   /** Última versão do admin vista no status (chave de cache dos instantes passados). */
   let versao: number | null = null;
+  /** Últimas marcas dos números por disputa vistas no status (fonte 'tse'): `?d=` do placar nacional ao vivo. */
+  let marcas: Record<string, string> = {};
   /** Query do instante: '' (agora) ou `?t=<epoch ms>&v=<versão>`. */
   const qt = (opts?: Instante) => {
     const t = opts?.t;
@@ -129,11 +134,13 @@ export function createHttpClient(opts: HttpClientOptions = {}): ApuracaoClient {
     async status() {
       const s = await req<LiveStatus>('/status', { timeout: to.status });
       if (typeof s?.versao === 'number') versao = s.versao;
+      marcas = marcasDoStatus(s);
       return s;
     },
     meta: () => req<PublicMeta>('/meta', { timeout: to.dados }),
     municipiosBr: (race, opts) => req<MunicipiosNacionalSnapshot>(`${ap(race)}/br/municipios${qt(opts)}`, { timeout: to.dados }),
-    nacional: (race, opts) => req<NationalSnapshot>(`${ap(race)}/br${qt(opts)}`, { timeout: to.dados }),
+    nacional: (race, opts) =>
+      req<NationalSnapshot>(`${ap(race)}/br${qt(opts) || queryMarca(marcas[String(race).toLowerCase()])}`, { timeout: to.dados }),
     uf: (race, uf: UF, opts) => req<UfSnapshot>(`${ap(race)}/uf/${lower(uf)}${qt(opts)}`, { timeout: to.dados }),
     municipio: (race, uf, cod, opts) =>
       req<MunicipioSnapshot>(`${ap(race)}/uf/${lower(uf)}/mun/${enc(cod)}${qt(opts)}`, { timeout: to.dados }),

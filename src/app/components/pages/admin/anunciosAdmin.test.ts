@@ -64,7 +64,10 @@ describe('anunciosAdmin', () => {
     expect(csvCampo('+5511')).toBe("'+5511");
     expect(csvCampo('-1')).toBe("'-1");
     expect(csvCampo('@soma')).toBe("'@soma");
-    expect(csvCampo('\tx')).toBe("'\tx");
+    expect(csvCampo('\tx')).toBe(`"'\tx"`);
+    // separador de outra planilha (vírgula, Excel em inglês): o trecho depois dela também não vira fórmula
+    expect(csvCampo("ACME,=cmd|' /C calc'!A0")).toBe(`"ACME,'=cmd|' /C calc'!A0"`);
+    expect(csvCampo('a;\n+b')).toBe(`"a;\n'+b"`);
     expect(csvCampo('Lynx')).toBe('Lynx');
     expect(csvCampo(-3)).toBe('-3'); // número vem do código
     const csv = csvRelatorio(metricas, [{ id: 'lynx', marca: '=cmd|calc' }], AGORA - 86400_000, AGORA);

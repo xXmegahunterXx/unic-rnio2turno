@@ -42,6 +42,9 @@ const routes: RouteObject[] = [
       { path: '/privacidade', element: page(() => import('./pages/static/PrivacidadePage')) },
       { path: '/sobre', element: page(() => import('./pages/static/SobrePage')) },
       { path: '/anuncie', element: page(() => import('./pages/static/AnunciePage')) },
+      { path: '/ao-vivo', element: page(() => import('./pages/chat/AoVivoPage')) },
+      { path: '/streamers', element: page(() => import('./pages/streamers/StreamersPage')) },
+      { path: '/palpite', element: page(() => import('./pages/palpite/PalpitePage')) },
       // Vitrine do design system (QA visual): só no `npm run dev` e no build demo. Fora do build de produção, onde
       // seria uma URL pública com números fictícios ao lado de nomes reais (e o chunk nem é gerado).
       ...(import.meta.env.DEV || __DEMO__
@@ -57,6 +60,8 @@ const routes: RouteObject[] = [
   { path: '/admin', element: page(() => import('./pages/admin/AdminPage')) },
   // Modo TV: tela cheia própria (fora do AppShell), para transmissão.
   { path: '/tv', element: page(() => import('./pages/tv/TvPage')) },
+  // Modo streamer: fonte de navegador do OBS/Streamlabs (fora do AppShell, fundo transparente).
+  { path: '/live', element: page(() => import('./pages/live/LivePage')) },
   // Widgets para incorporar (iframe em sites de terceiros): sem AppShell.
   { path: '/embed/:tipo', element: page(() => import('./pages/embed/EmbedPage')) },
 ];

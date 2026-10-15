@@ -1,11 +1,14 @@
 /**
  * "Oferecimento: <marca>" nas imagens de compartilhamento (formato de anúncio 'compartilhamento', src/shared/anuncios.ts).
  *
- * SÓ nos cartões genéricos, sem candidato e sem resultado (`CARTOES_COM_OFERECIMENTO`): Teste Cego, calculadora de
- * cenários (sem código) e capa das curiosidades. NUNCA no placar, no município, na seção, na ficha do candidato, nos
- * eleitos/bancadas, nos governadores, num fato isolado ou num cenário montado: são imagens com foto, nome, número ou
- * resultado de candidato, feitas para circular e que não dá para recolher depois (a marca ficaria associada a um
- * candidato — ARCHITECTURE §1.5).
+ * Nos cartões genéricos, sem candidato e sem resultado (`CARTOES_COM_OFERECIMENTO`): Teste Cego, calculadora de
+ * cenários (sem código), capa das curiosidades e convite do Palpite (og-palpite.ts). Nos cartões do PLACAR (Brasil/UF e
+ * município, og-placar.ts) só com `OFERECIMENTO_NO_PLACAR` — hoje DESLIGADO (src/shared/oferecimento.ts: a regra do
+ * projeto é anúncio nunca colado a placar, foto, nome ou número de candidato; ligar exige decisão escrita do dono e
+ * aditivo nos contratos). Ligado, seria como o "Oferecimento" de transmissão: faixa própria no pé, só texto, ABAIXO do
+ * rodapé com a marca e o endereço do Sintonia. NUNCA na seção, na ficha do candidato, nos eleitos/bancadas, nos
+ * governadores, num fato isolado ou num cenário montado (imagens centradas numa pessoa ou numa hipótese, que não dá
+ * para recolher depois — §1.5).
  *
  * Um rodapé discreto, só texto e sempre rotulado, numa faixa própria no pé da imagem (1200 × 32 px, com linha de
  * separação), centralizado (não fica embaixo de um lado do cartão). O cartão fica 32 px mais baixo, com menos respiro
@@ -16,6 +19,7 @@
  * versão `&v=` das meta tags muda, para a CDN e os apps buscarem a imagem nova).
  */
 import { escolherAnuncio, type AnuncioPublico } from '../shared/anuncios';
+import { OFERECIMENTO_COM_CANDIDATOS } from '../shared/oferecimento';
 import { hashCurto } from './http-cache';
 import { C, h, OG_H, OG_W, type No } from './og';
 
@@ -28,15 +32,25 @@ type Anuncios = readonly Pick<AnuncioPublico, 'id' | 'marca' | 'formatos' | 'pes
  * Cartões (chave do cache em og-rotas.ts) que podem levar a faixa: só os genéricos, sem candidato nem resultado.
  * A capa das curiosidades só entra quando nenhum dos três destaques é de cargo (percentual de candidato).
  */
-export const CARTOES_COM_OFERECIMENTO = ['teste', 'cen|generico', 'cur|capa'] as const;
+export const CARTOES_COM_OFERECIMENTO = ['teste', 'cen|generico', 'cur|capa', 'palpite'] as const;
 export type CartaoComOferecimento = (typeof CARTOES_COM_OFERECIMENTO)[number];
+
+/**
+ * Cartões do placar (Brasil/UF e município) com a faixa "Oferecimento: <marca>" quando há anúncio de compartilhamento no
+ * ar. Fonte única em src/shared/oferecimento.ts (vale também para o ShareCard e os cartões do Palpite no app).
+ */
+export const OFERECIMENTO_NO_PLACAR = OFERECIMENTO_COM_CANDIDATOS;
+
+/** Rotas dos cartões do placar (og-placar.ts). */
+const IMAGENS_PLACAR = ['/api/og/apuracao.png', '/api/og/municipio.png'];
 
 /**
  * Imagem das meta tags (caminho com query) que pode levar a faixa → o `&v=` leva o anunciante. As demais nunca têm
  * anúncio, então trocar o anunciante não muda a URL delas.
  */
 export function imagemComOferecimento(caminho: string): boolean {
-  return caminho === '/api/og/teste.png' || caminho === '/api/og/cenario.png' || caminho === '/api/og/curiosidade.png';
+  if (OFERECIMENTO_NO_PLACAR && IMAGENS_PLACAR.includes(caminho.split('?')[0])) return true;
+  return caminho === '/api/og/teste.png' || caminho === '/api/og/cenario.png' || caminho === '/api/og/curiosidade.png' || caminho === '/api/og/palpite.png';
 }
 
 const comFormato = (anuncios: Anuncios) => (anuncios ?? []).filter((a) => a.formatos.includes('compartilhamento'));

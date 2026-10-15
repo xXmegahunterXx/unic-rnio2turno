@@ -2,7 +2,8 @@
  * OG images: PNG válido 1200×630, marca "SIMULAÇÃO" quando simulado, cache de 30 s e validação.
  */
 import { beforeAll, describe, expect, it } from 'vitest';
-import { C, layoutPlacar } from './og';
+import { C } from './og';
+import { layoutPlacar } from './og-placar';
 import { anonimizarRace } from '../shared/anon';
 import { comando, login, montar, type Montado } from './test-helpers';
 

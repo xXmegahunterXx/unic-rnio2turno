@@ -1,8 +1,9 @@
 /**
  * /sobre — o que é o Sintonia, princípios (neutralidade, precisão, privacidade, beleza), apartidarismo,
- * anúncios só de marcas não políticas (contagem agregada, sem dado pessoal), equipe (placeholder) e contato (provisório).
+ * anúncios só de marcas não políticas (contagem agregada, sem cookie e sem guardar IP), equipe (placeholder) e contato (provisório).
  */
 import { REGRA_CORES } from '@/shared/cores';
+import { OFERECIMENTO_COM_CANDIDATOS } from '@/shared/oferecimento';
 import { ButtonLink } from '@/app/ui/Button';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import {
@@ -91,9 +92,12 @@ export default function SobrePage() {
             <>
               <strong>Não exibimos propaganda política.</strong> Os espaços de anúncio aceitam apenas anunciantes não políticos, sempre
               identificados como publicidade e separados dos resultados: nunca dentro do placar nem ao lado de foto, nome ou número de candidato.
+              {OFERECIMENTO_COM_CANDIDATOS
+                ? ' Nas imagens de compartilhamento do placar e do Palpite, o anunciante aparece só numa faixa de texto “Oferecimento” no pé, abaixo da marca do Sintonia.'
+                : null}
             </>,
             <>
-              Dos anúncios, medimos só totais de impressões e cliques, sem cookie, sem guardar IP e sem dado pessoal. Os links patrocinados levam
+              Dos anúncios, medimos só totais de impressões e cliques, sem cookie e sem guardar IP. Os links patrocinados levam
               marcadores de campanha (UTM) que dizem ao anunciante apenas que a visita veio do Sintonia.{' '}
               <LinkInterno to="/privacidade#anuncios">Como funciona</LinkInterno>.
             </>,

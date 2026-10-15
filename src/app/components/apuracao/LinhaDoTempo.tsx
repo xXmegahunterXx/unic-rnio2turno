@@ -183,6 +183,34 @@ interface Marco {
   eleito?: boolean;
 }
 
+/** Distância mínima (px) entre os centros de dois rótulos comuns ("25%", "50%"…). */
+export const DIST_ROTULOS_PX = 30;
+/** Distância mínima (px) entre um rótulo comum e o "✓ Eleito" (que tem ~50 px de largura). */
+export const DIST_ELEITO_PX = 56;
+
+/**
+ * Rótulos dos marcos sem colisão, em dois passes: (1) o "✓ Eleito" sempre aparece; (2) os demais, do mais antigo ao mais
+ * novo, aparecem só a ≥ 30 px do último mostrado E a ≥ 56 px de qualquer "Eleito" — antes, o "Eleito" não contava como
+ * vizinho e "✓ Eleito" e "99%" saíam um por cima do outro numa régua estreita (chat aberto a 1280 px). As posições já
+ * vêm presas à régua (10 px das pontas), como no desenho. Pura: testada em frenteA.test.ts.
+ */
+export function posicionarRotulos(marcos: readonly Marco[], ini: number, fim: number, largura: number): { m: Marco; x: number; mostra: boolean }[] {
+  const prender = (x: number) => Math.min(Math.max(x, 10), largura - 10);
+  const dentro = [...marcos]
+    .filter((m) => m.t >= ini && m.t <= fim)
+    .sort((a, b) => a.t - b.t)
+    .map((m) => ({ m, x: ((m.t - ini) / Math.max(1, fim - ini)) * largura }));
+  const xsEleito = dentro.filter((r) => r.m.eleito).map((r) => prender(r.x));
+  let ultimoX = -Infinity;
+  return dentro.map((r) => {
+    if (r.m.eleito) return { ...r, mostra: true };
+    const xp = prender(r.x);
+    const mostra = xp - ultimoX >= DIST_ROTULOS_PX && xsEleito.every((xe) => Math.abs(xp - xe) >= DIST_ELEITO_PX);
+    if (mostra) ultimoX = xp;
+    return { ...r, mostra };
+  });
+}
+
 /** % de seções num instante (interpolado da série). */
 function pstEm(serie: SeriePoint[], t: number): number {
   if (!serie.length || t < serie[0].t) return 0;
@@ -358,20 +386,8 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
     onChange(alvo === null ? undefined : alvo);
   }
 
-  // Rótulos dos marcos sem colisão (o mais antigo vence; "Eleito" sempre aparece).
-  const rotulos = useMemo(() => {
-    const largura = trilho.w || 300;
-    const visiveis: { m: Marco; x: number; mostra: boolean }[] = [];
-    let ultimoX = -Infinity;
-    for (const m of [...marcos].sort((a, b) => a.t - b.t)) {
-      if (m.t < ini || m.t > fim) continue;
-      const x = ((m.t - ini) / Math.max(1, fim - ini)) * largura;
-      const mostra = m.eleito || x - ultimoX >= 30;
-      if (mostra && !m.eleito) ultimoX = x;
-      visiveis.push({ m, x, mostra });
-    }
-    return visiveis;
-  }, [marcos, ini, fim, trilho.w]);
+  // Rótulos dos marcos sem colisão ("Eleito" sempre aparece e afasta os vizinhos; o mais antigo vence entre os demais).
+  const rotulos = useMemo(() => posicionarRotulos(marcos, ini, fim, trilho.w || 300), [marcos, ini, fim, trilho.w]);
 
   if (status.fase === 'pre' || simNow < ini + 3 * MIN || serie.length < 2) return null;
 

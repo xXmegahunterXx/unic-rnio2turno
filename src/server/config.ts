@@ -38,6 +38,10 @@
  *   ADMIN_SESSAO_HORAS validade da sessão do admin (padrão 12; 1–72)
  *   OG_LIMITE_MIN     imagens de compartilhamento NOVAS (renderizações) por cliente por minuto (padrão 30; 0 = sem
  *                     limite). Imagem já em memória nunca conta — uma CDN pedindo a mesma imagem não é barrada
+ *   CHAT_REGISTRO_CHAVE caminho de uma chave PÚBLICA RSA (PEM): liga o registro cifrado dos envios do chat (id, hora,
+ *                     IP e porta; Marco Civil, art. 15) em STATE_DIR/chat-registro — DESLIGADO por padrão; só com
+ *                     decisão do dono e do advogado (chat-registro.ts). A chave privada fica fora da VPS
+ *   CHAT_REGISTRO_HEADER_PORTA cabeçalho com a porta de origem do visitante, quando o proxy a repassa (opcional)
  *
  * Log:
  *   LOG_FORMAT        'json' (padrão em produção: 1 objeto por linha) ou 'texto' (padrão em dev)
@@ -64,6 +68,10 @@ export interface ServerConfig {
   distDir: string;
   serveStatic: boolean;
   stateDir: string;
+  /** chave pública do registro de envios do chat (caminho; null = desligado — o padrão) */
+  chatRegistroChave: string | null;
+  /** cabeçalho com a porta de origem (atrás de proxy) */
+  chatRegistroHeaderPorta: string | null;
   /** null → admin desabilitado (produção sem ADMIN_PASSWORD) */
   adminPassword: string | null;
   /** true quando a senha é o padrão de desenvolvimento */
@@ -238,6 +246,8 @@ export function loadConfig(env: Env = process.env, cwd = process.cwd()): ServerC
     distDir,
     serveStatic,
     stateDir,
+    chatRegistroChave: env.CHAT_REGISTRO_CHAVE?.trim() ? resolve(cwd, env.CHAT_REGISTRO_CHAVE.trim()) : null,
+    chatRegistroHeaderPorta: /^[a-z0-9-]{1,64}$/i.test(env.CHAT_REGISTRO_HEADER_PORTA?.trim() ?? '') ? env.CHAT_REGISTRO_HEADER_PORTA!.trim().toLowerCase() : null,
     adminPassword,
     adminPasswordPadrao,
     adminSecret,

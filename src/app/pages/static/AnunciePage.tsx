@@ -3,13 +3,16 @@
  * site (com um anúncio de exemplo), cotas, regras, o que enviar e o contato comercial (`LiveStatus.anuncie`, definido
  * no admin: WhatsApp e/ou e-mail com mensagem pronta).
  *
- * Sem números de audiência: nada de alcance inventado. Só o que o produto entrega de fato (formatos, rótulos, relatório
- * de impressões visíveis, cliques e taxa de cliques). Neutralidade: nenhum candidato, foto ou cor de candidato aqui.
+ * Números de audiência: só os MEDIDOS pelo próprio site (src/server/audiencia.ts) e só com "Mostrar audiência na página
+ * /anuncie" ligado no painel (padrão: desligado) — nada de alcance inventado. Formulário "Quero anunciar" (FormLead →
+ * painel "Interessados"), com WhatsApp/e-mail como alternativa, e "Siga o Sintonia" no fim. Neutralidade: nenhum
+ * candidato, foto ou cor de candidato aqui.
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ANUNCIO_LIMITES, FORMATOS_ANUNCIO, ROTULO_FORMATO, type AnuncioPublico, type FormatoAnuncio } from '@/shared/anuncios';
 import { fmtInt } from '@/shared/format';
+import { OFERECIMENTO_COM_CANDIDATOS } from '@/shared/oferecimento';
 import { useStatus } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { Icon, type IconName } from '@/app/ui/Icon';
@@ -20,6 +23,10 @@ import { FundoHero } from '@/app/components/pages/home/FundoHero';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { useRolarParaHash } from '@/app/components/pages/home/Institucional';
 import { AnuncioNativoPeca, OferecimentoTestePeca, VitrineFormato, fmtWhatsApp, linkEmail, linkWhatsApp } from '@/app/components/anuncios';
+import { FormLead } from '@/app/components/crescimento/FormLead';
+import { NumerosAudiencia, temNumeros } from '@/app/components/crescimento/NumerosAudiencia';
+import { SigaSintonia } from '@/app/components/crescimento/SigaSintonia';
+import { useDivulgacao } from '@/app/components/crescimento/useDivulgacao';
 
 /** Anúncio de exemplo da vitrine (nenhuma empresa real). */
 const EXEMPLO: AnuncioPublico = {
@@ -41,17 +48,26 @@ export default function AnunciePage() {
   const contato = useStatus().data?.anuncie ?? null;
   const zap = linkWhatsApp(contato?.whatsapp);
   const email = linkEmail(contato?.email);
+  // números REAIS medidos pelo site (só com o interruptor do painel ligado)
+  const audiencia = useDivulgacao().data?.audiencia ?? null;
 
   return (
     <>
-      <Hero chamada={contato?.chamada} zap={zap} email={email} />
-      <Container wide className="pb-6">
+      <Hero chamada={contato?.chamada} zap={zap} />
+      {/* celular: o formulário sobe para logo depois de "Por que anunciar" (a página é longa); no computador, no fim */}
+      <Container wide className="flex flex-col pb-6">
+        {audiencia && temNumeros(audiencia) ? (
+          <Bloco id="audiencia" eyebrow="Audiência" titulo="Números medidos pelo Sintonia">
+            <NumerosAudiencia audiencia={audiencia} />
+          </Bloco>
+        ) : null}
         <PorQue />
-        <Formatos />
-        <Cotas />
-        <Regras />
-        <Envio />
-        <Contato zap={zap} email={email} whatsapp={contato?.whatsapp} enderecoEmail={contato?.email} />
+        <Formatos className="order-2 lg:order-none" />
+        <Cotas className="order-2 lg:order-none" />
+        <Regras className="order-2 lg:order-none" />
+        <Envio className="order-2 lg:order-none" />
+        <Contato className="order-1 lg:order-none" zap={zap} email={email} whatsapp={contato?.whatsapp} enderecoEmail={contato?.email} />
+        <SigaSintonia variante="cartao" className="order-3 mt-14 sm:mt-20 lg:order-none" />
       </Container>
     </>
   );
@@ -60,7 +76,7 @@ export default function AnunciePage() {
 // ---------------------------------------------------------------------------------------------------------------
 // Hero
 
-function Hero({ chamada, zap, email }: { chamada?: string; zap: string | null; email: string | null }) {
+function Hero({ chamada, zap }: { chamada?: string; zap: string | null }) {
   return (
     <section aria-labelledby="anuncie-titulo" className="relative isolate overflow-hidden">
       <FundoHero />
@@ -92,23 +108,16 @@ function Hero({ chamada, zap, email }: { chamada?: string; zap: string | null; e
               A apuração do 2º turno ao vivo, do Brasil inteiro até a seção, e o Teste Cego, feito para ser compartilhado.{' '}
               <span className="text-fg">Espaços para marcas não políticas, sempre identificados como publicidade.</span>
             </p>
-            <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
+            <div className="mt-7 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+              {/* o formulário (#contato) funciona mesmo sem WhatsApp/e-mail configurados no painel */}
+              <ButtonLink to={{ hash: 'contato' }} variant="primary" size="lg" icon="seta-baixo">
+                Quero anunciar
+              </ButtonLink>
               {zap ? (
-                <a href={zap} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'primary', size: 'lg' })}>
+                <a href={zap} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'outline', size: 'lg' })}>
                   <Icon name="whatsapp" size={20} />
                   Falar no WhatsApp
                 </a>
-              ) : null}
-              {email ? (
-                <a href={email} className={buttonClasses({ variant: zap ? 'outline' : 'primary', size: 'lg' })}>
-                  <IconeQualquer name="carta" size={20} />
-                  Enviar e-mail
-                </a>
-              ) : null}
-              {!zap && !email ? (
-                <ButtonLink to={{ hash: 'contato' }} variant="primary" size="lg" icon="seta-baixo">
-                  Quero anunciar
-                </ButtonLink>
               ) : null}
               <ButtonLink to={{ hash: 'formatos' }} variant="outline" size="lg" icon="grade">
                 Ver os formatos
@@ -116,7 +125,7 @@ function Hero({ chamada, zap, email }: { chamada?: string; zap: string | null; e
             </div>
             <ul className="mt-6 flex flex-wrap gap-x-4 gap-y-2 text-[12.5px] text-fg-muted sm:text-[13.5px]">
               <Selo icone="selo">Só anunciantes não políticos</Selo>
-              <Selo icone="olho-fechado">Sem cookie, sem dado pessoal</Selo>
+              <Selo icone="olho-fechado">Sem cookie, sem guardar IP</Selo>
               <Selo icone="grafico">Relatório de entrega</Selo>
             </ul>
           </div>
@@ -192,13 +201,13 @@ const MOTIVOS: { icone: IconName; titulo: string; texto: string }[] = [
   },
   {
     icone: 'olho-fechado',
-    titulo: 'Teste Cego, feito para circular',
-    texto: 'Quem faz o teste compartilha o resultado e desafia os amigos. A tela de resultado traz “Teste Cego oferecido por” a sua marca, abaixo das ações de compartilhar.',
+    titulo: 'Teste Cego e Palpite, feitos para circular',
+    texto: 'Quem faz o teste ou crava o palpite do 2º turno compartilha e desafia os amigos. As duas telas trazem “oferecido por” a sua marca, abaixo das ações de compartilhar.',
   },
   {
     icone: 'compartilhar',
     titulo: 'Sua marca nas imagens compartilhadas',
-    texto: 'Os cartões genéricos que vão para o X e o WhatsApp — Teste Cego, calculadora do 2º turno e capa das curiosidades — levam “Oferecimento: sua marca” no rodapé.',
+    texto: 'Os cartões que vão para o X e o WhatsApp — Teste Cego, Palpite, calculadora do 2º turno e capa das curiosidades — levam “Oferecimento: sua marca” numa faixa própria no rodapé.',
   },
   {
     icone: 'grafico',
@@ -232,20 +241,24 @@ const ONDE: Record<FormatoAnuncio, string> = {
   topo: 'Logo abaixo do cabeçalho, em todas as páginas. No computador acompanha a rolagem; no celular, em versão compacta.',
   rodape: 'Barra no pé da tela do celular, acima do menu, depois que a pessoa rola a página — e nunca por cima de placar ou de candidato. Pode ser fechada e aparece de novo na próxima visita.',
   nativo: 'Cartão “Patrocinado” entre as seções da página inicial, da apuração, dos governadores, das curiosidades e da calculadora.',
-  teste: 'Na tela de resultado do Teste Cego, depois que a pessoa revela e abaixo das ações de compartilhar: “Teste Cego oferecido por”.',
+  teste: 'Na tela de resultado do Teste Cego, depois que a pessoa revela e abaixo das ações de compartilhar (“Teste Cego oferecido por”), e no fim da página do Palpite do 2º turno (“Palpite oferecido por”).',
   tv: '“Oferecimento” com a sua logo na barra do topo do Modo TV, a tela cheia para transmissões e telões — fora do placar.',
-  compartilhamento: '“Oferecimento: sua marca” no rodapé das imagens genéricas (Teste Cego, calculadora, capa das curiosidades) postadas no X e no WhatsApp. Nunca nas imagens de placar ou de candidato.',
-  chat: '“Sala oferecida por sua marca” no topo do chat ao vivo da apuração, onde o público comenta cada atualização — fora das mensagens.',
-  live: '“Oferecido por sua marca” no placar que streamers põem nas lives (Twitch, YouTube, Kick) pelo OBS: a sua marca na tela de quem transmite a apuração.',
+  // o texto acompanha OFERECIMENTO_COM_CANDIDATOS (src/shared/oferecimento.ts): a página diz exatamente onde a marca aparece
+  compartilhamento: OFERECIMENTO_COM_CANDIDATOS
+    ? '“Oferecimento: sua marca” numa faixa própria no rodapé das imagens postadas no X e no WhatsApp: Teste Cego, calculadora, capa das curiosidades e convite do Palpite — e também nos cartões do placar e do Palpite, que mostram candidatos, fotos oficiais e números: nesses, só texto, numa faixa abaixo da marca do Sintonia, nunca sobre foto, nome ou número. Nunca na ficha de candidato.'
+    : '“Oferecimento: sua marca” numa faixa própria no rodapé das imagens postadas no X e no WhatsApp: Teste Cego, calculadora, capa das curiosidades e a imagem-convite do Palpite. Nunca em imagem com candidato: placar, resultado, cartão de palpite com nomes e percentuais ou ficha de candidato.',
+  chat: '“Sala oferecida por sua marca” no chat ao vivo da apuração, onde o público comenta cada atualização: no topo da sala no computador e no pé dela no celular, sempre fora das mensagens.',
+  live: '“Oferecido por sua marca” na barra do Sintonia que streamers põem nas lives (Twitch, YouTube, Kick) pelo OBS: a sua marca na tela de quem transmite a apuração, sem link e separada do placar pela marca do Sintonia.',
 };
 
 const QTD_FORMATOS = ['Um', 'Dois', 'Três', 'Quatro', 'Cinco', 'Seis', 'Sete', 'Oito', 'Nove', 'Dez'][FORMATOS_ANUNCIO.length - 1] ?? String(FORMATOS_ANUNCIO.length);
 
 const MASTER_PRIMEIRO: FormatoAnuncio[] = ['topo', 'tv', 'live', 'compartilhamento'];
 
-function Formatos() {
+function Formatos({ className }: { className?: string }) {
   return (
     <Bloco
+      className={className}
       id="formatos"
       eyebrow="Formatos"
       titulo={`${QTD_FORMATOS} formatos, todos identificados`}
@@ -276,9 +289,7 @@ function Formatos() {
                 <p className="mt-1.5 text-pretty text-[14px] leading-snug text-fg-muted">{ONDE[f]}</p>
               </div>
             </div>
-            <div className={cn('flex flex-1 flex-col justify-center border-t border-line bg-bg/60 p-3 sm:p-5', f === 'compartilhamento' && 'lg:border-l lg:border-t-0')}>
-              <VitrineFormato anuncio={EXEMPLO} formato={f} pecaPrevia={<PecaExemplo compacta />} />
-            </div>
+            <MaqueteFormato formato={f} />
           </li>
         ))}
       </ol>
@@ -286,9 +297,41 @@ function Formatos() {
   );
 }
 
+/**
+ * A peça de exemplo de cada formato. No celular fica recolhida ("Ver como fica"): as oito maquetes uma embaixo da outra
+ * faziam a página passar de 13 mil px; no computador, sempre à mostra.
+ */
+function MaqueteFormato({ formato: f }: { formato: FormatoAnuncio }) {
+  const [aberta, setAberta] = useState(false);
+  return (
+    <>
+      <div className="border-t border-line px-5 py-3 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setAberta((a) => !a)}
+          aria-expanded={aberta}
+          className="toque relative inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-brand-fg"
+        >
+          <Icon name="chevron-cima" size={16} className={cn('transition-transform', !aberta && 'rotate-180')} />
+          {aberta ? 'Esconder o exemplo' : 'Ver como fica'}
+        </button>
+      </div>
+      <div
+        className={cn(
+          'flex-1 flex-col justify-center border-t border-line bg-bg/60 p-3 sm:p-5',
+          aberta ? 'flex' : 'hidden lg:flex',
+          f === 'compartilhamento' && 'lg:border-l lg:border-t-0',
+        )}
+      >
+        <VitrineFormato anuncio={EXEMPLO} formato={f} pecaPrevia={<PecaExemplo compacta />} />
+      </div>
+    </>
+  );
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 
-function Cotas() {
+function Cotas({ className }: { className?: string }) {
   const cotas: { nome: string; destaque: string; itens: string[]; marca?: boolean }[] = [
     {
       nome: 'Master',
@@ -311,7 +354,7 @@ function Cotas() {
     },
   ];
   return (
-    <Bloco id="cotas" eyebrow="Cotas" titulo="Master ou apoio" descricao="Valores e períodos sob consulta. Todos os anúncios têm data de início e de fim e podem ser pausados a qualquer momento.">
+    <Bloco className={className} id="cotas" eyebrow="Cotas" titulo="Master ou apoio" descricao="Valores e períodos sob consulta. Todos os anúncios têm data de início e de fim e podem ser pausados a qualquer momento.">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         {cotas.map((c) => (
           <div
@@ -349,7 +392,9 @@ const REGRAS: { icone: IconName; titulo: string; texto: ReactNode }[] = [
   {
     icone: 'grade',
     titulo: 'Separado dos resultados',
-    texto: 'Nunca dentro do placar ou de um resultado, nem ao lado de foto, nome ou número de candidato.',
+    texto: OFERECIMENTO_COM_CANDIDATOS
+      ? 'Nunca dentro do placar ou de um resultado, nem ao lado de foto, nome ou número de candidato. No Modo TV e na live dos streamers, fica na barra do Sintonia, separado do placar por ela. Exceção: nas imagens do placar e do Palpite, uma faixa só de texto “Oferecimento” no pé, abaixo da marca do Sintonia.'
+      : 'Nunca dentro do placar ou de um resultado, nem ao lado de foto, nome ou número de candidato. No Modo TV e na live dos streamers, fica na barra do Sintonia, separado do placar por ela.',
   },
   { icone: 'pause', titulo: 'Sem interrupção', texto: 'Sem pop-up, sem tela cheia, sem som e sem animação piscante.' },
   {
@@ -365,14 +410,14 @@ const REGRAS: { icone: IconName; titulo: string; texto: ReactNode }[] = [
   },
   {
     icone: 'olho-fechado',
-    titulo: 'Contagem honesta e sem dado pessoal',
+    titulo: 'Contagem honesta e agregada',
     texto: 'Impressões e cliques são contados de forma agregada, sem cookie, sem guardar IP e sem identificar ninguém. Robôs, repetições e cliques vindos de fora do site não contam.',
   },
 ];
 
-function Regras() {
+function Regras({ className }: { className?: string }) {
   return (
-    <Bloco id="regras" eyebrow="Regras" titulo="Publicidade que respeita quem acompanha a eleição">
+    <Bloco className={className} id="regras" eyebrow="Regras" titulo="Publicidade que respeita quem acompanha a eleição">
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
         {REGRAS.map((r) => (
           <li key={r.titulo} className="flex gap-3.5 rounded-3xl border border-line bg-surface p-5 shadow-card">
@@ -390,7 +435,7 @@ function Regras() {
   );
 }
 
-function Envio() {
+function Envio({ className }: { className?: string }) {
   const kb = (dataUri: number) => Math.round((((dataUri - 64) * 3) / 4 / 1024) / 10) * 10;
   const L = ANUNCIO_LIMITES;
   const itens: { item: string; detalhe: ReactNode }[] = [
@@ -402,7 +447,7 @@ function Envio() {
     { item: 'Link', detalhe: <>Endereço https do seu site (as UTMs são acrescentadas automaticamente).</> },
   ];
   return (
-    <Bloco id="envio" eyebrow="O que enviar" titulo="O que você precisa">
+    <Bloco className={className} id="envio" eyebrow="O que enviar" titulo="O que você precisa">
       <div className="overflow-hidden rounded-3xl border border-line bg-surface shadow-card">
         <dl className="divide-y divide-line">
           {itens.map((i) => (
@@ -417,65 +462,78 @@ function Envio() {
   );
 }
 
-function Contato({ zap, email, whatsapp, enderecoEmail }: { zap: string | null; email: string | null; whatsapp?: string; enderecoEmail?: string }) {
+function Contato({
+  zap,
+  email,
+  whatsapp,
+  enderecoEmail,
+  className,
+}: {
+  zap: string | null;
+  email: string | null;
+  whatsapp?: string;
+  enderecoEmail?: string;
+  className?: string;
+}) {
   const tem = !!(zap || email);
   return (
-    <Bloco id="contato" eyebrow="Contato comercial" titulo="Vamos conversar">
-      <div className="relative isolate overflow-hidden rounded-[32px] border border-brand/35 bg-surface p-6 shadow-card sm:p-10">
+    <Bloco
+      className={className}
+      id="contato"
+      eyebrow="Contato comercial"
+      titulo="Quero anunciar"
+      descricao="Conte o que você quer divulgar e em quais formatos. Respondemos pelo e-mail informado."
+    >
+      <div className="relative isolate overflow-hidden rounded-[32px] border border-brand/35 bg-surface p-5 shadow-card sm:p-8 lg:p-10">
         <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 -z-10 h-72 w-72 rounded-full bg-brand/15 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-28 -right-20 -z-10 h-72 w-72 rounded-full bg-brand-2/10 blur-3xl" />
-        {tem ? (
-          <div className="grid grid-cols-1 items-center gap-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-10">
-            <div className="min-w-0">
-              <p className="max-w-[40rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:text-[18px]">
-                Conte o que você quer divulgar e em quais formatos. A mensagem já vai pronta: é só enviar.
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)] lg:gap-12">
+          <FormLead />
+          <aside aria-label="Outras formas de contato" className="min-w-0 border-t border-line pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-1">
+            <h3 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">Prefere conversar agora?</h3>
+            {tem ? (
+              <>
+                <p className="mt-1.5 text-pretty text-[14.5px] leading-relaxed text-fg-muted">A mensagem já vai pronta: é só enviar.</p>
+                <div className="mt-4 flex flex-col gap-2.5">
+                  {zap ? (
+                    <a href={zap} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'secondary', size: 'lg', block: true })}>
+                      <Icon name="whatsapp" size={20} />
+                      Falar no WhatsApp
+                    </a>
+                  ) : null}
+                  {email ? (
+                    <a href={email} className={buttonClasses({ variant: 'outline', size: 'lg', block: true })}>
+                      <IconeQualquer name="carta" size={20} />
+                      Enviar e-mail
+                    </a>
+                  ) : null}
+                </div>
+                <ul className="mt-4 space-y-1.5 text-[14px] text-fg-muted">
+                  {zap && whatsapp ? (
+                    <li className="flex items-center gap-2">
+                      <Icon name="whatsapp" size={16} className="text-fg-subtle" />
+                      <span className="num">{fmtWhatsApp(whatsapp)}</span>
+                    </li>
+                  ) : null}
+                  {email && enderecoEmail ? (
+                    <li className="flex min-w-0 items-center gap-2">
+                      <IconeQualquer name="carta" size={16} className="shrink-0 text-fg-subtle" />
+                      <span className="truncate">{enderecoEmail}</span>
+                    </li>
+                  ) : null}
+                </ul>
+              </>
+            ) : (
+              <p className="mt-1.5 text-pretty text-[14.5px] leading-relaxed text-fg-muted">
+                Veja os outros canais na página{' '}
+                <Link to="/sobre#contato" className="font-medium text-fg underline decoration-line/[3] underline-offset-[3px] hover:decoration-brand-fg">
+                  Sobre
+                </Link>
+                .
               </p>
-              <ul className="mt-4 space-y-1.5 text-[14.5px] text-fg-muted">
-                {zap && whatsapp ? (
-                  <li className="flex items-center gap-2">
-                    <Icon name="whatsapp" size={16} className="text-fg-subtle" />
-                    <span className="num">{fmtWhatsApp(whatsapp)}</span>
-                  </li>
-                ) : null}
-                {email && enderecoEmail ? (
-                  <li className="flex min-w-0 items-center gap-2">
-                    <IconeQualquer name="carta" size={16} className="shrink-0 text-fg-subtle" />
-                    <span className="truncate">{enderecoEmail}</span>
-                  </li>
-                ) : null}
-              </ul>
-            </div>
-            <div className="flex flex-col gap-2.5 sm:flex-row lg:flex-col">
-              {zap ? (
-                <a href={zap} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'primary', size: 'lg' })}>
-                  <Icon name="whatsapp" size={20} />
-                  Falar no WhatsApp
-                </a>
-              ) : null}
-              {email ? (
-                <a href={email} className={buttonClasses({ variant: zap ? 'outline' : 'primary', size: 'lg' })}>
-                  <IconeQualquer name="carta" size={20} />
-                  Enviar e-mail
-                </a>
-              ) : null}
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
-            <div className="flex min-w-0 items-start gap-3.5">
-              <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand-fg">
-                <Icon name="relogio" size={19} />
-              </span>
-              <p className="max-w-[40rem] text-pretty text-[16px] leading-relaxed text-fg-muted sm:text-[17px]">
-                <strong className="font-semibold text-fg">O contato comercial está sendo configurado.</strong> Enquanto isso, fale com a gente pelos
-                canais da página <Link to="/sobre#contato" className="font-medium text-fg underline decoration-line/[3] underline-offset-[3px] hover:decoration-brand-fg">Sobre</Link>.
-              </p>
-            </div>
-            <ButtonLink to="/sobre#contato" variant="outline" size="lg" iconRight="seta" className="shrink-0">
-              Ver contatos
-            </ButtonLink>
-          </div>
-        )}
+            )}
+          </aside>
+        </div>
       </div>
     </Bloco>
   );

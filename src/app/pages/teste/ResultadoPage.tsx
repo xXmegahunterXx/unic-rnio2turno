@@ -25,6 +25,7 @@ import { useCandidatosTeste } from '@/app/components/pages/teste/candidatos';
 import { caminhoTeste, codificar, decodificar, ehCodigoV1, novaSemente } from '@/app/components/pages/teste/codigo';
 import { PainelCompartilhar, PainelDuelo } from '@/app/components/pages/teste/Compartilhar';
 import { OferecimentoTeste } from '@/app/components/anuncios/Oferecimento';
+import { SigaSintonia } from '@/app/components/crescimento/SigaSintonia';
 import { SemResultado, VersaoAnterior } from '@/app/components/pages/teste/Estados';
 import { Aviso, EM_REVISAO } from '@/app/components/pages/teste/IntroTeste';
 import { PorTema } from '@/app/components/pages/teste/PorTema';
@@ -341,6 +342,9 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
               </div>
             </div>
           </section>
+
+          {/* redes do Sintonia (painel → Audiência); sem nenhuma configurada, nada aparece */}
+          <SigaSintonia variante="cartao" className="mt-4 sm:mt-6" />
         </motion.div>
       ) : (
         <div className="mt-4 md:mt-6">

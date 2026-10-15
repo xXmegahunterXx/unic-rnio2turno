@@ -29,6 +29,7 @@ export const MAIS: GrupoMais[] = [
     titulo: 'Explore',
     itens: [
       { to: '/curiosidades', label: 'Curiosidades', desc: 'Recordes e fatos do 1º turno', icon: 'grafico', match: (p) => p.startsWith('/curiosidades') },
+      { to: '/palpite', label: 'Palpite do 2º turno', desc: 'Crave o % de cada um até as 17h de 25/10', icon: 'relogio', match: (p) => p.startsWith('/palpite') },
       { to: '/cenarios', label: 'E se…? Monte seu cenário', desc: 'Calculadora do 2º turno, não é previsão', icon: 'troca', match: (p) => p.startsWith('/cenarios') },
       { to: '/governadores', label: 'Governadores', desc: `2º turno em ${nEstadosGov()}`, icon: 'grade', match: (p) => p.startsWith('/governadores') },
       { to: '/tv', label: 'Modo TV', desc: 'Tela cheia para transmissão', icon: 'tv' },
@@ -47,6 +48,7 @@ export const MAIS: GrupoMais[] = [
     itens: [
       { acao: 'compartilhar', label: 'Compartilhar o Sintonia', desc: 'Imagem, texto e link prontos', icon: 'compartilhar' },
       { acao: 'incorporar', label: 'Incorporar no seu site', desc: 'Placar e mapa para blogs', icon: 'codigo' },
+      { to: '/streamers', label: 'Para streamers', desc: 'Placar ao vivo no OBS e no Streamlabs', icon: 'ao-vivo', match: (p) => p.startsWith('/streamers') },
     ],
   },
   {

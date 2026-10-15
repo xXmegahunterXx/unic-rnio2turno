@@ -6,8 +6,14 @@
  * respiro —, a barra fica escondida (o espaço no fim da página continua reservado: nada pula).
  *
  * Medição com IntersectionObserver (a raiz é só a faixa de baixo: `rootMargin` com o topo negativo), refeita ao trocar
- * de página, ao mudar a altura da tela e quando a página ganha ou perde blocos marcados (MutationObserver, com atraso).
- * Esconde na hora; para voltar espera um instante livre (sem pisca-pisca na borda de um bloco).
+ * de página, ao mudar a altura da tela (janela ou `visualViewport`) e quando a página ganha ou perde blocos marcados
+ * (MutationObserver, com atraso). Esconde na hora; para voltar espera um instante livre (sem pisca-pisca na borda).
+ *
+ * A altura da tela nunca passa da altura da TELA do aparelho (`alturaTela`): durante o carregamento, antes do CSS, o
+ * celular pode reduzir o zoom para caber uma página larga e o `innerHeight` chega a ~3.400 px — um observador criado
+ * nessa hora vigiaria a faixa errada para sempre. Rede de segurança: na rolagem (1× por quadro), se a altura mudou o
+ * observador é refeito, e um bloco marcado na faixa (pela geometria) esconde a barra mesmo que o observador não tenha
+ * avisado.
  */
 import { useEffect, useState } from 'react';
 
@@ -35,6 +41,17 @@ export function margemDaFaixa(alturaTela: number, faixa = FAIXA_BARRA_PX): strin
   return `-${corte}px 0px ${ANTECIPA_PX}px 0px`;
 }
 
+/**
+ * Altura útil da tela (px): o menor entre a janela, o `visualViewport` e a altura da tela do aparelho (o zoom reduzido
+ * do carregamento infla os dois primeiros, nunca o último). `win` só para testes.
+ */
+export function alturaTela(
+  win: Pick<Window, 'innerHeight'> & { visualViewport?: { height: number } | null; screen?: { height: number } } = window,
+): number {
+  const candidatas = [win.innerHeight, win.visualViewport?.height, win.screen?.height].filter((x): x is number => typeof x === 'number' && x > 0);
+  return candidatas.length ? Math.min(...candidatas) : 0;
+}
+
 /** Retângulo (posição na tela) dentro da faixa de baixo (ou logo abaixo da tela)? Reserva sem IntersectionObserver e testes. */
 export function naFaixa(r: { top: number; bottom: number }, alturaTela: number, faixa = FAIXA_BARRA_PX): boolean {
   const topoFaixa = Math.max(0, alturaTela - faixa);
@@ -56,7 +73,7 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
         const els = document.querySelectorAll(SELETOR_SEM_ANUNCIO_FIXO);
         let ocupado = false;
         els.forEach((el) => {
-          if (!ocupado && naFaixa(el.getBoundingClientRect(), window.innerHeight)) ocupado = true;
+          if (!ocupado && naFaixa(el.getBoundingClientRect(), alturaTela())) ocupado = true;
         });
         setLivre(!ocupado);
       };
@@ -75,7 +92,8 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
     let tMostrar = 0;
     let tVarrer = 0;
     let tAltura = 0;
-    let altura = window.innerHeight;
+    let quadro = 0;
+    let altura = alturaTela();
 
     const aplicar = () => {
       if (dentro.size > 0) {
@@ -105,7 +123,7 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
           io.observe(el);
           observados.add(el);
           // até o observador responder (próximo quadro), confere na hora: nunca mostra sobre um bloco recém-chegado
-          if (naFaixa(el.getBoundingClientRect(), window.innerHeight)) dentro.add(el);
+          if (naFaixa(el.getBoundingClientRect(), altura)) dentro.add(el);
         }
       }
       aplicar();
@@ -114,7 +132,7 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
       io?.disconnect();
       dentro.clear();
       observados.clear();
-      altura = window.innerHeight;
+      altura = alturaTela();
       io = new IntersectionObserver(
         (entradas) => {
           for (const e of entradas) {
@@ -132,23 +150,50 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
     };
     const aoMudarAltura = () => {
       // a barra de endereço do celular muda a altura ao rolar: refaz só quando muda de verdade, com atraso
-      if (Math.abs(window.innerHeight - altura) < 24) return;
+      if (Math.abs(alturaTela() - altura) < 24) return;
       if (tAltura) window.clearTimeout(tAltura);
       tAltura = window.setTimeout(() => {
         tAltura = 0;
         criar();
       }, 150);
     };
+    /** Rede de segurança na rolagem (1× por quadro): altura nova → refaz; bloco na faixa pela geometria → esconde. */
+    const aoRolar = () => {
+      if (quadro) return;
+      quadro = window.requestAnimationFrame(() => {
+        quadro = 0;
+        if (Math.abs(alturaTela() - altura) >= 24) {
+          criar();
+          return;
+        }
+        let mudou = false;
+        for (const el of observados) {
+          if (!dentro.has(el) && naFaixa(el.getBoundingClientRect(), altura)) {
+            dentro.add(el);
+            mudou = true;
+          }
+        }
+        if (mudou) aplicar();
+      });
+    };
 
     criar();
     const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(agendarVarredura) : null;
     mo?.observe(document.body, { childList: true, subtree: true });
     window.addEventListener('resize', aoMudarAltura);
+    window.visualViewport?.addEventListener('resize', aoMudarAltura);
+    window.addEventListener('scroll', aoRolar, { passive: true });
+    // depois do carregamento (CSS aplicado, zoom normal), confere a altura de novo
+    if (document.readyState !== 'complete') window.addEventListener('load', aoMudarAltura, { once: true });
     return () => {
       mo?.disconnect();
       io?.disconnect();
       io = null;
       window.removeEventListener('resize', aoMudarAltura);
+      window.visualViewport?.removeEventListener('resize', aoMudarAltura);
+      window.removeEventListener('scroll', aoRolar);
+      window.removeEventListener('load', aoMudarAltura);
+      if (quadro) window.cancelAnimationFrame(quadro);
       for (const t of [tMostrar, tVarrer, tAltura]) if (t) window.clearTimeout(t);
     };
   }, [ativo, chave]);

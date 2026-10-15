@@ -74,6 +74,8 @@ ignorados com aviso no log da subida.
 | `LOG_FORMAT` | produção: `json` · dev: `texto` | formato do log (JSON = um objeto por linha) |
 | `LOG_AMOSTRA` | `0.01` | fração das requisições "quentes" registradas (`/api/status`, apuração, estáticos). 5xx, 429, lentas (≥ 1 s) e o painel: sempre |
 | `LOG_AMOSTRA_PAGINAS` | `0.1` | fração das páginas (HTML) e imagens OG registradas |
+| `CHAT_REGISTRO_CHAVE` | desligado | caminho de uma chave PÚBLICA RSA (PEM, ≥ 2048 bits): liga o registro cifrado dos envios do chat (id, hora, IP, porta) em `STATE_DIR/chat-registro`, 6 meses, fora do backup. Só com decisão do dono e do advogado (DEPLOY.md, seção 5.1) |
+| `CHAT_REGISTRO_HEADER_PORTA` | — | cabeçalho com a porta de origem do visitante, quando o proxy a repassa (ex.: `x-porta-cliente`) |
 | `SINTONIA_COMMIT` / `SINTONIA_BUILD_DATE` | `.git` local ou `dev` | versão do build mostrada em `x-sintonia-versao`, `/api/versao`, `/healthz` e no painel (a imagem Docker grava o commit a partir do build-arg `GIT_COMMIT`; `GIT_COMMIT`/`BUILD_DATE` também valem) |
 
 ---
@@ -133,23 +135,30 @@ Leve para a máquina: `dist/`, `dist-server/`, `package.json`, `package-lock.jso
 ### CDN (recomendado na noite da eleição)
 
 O servidor já responde pensando em CDN; basta respeitar `Cache-Control`, `ETag` e `Vary: Accept-Encoding` e incluir
-a **query string** na chave de cache (`?race=`, `?t=`, `&v=`).
+a **query string** na chave de cache (`?race=`, `?t=`, `&v=`, `?d=`).
 
 | Rota | Cache-Control | Observações |
 |---|---|---|
-| `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão, `pessoasAgora` arredondado, anúncios no ar com imagens por URL, contato da página Anuncie, patrocínio legado) |
+| `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão, `pessoasAgora` arredondado, anúncios no ar com imagens por URL, contato da página Anuncie, patrocínio legado; na fonte `tse`, `frescor`: marca dos números e última leitura boa de cada disputa) |
 | `GET /api/meta` | `public, max-age=60, s-maxage=300` | ETag pela versão do dataset |
-| `GET /api/apuracao/:race/…` (2º turno) | `public, max-age=0, s-maxage=2, stale-while-revalidate=10` | ETag fraco `W/"v{versão}-{balde}-{rota}"` → 304 |
+| `GET /api/apuracao/:race/…` (2º turno) | `public, max-age=0, s-maxage=2, stale-while-revalidate=10` | ETag fraco `W/"v{versão}-{balde}-{rota}"` → 304 (simulação) |
+| idem na fonte `tse` | `public, max-age=0, s-maxage=1, stale-while-revalidate=1, stale-if-error=60` | balde = marca dos números (hash do conteúdo: o ETag muda no instante em que o TSE publica e fica igual enquanto nada muda); abaixo do Brasil, marca + 5 s (os municípios chegam pela fila) |
+| `GET /api/apuracao/:race/br?d=<marca atual>` (fonte `tse`) | `public, max-age=0, s-maxage=60, stale-while-revalidate=60` | placar nacional pedido pelo app com a marca do `/api/status`: dado novo = endereço novo, então a cópia de cada marca pode ficar mais tempo na CDN; marca antiga ou desconhecida responde o atual com o cache de 1 s |
 | `GET /api/apuracao/:race-t1/…` (1º turno) | `public, max-age=60, s-maxage=300, stale-while-revalidate=600` | resultado final (ignora `?t=`) |
 | `GET /api/apuracao/:race/…?t=<passado>&v=<versão>` | `public, max-age=600, s-maxage=3600, stale-while-revalidate=600` | "reveja a noite": instante ≥ 60 s (simulação) ou 3 min (TSE) no passado, com a versão atual do admin na URL; ETag `W/"v{versão}-h{t}-{rota}"` |
 | idem sem `&v=` (ou versão antiga) | `public, max-age=0, s-maxage=30, stale-while-revalidate=60` | passado recente ou `t` futuro = cache do agora (futuro nunca é atendido: vira o agora) |
 | `GET /api/apuracao/:race/br/municipios` | como as demais de apuração | mapa nacional por município (`MunicipiosNacionalSnapshot`, ordem de `municipios-br.json`) |
+| `GET /api/apuracao/pres/br/desde-t1` | `public, max-age=0, s-maxage=5, stale-while-revalidate=10` | "Desde o 1º turno" no Brasil por município (`DesdeT1Agregado`, `src/server/desde-t1.ts`): só os municípios com 100% das seções, cobertura e "onde cada um cresceu mais"; recalculado no máximo a cada 5 s; na fonte `tse` só lê o cache (nunca baixa do TSE); nomes ocultos ou outra disputa → 404. Já coberto pela Regra 1 da Cloudflare (`/api/apuracao/`) |
 | `GET /api/anuncio/img?h=<hash>` | `public, max-age=31536000, s-maxage=31536000, immutable` | logo/peça de um anúncio pelo hash do conteúdo (o `/api/status` leva só esta URL); SVG com `Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'` e `nosniff`; hash desconhecido → 404 |
 | `GET /api/anuncio/ir/:id?f=<formato>` | `no-store` | clique: anúncio no ar → conta (agregado; mesmo visitante, anúncio e formato em 10 s conta 1; robô não conta) e 302 para o link cadastrado com UTM (`utm_source=sintonia&utm_medium=<formato ou link>&utm_campaign=<id>`); id desconhecido/fora do ar → 302 para `/` (nunca redirecionamento aberto) |
 | `POST /api/anuncio/evento` `{ id, formato }` | `no-store` | impressão VISÍVEL (o app manda, inclusive por `navigator.sendBeacon`: corpo JSON ou `text/plain`); só do próprio site (403), anúncio no ar e formato dele (404/400), corpo ≤ 2 KB (413); mesmo visitante, anúncio e formato em 5 min conta 1; 60/min por visitante (429); 204 |
+| `GET /api/chat` | `public, max-age=0, s-maxage=1` | chat ao vivo (`src/server/chat.ts`): últimas 60 mensagens + estado da sala (aberta, modo lento, fixada, pessoas na sala estimadas, reações do último minuto, ids removidos, `intervaloS` sugerido); a MESMA URL para todos, ETag → 304 |
+| `GET /api/divulgacao` | `public, max-age=120, s-maxage=60` | redes do Sintonia ("Siga o Sintonia") e, só com "Mostrar audiência na página /anuncie" ligado no painel, os números medidos (pico, maior dia, páginas vistas, desde); ETag → 304 |
+| `POST /api/audiencia`, `POST /api/anuncie/lead` | `no-store` | sinal agregado de audiência do app (grupo da rota / origem da entrada / presença; responde `{ s }`) e o formulário "Quero anunciar" — sempre na origem (ARCHITECTURE §11.12) |
+| `POST /api/chat` `{ apelido, texto, token }` · `/api/chat/denuncia` · `/presenca` · `/reacao` | `no-store` | só JSON do próprio site (403/415), corpo ≤ 4 KB; recusas com o motivo (400/403/422; modo lento e limites → 429 + `Retry-After`) |
 | `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | LEGADO: logo do `status.patrocinio` (derivado do anúncio master com 'topo'), com o mesmo cabeçalho de segurança das imagens de anúncio |
 | 404 de `/api/apuracao/…` | `public, max-age=30, s-maxage=60` | evita martelar a origem com URLs inexistentes |
-| `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630 |
+| `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630; `&formato=x\|feed\|story` → 1200×675, 1080×1350, 1080×1920 (cartões do placar com retratos grandes, `src/server/og-placar.ts`); com anúncio de compartilhamento no ar, faixa "Oferecimento" no pé (ARCHITECTURE §11.14) |
 | `GET /api/og/{municipio,secao,governadores}.png` | ao vivo: como `apuracao.png`; 1º turno oficial (antes da apuração): `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | município, boletim de urna e as disputas de governador do 2º turno (`UFS_GOV_2T`) |
 | `GET /api/og/{candidato,senado,camara,assembleia,curiosidade,cenario}.png` | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | dado oficial (ou cenário recalculado do `?c=`); o `&v=` das meta tags é a versão do dataset |
 | `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego (o código de um Duelo nunca é lido) |
@@ -302,7 +311,7 @@ Painel em `/admin` (fora do layout público). Rotas (todas JSON, `no-store`):
 | `POST /api/admin/command` | aplica um `AdminCommand` (ver `src/shared/api.ts`) e devolve o `AdminSnapshot` |
 | `GET /api/admin/presets` | cenários prontos (simétricos para A e B) |
 | `GET /api/admin/tse/test` | testa o feed do TSE com a configuração atual: `{ ok, detalhe, amostra }` |
-| `GET /api/admin/tse/health` | saúde do polling do TSE (arquivos, falhas, fila de municípios, HTTP) ou `null` |
+| `GET /api/admin/tse/health` | saúde do polling do TSE (arquivos, falhas, fila de municípios, HTTP, laço do resumo nacional de Presidente com o atraso medido TSE → servidor) ou `null` |
 | `GET /api/admin/anuncios/metricas` | relatório de entrega: `{ metricas: MetricaAnuncio[]; desde }` — impressões visíveis e cliques por anúncio × formato (totais desde `desde` e as últimas 48 h por hora) |
 
 O `AdminSnapshot` do servidor traz também `servidor`: build, produção ou não, se a simulação pode ir ao ar (e o
@@ -353,8 +362,11 @@ do comportamento do servidor:
    próxima tentativa). No painel dá para **desligar**, **adiar** (+5 min, +15 min, +1 h ou um horário de Brasília) e
    **trocar agora**. Trocar a fonte à mão continua valendo a qualquer momento; depois de feita (automática ou à mão,
    após o horário) a troca não se repete — "ligar" de novo rearma.
-3. **Durante a apuração**: se o TSE ficar instável, o adaptador mantém o último dado bom (as páginas mostram o horário
-   da última seção totalizada, mas não avisam da queda sozinhas); publique um `aviso` se precisar. A simulação não pode
+3. **Durante a apuração**: o resumo nacional de Presidente é lido a cada 5 s (painel → Fonte → "Placar nacional"), os
+   demais arquivos a cada 15 s; o app reconsulta o placar assim que o `/api/status` traz a marca nova e mostra
+   "Atualizado às … · dado do TSE das …". Se o TSE ficar instável, o adaptador mantém o último dado bom e espaça as
+   leituras (backoff); as páginas mostram as duas horas paradas, mas não avisam da queda sozinhas; publique um `aviso`
+   se precisar. A simulação não pode
    ir ao ar por engano em produção (`ALLOW_SIMULACAO`). As imagens de compartilhamento ao vivo se renovam a cada 30 s
    (uma imagem parada há mais de 90 s espera a nova, em vez de sair vencida para o robô do X).
 4. **Fim**: quando o TSE conclui Presidente e nenhuma disputa de governador segue apurando, o `/api/status` público

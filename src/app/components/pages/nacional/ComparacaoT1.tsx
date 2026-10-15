@@ -147,7 +147,7 @@ function ComparacaoOculta({ className }: { className?: string }) {
         </span>
         <div className="min-w-0">
           <h2 id="comparacao-titulo" className="font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[19px]">
-            Comparação com o 1º turno
+            Desde o 1º turno
           </h2>
           <p className="mt-1 text-pretty text-[13px] leading-relaxed text-fg-muted">
             Fica oculta na simulação: os números oficiais de 4 de outubro identificariam quem é o Candidato A e quem é o Candidato B ao lado de

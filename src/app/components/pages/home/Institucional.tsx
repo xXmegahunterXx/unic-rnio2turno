@@ -353,7 +353,10 @@ export function Resumo({ itens }: { itens: { icone: IconName; titulo: string; te
   );
 }
 
-/** Contato provisório (o produto ainda não tem endereços definitivos). */
+/** Endereço ainda provisório (domínio reservado `.example`, que não recebe e-mail). */
+export const contatoProvisorio = (endereco: string) => /\.example$/i.test(endereco.trim());
+
+/** Contato provisório (o produto ainda não tem endereços definitivos — CHECKLIST-LANCAMENTO A9.1). */
 export const CONTATO = {
   geral: 'contato@sintonia.example',
   privacidade: 'privacidade@sintonia.example',

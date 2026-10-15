@@ -176,8 +176,9 @@ export function ProgressoPres({ compacto, bloco, className }: { compacto?: boole
         `${eleito.nomeUrna} eleito`
       ) : (
         <>
-          <span className="xl:hidden">Eleito</span>
-          <span className="hidden xl:inline">{eleito.nomeUrna} eleito</span>
+          {/* nome inteiro só em tela bem larga: em 1280 px ele invadia os botões do relógio */}
+          <span className="2xl:hidden">Eleito</span>
+          <span className="hidden 2xl:inline">{eleito.nomeUrna} eleito</span>
         </>
       )}
     </Badge>

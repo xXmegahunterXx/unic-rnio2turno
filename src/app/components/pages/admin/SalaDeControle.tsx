@@ -23,6 +23,9 @@ import { SecaoEstados } from './SecaoEstados';
 import { SecaoFonte } from './SecaoFonte';
 import { SecaoMonitor } from './SecaoMonitor';
 import { SecaoAnuncios } from './SecaoAnuncios';
+import { SecaoChat } from './SecaoChat';
+import { SecaoAudiencia } from './SecaoAudiencia';
+import { SecaoInteressados, useInteressadosNovos } from './SecaoInteressados';
 import { situacaoDe } from './anunciosAdmin';
 
 export function SalaDeControle({ offline }: { offline: boolean }) {
@@ -68,8 +71,14 @@ function ConteudoSecao({ secao }: { secao: SecaoId }) {
       return <SecaoComunicacao />;
     case 'anuncios':
       return <SecaoAnuncios />;
+    case 'chat':
+      return <SecaoChat />;
     case 'fonte':
       return <SecaoFonte />;
+    case 'interessados':
+      return <SecaoInteressados />;
+    case 'audiencia':
+      return <SecaoAudiencia />;
     case 'monitor':
       return <SecaoMonitor />;
     default:
@@ -105,6 +114,7 @@ function useDicas(): Record<SecaoId, ReactNode> {
   const { snap } = useAdmin();
   const st = snap.state;
   const noAr = useAnunciosNoAr();
+  const novos = useInteressadosNovos();
   const ajustes = new Set([...Object.keys(st.cenario.ufVies), ...Object.keys(st.cenario.ufAtraso)]).size;
   return {
     controle:
@@ -136,7 +146,14 @@ function useDicas(): Record<SecaoId, ReactNode> {
       ) : (
         <span className="text-[11.5px] text-fg-subtle">{FONTE_CURTA[st.fonte]}</span>
       ),
+    chat: null,
     monitor: <span className="num text-[11px] text-fg-subtle">v{st.versao}</span>,
+    interessados: novos ? (
+      <Badge size="xs" tone="brand">
+        <span className="num">{novos}</span> {novos === 1 ? 'novo' : 'novos'}
+      </Badge>
+    ) : null,
+    audiencia: null,
   };
 }
 
@@ -145,6 +162,7 @@ function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
   const { snap } = useAdmin();
   const st = snap.state;
   const noAr = useAnunciosNoAr();
+  const novos = useInteressadosNovos();
   const ajustes = Object.keys(st.cenario.ufVies).length + Object.keys(st.cenario.ufAtraso).length;
   return {
     controle: st.congelado ? 'alert' : null,
@@ -152,8 +170,11 @@ function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
     estados: ajustes ? 'brand' : null,
     comunicacao: st.congelado || st.aviso?.nivel === 'alerta' ? 'alert' : st.aviso ? 'brand' : null,
     anuncios: noAr ? 'brand' : null,
+    chat: null,
     fonte: st.fonte === 'simulacao' && st.nomesReais ? 'alert' : null,
     monitor: null,
+    interessados: novos ? 'brand' : null,
+    audiencia: null,
   };
 }
 
@@ -290,6 +311,7 @@ function BarraSuperior() {
 
 function CabecalhoMovel() {
   const { secao, irPara, sair, abrirAtalhos, snap } = useAdmin();
+  const novos = useInteressadosNovos();
   const listaRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = listaRef.current?.querySelector<HTMLElement>('[aria-selected="true"]');
@@ -344,6 +366,7 @@ function CabecalhoMovel() {
             >
               <Icon name={s.icone} size={15} />
               {s.rotulo}
+              {s.id === 'interessados' && novos ? <span className="num rounded-full bg-brand px-1.5 text-[11px] font-semibold leading-[18px] text-brand-ink">{novos}</span> : null}
             </button>
           );
         })}

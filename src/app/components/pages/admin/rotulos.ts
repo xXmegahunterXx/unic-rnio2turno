@@ -41,7 +41,7 @@ export const ORDEM_ROTULO: Record<OrdemRegional, string> = {
   'sul-primeiro': 'Sul e Sudeste bem antes',
 };
 
-export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'fonte' | 'monitor';
+export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'chat' | 'fonte' | 'monitor' | 'interessados' | 'audiencia';
 
 export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: string }[] = [
   { id: 'controle', rotulo: 'Controle', icone: 'ao-vivo', descricao: 'Relógio, linha do tempo e pré-visualização' },
@@ -49,8 +49,12 @@ export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: 
   { id: 'estados', rotulo: 'Estados', icone: 'mapa', descricao: 'Viés e atraso por UF' },
   { id: 'comunicacao', rotulo: 'Comunicação', icone: 'alerta', descricao: 'Aviso global e congelamento' },
   { id: 'anuncios', rotulo: 'Anunciantes', icone: 'selo', descricao: 'Anúncios, métricas de entrega e a página Anuncie (só anunciante não político)' },
+  { id: 'chat', rotulo: 'Chat ao vivo', icone: 'usuarios', descricao: 'Sala da apuração: abrir e fechar, modo lento, fixada, denúncias e moderação' },
   { id: 'fonte', rotulo: 'Fonte', icone: 'globo', descricao: 'Pré-eleição, simulação ou TSE' },
   { id: 'monitor', rotulo: 'Monitor', icone: 'grafico', descricao: 'Métricas e log operacional' },
+  // crescimento (src/server/crescimento.ts): no fim, para não mudar os atalhos 1–8 das seções da noite
+  { id: 'interessados', rotulo: 'Interessados', icone: 'lista', descricao: 'Pedidos do formulário “Quero anunciar” da página Anuncie' },
+  { id: 'audiencia', rotulo: 'Audiência', icone: 'grade', descricao: 'Pico, visitantes únicos, páginas e origens (agregado) e as redes do Sintonia' },
 ];
 
 export const ehSecao = (s: string | null): s is SecaoId => !!s && SECOES.some((x) => x.id === s);

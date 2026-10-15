@@ -34,6 +34,7 @@ export function tsePadrao(st: Structure): TseConfig {
     eleicaoGov: gov?.eleicao ?? '6260',
     pleito: pres?.pleito ?? '3221',
     intervaloSeg: 15,
+    intervaloPrioritarioSeg: 5,
   };
 }
 
@@ -202,6 +203,7 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     eleicaoGov: str(t.eleicaoGov, fallback.tse.eleicaoGov),
     pleito: str(t.pleito, fallback.tse.pleito),
     intervaloSeg: Math.min(600, Math.max(5, finito(t.intervaloSeg, fallback.tse.intervaloSeg))),
+    intervaloPrioritarioSeg: Math.min(600, Math.max(3, finito(t.intervaloPrioritarioSeg, fallback.tse.intervaloPrioritarioSeg ?? 5))),
   };
   const congelado = typeof v.congelado === 'boolean' ? v.congelado : fallback.congelado;
   return {

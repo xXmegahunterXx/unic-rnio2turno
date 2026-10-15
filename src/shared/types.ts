@@ -298,6 +298,19 @@ export interface LiveStatus {
   anuncios?: AnuncioPublico[];
   /** Contato da página /anuncie (configurado no admin). */
   anuncie?: ContatoAnuncie | null;
+  /**
+   * Frescor do feed oficial por disputa do 2º turno (só na fonte 'tse', no servidor; ausente no demo e nas outras fontes).
+   * O app reconsulta o placar assim que a `marca` muda, sem esperar o próximo ciclo de consulta.
+   */
+  frescor?: Partial<Record<RaceId, FrescorCorrida>>;
+}
+
+/** Frescor dos números de uma disputa na fonte 'tse' (ver `LiveStatus.frescor`). */
+export interface FrescorCorrida {
+  /** Identifica os números atuais da disputa (hash do conteúdo): muda quando o TSE publica dado novo. */
+  marca: string;
+  /** Última leitura bem-sucedida (200 ou 304) do arquivo principal da disputa no TSE (epoch ms, relógio do servidor). */
+  conferidoEm: number | null;
 }
 
 /** Patrocínio/anúncio institucional (nunca político — ARCHITECTURE §1.5). */
@@ -357,6 +370,12 @@ export interface TseConfig {
   eleicaoGov: string; // 6260
   pleito: string; // 3221
   intervaloSeg: number; // 15
+  /**
+   * Intervalo (s) do arquivo prioritário: o resumo nacional de Presidente (o menor e o mais olhado), consultado à parte
+   * com requisição condicional. Padrão 5 (3–600). Igual ou maior que `intervaloSeg` = sem consulta à parte.
+   * Opcional por compatibilidade com estados salvos antes (ausente = padrão).
+   */
+  intervaloPrioritarioSeg?: number; // 5
 }
 
 export interface AdminState {

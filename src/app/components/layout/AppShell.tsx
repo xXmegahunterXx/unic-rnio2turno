@@ -41,11 +41,13 @@ export function AppShell({ children }: { children?: ReactNode }) {
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <FundoNoite />
       <Header />
-      <main id="conteudo" tabIndex={-1} className="relative flex-1 outline-none">
+      {/* --sala-lateral: largura do chat ao vivo quando ele está aberto ao lado da página (desktop; chat/SalaDaApuracao) */}
+      <main id="conteudo" tabIndex={-1} className="relative flex-1 pr-[var(--sala-lateral,0px)] outline-none">
         {children ?? <Outlet />}
       </main>
       <Footer />
       <RodapeAnuncio />
+      <SalaChatApuracao />
       <TabBar />
       <BarrasMoveis />
       <BuscaRapida />
@@ -103,6 +105,19 @@ function RodapeAnuncio() {
   return (
     <Suspense fallback={null}>
       <BarraRodape />
+    </Suspense>
+  );
+}
+
+/** Chat ao vivo moderado nas páginas da apuração (/apuracao e /apuracao/:uf): chunk próprio, carregado só nelas. */
+const SalaDaApuracao = lazy(() => import('../chat/SalaDaApuracao'));
+const SigaSintonia = lazy(() => import('../crescimento/SigaSintonia').then((m) => ({ default: m.SigaSintonia })));
+function SalaChatApuracao() {
+  const { pathname } = useLocation();
+  if (!/^\/apuracao(\/[a-z]{2})?\/?$/i.test(pathname)) return null;
+  return (
+    <Suspense fallback={null}>
+      <SalaDaApuracao />
     </Suspense>
   );
 }
@@ -381,7 +396,7 @@ function TabBar() {
 function Footer() {
   return (
     // No celular: espaço da tab bar + o da barra de anúncio, quando ela existe (--anuncio-rodape-h, BarraRodape).
-    <footer className="relative mt-12 border-t border-line bg-surface/40 pb-[calc(84px+var(--anuncio-rodape-h,0px)+env(safe-area-inset-bottom))] pt-10 md:mt-20 md:pb-12">
+    <footer className="relative mt-12 border-t border-line bg-surface/40 pb-[calc(84px+var(--anuncio-rodape-h,0px)+env(safe-area-inset-bottom))] pr-[var(--sala-lateral,0px)] pt-10 md:mt-20 md:pb-12">
       <Container wide>
         <div className="grid grid-cols-2 gap-x-6 gap-y-9 md:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr_1fr] lg:gap-10">
           <div className="col-span-2 max-w-sm md:col-span-4 lg:col-span-1">
@@ -397,6 +412,10 @@ function Footer() {
                 candidatos, partidos ou campanhas. Não fazemos enquetes. {REGRA_CORES_CURTA}
               </span>
             </p>
+            {/* "Siga o Sintonia" (redes do painel; sem nenhuma, nada aparece): chunk próprio, fora do JS inicial */}
+            <Suspense fallback={null}>
+              <SigaSintonia variante="rodape" className="mt-5" />
+            </Suspense>
           </div>
           <FooterCol
             titulo="2º turno"
@@ -406,6 +425,7 @@ function Footer() {
               { to: '/apuracao/consulta', label: 'Consulte sua seção' },
               { to: '/teste', label: 'Teste Cego' },
               { to: '/cenarios', label: 'E se…? Monte seu cenário' },
+              { to: '/palpite', label: 'Palpite do 2º turno' },
             ]}
           />
           <FooterCol
@@ -434,6 +454,11 @@ function Footer() {
               <li>
                 <Link to="/tv" className={LINK_RODAPE}>
                   Modo TV
+                </Link>
+              </li>
+              <li>
+                <Link to="/streamers" className={LINK_RODAPE}>
+                  Para streamers
                 </Link>
               </li>
             </ul>

@@ -353,12 +353,13 @@ function MiniStat({ rotulo, valor }: { rotulo: string; valor: string }) {
   );
 }
 
-/** % de cada finalista no 1º turno (na UF) vs agora. */
+/** % de cada finalista no 1º turno (na UF) vs agora; com a UF 100% apurada, também a diferença em votos (mesmo eleitorado). */
 function ComparacaoUf({ race, resumo, t1, raceT1 }: { race: Race; resumo: Summary; t1: Summary; raceT1: Race }) {
   const tem = validos(resumo) > 0;
+  const concluida = resumo.secoes > 0 && resumo.secoesTotalizadas >= resumo.secoes;
   return (
     <div className="rounded-2xl border border-line p-3.5">
-      <p className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Comparação com o 1º turno</p>
+      <p className="text-[11.5px] font-semibold uppercase tracking-[0.1em] text-fg-muted">Desde o 1º turno</p>
       <ul className="mt-2.5 space-y-2">
         {race.candidatos.map((c, i) => {
           const j = raceT1.candidatos.findIndex((x) => x.numero === c.numero);
@@ -376,6 +377,14 @@ function ComparacaoUf({ race, resumo, t1, raceT1 }: { race: Race; resumo: Summar
                 <Icon name="seta" size={13} className="mx-1 inline -translate-y-px text-fg-subtle" />
                 <span className="font-semibold text-fg">{tem ? fmtPct(agora, 1) : '—'}</span>
                 {tem ? <span className="ml-1.5 text-[12px]">({fmtPP(agora - antes)})</span> : null}
+                {concluida ? (
+                  <span className="ml-1.5 block text-right text-[12px]">
+                    {(() => {
+                      const dv = (resumo.votos[i] ?? 0) - (t1.votos[j] ?? 0);
+                      return `${dv > 0 ? '+' : dv < 0 ? '−' : ''}${fmtInt(Math.abs(dv))} votos`;
+                    })()}
+                  </span>
+                ) : null}
               </span>
             </li>
           );
