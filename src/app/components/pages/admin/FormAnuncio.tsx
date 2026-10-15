@@ -21,7 +21,7 @@ import {
   type FormatoAnuncio,
 } from '@/shared/anuncios';
 import { cn } from '@/app/lib/cn';
-import { Button, Icon, Segmented, Toggle } from '@/app/ui';
+import { Button, Icon, Segmented, Toggle, toast } from '@/app/ui';
 import { useAdmin } from './dados';
 import { AreaTexto, Callout, Campo, Painel, Passo, Rotulo } from './kit';
 import { ONDE_APARECE, deCampoData, kbDe, paraCampoData, prepararLogo, prepararPeca } from './anunciosAdmin';
@@ -248,7 +248,14 @@ export function FormAnuncio({ inicial, onFechar }: { inicial: AnuncioConfig | nu
 
   async function salvar() {
     setTentou(true);
-    if (!('ok' in validacao) || idRepetido) return;
+    if (!('ok' in validacao) || idRepetido) {
+      // mostra onde está o problema (no celular, o aviso fica longe do botão)
+      toast(erroGeral ?? 'Confira os campos.', { tone: 'alert', duracao: 5000 });
+      requestAnimationFrame(() =>
+        document.querySelector('[aria-invalid="true"], [data-erro-form]')?.scrollIntoView({ block: 'center', behavior: 'smooth' }),
+      );
+      return;
+    }
     const snapNovo = await run(
       { tipo: 'anuncio-salvar', anuncio: validacao.ok },
       { chave: 'anuncio-salvar', sucesso: editando ? `Anúncio de ${validacao.ok.marca} atualizado` : `Anúncio de ${validacao.ok.marca} criado` },
@@ -449,6 +456,7 @@ export function FormAnuncio({ inicial, onFechar }: { inicial: AnuncioConfig | nu
 
             <Grupo titulo="Declaração">
               <label
+                data-erro-form={tentou && !r.naoPolitico && !erros.marca && !erros.titulo && !erros.url && !erros.id ? '' : undefined}
                 className={cn(
                   'flex cursor-pointer items-start gap-3 rounded-2xl border p-4 transition-colors',
                   r.naoPolitico ? 'border-ok/45 bg-ok/[0.07]' : tentou ? 'border-alert/50 bg-alert/[0.06]' : 'border-line bg-surface-2/60',
@@ -476,12 +484,12 @@ export function FormAnuncio({ inicial, onFechar }: { inicial: AnuncioConfig | nu
             ) : null}
 
             {/* barra de ações: fixa no pé (acima da barra de controle do celular) */}
-            <div className="sticky bottom-[calc(84px+env(safe-area-inset-bottom))] z-20 -mx-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:px-5 lg:bottom-0">
+            <div className="sticky bottom-[calc(72px+env(safe-area-inset-bottom))] z-20 -mx-4 -mb-4 rounded-b-2xl border-t border-line bg-surface/95 px-4 py-3 backdrop-blur sm:-mx-5 sm:-mb-5 sm:px-5 lg:bottom-0">
               <div className="flex items-center gap-2">
                 <Button variant="ghost" onClick={onFechar} className="shrink-0">
                   Cancelar
                 </Button>
-                <Button type="submit" variant="primary" icon="check" block loading={pendente('anuncio-salvar')} disabled={tentou && !!erroGeral}>
+                <Button type="submit" variant="primary" icon="check" block loading={pendente('anuncio-salvar')}>
                   {editando ? 'Salvar alterações' : 'Publicar anúncio'}
                 </Button>
               </div>

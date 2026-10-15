@@ -65,7 +65,7 @@ ignorados com aviso no log da subida.
 | `SIM_AUTOSTART` | — | `1`: sobe simulando a 20× (se não houver simulação/TSE em curso) · `force`: sempre. Em produção só com `ALLOW_SIMULACAO=1` |
 | `DATA_DIR` | `public/data` (dev) · `dist/data` (produção) | dataset (`meta.json`, `uf/*.json`) |
 | `DIST_DIR` | `dist` | build do app servido em produção |
-| `STATE_DIR` | `.server-state` | estado do admin (`admin.json`) e histórico do TSE (`tse-historico.json`) |
+| `STATE_DIR` | `.server-state` | estado do admin (`admin.json`, com os anúncios), histórico do TSE (`tse-historico.json`) e métricas agregadas dos anúncios (`anuncios-metricas.json`) |
 | `SERVE_STATIC` | só em produção | `1`/`0` força servir (ou não) o `DIST_DIR` |
 | `FONTS_DIR` | `dist-server/assets/fonts` | fontes TTF das imagens de compartilhamento |
 | `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`); inválido = ignorado com aviso no log |
@@ -137,14 +137,17 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`).
 
 | Rota | Cache-Control | Observações |
 |---|---|---|
-| `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão, `pessoasAgora` arredondado, patrocínio) |
+| `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão, `pessoasAgora` arredondado, anúncios no ar com imagens por URL, contato da página Anuncie, patrocínio legado) |
 | `GET /api/meta` | `public, max-age=60, s-maxage=300` | ETag pela versão do dataset |
 | `GET /api/apuracao/:race/…` (2º turno) | `public, max-age=0, s-maxage=2, stale-while-revalidate=10` | ETag fraco `W/"v{versão}-{balde}-{rota}"` → 304 |
 | `GET /api/apuracao/:race-t1/…` (1º turno) | `public, max-age=60, s-maxage=300, stale-while-revalidate=600` | resultado final (ignora `?t=`) |
 | `GET /api/apuracao/:race/…?t=<passado>&v=<versão>` | `public, max-age=600, s-maxage=3600, stale-while-revalidate=600` | "reveja a noite": instante ≥ 60 s (simulação) ou 3 min (TSE) no passado, com a versão atual do admin na URL; ETag `W/"v{versão}-h{t}-{rota}"` |
 | idem sem `&v=` (ou versão antiga) | `public, max-age=0, s-maxage=30, stale-while-revalidate=60` | passado recente ou `t` futuro = cache do agora (futuro nunca é atendido: vira o agora) |
 | `GET /api/apuracao/:race/br/municipios` | como as demais de apuração | mapa nacional por município (`MunicipiosNacionalSnapshot`, ordem de `municipios-br.json`) |
-| `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | logo do patrocínio enviada em data URI (o `/api/status` leva só esta URL) |
+| `GET /api/anuncio/img?h=<hash>` | `public, max-age=31536000, s-maxage=31536000, immutable` | logo/peça de um anúncio pelo hash do conteúdo (o `/api/status` leva só esta URL); SVG com `Content-Security-Policy: sandbox; default-src 'none'; style-src 'unsafe-inline'` e `nosniff`; hash desconhecido → 404 |
+| `GET /api/anuncio/ir/:id?f=<formato>` | `no-store` | clique: anúncio no ar → conta (agregado; mesmo visitante, anúncio e formato em 10 s conta 1; robô não conta) e 302 para o link cadastrado com UTM (`utm_source=sintonia&utm_medium=<formato ou link>&utm_campaign=<id>`); id desconhecido/fora do ar → 302 para `/` (nunca redirecionamento aberto) |
+| `POST /api/anuncio/evento` `{ id, formato }` | `no-store` | impressão VISÍVEL (o app manda, inclusive por `navigator.sendBeacon`: corpo JSON ou `text/plain`); só do próprio site (403), anúncio no ar e formato dele (404/400), corpo ≤ 2 KB (413); mesmo visitante, anúncio e formato em 5 min conta 1; 60/min por visitante (429); 204 |
+| `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | LEGADO: logo do `status.patrocinio` (derivado do anúncio master com 'topo'), com o mesmo cabeçalho de segurança das imagens de anúncio |
 | 404 de `/api/apuracao/…` | `public, max-age=30, s-maxage=60` | evita martelar a origem com URLs inexistentes |
 | `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630 |
 | `GET /api/og/{municipio,secao,governadores}.png` | ao vivo: como `apuracao.png`; 1º turno oficial (antes da apuração): `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | município, boletim de urna e as disputas de governador do 2º turno (`UFS_GOV_2T`) |
@@ -252,10 +255,14 @@ intervalo as requisições esperam (a CDN continua servindo o conteúdo anterior
   por cliente (IP real com `TRUST_PROXY`, pelo último salto — forjar o começo do `X-Forwarded-For` não escapa) e 300/min
   no total → 429 com `Retry-After`; **CSRF**: `POST` só com `application/json`, e pedido de navegador vindo de outro site
   é recusado (403) pelo `Sec-Fetch-Site` e pelo `Origin`/`Referer`, que precisam ser o próprio site (`PUBLIC_URL` ou o
-  Host; clientes fora do navegador, como `curl`, não mandam esses cabeçalhos e passam); corpo ≤ 64 KB (256 KB no
-  `/command`, por causa da logo do patrocínio); comandos validados com zod (`src/server/validation.ts`).
+  Host; clientes fora do navegador, como `curl`, não mandam esses cabeçalhos e passam); corpo ≤ 64 KB (1 MB no
+  `/command`, por causa da logo e da peça dos anúncios); comandos validados com zod (`src/server/validation.ts`; o
+  anúncio pela MESMA `validaAnuncio` do motor).
 - Simulação em produção só com `ALLOW_SIMULACAO=1` (senão: 403 com o motivo, que o painel também mostra).
-- Limites: URL ≤ 8 KB (414), corpo declarado ≤ 512 KB em qualquer rota (413); parâmetros validados por rota (UF,
+- Anúncios: imagens enviadas pelo admin servidas com `Content-Security-Policy: sandbox; default-src 'none';
+  style-src 'unsafe-inline'` e `nosniff`; o clique só redireciona para o link cadastrado (id desconhecido → `/`);
+  eventos só do próprio site, com repetição descartada e limite por visitante; robôs não contam.
+- Limites: URL ≤ 8 KB (414), corpo declarado ≤ 512 KB em qualquer rota, 1 MB no `/api/admin/command` (413); parâmetros validados por rota (UF,
   código, zona, seção, `?t=`, código de cenário ≤ 600 caracteres).
 - Cabeçalhos: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS de 1 ano em
   produção; nas páginas, **Content-Security-Policy** (scripts só do próprio site + os 2 scripts inline do `index.html`
@@ -291,6 +298,7 @@ Painel em `/admin` (fora do layout público). Rotas (todas JSON, `no-store`):
 | `GET /api/admin/presets` | cenários prontos (simétricos para A e B) |
 | `GET /api/admin/tse/test` | testa o feed do TSE com a configuração atual: `{ ok, detalhe, amostra }` |
 | `GET /api/admin/tse/health` | saúde do polling do TSE (arquivos, falhas, fila de municípios, HTTP) ou `null` |
+| `GET /api/admin/anuncios/metricas` | relatório de entrega: `{ metricas: MetricaAnuncio[]; desde }` — impressões visíveis e cliques por anúncio × formato (totais desde `desde` e as últimas 48 h por hora) |
 
 O `AdminSnapshot` do servidor traz também `servidor`: build, produção ou não, se a simulação pode ir ao ar (e o
 motivo), o estado da troca automática para o TSE e métricas do processo (req/s, p50/p99, 5xx/429, cache, requisições
@@ -298,10 +306,23 @@ em andamento, atraso do event loop, memória, imagens OG). O painel mostra tudo 
 
 Comandos: `relogio` (iniciar · pausar · retomar · reiniciar), `velocidade`, `saltar-tempo`, `saltar-pct`,
 `cenario` (parcial), `preset`, `fonte` (`pre` · `simulacao` · `tse`), `aviso` (faixa para todos os visitantes),
-`congelar` (simula instabilidade: números param), `tse` (códigos e intervalo do feed), `nomes-reais`, `patrocinio` e
-`troca-auto` (`ligar` · `desligar` · `agora` · `adiar` com `para` = epoch ms ou `null` para o horário padrão). Cada
-comando incrementa a `versao`, que invalida o cache dos clientes e da CDN, e é gravado em `STATE_DIR/admin.json`
-(escrita atômica).
+`congelar` (simula instabilidade: números param), `tse` (códigos e intervalo do feed), `nomes-reais`,
+`anuncio-salvar` (cria ou substitui pelo id; validado por `validaAnuncio`, `src/shared/anuncios.ts`), `anuncio-remover`,
+`anuncio-ativo` (pausar/ativar), `anuncie-contato` (e-mail, WhatsApp e chamada da página `/anuncie`; `null` limpa),
+`patrocinio` (LEGADO: vira/atualiza o anúncio master `patrocinio`) e `troca-auto` (`ligar` · `desligar` · `agora` ·
+`adiar` com `para` = epoch ms ou `null` para o horário padrão). Cada comando incrementa a `versao`, que invalida o cache
+dos clientes e da CDN, e é gravado em `STATE_DIR/admin.json` (escrita atômica).
+
+**Anunciantes** (seção do painel, feita para o celular): vários anúncios ao mesmo tempo (até 24 cadastrados), cada um com
+os formatos em que aparece (`topo`, `rodape`, `nativo`, `teste`, `tv`, `compartilhamento`), cota master/apoio, peso 1–10
+na rotação, ativo e janela início/fim (horário de Brasília, relógio real — a simulação não mexe nela) e a declaração
+obrigatória de que anunciante e peça não têm conteúdo político-eleitoral. Logo (≤ 512 px, ≤ 150 KB; SVG como está) e peça
+(≤ 1600 px, ≤ 400 KB, WebP) são redimensionadas no navegador. No `AdminSnapshot` as imagens vêm como
+`/api/anuncio/img?h=…` e voltam assim ao salvar (o servidor troca pelo conteúdo). Relatório de entrega com CSV (totais e
+por hora). Métricas: só agregadas por anúncio × formato × hora, sem cookie, sem IP e sem dado pessoal (o visitante é só a
+chave anonimizada do app, usada em memória para descartar repetições); gravadas a cada 60 s e no encerramento em
+`STATE_DIR/anuncios-metricas.json`. Com um anúncio no formato `compartilhamento`, as imagens OG ganham a faixa
+"Oferecimento: <marca>" no pé (o master vence) e a versão da imagem nas meta tags muda com o anunciante.
 
 Na VPS, os mesmos comandos sem navegador: `deploy/painel.sh` (estado, `trocar-agora`, `adiar`, `marcar`, `fonte pre`,
 `aviso`/`alerta`/`sem-aviso`, `tse`, `testar-tse`; recusa a simulação). Com `curl`, em desenvolvimento:

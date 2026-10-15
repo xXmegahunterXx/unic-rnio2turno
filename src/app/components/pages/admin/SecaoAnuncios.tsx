@@ -92,26 +92,41 @@ function Numero({ rotulo, valor, sub }: { rotulo: string; valor: string; sub?: s
   );
 }
 
-/** Barrinhas das últimas 48 h (impressões por hora; a hora com clique ganha um ponto). Só tokens. */
+/** Barrinhas das últimas 48 h: impressões por hora em cima, cliques por hora embaixo (escalas próprias). Só tokens. */
 function Barras48h({ serie, className }: { serie: { hora: number; impressoes: number; cliques: number }[]; className?: string }) {
-  const max = Math.max(1, ...serie.map((p) => p.impressoes));
-  const algum = serie.some((p) => p.impressoes > 0 || p.cliques > 0);
+  const maxI = Math.max(1, ...serie.map((p) => p.impressoes));
+  const maxC = Math.max(1, ...serie.map((p) => p.cliques));
+  const totI = serie.reduce((s, p) => s + p.impressoes, 0);
+  const totC = serie.reduce((s, p) => s + p.cliques, 0);
+  const altura = (v: number, max: number) => (v > 0 ? `${Math.max(10, (100 * v) / max)}%` : '2px');
   return (
-    <div className={className}>
-      <div className="flex h-10 items-end gap-[2px]" role="img" aria-label={`Impressões por hora nas últimas 48 horas: ${fmtInt(serie.reduce((s, p) => s + p.impressoes, 0))} no total`}>
+    <div className={className} role="img" aria-label={`Últimas 48 horas: ${fmtInt(totI)} impressões e ${fmtInt(totC)} cliques`}>
+      <div className="flex h-9 items-end gap-[2px]" aria-hidden>
         {serie.map((p) => (
-          <span key={p.hora} className="relative flex h-full min-w-0 flex-1 items-end" title={`${fmtDataHora(p.hora)} · ${fmtInt(p.impressoes)} impressões · ${fmtInt(p.cliques)} cliques`}>
-            <span
-              className={cn('block w-full rounded-[2px]', p.impressoes > 0 ? 'bg-brand-2/80' : 'bg-surface-3')}
-              style={{ height: p.impressoes > 0 ? `${Math.max(8, (100 * p.impressoes) / max)}%` : '3px' }}
-            />
-            {p.cliques > 0 ? <span className="absolute -top-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-ok" /> : null}
+          <span key={p.hora} className="flex h-full min-w-0 flex-1 items-end" title={`${fmtDataHora(p.hora)} · ${fmtInt(p.impressoes)} impressões · ${fmtInt(p.cliques)} cliques`}>
+            <span className={cn('block w-full rounded-[2px]', p.impressoes > 0 ? 'bg-brand-2/80' : 'bg-surface-3')} style={{ height: altura(p.impressoes, maxI) }} />
           </span>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[10.5px] text-fg-subtle">
+      <div className="mt-[3px] flex h-3.5 items-start gap-[2px]" aria-hidden>
+        {serie.map((p) => (
+          <span key={p.hora} className="flex h-full min-w-0 flex-1 items-start">
+            <span className={cn('block w-full rounded-[2px]', p.cliques > 0 ? 'bg-ok/80' : 'bg-surface-3/70')} style={{ height: altura(p.cliques, maxC) }} />
+          </span>
+        ))}
+      </div>
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[10.5px] text-fg-subtle">
         <span className="num">{serie.length ? fmtDataHora(serie[0].hora) : ''}</span>
-        <span>{algum ? 'últimas 48 h' : 'sem impressões nas últimas 48 h'}</span>
+        <span className="flex items-center gap-2.5">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-[2px] bg-brand-2/80" aria-hidden />
+            impressões
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2 w-2 rounded-[2px] bg-ok/80" aria-hidden />
+            cliques
+          </span>
+        </span>
         <span className="num">{serie.length ? fmtHora(serie[serie.length - 1].hora) : ''}</span>
       </div>
     </div>
@@ -234,10 +249,10 @@ function Resumo({ anuncios, agora, metricas }: { anuncios: AnuncioConfig[]; agor
   const noAr = anuncios.filter((a) => situacaoDe(a, agora) === 'no-ar').length;
   const t48 = metricas ? totais48h(metricas, agora) : null;
   const itens = [
-    { rotulo: 'No ar agora', valor: `${fmtInt(noAr)} de ${fmtInt(anuncios.length)}`, icone: 'ao-vivo' as const },
-    { rotulo: 'Impressões (48 h)', valor: t48 ? fmtInt(t48.impressoes) : '—', icone: 'grafico' as const },
-    { rotulo: 'Cliques (48 h)', valor: t48 ? fmtInt(t48.cliques) : '—', icone: 'externo' as const },
-    { rotulo: 'CTR (48 h)', valor: t48 ? fmtCtr(t48) : '—', icone: 'rapido' as const },
+    { rotulo: 'No ar agora', valor: `${fmtInt(noAr)} de ${fmtInt(anuncios.length)}`, sub: 'anúncios cadastrados', icone: 'ao-vivo' as const },
+    { rotulo: 'Impressões', valor: t48 ? fmtInt(t48.impressoes) : '—', sub: 'últimas 48 h', icone: 'grafico' as const },
+    { rotulo: 'Cliques', valor: t48 ? fmtInt(t48.cliques) : '—', sub: 'últimas 48 h', icone: 'externo' as const },
+    { rotulo: 'CTR', valor: t48 ? fmtCtr(t48) : '—', sub: 'cliques ÷ impressões, 48 h', icone: 'rapido' as const },
   ];
   return (
     <div className="mb-4 grid grid-cols-2 gap-2.5 sm:gap-3 lg:mb-5 lg:grid-cols-4">
@@ -248,6 +263,7 @@ function Resumo({ anuncios, agora, metricas }: { anuncios: AnuncioConfig[]; agor
             <Rotulo className="truncate">{i.rotulo}</Rotulo>
           </div>
           <div className="num mt-2 truncate font-display text-[22px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[24px]">{i.valor}</div>
+          <div className="mt-1 truncate text-[11.5px] text-fg-subtle">{i.sub}</div>
         </div>
       ))}
     </div>
@@ -304,43 +320,63 @@ function Relatorio({ anuncios, resposta, erro, agora }: { anuncios: AnuncioConfi
         </p>
       ) : (
         <div className="space-y-3">
-          {linhas.map((l) => (
-            <div key={l.id} className="overflow-hidden rounded-xl border border-line">
-              <div className="flex items-center justify-between gap-3 bg-surface-2/70 px-3 py-2">
-                <span className="min-w-0 truncate text-[13.5px] font-semibold text-fg">
-                  {l.marca}
-                  {l.removido ? <span className="ml-1.5 text-[11.5px] font-normal text-fg-subtle">(removido)</span> : null}
-                </span>
-                <span className="num shrink-0 text-[12px] text-fg-muted">CTR {fmtCtr(l.total)}</span>
-              </div>
-              <table className="w-full text-[12.5px]">
-                <thead>
-                  <tr className="text-left text-[11px] text-fg-subtle">
-                    <th className="px-3 py-1.5 font-medium">Formato</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Impr.</th>
-                    <th className="px-2 py-1.5 text-right font-medium">Cliques</th>
-                    <th className="px-3 py-1.5 text-right font-medium">CTR</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {l.formatos.map((f) => (
-                    <tr key={f.formato}>
-                      <td className="px-3 py-1.5 text-fg-muted">{ROTULO_CURTO[f.formato]}</td>
-                      <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(f.impressoes)}</td>
-                      <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(f.cliques)}</td>
-                      <td className="num px-3 py-1.5 text-right text-fg-muted">{fmtCtr(f)}</td>
+          {linhas
+            .filter((l) => l.total.impressoes > 0 || l.total.cliques > 0)
+            .map((l) => (
+              <div key={l.id} className="overflow-hidden rounded-xl border border-line">
+                <div className="flex items-center justify-between gap-3 bg-surface-2/70 px-3 py-2">
+                  <span className="min-w-0 truncate text-[13.5px] font-semibold text-fg">
+                    {l.marca}
+                    {l.removido ? <span className="ml-1.5 text-[11.5px] font-normal text-fg-subtle">(removido)</span> : null}
+                  </span>
+                  <span className="num shrink-0 text-[12px] text-fg-muted">CTR {fmtCtr(l.total)}</span>
+                </div>
+                <table className="w-full table-fixed text-[12.5px]">
+                  <colgroup>
+                    <col className="w-[34%]" />
+                    <col className="w-[24%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[22%]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="text-left text-[11px] text-fg-subtle">
+                      <th className="px-3 py-1.5 font-medium">Formato</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Impressões</th>
+                      <th className="px-2 py-1.5 text-right font-medium">Cliques</th>
+                      <th className="px-3 py-1.5 text-right font-medium">CTR</th>
                     </tr>
-                  ))}
-                  <tr className="bg-surface-2/40 font-semibold">
-                    <td className="px-3 py-1.5 text-fg">Total</td>
-                    <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(l.total.impressoes)}</td>
-                    <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(l.total.cliques)}</td>
-                    <td className="num px-3 py-1.5 text-right text-fg">{fmtCtr(l.total)}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          ))}
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {l.formatos.map((f) => (
+                      <tr key={f.formato}>
+                        <td className="truncate px-3 py-1.5 text-fg-muted">{ROTULO_CURTO[f.formato]}</td>
+                        <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(f.impressoes)}</td>
+                        <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(f.cliques)}</td>
+                        <td className="num px-3 py-1.5 text-right text-fg-muted">{fmtCtr(f)}</td>
+                      </tr>
+                    ))}
+                    {l.formatos.length > 1 ? (
+                      <tr className="bg-surface-2/40 font-semibold">
+                        <td className="px-3 py-1.5 text-fg">Total</td>
+                        <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(l.total.impressoes)}</td>
+                        <td className="num px-2 py-1.5 text-right text-fg">{fmtInt(l.total.cliques)}</td>
+                        <td className="num px-3 py-1.5 text-right text-fg">{fmtCtr(l.total)}</td>
+                      </tr>
+                    ) : null}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          {linhas.some((l) => !l.total.impressoes && !l.total.cliques) ? (
+            <p className="text-[12.5px] text-fg-subtle">
+              Ainda sem entrega:{' '}
+              {linhas
+                .filter((l) => !l.total.impressoes && !l.total.cliques)
+                .map((l) => l.marca)
+                .join(', ')}
+              .
+            </p>
+          ) : null}
           {geral ? (
             <p className="num text-right text-[12px] text-fg-muted">
               Todos: {fmtInt(geral.impressoes)} impressões · {fmtInt(geral.cliques)} cliques · CTR {fmtCtr(geral)}
@@ -384,7 +420,7 @@ function PaginaAnuncie() {
           if ('ok' in v) void run({ tipo: 'anuncie-contato', contato: Object.keys(v.ok).length ? v.ok : null }, { chave: 'anuncie-contato', sucesso: 'Contato da página Anuncie salvo' });
         }}
       >
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4">
           <Campo rotulo="E-mail comercial" type="email" inputMode="email" autoCapitalize="none" value={email} placeholder="comercial@exemplo.com.br" onChange={(e) => setEmail(e.target.value)} />
           <Campo
             rotulo="WhatsApp (com DDI e DDD)"

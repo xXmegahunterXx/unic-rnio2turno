@@ -37,8 +37,11 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
 4. **Simulação sempre sinalizada.** Quando `LiveStatus.simulacao === true`, o app mostra uma faixa
    "SIMULAÇÃO · dados fictícios" visível em toda página de apuração, e as imagens de compartilhamento
    levam a marca "SIMULAÇÃO".
-5. **Sem deepfake e sem propaganda paga.** Nenhuma imagem gerada de candidato. Os espaços de anúncio
-   (`<AdSlot/>`) aceitam só anunciantes não políticos.
+5. **Sem deepfake e sem propaganda paga.** Nenhuma imagem gerada de candidato. Os espaços de anúncio aceitam só
+   anunciantes não políticos (declaração obrigatória no cadastro), sempre rotulados ("Publicidade", "Patrocinado",
+   "Oferecido por"), com link `rel="sponsored noopener noreferrer"` em nova aba, nunca dentro de placar/resultado nem
+   colados a foto, nome ou número de candidato, sem pop-up, intersticial, som ou animação piscante. Métricas de anúncio só
+   agregadas, sem cookie, sem IP e sem dado pessoal (§10.2, item 10).
 6. **Fonte.** Dados reais vêm do TSE (resultados.tse.jus.br) e do IBGE (malhas). Cite as fontes na
    página `/metodologia`.
 
@@ -287,6 +290,8 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 - **Operação**: `GET /healthz` (vivo; usado pelo healthcheck do Docker), `GET /readyz` (pronto: dataset, modelo e build
   do app presentes; 503 durante o encerramento), `GET /api/versao` (commit/data do build, também no cabeçalho
   `x-sintonia-versao`), `GET /sitemap.xml` e `GET /robots.txt` (gerados com `PUBLIC_URL`).
+- **Anúncios** (`anuncios.ts`, §10.2 item 10): `/api/status` com as imagens por `/api/anuncio/img?h=<hash>` e o link
+  por `/api/anuncio/ir/<id>`; clique contado + 302; `POST /api/anuncio/evento` (impressão visível); relatório no admin.
 - **Produção** (`NODE_ENV=production`): troca automática `pre` → `tse` às 17h de 25/10 (`troca-auto.ts`), simulação
   travada sem `ALLOW_SIMULACAO=1`, CSP/HSTS, CSRF no admin, logs em JSON e `/kit` = 404. Ver §12.
 
@@ -409,10 +414,39 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
    - `/assembleias/:uf`;
    - governadores eleitos no 1º turno;
    - ficha `/candidato/:sqcand`: dados públicos do TSE, patrimônio declarado e resultado.
-10. **Patrocínio:**
-    - slot discreto "Oferecido por", só para anunciante não político;
-    - configurado no admin (`AdminCommand 'patrocinio'`, `LiveStatus.patrocinio`);
-    - desligado por padrão.
+10. **Anúncios** (vários anunciantes; substitui o patrocínio único). Contrato em `src/shared/anuncios.ts`:
+    - **Formatos**: `topo` (faixa abaixo do cabeçalho; master tem prioridade), `rodape` (barra fixa do celular, pode ser
+      fechada), `nativo` (cartão "Patrocinado" no conteúdo), `teste` ("Resultado oferecido por" no Teste Cego), `tv` (logo
+      no Modo TV) e `compartilhamento` ("Oferecimento: <marca>" no pé das imagens OG). `escolherAnuncio` faz a rotação
+      ponderada pelo `peso`, fixa por semente (a mesma posição não troca a cada renderização), com o master vencendo em
+      `topo`, `tv` e `compartilhamento`.
+    - **Admin** (seção Anunciantes, pensada para 390 px): lista com situação (no ar · agendado · pausado · encerrado),
+      formatos, cota, peso e métricas (totais, 48 h por hora); formulário com marca, id (`idDaMarca`, fixo depois de
+      criado), título, texto, botão, link https, logo e peça (redimensionadas no navegador), formatos, cota, peso, ativo,
+      início/fim (Brasília) e a declaração obrigatória "não político-eleitoral"; relatório de entrega com CSV; contato da
+      página `/anuncie`. `PreviaAnuncio` (admin) é a prévia simples; o ponto de troca pelos componentes do site está
+      comentado nele.
+    - **Motor** (`AdminState.anuncios` ≤ 24, `AdminState.anuncie`): comandos `anuncio-salvar` (valida com `validaAnuncio`;
+      substitui pelo id; imagem que volta do painel como URL do servidor mantém a que o anúncio já tem), `anuncio-remover`,
+      `anuncio-ativo`, `anuncie-contato`. `LiveStatus.anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`;
+      memorizado até o próximo início/fim) como `AnuncioPublico` (link com UTM `link`, `destino` = domínio; no demo as
+      imagens seguem em data URI). LEGADO: o comando `patrocinio` vira/atualiza o anúncio master `patrocinio` (formatos
+      topo + nativo + tv, título = texto cortado em 60, botão "Saiba mais"); um estado salvo com o patrocínio antigo é
+      migrado uma vez; `LiveStatus.patrocinio` é derivado do master (ou do 1º) com `topo`. `state()` copia o estado
+      compartilhando as strings (as imagens não são duplicadas a cada consulta).
+    - **Servidor** (`src/server/anuncios.ts`): imagens pelo hash do conteúdo (`/api/anuncio/img`, cache imutável, SVG em
+      sandbox; o painel também recebe URLs, e o servidor troca pelo conteúdo ao salvar); `/api/anuncio/ir/:id?f=` conta o
+      clique e redireciona com UTM (id desconhecido → `/`); `POST /api/anuncio/evento` conta a impressão visível (só do
+      próprio site, anúncio no ar com aquele formato, aceita o `text/plain` do `sendBeacon`). Métricas em memória por
+      anúncio × formato × hora (48 h no detalhe, totais desde sempre), gravadas de forma atômica em
+      `STATE_DIR/anuncios-metricas.json` a cada 60 s e no encerramento; `GET /api/admin/anuncios/metricas`.
+    - **Contagem honesta e LGPD**: o visitante é só a chave anonimizada do app (hash do IP com sal por processo), usada em
+      memória como número de 53 bits para descartar repetições (impressão: mesmo visitante, anúncio e formato em 5 min;
+      clique: 10 s) e limitar abusos (60 eventos/min); nunca é gravada. Robôs de prévia/busca não contam. Atrás de uma
+      mesma rede (CGNAT), várias pessoas contam como uma: a contagem é conservadora.
+    - **Imagens OG**: com anúncio `compartilhamento` no ar, faixa própria de 32 px no pé ("Oferecimento: <marca>", só
+      texto, separada por linha); o cartão perde ~8 px de altura útil. O conjunto de anunciantes entra na chave de cache
+      das imagens e no `&v=` das meta tags (`tagOferecimento`): trocar o anunciante gera imagens novas.
 
 ---
 
@@ -587,7 +621,7 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
                         │  rede interna do Docker (porta do app não publicada)
                         ▼
                app: 1 processo Node 22 (dist/ + dist-server/main.js): SPA, API, motor, adaptador do TSE, imagens OG
-                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json
+                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json
 ```
 
 - **Imagem** (`Dockerfile`): multi-stage em `node:22-bookworm-slim` (glibc, por causa do binário do resvg); a final leva
@@ -637,7 +671,10 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
 - **Limites**: URL ≤ 8 KB (414), corpo ≤ 512 KB (413), imagens OG novas ≤ `OG_LIMITE_MIN`/min por cliente (429) e fila
   de geração limitada (503); estáticos nunca servem arquivos ocultos; erros sem pilha para o cliente.
 - **Privacidade**: nenhum log de IP, cookie, senha, query string ou código de Duelo (o Caddy não tem log de acesso);
-  respostas do Teste Cego nunca chegam ao servidor (§1.3). Ver `CHECKLIST-LANCAMENTO.md` B1.7 sobre o Marco Civil.
+  respostas do Teste Cego nunca chegam ao servidor (§1.3); métricas de anúncio só agregadas (§10.2, item 10). Ver
+  `CHECKLIST-LANCAMENTO.md` B1.7 sobre o Marco Civil.
+- **Anúncios**: imagens do admin com CSP `sandbox` + `nosniff`; clique só para o link cadastrado; eventos só do próprio
+  site; `/api/admin/command` aceita até 1 MB (logo + peça), as demais rotas 512 KB.
 
 ### 12.4 Operação
 
