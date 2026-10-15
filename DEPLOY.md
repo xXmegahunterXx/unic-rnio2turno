@@ -294,6 +294,20 @@ O que acontece:
 Mudou só a senha ou outra variável do servidor (não de build)? Basta
 `cd /opt/sintonia && docker compose up -d` (recria o app em ~3 s).
 
+### 6.1 Atualização automática (sem precisar entrar na VPS)
+
+```bash
+/opt/sintonia/deploy/auto-update.sh ligar      # desligar: … desligar · ver: … estado
+```
+
+A cada 5 minutos a VPS confere o GitHub e, se houver versão nova, roda o `update.sh` acima (com ensaio e volta
+automática). Um commit que falhou não é tentado de novo até chegar outro. **Congelada na noite da eleição**: de
+25/10 12:00 a 26/10 06:00 (Brasília) nada atualiza sozinho — mude com `AUTO_CONGELAR_DE` / `AUTO_CONGELAR_ATE`
+(ISO 8601) no `.env`. Registro em `/var/log/sintonia-auto-update.log`.
+
+**Pelo celular:** um app de SSH (Termius, para Android e iPhone; ou JuiceSSH no Android) com host `IP-DA-VPS`,
+usuário `root` e a senha; depois cole o comando.
+
 ## 7. Backup e restauração
 
 - **Automático:** de hora em hora, em `/var/backups/sintonia/` (mantém os 72 últimos = 3 dias). Cada arquivo tem
@@ -462,6 +476,7 @@ Teste local sem domínio: no `.env`, `SITE_ADDRESS=':80'`, `HTTP_PORT=8080`, `HT
 | `deploy/caddy/Caddyfile` | HTTPS automático, HTTP/3, compressão, IP real do visitante, espera durante reinícios |
 | `deploy/healthcheck.mjs` | healthcheck do contêiner + vigia de travamento |
 | `deploy/install.sh` | instalação completa numa VPS Ubuntu/Debian (detecta VPS com outros projetos → modo compartilhado, seção 3.4) |
+| `deploy/auto-update.sh` | atualização automática a cada 5 min (ligar/desligar/estado), congelada na noite da eleição (seção 6.1) |
 | `deploy/dominio.sh` | liga ou troca o domínio; numa VPS compartilhada, configura o nginx/Caddy/Apache da máquina com conferência e desfazer (seção 3.4) |
 | `deploy/diagnostico.sh` | diagnóstico só de leitura da máquina (portas 80/443, contêineres, Caddyfile/nginx e os sites que atendem, situação do Sintonia), sem senhas — para mandar a quem está ajudando |
 | `docker-compose.vps.yml` | gerado no modo compartilhado (app em `127.0.0.1`, Caddy próprio desligado); não vai para o git |
