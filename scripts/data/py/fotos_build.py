@@ -3,6 +3,7 @@ Fotos oficiais dos candidatos (TSE) em pacotes por grupo — FotoPacote em src/s
 
     python3 -I scripts/data/py/fotos_build.py              # baixa o que falta (cache) e gera os pacotes
     python3 -I scripts/data/py/fotos_build.py --offline    # só o cache
+    python3 -I scripts/data/py/fotos_build.py --so-hd      # só o pacote 'presidente-hd' (do cache; não mexe nos outros)
 
 Rode DEPOIS de scripts/data/py/candidatos_build.ts: os grupos e os candidatos vêm de public/data/candidatos/*.json
 (os mesmos grupos das fichas; cada ficha tem `fotoGrupo`).
@@ -21,6 +22,13 @@ Tratamento — IGUAL para todos e sem nenhuma edição além de redimensionar/re
       ver src/server/fotos.ts).
 Saída: public/data/fotos/{grupo}.json = {"grupo": "...", "fotos": {sqcand: data URI}} (JSON minificado).
 Orçamento total: ≤ 10 MB (o script para se passar).
+
+Pacote extra 'presidente-hd' (hero da Home e topo da apuração antes das 17h, onde a foto aparece grande):
+    - só os candidatos a Presidente do grupo 'segundo-turno' (os dois finalistas; vices fora);
+    - RESOLUÇÃO ORIGINAL do TSE (161×225): se os dois originais têm o mesmo tamanho e só o cabeçalho JFIF, o arquivo
+      vai BYTE A BYTE como veio do TSE (nem recompressão); senão, os dois são recortados/redimensionados para o mesmo
+      tamanho (o menor comum, mesma regra do ImageOps.fit acima) e salvos em JPEG qualidade 92 — sem nenhum filtro;
+    - JPEG (o servidor também consegue usá-lo nas imagens de compartilhamento); ~19 KB no total, baixado sob demanda.
 """
 from __future__ import annotations
 
@@ -46,9 +54,12 @@ LARGURA, ALTURA = 120, 160
 QUALIDADE_WEBP = 70
 QUALIDADE_JPEG = 85
 GRUPOS_JPEG = {'segundo-turno'}
+GRUPO_HD = 'presidente-hd'
+QUALIDADE_HD = 92
 CONCORRENCIA = 8
 ORCAMENTO = 10 * 1024 * 1024
-OFFLINE = '--offline' in sys.argv
+SO_HD = '--so-hd' in sys.argv
+OFFLINE = '--offline' in sys.argv or SO_HD
 
 
 def log(*a: object) -> None:
@@ -123,6 +134,63 @@ def processar(caminho: str, formato: str) -> str:
     return f'data:{mime};base64,{base64.b64encode(buf.getvalue()).decode("ascii")}'
 
 
+def so_jfif(dados: bytes) -> bool:
+    """True se o JPEG só tem o cabeçalho JFIF (APP0) antes da imagem: nenhum EXIF/XMP/ICC/comentário a descartar."""
+    i = 2
+    while i + 4 <= len(dados) and dados[i] == 0xFF:
+        m = dados[i + 1]
+        if m == 0xDA:  # início da imagem (SOS)
+            return True
+        if (0xE1 <= m <= 0xEF) or m == 0xFE:
+            return False
+        i += 2 + int.from_bytes(dados[i + 2:i + 4], 'big')
+    return False
+
+
+def pacote_hd(grupos: list[tuple[str, list[dict]]], resultado: dict[str, tuple[str | None, str]]) -> tuple[str, int, int]:
+    """Gera public/data/fotos/presidente-hd.json. Devolve (linha do relatório, bytes, nº de fotos)."""
+    cands = [c for g, cs in grupos if g == 'segundo-turno' for c in cs if c.get('cargo') == 'Presidente' and c.get('uf') == 'BR']
+    if len(cands) != 2:
+        raise SystemExit(f'{GRUPO_HD}: esperava 2 candidatos a Presidente no grupo segundo-turno, achei {len(cands)}')
+    caminhos: list[tuple[dict, str]] = []
+    for c in cands:
+        caminho, origem = resultado.get(c['sqcand'], (None, 'fora do cache'))
+        if caminho is None:
+            raise SystemExit(f'{GRUPO_HD}: sem a foto original de {c["nomeUrna"]} ({c["sqcand"]}) — {origem}')
+        caminhos.append((c, caminho))
+    tamanhos = []
+    for _, caminho in caminhos:
+        with Image.open(caminho) as im:
+            tamanhos.append(im.size)
+    brutos: list[bytes] = []
+    for _, caminho in caminhos:
+        with open(caminho, 'rb') as f:
+            brutos.append(f.read())
+    fotos: dict[str, str] = {}
+    if len(set(tamanhos)) == 1 and all(so_jfif(b) for b in brutos):
+        # Mesmo tamanho e sem metadados: o arquivo oficial, intacto.
+        for (c, _), b in zip(caminhos, brutos):
+            fotos[c['sqcand']] = f'data:image/jpeg;base64,{base64.b64encode(b).decode("ascii")}'
+        modo = f'original {tamanhos[0][0]}×{tamanhos[0][1]}, bytes do TSE'
+    else:
+        # Mesmo tratamento para os dois: o menor tamanho comum (proporção 161:225), recorte central mínimo, Lanczos.
+        w = min(t[0] for t in tamanhos)
+        h = min(round(w * 225 / 161), min(t[1] for t in tamanhos))
+        for c, caminho in caminhos:
+            with Image.open(caminho) as im:
+                im = ImageOps.fit(im.convert('RGB'), (w, h), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+                buf = io.BytesIO()
+                im.save(buf, 'JPEG', quality=QUALIDADE_HD, optimize=True, progressive=False)
+            fotos[c['sqcand']] = f'data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode("ascii")}'
+        modo = f'recorte comum {w}×{h}, JPEG {QUALIDADE_HD}'
+    txt = json.dumps({'grupo': GRUPO_HD, 'fotos': fotos}, ensure_ascii=False, separators=(',', ':'))
+    os.makedirs(DIR_OUT, exist_ok=True)
+    with open(os.path.join(DIR_OUT, f'{GRUPO_HD}.json'), 'w', encoding='utf-8') as f:
+        f.write(txt)
+    n = len(txt.encode('utf-8'))
+    return f'{GRUPO_HD:<16} {len(fotos):>4}/{len(cands):<4} {n / 1024:>7.0f} KB  ({modo})', n, len(fotos)
+
+
 def main() -> None:
     t0 = time.time()
     if not os.path.isdir(DIR_CAND):
@@ -143,6 +211,13 @@ def main() -> None:
     prioridade = {'segundo-turno': 0, 'governadores': 1, 'senado': 2}
     grupos.sort(key=lambda g: (prioridade.get(g[0], 3 if g[0].startswith('camara') else 4), g[0]))
 
+    if SO_HD:
+        pres = [c for g, cs in grupos if g == 'segundo-turno' for c in cs if c.get('cargo') == 'Presidente' and c.get('uf') == 'BR']
+        res = {sq: (caminho, origem) for sq, caminho, origem in (baixar(c['sqcand'], c['uf']) for c in pres)}
+        linha, _, _ = pacote_hd(grupos, res)
+        print(linha)
+        return
+
     pedidos = {(c['sqcand'], c['uf']) for _, cs in grupos for c in cs}
     log(f'{len(pedidos)} fotos em {len(grupos)} grupos; cache em {os.path.relpath(CACHE, ROOT)}')
     resultado: dict[str, tuple[str | None, str]] = {}
@@ -157,7 +232,7 @@ def main() -> None:
     log('download: ' + ', '.join(f'{k} {v}' for k, v in sorted(contagem.items())))
 
     os.makedirs(DIR_OUT, exist_ok=True)
-    esperados = {f'{g}.json' for g, _ in grupos}
+    esperados = {f'{g}.json' for g, _ in grupos} | {f'{GRUPO_HD}.json'}
     for nome in os.listdir(DIR_OUT):
         if nome.endswith('.json') and nome not in esperados:
             os.remove(os.path.join(DIR_OUT, nome))
@@ -181,6 +256,10 @@ def main() -> None:
         total += n
         media = (n / len(fotos) / 1024) if fotos else 0
         linhas.append(f'{grupo:<16} {len(fotos):>4}/{len(cands):<4} {n / 1024:>7.0f} KB  ({formato}, ~{media:.1f} KB/foto)')
+
+    linha_hd, n_hd, _ = pacote_hd(grupos, resultado)
+    linhas.append(linha_hd)
+    total += n_hd
 
     print('\nGrupo            fotos       tamanho')
     print('\n'.join(linhas))
