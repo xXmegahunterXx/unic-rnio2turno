@@ -19,9 +19,9 @@ export const ONDE_APARECE: Record<FormatoAnuncio, string> = {
   topo: 'Faixa logo abaixo do cabeçalho, em todas as páginas. A cota master tem prioridade.',
   rodape: 'Barra fixa no pé da tela do celular; o visitante pode fechar (volta na próxima visita).',
   nativo: 'Cartão “Patrocinado” no meio do conteúdo: home, apuração, curiosidades, governadores.',
-  teste: '“Resultado oferecido por” na tela de resultado do Teste Cego, a mais compartilhada.',
+  teste: '“Teste Cego oferecido por” na tela de resultado do Teste Cego, depois de revelar e longe do cartão do resultado.',
   tv: 'Logo grande no Modo TV (telões e transmissões ao vivo).',
-  compartilhamento: '“Oferecimento: marca” no rodapé das imagens que vão para o X e o WhatsApp.',
+  compartilhamento: '“Oferecimento: marca” no rodapé das imagens genéricas (Teste Cego, calculadora, curiosidades) que vão para o X e o WhatsApp; nunca nas de placar ou candidato. Não medido.',
 };
 
 export const ROTULO_CURTO: Record<FormatoAnuncio, string> = {
@@ -143,8 +143,14 @@ export function linhasRelatorio(
 
 // ---- CSV ------------------------------------------------------------------------------------------------
 
-const csvCampo = (v: string | number) => {
-  const s = String(v);
+/**
+ * Campo do CSV. Texto que começa com = + - @ TAB ou CR (a marca é texto livre do anunciante) ganha um apóstrofo na
+ * frente: o Excel/Planilhas trataria como fórmula mesmo entre aspas (=HYPERLINK(…) vira link clicável). Números vêm do
+ * código e seguem como estão.
+ */
+export const csvCampo = (v: string | number) => {
+  const s0 = String(v);
+  const s = typeof v === 'string' && /^[=+\-@\t\r]/.test(s0) ? `'${s0}` : s0;
   return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 

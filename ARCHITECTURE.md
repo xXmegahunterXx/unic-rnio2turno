@@ -415,11 +415,23 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
    - governadores eleitos no 1º turno;
    - ficha `/candidato/:sqcand`: dados públicos do TSE, patrimônio declarado e resultado.
 10. **Anúncios** (vários anunciantes; substitui o patrocínio único). Contrato em `src/shared/anuncios.ts`:
-    - **Formatos**: `topo` (faixa abaixo do cabeçalho; master tem prioridade), `rodape` (barra fixa do celular, pode ser
-      fechada), `nativo` (cartão "Patrocinado" no conteúdo), `teste` ("Resultado oferecido por" no Teste Cego), `tv` (logo
-      no Modo TV) e `compartilhamento` ("Oferecimento: <marca>" no pé das imagens OG). `escolherAnuncio` faz a rotação
-      ponderada pelo `peso`, fixa por semente (a mesma posição não troca a cada renderização), com o master vencendo em
-      `topo`, `tv` e `compartilhamento`.
+    - **Formatos**: `topo` (faixa abaixo do cabeçalho; master tem prioridade; no celular, título inteiro em até 2 linhas),
+      `rodape` (barra fixa do celular, pode ser fechada), `nativo` (cartão "Patrocinado" entre seções), `teste` ("Teste Cego
+      oferecido por", só depois de revelar e longe do cartão do resultado), `tv` ("Oferecimento" na barra do topo do Modo TV;
+      em retrato, faixa acima do letreiro) e `compartilhamento` ("Oferecimento: <marca>" no pé SÓ das imagens OG genéricas:
+      Teste Cego, calculadora sem código e capa das curiosidades — nunca placar, município, seção, ficha, eleitos, bancadas,
+      governadores, fato isolado ou cenário). `escolherAnuncio` (módulo próprio `anuncios-escolha.ts`, o único que entra no
+      JS inicial do site; reexportado pelo contrato) faz a rotação ponderada pelo `peso`, fixa por semente, com o master
+      vencendo em `topo`, `tv` e `compartilhamento`.
+    - **Posição (regra dura)**: nada dentro de placar/resultado nem encostado em foto, nome ou número de candidato. A barra
+      fixa do rodapé só entra depois da 1ª rolagem e fica escondida enquanto um bloco marcado com `data-sem-anuncio-fixo`
+      (placares, cartão do confronto, PreHero, retratos/avatares, barras de votos, BU, governadores, `FotoOficial`, placar
+      dos cenários) estiver na faixa de baixo da tela (`anuncios/faixaLivre.ts`); bloco novo com resultado/candidato leva o
+      atributo na raiz.
+    - **Nada político-eleitoral**: além da declaração, `validaAnuncio` recusa (`anuncios-politica.ts`) nomes de candidatos
+      (os do dataset, passados pelo motor, + "Lula"/"Bolsonaro"), termos eleitorais, número de urna pedido como voto,
+      siglas de partido em maiúsculas e destinos de governo/Legislativo/Judiciário/MP (publicidade institucional), de
+      partido ou com nome de candidato.
     - **Admin** (seção Anunciantes, pensada para 390 px): lista com situação (no ar · agendado · pausado · encerrado),
       formatos, cota, peso e métricas (totais, 48 h por hora); formulário com marca, id (`idDaMarca`, fixo depois de
       criado), título, texto, botão, link https, logo e peça (redimensionadas no navegador), formatos, cota, peso, ativo,
@@ -436,17 +448,24 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
       compartilhando as strings (as imagens não são duplicadas a cada consulta).
     - **Servidor** (`src/server/anuncios.ts`): imagens pelo hash do conteúdo (`/api/anuncio/img`, cache imutável, SVG em
       sandbox; o painel também recebe URLs, e o servidor troca pelo conteúdo ao salvar); `/api/anuncio/ir/:id?f=` conta o
-      clique e redireciona com UTM (id desconhecido → `/`); `POST /api/anuncio/evento` conta a impressão visível (só do
-      próprio site, anúncio no ar com aquele formato, aceita o `text/plain` do `sendBeacon`). Métricas em memória por
+      clique e redireciona com UTM (id desconhecido → `/`; só conta GET de navegação vinda do site — `Sec-Fetch-Dest`
+      documento, `Sec-Fetch-Site` same-origin/none — e só formatos com link: `topo`, `rodape`, `nativo`, `teste`);
+      `POST /api/anuncio/evento` conta a impressão visível (só do próprio site: `Origin`/`Sec-Fetch-Site`, sem os dois
+      → 204 sem contar; anúncio no ar com aquele formato; `compartilhamento` não é medido; aceita o `text/plain` do
+      `sendBeacon`). UTM: `utm_medium` = formato, exceto o do Teste Cego, que sai `conteudo` (não revela que a visita fez
+      o teste). Métricas em memória por
       anúncio × formato × hora (48 h no detalhe, totais desde sempre), gravadas de forma atômica em
       `STATE_DIR/anuncios-metricas.json` a cada 60 s e no encerramento; `GET /api/admin/anuncios/metricas`.
-    - **Contagem honesta e LGPD**: o visitante é só a chave anonimizada do app (hash do IP com sal por processo), usada em
-      memória como número de 53 bits para descartar repetições (impressão: mesmo visitante, anúncio e formato em 5 min;
-      clique: 10 s) e limitar abusos (60 eventos/min); nunca é gravada. Robôs de prévia/busca não contam. Atrás de uma
-      mesma rede (CGNAT), várias pessoas contam como uma: a contagem é conservadora.
-    - **Imagens OG**: com anúncio `compartilhamento` no ar, faixa própria de 32 px no pé ("Oferecimento: <marca>", só
-      texto, separada por linha); o cartão perde ~8 px de altura útil. O conjunto de anunciantes entra na chave de cache
-      das imagens e no `&v=` das meta tags (`tagOferecimento`): trocar o anunciante gera imagens novas.
+    - **Contagem honesta e LGPD**: o visitante é só a chave anonimizada do app (hash da rede com sal por processo: IPv4
+      inteiro, IPv6 pelo prefixo /64 — trocar de endereço dentro da faixa não zera nada), usada em memória como número de
+      53 bits para descartar repetições (impressão: mesmo visitante, anúncio e formato em 5 min; clique: 30 min) e
+      limitar abusos (60 eventos/min; no máximo 100 mil visitantes por janela em memória); nunca é gravada. Robôs de
+      prévia/busca não contam. Atrás de uma mesma rede (CGNAT), várias pessoas contam como uma: a contagem é conservadora.
+    - **Imagens OG**: com anúncio `compartilhamento` no ar, faixa própria de 32 px no pé, centralizada ("Oferecimento:
+      <marca>", só texto, separada por linha), só nos cartões genéricos (`CARTOES_COM_OFERECIMENTO` em
+      `og-oferecimento.ts`); o cartão perde ~8 px de altura útil. Nesses cartões o conjunto de anunciantes entra na chave
+      de cache e no `&v=` das meta tags (`tagOferecimento`): trocar o anunciante gera imagens novas; as demais imagens
+      não mudam com o anunciante.
 
 ---
 
@@ -673,8 +692,10 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
 - **Privacidade**: nenhum log de IP, cookie, senha, query string ou código de Duelo (o Caddy não tem log de acesso);
   respostas do Teste Cego nunca chegam ao servidor (§1.3); métricas de anúncio só agregadas (§10.2, item 10). Ver
   `CHECKLIST-LANCAMENTO.md` B1.7 sobre o Marco Civil.
-- **Anúncios**: imagens do admin com CSP `sandbox` + `nosniff`; clique só para o link cadastrado; eventos só do próprio
-  site; `/api/admin/command` aceita até 1 MB (logo + peça), as demais rotas 512 KB.
+- **Anúncios**: imagens do admin com CSP `sandbox` + `nosniff`; páginas com `img-src 'self'` (+ origem do `PUBLIC_URL`),
+  `data:` e `blob:` (nenhum pixel de terceiro); clique só para o link cadastrado e só contado em navegação vinda do site
+  (30 min entre cliques do mesmo visitante); eventos só do próprio site; visitante = hash da rede (IPv4 inteiro, IPv6
+  /64); `/api/admin/command` aceita até 1 MB (logo + peça), as demais rotas 512 KB.
 
 ### 12.4 Operação
 

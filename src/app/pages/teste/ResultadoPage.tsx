@@ -24,7 +24,7 @@ import { ListaAfirmacoes, TituloSecao, type LinhaAfirmacao } from '@/app/compone
 import { useCandidatosTeste } from '@/app/components/pages/teste/candidatos';
 import { caminhoTeste, codificar, decodificar, ehCodigoV1, novaSemente } from '@/app/components/pages/teste/codigo';
 import { PainelCompartilhar, PainelDuelo } from '@/app/components/pages/teste/Compartilhar';
-import { OferecimentoTeste } from '@/app/components/anuncios';
+import { OferecimentoTeste } from '@/app/components/anuncios/Oferecimento';
 import { SemResultado, VersaoAnterior } from '@/app/components/pages/teste/Estados';
 import { Aviso, EM_REVISAO } from '@/app/components/pages/teste/IntroTeste';
 import { PorTema } from '@/app/components/pages/teste/PorTema';
@@ -215,9 +215,6 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
         </div>
       </section>
 
-      {/* publicidade: "Resultado oferecido por", FORA do cartão do resultado (que tem fotos, nomes e percentuais) */}
-      <OferecimentoTeste className="mt-6 md:mt-8" />
-
       {revelado ? (
         <motion.div initial={reduzir ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: reduzir ? 0 : 0.6 }}>
           {rapido && faltam > 0 ? (
@@ -261,6 +258,11 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
               </Link>
             </Aviso>
           </div>
+
+          {/* publicidade: "Teste Cego oferecido por" — só depois de revelar e LONGE do cartão do resultado (que tem fotos,
+              nomes e percentuais): depois das ações de compartilhar e dos avisos, com filete e respiro próprios. A marca
+              fica com o Teste Cego, nunca com o resultado. */}
+          <OferecimentoTeste className="mt-10 border-t border-line pt-8 sm:mt-14 sm:pt-10" />
 
           <section aria-labelledby="por-tema" className="mt-10 sm:mt-14">
             <TituloSecao id="por-tema" titulo="Tema a tema">

@@ -245,8 +245,13 @@ const ehDataUri = (v: string | undefined): v is string => typeof v === 'string' 
  * URL do próprio servidor (`/api/anuncio/img?h=…`, ida e volta pelo admin) e que o servidor não trocou pelo conteúdo
  * mantém a imagem que o anúncio de mesmo id já tem; sem anterior, fica sem imagem.
  */
-export function normalizaAnuncio(v: unknown, anterior?: AnuncioConfig | null): { ok: AnuncioConfig } | { erro: string } {
-  const r = validaAnuncio(v);
+export function normalizaAnuncio(
+  v: unknown,
+  anterior?: AnuncioConfig | null,
+  /** nomes de candidatos do dataset (anúncio que os cite é recusado — src/shared/anuncios-politica.ts) */
+  nomesCandidatos?: readonly string[],
+): { ok: AnuncioConfig } | { erro: string } {
+  const r = validaAnuncio(v, { nomesCandidatos });
   if ('erro' in r) return r;
   const a = { ...r.ok };
   for (const campo of ['logo', 'imagem'] as const) {
@@ -291,7 +296,7 @@ const cortarTexto = (s: string, max: number) => (s.length <= max ? s : `${s.slic
  * cota master, formatos topo + nativo + tv, título = texto cortado em 60, botão "Saiba mais". Logo só em data URI (a
  * logo por URL externa não é aceita nos anúncios: o site não carrega imagem de terceiros). Mantém o peso do anterior.
  */
-export function anuncioDoPatrocinio(p: Patrocinio, anterior?: AnuncioConfig | null): { ok: AnuncioConfig } | { erro: string } {
+export function anuncioDoPatrocinio(p: Patrocinio, anterior?: AnuncioConfig | null, nomesCandidatos?: readonly string[]): { ok: AnuncioConfig } | { erro: string } {
   return normalizaAnuncio({
     id: ID_PATROCINIO,
     marca: cortarTexto(p.marca.trim(), ANUNCIO_LIMITES.marca),
@@ -307,7 +312,7 @@ export function anuncioDoPatrocinio(p: Patrocinio, anterior?: AnuncioConfig | nu
     inicio: null,
     fim: null,
     naoPolitico: true,
-  });
+  }, null, nomesCandidatos);
 }
 
 /**

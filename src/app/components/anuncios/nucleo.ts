@@ -8,7 +8,9 @@
  * Um nativo nunca repete um anunciante já mostrado em OUTRO nativo da mesma página: sem anúncio novo para a posição,
  * entra o anúncio da casa ("Anuncie no Sintonia", no máximo 1 por página) e, depois dele, nada.
  */
-import { escolherAnuncio, type AnuncioPublico, type ContatoAnuncie, type FormatoAnuncio } from '@/shared/anuncios';
+// só a escolha (módulo pequeno): a validação e os limites do painel ficam fora do JS inicial do site
+import { escolherAnuncio } from '@/shared/anuncios-escolha';
+import type { AnuncioPublico, ContatoAnuncie, FormatoAnuncio } from '@/shared/anuncios';
 
 /** Anúncio da casa (bloco nativo sem anunciante): leva a /anuncie. Nunca no topo nem no rodapé. */
 export const CASA = 'casa' as const;
@@ -71,7 +73,7 @@ export function escolhaDaPagina(
 /**
  * Rotas com a barra do rodapé (celular). Fora do Teste Cego e do Duelo: nas perguntas as respostas ficam na metade de
  * baixo da tela, e no resultado o botão "Revelar" também — a barra atrapalharia e geraria toques sem querer (o
- * resultado já tem o próprio espaço, "Resultado oferecido por").
+ * resultado já tem o próprio espaço, "Teste Cego oferecido por").
  */
 export const rodapePermitido = (pathname: string): boolean => !pathname.startsWith('/teste') && !pathname.startsWith('/duelo');
 

@@ -16,7 +16,7 @@ import { UF_NOMES } from '@/shared/constants';
 import { fmtCompact, fmtInt } from '@/shared/format';
 import { useMunicipio, useStatus, useUf } from '@/app/data/hooks';
 import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
 import { Badge, ButtonLink, Combobox, Icon, IconButton, Segmented, Sheet, type ComboOption } from '@/app/ui';

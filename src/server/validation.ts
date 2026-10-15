@@ -159,8 +159,9 @@ const patrocinio = z
 const CAMPOS_ANUNCIO = new Set(['id', 'marca', 'titulo', 'texto', 'cta', 'url', 'logo', 'imagem', 'formatos', 'peso', 'cota', 'ativo', 'inicio', 'fim', 'naoPolitico']);
 
 /**
- * Anúncio: a MESMA validação do motor (`validaAnuncio`, src/shared/anuncios.ts) — o que passa aqui nunca é recusado lá.
- * A mensagem sai como está (já diz o campo).
+ * Anúncio: a MESMA validação do motor (`validaAnuncio`, src/shared/anuncios.ts), com a barreira de conteúdo
+ * político-eleitoral (src/shared/anuncios-politica.ts). O motor confere também os nomes dos candidatos do dataset (e
+ * recusa com uma mensagem igualmente limpa). A mensagem sai como está (já diz o campo).
  */
 const anuncio = z.unknown().superRefine((v, ctx) => {
   if (v && typeof v === 'object' && !Array.isArray(v)) {

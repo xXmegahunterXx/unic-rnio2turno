@@ -1,7 +1,7 @@
 /** Utilidades puras da seção "Anunciantes" do painel. */
 import { describe, expect, it } from 'vitest';
 import type { MetricaAnuncio } from '@/shared/anuncios';
-import { HORA_MS, csvPorHora, csvRelatorio, ctr, deCampoData, linhasRelatorio, paraCampoData, serieHoras, situacaoDe, totais48h, totaisDe } from './anunciosAdmin';
+import { HORA_MS, csvCampo, csvPorHora, csvRelatorio, ctr, deCampoData, linhasRelatorio, paraCampoData, serieHoras, situacaoDe, totais48h, totaisDe } from './anunciosAdmin';
 
 const AGORA = Date.UTC(2026, 9, 15, 15, 30, 0); // 12:30 de Brasília
 const H0 = Math.floor(AGORA / HORA_MS) * HORA_MS;
@@ -57,5 +57,17 @@ describe('anunciosAdmin', () => {
     const ph = csvPorHora(metricas, [{ id: 'lynx', marca: 'Lynx' }]);
     expect(ph.split('\r\n').filter(Boolean)).toHaveLength(1 + 4);
     expect(ph).toContain(`lynx;Lynx;topo;${new Date(H0).toISOString()};100;1`);
+  });
+
+  it('CSV: texto que começa com = + - @ TAB ou CR não vira fórmula na planilha', () => {
+    expect(csvCampo('=HYPERLINK("http://x")')).toBe(`"'=HYPERLINK(""http://x"")"`);
+    expect(csvCampo('+5511')).toBe("'+5511");
+    expect(csvCampo('-1')).toBe("'-1");
+    expect(csvCampo('@soma')).toBe("'@soma");
+    expect(csvCampo('\tx')).toBe("'\tx");
+    expect(csvCampo('Lynx')).toBe('Lynx');
+    expect(csvCampo(-3)).toBe('-3'); // número vem do código
+    const csv = csvRelatorio(metricas, [{ id: 'lynx', marca: '=cmd|calc' }], AGORA - 86400_000, AGORA);
+    expect(csv).toContain("lynx;'=cmd|calc;topo;");
   });
 });

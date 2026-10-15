@@ -33,7 +33,7 @@ import { EmptyState, ErrorState } from '@/app/components/apuracao/States';
 import { LinkModoTv, Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
 import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
 import { PessoasAgora } from '@/app/components/apuracao/PessoasAgora';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 import { PreHero } from '@/app/components/pages/nacional/PreHero';
 import { MapaPanel } from '@/app/components/pages/nacional/MapaPanel';
 import { CorridaPanel } from '@/app/components/pages/nacional/CorridaPanel';

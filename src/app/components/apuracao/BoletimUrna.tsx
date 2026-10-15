@@ -47,7 +47,7 @@ export function BoletimUrna({ secao, race, className }: BoletimUrnaProps) {
   const v = (n: number) => (tot ? fmtInt(n) : '—');
   const titulo = `Boletim de Urna da seção ${secao.secao}, zona ${secao.zona}, ${secao.nomeMunicipio} (${secao.uf})`;
   return (
-    <figure aria-label={titulo} className={cn('relative mx-auto w-full max-w-[400px]', className)}>
+    <figure data-sem-anuncio-fixo aria-label={titulo} className={cn('relative mx-auto w-full max-w-[400px]', className)}>
       {/* sombra do papel */}
       <div aria-hidden className="absolute inset-x-3 bottom-[-10px] top-3 rounded-[28px] bg-[rgb(0_0_0/0.35)] blur-2xl dark:bg-[rgb(0_0_0/0.6)]" />
       <div

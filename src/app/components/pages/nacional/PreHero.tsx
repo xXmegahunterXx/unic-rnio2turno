@@ -83,6 +83,8 @@ export function PreHero({
 
   return (
     <section
+      // fotos, nomes e 1º turno: sem barra fixa de anúncio por cima (anuncios/faixaLivre.ts)
+      data-sem-anuncio-fixo
       aria-label="Contagem regressiva para a apuração"
       className={cn('relative isolate overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-8 lg:p-10', className)}
     >

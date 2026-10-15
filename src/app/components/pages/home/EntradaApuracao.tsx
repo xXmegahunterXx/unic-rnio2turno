@@ -32,7 +32,7 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
   const pst = data ? pctTotalizadas(data.resumo) : 0;
 
   return (
-    <article className={cn('relative isolate flex flex-col overflow-hidden rounded-[28px] border border-line bg-surface shadow-card', className)}>
+    <article data-sem-anuncio-fixo className={cn('relative isolate flex flex-col overflow-hidden rounded-[28px] border border-line bg-surface shadow-card', className)}>
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -left-24 -top-28 h-64 w-64 rounded-full bg-brand/[0.12] blur-3xl" />
       </div>
@@ -137,26 +137,31 @@ function Linha({ c, pct, votos, semVotos }: { c: Candidate; pct: number; votos: 
         ) : (
           <CandidateAvatar candidato={c} size="sm" />
         )}
+        {/* o nome disputa a largura só com o percentual (os votos vão para a linha de baixo): os dois nomes aparecem
+            inteiros mesmo numa coluna estreita (até 2 linhas), sem cortar um e não o outro */}
         <div className="min-w-0 flex-1">
-          <div className={cn('text-[14.5px] leading-tight', agregado ? 'font-medium text-fg-muted' : 'truncate font-semibold text-fg')}>
-            {agregado ? 'Demais candidatos' : c.nomeUrna}
-          </div>
-          {!agregado ? (
-            <div className="num mt-0.5 truncate text-[12px] text-fg-muted">
-              {partidoENumero(c)}
+          <div className="flex items-center justify-between gap-2">
+            <div
+              className={cn(
+                'line-clamp-2 min-w-0 text-[14.5px] leading-tight [overflow-wrap:anywhere]',
+                agregado ? 'font-medium text-fg-muted' : 'font-semibold text-fg',
+              )}
+            >
+              {agregado ? 'Demais candidatos' : c.nomeUrna}
             </div>
-          ) : null}
-        </div>
-        <div className="shrink-0 text-right">
-          <div
-            className={cn(
-              'num font-display font-semibold leading-none tracking-[-0.03em]',
-              agregado ? 'text-[18px] text-fg-muted' : cn('text-[24px]', semVotos ? 'text-fg-subtle' : s.textDisplay),
-            )}
-          >
-            {fmtPct(pct)}
+            <div
+              className={cn(
+                'num shrink-0 font-display font-semibold leading-none tracking-[-0.03em]',
+                agregado ? 'text-[18px] text-fg-muted' : cn('text-[24px]', semVotos ? 'text-fg-subtle' : s.textDisplay),
+              )}
+            >
+              {fmtPct(pct)}
+            </div>
           </div>
-          <div className="num mt-1 text-[11.5px] text-fg-muted">{fmtInt(votos)} votos</div>
+          <div className="mt-1 flex items-baseline justify-between gap-2 text-[11.5px] text-fg-muted">
+            <span className="num min-w-0 truncate text-[12px]">{agregado ? '' : partidoENumero(c)}</span>
+            <span className="num shrink-0">{fmtInt(votos)} votos</span>
+          </div>
         </div>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3">

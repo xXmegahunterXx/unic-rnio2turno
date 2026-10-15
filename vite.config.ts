@@ -16,6 +16,12 @@ import { fileURLToPath, URL } from 'node:url';
 function preCarregamentoCritico(demo: boolean): Plugin {
   let base = '/';
   const ROTAS: Record<string, string> = { '/': 'src/app/pages/Home.tsx', '/teste': 'src/app/pages/teste/TestePage.tsx' };
+  /**
+   * Dados que a rota aberta precisa já na 1ª dobra, pedidos junto com o HTML (`<link rel=preload as=fetch crossorigin>`;
+   * o `fetch()` padrão do app — mesma origem, sem `credentials: 'omit'` — reaproveita a resposta). Home: as fotos
+   * oficiais em resolução original dos finalistas (o retrato é o maior elemento da tela: o LCP).
+   */
+  const DADOS: Record<string, string[]> = { '/': ['data/fotos/presidente-hd.json'] };
   return {
     name: 'sintonia-precarregamento-critico',
     apply: 'build',
@@ -55,6 +61,9 @@ function preCarregamentoCritico(demo: boolean): Plugin {
             tag: 'script',
             children:
               `(function(){var r=${JSON.stringify(mapa)};${rotaAtual};p=p.split(/[?#]/)[0].replace(/\\/+$/,'')||'/';` +
+              `var d=${JSON.stringify(Object.fromEntries(Object.entries(DADOS).map(([k, v]) => [k, v.map(url)])))}[p]||[];` +
+              `for(var j=0;j<d.length;j++){var f=document.createElement('link');f.rel='preload';f.as='fetch';f.crossOrigin='anonymous';` +
+              `f.href=d[j];document.head.appendChild(f);}` +
               `var l=r[p];if(!l)return;for(var i=0;i<l.length;i++){var e=document.createElement('link');` +
               `e.rel='modulepreload';e.crossOrigin='';e.href=l[i];document.head.appendChild(e);}})();`,
             injectTo: 'head',

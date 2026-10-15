@@ -54,7 +54,7 @@ export function VoteSplitBar({
       : 'Sem votos apurados');
   const raio = size === 'xs' || size === 'sm' ? 'rounded-full' : 'rounded-[6px]';
   return (
-    <div className={cn('w-full', className)}>
+    <div data-sem-anuncio-fixo className={cn('w-full', className)}>
       {showLabels && total > 0 ? (
         <div className="mb-1.5 flex items-baseline justify-between text-[12px] font-semibold">
           <span className={cn('num', corSlot(slots[0]).text)}>{fmtPct(pcts[0], 1)}</span>

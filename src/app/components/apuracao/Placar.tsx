@@ -158,6 +158,8 @@ function PlacarDuelo({
 
   return (
     <section
+      // resultado: a barra fixa de anúncio do celular nunca fica por cima (anuncios/faixaLivre.ts)
+      data-sem-anuncio-fixo
       aria-label={`Placar · ${race.titulo}`}
       className={cn(
         'relative overflow-hidden rounded-3xl border border-line bg-surface shadow-card',

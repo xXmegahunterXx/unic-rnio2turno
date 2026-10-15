@@ -37,6 +37,7 @@ export function FotoOficial({ sqcand, fotoGrupo, nome, tamanho = 'md', real = tr
   return (
     <span
       aria-hidden
+      data-sem-anuncio-fixo
       className={cn(
         'relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden bg-surface-3 ring-1 ring-inset ring-line',
         caixa[tamanho],

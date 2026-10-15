@@ -29,7 +29,7 @@ import { FiltroTemas } from '@/app/components/pages/curiosidades/FiltroTemas';
 import { DestaquesCuriosidades, escolherDestaques } from '@/app/components/pages/curiosidades/DestaquesCuriosidades';
 import { CartaoResumoCuriosidades } from '@/app/components/pages/curiosidades/CartaoResumoCuriosidades';
 import { DESTAQUES_PADRAO, HASHTAGS_CURIOSIDADES, ICONE_TEMA, corFinalista, fatosDoTema, temaDoParam, temasComContagem, textoPagina } from '@/app/components/pages/curiosidades/formato';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 
 /** Um cartão de publicidade a cada ~N fatos (sempre entre temas). */
 const FATOS_POR_ANUNCIO = 6;

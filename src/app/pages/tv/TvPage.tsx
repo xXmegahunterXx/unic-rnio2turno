@@ -3,8 +3,9 @@
  *
  *  - Placar gigante (fotos oficiais quando não anonimizado), mapa grande (estados ou municípios), ticker de
  *    eventos, relógio da apuração (Brasília), QR + endereço do site, faixa SIMULAÇÃO quando for o caso e o
- *    anunciante do formato 'tv' ("Oferecimento", logo grande, sem link — src/app/components/anuncios), num quadro
- *    próprio ao lado do QR, longe do placar.
+ *    anunciante do formato 'tv' ("Oferecimento", logo + marca, sem link — src/app/components/anuncios) FORA do placar:
+ *    na barra do topo, entre a marca do Sintonia e o relógio (TV deitada), ou numa faixa própria acima do letreiro
+ *    (retrato) — nunca dentro da seção do placar nem embaixo da coluna de um candidato.
  *  - Rodízio opcional (padrão ligado): a cada 12 s o mapa mostra uma das UFs mais disputadas (menor diferença,
  *    com seções apuradas), alternando com o Brasil.
  *  - "Tela cheia" pela Fullscreen API (tolera recusa: o navegador pode não deixar); mantém a tela acesa (Wake Lock)
@@ -37,7 +38,8 @@ import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { BrazilMap } from '@/app/components/apuracao/BrazilMap';
 import { UfMap } from '@/app/components/apuracao/UfMap';
 import { hachuraStyle } from '@/app/components/apuracao/MapHatch';
-import { OferecimentoTv, ProvedorAnuncios } from '@/app/components/anuncios';
+import { OferecimentoTv } from '@/app/components/anuncios/Oferecimento';
+import { ProvedorAnuncios } from '@/app/components/anuncios/contexto';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
 import { useElementSize } from '@/app/components/apuracao/MapHooks';
 import { gerarQr, qrPath } from '@/app/components/apuracao/qr';
@@ -148,6 +150,7 @@ export default function TvPage() {
           inicio={status?.inicioApuracao}
           ao_vivo={!!status && status.fase === 'apurando' && !status.pausado && !status.congelado}
           simulacao={!!status?.simulacao}
+          oferecimento={<OferecimentoTv variante="cabecalho" />}
           controles={
             <Controles
               visivel={!ocioso || !cheia}
@@ -192,6 +195,12 @@ export default function TvPage() {
             )}
           </section>
         </main>
+
+        {/* retrato: o oferecimento numa faixa própria, longe do placar (deitada ele fica na barra do topo) */}
+        <OferecimentoTv
+          variante="faixa"
+          className="mx-[calc(var(--u)*3)] mb-[calc(var(--u)*1.5)] justify-center rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 px-[calc(var(--u)*2)] landscape:hidden"
+        />
 
         <Ticker eventos={dados?.eventos ?? []} race={race} vazio={pre ? 'A apuração começa às 17h (horário de Brasília).' : 'Os acontecimentos da apuração aparecem aqui.'} />
 
@@ -238,6 +247,7 @@ function BarraTopo({
   inicio,
   ao_vivo,
   simulacao,
+  oferecimento,
   controles,
 }: {
   race: Race | undefined;
@@ -247,6 +257,8 @@ function BarraTopo({
   inicio?: number;
   ao_vivo: boolean;
   simulacao: boolean;
+  /** "Oferecimento" (formato 'tv'): só com a TV deitada; em retrato vai para a faixa acima do letreiro */
+  oferecimento?: ReactNode;
   controles: ReactNode;
 }) {
   const falta = pre && inicio ? partesTempo(Math.max(0, inicio - simNow)) : null;
@@ -261,6 +273,11 @@ function BarraTopo({
           </div>
         </div>
       </div>
+      {oferecimento ? (
+        <div className="hidden min-w-0 flex-1 justify-center px-[calc(var(--u)*1.5)] landscape:flex">
+          <div className="flex min-w-0 max-w-[calc(var(--u)*56)] items-center border-l border-line pl-[calc(var(--u)*2)]">{oferecimento}</div>
+        </div>
+      ) : null}
       <div className="order-3 flex w-full justify-end min-[1100px]:order-none min-[1100px]:ml-auto min-[1100px]:w-auto">{controles}</div>
       <div className="ml-auto flex items-center gap-[calc(var(--u)*2)] min-[1100px]:ml-0">
         {pre && falta ? (
@@ -630,8 +647,6 @@ function Rodape() {
           <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">Estado, município e seção por seção · fonte TSE</div>
         </div>
       </div>
-      {/* Publicidade (formato 'tv'): quadro próprio, fora do placar; aparece também em retrato. */}
-      <OferecimentoTv className="mt-[calc(var(--u)*1.6)] max-w-[46%] shrink-0 rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 py-[calc(var(--u)*1.4)] pl-[calc(var(--u)*1.4)] pr-[calc(var(--u)*2.6)] portrait:max-w-none portrait:flex-1" />
     </div>
   );
 }

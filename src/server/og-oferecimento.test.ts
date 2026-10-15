@@ -94,13 +94,15 @@ describe('faixa no pé', () => {
     expect(textos(no)).toContain('Lynx');
     const [conteudo, faixa] = no.props.children as No[];
     expect(conteudo.props.style).toMatchObject({ height: OG_H - FAIXA_OFERECIMENTO, overflow: 'hidden' });
-    expect(faixa.props.style).toMatchObject({ height: FAIXA_OFERECIMENTO, width: OG_W });
+    // centralizada: nunca embaixo de um dos lados do cartão
+    expect(faixa.props.style).toMatchObject({ height: FAIXA_OFERECIMENTO, width: OG_W, justifyContent: 'center' });
     expect(String(faixa.props.style!.borderTop)).toContain('solid');
     // a marca nunca passa de 40 caracteres
     expect(textos(comOferecimento(layoutTeste(), 'M'.repeat(80)))).toContain('M'.repeat(40));
   });
 
-  it('renderiza (PNG 1200×630) no placar, no Teste Cego e numa moldura de cartão', async () => {
+  // a função de moldura em si (as rotas só a aplicam aos cartões genéricos — ver 'rotas')
+  it('renderiza (PNG 1200×630) em layouts de altura cheia, no Teste Cego e numa moldura de cartão', async () => {
     const casos: [string, No][] = [
       ['placar', await placar()],
       ['teste', layoutTeste()],
@@ -117,7 +119,7 @@ describe('faixa no pé', () => {
 });
 
 describe('rotas', () => {
-  it('trocar/tirar o anunciante gera imagens novas; meta tags com o anunciante no &v=', async () => {
+  it('só os cartões genéricos levam a faixa; trocar/tirar o anunciante gera imagens novas; meta tags com o anunciante no &v=', async () => {
     const dist = mkdtempSync(join(tmpdir(), 'sintonia-dist-of-'));
     writeFileSync(join(dist, 'index.html'), '<!doctype html><html><head><!--app-meta--></head><body></body></html>');
     const m = await montar({ env: { SERVE_STATIC: '1', DIST_DIR: dist } });
@@ -125,29 +127,42 @@ describe('rotas', () => {
     const bytes = async (u: string) => Buffer.from(await (await m.app.request(u)).arrayBuffer());
     const vDe = async (p: string) => /og:image" content="[^"]*[?&]v=([^"&]+)"/.exec(await (await m.app.request(p)).text())?.[1];
 
-    const testeSem = await bytes('/api/og/teste.png');
-    const candSem = await bytes('/api/og/candidato.png?sq=280002542548');
+    /** cartões com candidato, foto, número ou resultado: NUNCA levam a faixa */
+    const comCandidato = [
+      '/api/og/candidato.png?sq=280002542548',
+      '/api/og/apuracao.png',
+      '/api/og/senado.png',
+      '/api/og/camara.png',
+      '/api/og/governadores.png',
+    ];
+    const genericos = ['/api/og/teste.png', '/api/og/cenario.png'];
+    const sem = new Map<string, Buffer>();
+    for (const u of [...comCandidato, ...genericos]) sem.set(u, await bytes(u));
     const vSem = await vDe('/curiosidades');
+    const vCandSem = await vDe('/candidato/280002542548');
     expect(vSem).toBeTruthy();
 
     await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx') });
-    const testeCom = await bytes('/api/og/teste.png');
-    const candCom = await bytes('/api/og/candidato.png?sq=280002542548');
-    expect(testeCom.equals(testeSem)).toBe(false);
-    expect(candCom.equals(candSem)).toBe(false);
+    const com = new Map<string, Buffer>();
+    for (const u of genericos) {
+      com.set(u, await bytes(u));
+      expect(com.get(u)!.equals(sem.get(u)!), u).toBe(false);
+    }
+    for (const u of comCandidato) expect((await bytes(u)).equals(sem.get(u)!), u).toBe(true);
     const vCom = await vDe('/curiosidades');
     expect(vCom).not.toBe(vSem);
     expect(vCom).toContain('-of');
+    // página com a ficha do candidato: a imagem não tem anúncio, então a URL não muda com o anunciante
+    expect(await vDe('/candidato/280002542548')).toBe(vCandSem);
 
-    // outro anunciante (marca): imagem nova de novo
-    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { marca: 'Lynx Pay' }) });
-    expect((await bytes('/api/og/teste.png')).equals(testeCom)).toBe(false);
-    expect((await bytes('/api/og/candidato.png?sq=280002542548')).equals(candCom)).toBe(false);
+    // outro anunciante (marca): imagem nova de novo nos genéricos; os com candidato seguem iguais
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { marca: 'Lynx Pay', cota: 'master' }) });
+    for (const u of genericos) expect((await bytes(u)).equals(com.get(u)!), u).toBe(false);
+    for (const u of comCandidato) expect((await bytes(u)).equals(sem.get(u)!), u).toBe(true);
 
     // anúncio sem o formato 'compartilhamento' não aparece nas imagens
     await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { formatos: ['topo'] }) });
-    expect((await bytes('/api/og/teste.png')).equals(testeSem)).toBe(true);
-    expect((await bytes('/api/og/candidato.png?sq=280002542548')).equals(candSem)).toBe(true);
+    for (const u of genericos) expect((await bytes(u)).equals(sem.get(u)!), u).toBe(true);
     expect(await vDe('/curiosidades')).not.toContain('-of');
-  }, 120_000);
+  }, 180_000);
 });

@@ -159,15 +159,17 @@ export default function PrivacidadePage() {
             </>,
             <>
               <strong>Sem cookie, sem IP e sem dado pessoal.</strong> Nenhum cookie é criado e a contagem não guarda o endereço IP: o servidor
-              usa, só em memória e por alguns minutos, um código anônimo derivado da conexão para não contar a mesma visualização duas vezes. Esse
-              código nunca é gravado nem associado a você.
+              usa, só em memória e por no máximo uma hora, um código anônimo derivado da conexão para não contar a mesma visualização ou o mesmo
+              clique duas vezes. Esse código nunca é gravado nem associado a você.
             </>,
             <>
               <strong>Links patrocinados com UTM.</strong> Ao tocar num anúncio, o link passa pelo Sintonia (para somar o clique) e abre o site
               do anunciante em nova aba com marcadores de campanha no endereço: <span className="font-mono text-[14px] text-fg">utm_source=sintonia</span>,
               o formato em <span className="font-mono text-[14px] text-fg">utm_medium</span> e o anúncio em{' '}
               <span className="font-mono text-[14px] text-fg">utm_campaign</span>. Eles dizem ao anunciante só que a visita veio do Sintonia e
-              de qual formato; nada sobre você. A partir dali vale a política de privacidade do site do anunciante.
+              de qual formato; nada sobre você. O anúncio da tela do Teste Cego sai com{' '}
+              <span className="font-mono text-[14px] text-fg">utm_medium=conteudo</span>, para não contar ao anunciante que a visita fez o
+              teste. A partir dali vale a política de privacidade do site do anunciante.
             </>,
             <>Os anúncios nunca têm acesso às suas respostas do Teste Cego, que não saem do seu aparelho.</>,
           ]}

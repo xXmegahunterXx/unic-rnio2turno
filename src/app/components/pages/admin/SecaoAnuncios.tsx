@@ -384,6 +384,12 @@ function Relatorio({ anuncios, resposta, erro, agora }: { anuncios: AnuncioConfi
           ) : null}
         </div>
       )}
+      {resposta ? (
+        <p className="mt-3 text-[12px] leading-snug text-fg-subtle">
+          Não medidos: imagens de compartilhamento (circulam fora do site) e cliques no Modo TV (a tela não tem link). Cliques contam só quando
+          o visitante toca no anúncio dentro do site, uma vez a cada 30 min por conexão.
+        </p>
+      ) : null}
     </Painel>
   );
 }

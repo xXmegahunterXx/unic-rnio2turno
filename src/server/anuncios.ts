@@ -192,7 +192,11 @@ export class Repeticoes {
   }
 }
 
-/** No máximo `max` eventos por chave a cada janela fixa de `janelaMs` (contadores zerados a cada janela). */
+/**
+ * No máximo `max` eventos por chave a cada janela fixa de `janelaMs` (contadores zerados a cada janela). Memória
+ * limitada: com `maxChaves` visitantes diferentes na janela, um visitante novo é recusado até a janela virar (é só a
+ * contagem dos anúncios: recusar, ali, é não contar — nunca derruba o site).
+ */
 export class LimiteJanela {
   private contas = new Map<number, number>();
   private fimJanela: number;
@@ -201,6 +205,7 @@ export class LimiteJanela {
     readonly max: number,
     readonly janelaMs: number,
     private readonly now: () => number = Date.now,
+    readonly maxChaves = 100_000,
   ) {
     this.fimJanela = now() + janelaMs;
   }
@@ -213,9 +218,15 @@ export class LimiteJanela {
       this.fimJanela = t + this.janelaMs;
     }
     const k = numeroDe(chave);
-    const n = (this.contas.get(k) ?? 0) + 1;
+    const antes = this.contas.get(k);
+    if (antes === undefined && this.contas.size >= this.maxChaves) return false;
+    const n = (antes ?? 0) + 1;
     this.contas.set(k, n);
     return n <= this.max;
+  }
+
+  get tamanho() {
+    return this.contas.size;
   }
 }
 
@@ -228,8 +239,11 @@ export const HORA_MS = 3_600_000;
 export const HORAS_DETALHE = 48;
 /** Impressão do mesmo visitante, anúncio e formato conta uma vez a cada 5 min. */
 export const JANELA_IMPRESSAO_MS = 5 * 60_000;
-/** Clique do mesmo visitante, anúncio e formato conta uma vez a cada 10 s (duplo toque, voltar e tocar de novo). */
-export const JANELA_CLIQUE_MS = 10_000;
+/**
+ * Clique do mesmo visitante, anúncio e formato conta uma vez a cada 30 min (duplo toque, voltar e tocar de novo, e quem
+ * tenta inflar o relatório repetindo o clique). O redirecionamento acontece sempre.
+ */
+export const JANELA_CLIQUE_MS = 30 * 60_000;
 
 interface Contagem {
   impressoes: number;
@@ -278,7 +292,7 @@ export class MetricasAnuncios {
     return true;
   }
 
-  /** Clique; false = repetido (mesmo visitante, anúncio e formato em 10 s) e não contado. */
+  /** Clique; false = repetido (mesmo visitante, anúncio e formato em 30 min) e não contado. */
   clique(id: string, formato: FormatoAnuncio, visitante: string): boolean {
     if (this.cliquesVistos.visto(`${visitante}|${id}|${formato}`)) return false;
     this.contar(id, formato, 'cliques');

@@ -13,7 +13,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
 import type { AdminCommand, AdminSnapshot, MetricasServidor, ServidorInfo } from '../shared/api';
-import { FORMATOS_ANUNCIO, urlComUtm, type FormatoAnuncio } from '../shared/anuncios';
+import { FORMATOS_COM_CLIQUE, FORMATOS_COM_IMPRESSAO, urlComUtm, type FormatoAnuncio } from '../shared/anuncios';
 import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
@@ -21,7 +21,7 @@ import type { LoadedDataset, Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
 import { anuncioDoLegado } from '../engine/controller';
 import { LimiteJanela, MetricasAnuncios, TabelaAnuncios, ehRobo } from './anuncios';
-import { tagOferecimento } from './og-oferecimento';
+import { imagemComOferecimento, tagOferecimento } from './og-oferecimento';
 import type { JsonStore } from './state-store';
 import { COOKIE_SESSAO, LimiteTaxa, Sessoes, chaveCliente, senhaConfere } from './auth';
 import { motivoSemSimulacao, type ServerConfig } from './config';
@@ -155,11 +155,13 @@ export const MAX_CORPO_COMANDO = 1024 * 1024;
 
 /**
  * Content-Security-Policy das páginas: scripts só do próprio site + os scripts inline do index.html autorizados pelo
- * hash (tema e pré-carregamento); estilos inline (atributos style do React/framer-motion); imagens de qualquer https
- * (logo de patrocínio por URL) e data:/blob: (cartões de compartilhar); nada de plugins; `frame-ancestors` 'self' (ou *
- * nos widgets /embed/*).
+ * hash (tema e pré-carregamento); estilos inline (atributos style do React/framer-motion); imagens só do próprio site
+ * (as logos e peças dos anúncios são servidas por /api/anuncio/img; nada de terceiros — um pixel externo vazaria o IP
+ * do visitante), da origem pública (`origemPublica`, PUBLIC_URL: as URLs absolutas das imagens dos anúncios usam ela,
+ * e o site pode ser aberto por outro endereço) e data:/blob: (cartões de compartilhar); nada de plugins;
+ * `frame-ancestors` 'self' (ou * nos widgets /embed/*).
  */
-export function cspPagina(template: string, embed: boolean): string {
+export function cspPagina(template: string, embed: boolean, origemPublica?: string | null): string {
   const hashes: string[] = [];
   const re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
   for (let m = re.exec(template); m; m = re.exec(template)) {
@@ -171,7 +173,7 @@ export function cspPagina(template: string, embed: boolean): string {
     "default-src 'self'",
     `script-src 'self'${hashes.length ? ` ${hashes.join(' ')}` : ''}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    `img-src 'self'${origemPublica ? ` ${origemPublica}` : ''} data: blob:`,
     "font-src 'self' data:",
     "connect-src 'self' data: blob:",
     "media-src 'self' data: blob:",
@@ -673,13 +675,40 @@ export function createApp(deps: AppDeps) {
     return responder(c, c.req.method === 'HEAD' ? null : img.corpo, 200, headers);
   });
 
-  const formatoValido = (f: unknown, de: readonly FormatoAnuncio[]): f is FormatoAnuncio =>
-    typeof f === 'string' && (FORMATOS_ANUNCIO as readonly string[]).includes(f) && de.includes(f as FormatoAnuncio);
+  /** Formato medido (`medidos`) que o anúncio usa. */
+  const formatoValido = (f: unknown, de: readonly FormatoAnuncio[], medidos: readonly FormatoAnuncio[]): f is FormatoAnuncio =>
+    typeof f === 'string' && medidos.includes(f as FormatoAnuncio) && de.includes(f as FormatoAnuncio);
 
   /**
-   * Clique: anúncio cadastrado e no ar → conta (agregado; repetido do mesmo visitante em 10 s não conta; robô não conta)
-   * e 302 para o destino com UTM. Id desconhecido ou fora do ar → 302 para a home (nunca redireciona para endereço
-   * vindo da URL: o destino é sempre o link cadastrado no painel).
+   * O pedido é uma navegação de verdade (o visitante tocou no link)? Só GET (HEAD não conta), com Sec-Fetch-Dest
+   * ausente ou 'document' (um <img>/<script> em outro site apontando para cá não conta) e Sec-Fetch-Site ausente,
+   * 'same-origin' (o link no próprio site) ou 'none' (endereço digitado). Navegadores antigos não mandam os cabeçalhos.
+   */
+  const navegacaoDoSite = (c: Ctx): boolean => {
+    if (c.req.method !== 'GET') return false;
+    const dest = c.req.header('sec-fetch-dest');
+    if (dest && dest !== 'document') return false;
+    const site = c.req.header('sec-fetch-site');
+    return !site || site === 'same-origin' || site === 'none';
+  };
+
+  /**
+   * Evento de impressão mandado pelo próprio site: Origin do site OU Sec-Fetch-Site 'same-origin' (sendBeacon manda os
+   * dois). Sem nenhum dos dois (curl, script fora do navegador), o pedido é aceito mas não conta.
+   */
+  const eventoDoSite = (c: Ctx): boolean => {
+    const site = c.req.header('sec-fetch-site');
+    if (site && site !== 'same-origin') return false;
+    const o = c.req.header('origin');
+    if (!o) return site === 'same-origin';
+    return origemPermitida(c);
+  };
+
+  /**
+   * Clique: anúncio cadastrado e no ar → conta (agregado; repetido do mesmo visitante, anúncio e formato em 30 min não
+   * conta; robô não conta; só navegação de verdade a partir do site — `navegacaoDoSite`; só formatos com link) e 302
+   * para o destino com UTM. Redireciona SEMPRE (contando ou não). Id desconhecido ou fora do ar → 302 para a home
+   * (nunca redireciona para endereço vindo da URL: o destino é sempre o link cadastrado no painel).
    */
   app.get('/api/anuncio/ir/:id', (c) => {
     const id = c.req.param('id');
@@ -690,8 +719,8 @@ export function createApp(deps: AppDeps) {
     const h = { 'cache-control': CC.privado, 'x-robots-tag': 'noindex' };
     if (!noAr || !cfg) return c.body(null, 302, { ...h, location: '/' });
     const f = c.req.query('f');
-    const formato = formatoValido(f, noAr.formatos) ? f : null;
-    if (formato && !ehRobo(c.req.header('user-agent'))) {
+    const formato = formatoValido(f, noAr.formatos, FORMATOS_COM_CLIQUE) ? f : null;
+    if (formato && navegacaoDoSite(c) && !ehRobo(c.req.header('user-agent'))) {
       const cliente = clienteDe(c);
       if (limiteCliques.tentar(cliente)) metricasAnuncios.clique(id, formato, cliente);
     }
@@ -700,7 +729,9 @@ export function createApp(deps: AppDeps) {
 
   /**
    * Impressão VISÍVEL (o app manda quando o anúncio aparece na tela; navigator.sendBeacon → corpo text/plain com JSON).
-   * Só do próprio site; anúncio no ar com aquele formato; repetida do mesmo visitante em 5 min não conta; robô não conta.
+   * Outro site → 403; sem Origin nem Sec-Fetch-Site → 204 sem contar (`eventoDoSite`); anúncio no ar com aquele formato
+   * (e formato que aparece no site: 'compartilhamento' não é medido); repetida do mesmo visitante em 5 min não conta;
+   * robô não conta.
    */
   app.post(
     '/api/anuncio/evento',
@@ -720,10 +751,10 @@ export function createApp(deps: AppDeps) {
         throw new ErroValidacao('Envie { id, formato } em JSON.');
       const a = dados.status().anuncios?.find((x) => x.id === id);
       if (!a) throw new NotFoundError('Anúncio fora do ar.');
-      if (!formatoValido(formato, a.formatos)) throw new ErroValidacao('Formato que este anúncio não usa.');
+      if (!formatoValido(formato, a.formatos, FORMATOS_COM_IMPRESSAO)) throw new ErroValidacao('Formato que este anúncio não usa ou que não é medido.');
       const cliente = clienteDe(c);
       if (!limiteEventos.tentar(cliente)) throw new ErroHttp(429, 'Muitos eventos; tente mais tarde.', { 'retry-after': '60' });
-      if (!ehRobo(c.req.header('user-agent'))) metricasAnuncios.impressao(id, formato, cliente);
+      if (eventoDoSite(c) && !ehRobo(c.req.header('user-agent'))) metricasAnuncios.impressao(id, formato, cliente);
       return c.body(null, 204, { 'cache-control': CC.privado });
     },
   );
@@ -1002,7 +1033,7 @@ export function createApp(deps: AppDeps) {
     /** CSP por template (os hashes dos scripts inline mudam a cada build). */
     let cspMemo: { tpl: string; pagina: string; embed: string } | null = null;
     const csp = (tpl: string, embed: boolean) => {
-      if (cspMemo?.tpl !== tpl) cspMemo = { tpl, pagina: cspPagina(tpl, false), embed: cspPagina(tpl, true) };
+      if (cspMemo?.tpl !== tpl) cspMemo = { tpl, pagina: cspPagina(tpl, false, config.publicUrl), embed: cspPagina(tpl, true, config.publicUrl) };
       return embed ? cspMemo.embed : cspMemo.pagina;
     };
 
@@ -1030,8 +1061,9 @@ export function createApp(deps: AppDeps) {
         const m = metaDaRota(path, url.searchParams, ctxMeta);
         const raceQ = url.searchParams.get('race');
         const canonico = m.canonico ?? `${path}${raceQ && races.has(raceQ.toLowerCase()) ? `?race=${raceQ.toLowerCase()}` : ''}`;
-        // anunciante das imagens ("Oferecimento") trocado → outra URL de imagem (CDN e apps buscam a nova)
-        const of = tagOferecimento(st.anuncios);
+        // anunciante das imagens ("Oferecimento", só nos cartões genéricos) trocado → outra URL de imagem (CDN e apps
+        // buscam a nova); as imagens com candidato ou resultado nunca levam anúncio e não mudam de URL por isso
+        const of = imagemComOferecimento(m.imagem) ? tagOferecimento(st.anuncios) : '';
         const vImg = `${m.imagemVersao ?? versaoImg}${of ? `-${of}` : ''}`;
         const html = injetarMeta(tpl, m, origem, `${origem}${canonico}`, vImg, { twitterSite: config.twitterSite });
         return Object.assign({ bruto: Buffer.from(html) }, { status: m.status, noindex: !!m.noindex });

@@ -99,6 +99,8 @@ export function Confronto({ race, fotos, abaixo, eleito, esqueleto, retratoClass
   return (
     <div
       role="group"
+      // fotos, nomes e números: a barra fixa de anúncio do celular nunca fica por cima (anuncios/faixaLivre.ts)
+      data-sem-anuncio-fixo
       className={cn('min-w-0', className)}
       aria-busy={esqueleto || undefined}
       aria-label={esqueleto ? 'Carregando' : `${finalistas[0].nomeUrna} e ${finalistas[1].nomeUrna}`}
@@ -285,7 +287,8 @@ export function PainelDuelo({ status, recebidoEm, race, raceT1, resumo, anonimiz
   const pre = status ? status.fase === 'pre' : Date.now() < INICIO_APURACAO;
   const retrato = largo ? 'max-w-[220px] xl:max-w-[236px]' : 'max-w-[176px] sm:max-w-[210px]';
   return (
-    <div className={cn(vidro, className)}>
+    // o cartão inteiro (fotos, percentuais, votos, contagem): sem barra fixa de anúncio por cima (anuncios/faixaLivre.ts)
+    <div data-sem-anuncio-fixo className={cn(vidro, className)}>
       {/* brilho interno da marca (decoração neutra: nunca cor de candidato) */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand-2/50 to-transparent" />
@@ -373,7 +376,36 @@ function ContagemDuelo({ status, recebidoEm }: { status: LiveStatus | undefined;
   const relogio = useRelogioApuracao(status, recebidoEm);
   const alvo = status?.inicioApuracao || INICIO_APURACAO;
   return (
-    <div className="mt-4 border-t border-line pt-3.5 sm:mt-6 sm:pt-5">
+    <>
+      {/* celular: numa linha só (rótulo à esquerda, caixas pequenas à direita) — o botão principal sobe para a 1ª tela */}
+      <div className="mt-3.5 flex items-center justify-between gap-2.5 border-t border-line pt-3 sm:hidden">
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-fg">
+            <Icon name="relogio" size={14} className="shrink-0 text-brand-fg" />
+            <span className="truncate">Apuração em</span>
+          </span>
+          <span className="num mt-0.5 block text-[12px] font-medium text-fg-muted">25/10 · {fmtHora(alvo)}</span>
+        </span>
+        <span aria-hidden={!status || undefined} className="shrink-0">
+          <Countdown
+            target={alvo}
+            now={status ? relogio : alvo - DIA - 1000}
+            size="sm"
+            hideZeroDays
+            doneLabel="Começando…"
+            className={cn('[&>div]:min-w-[2.35rem] [&>div]:px-1', !status && '[&_*]:!text-transparent')}
+          />
+        </span>
+      </div>
+      <ContagemDueloLarga status={status} relogio={relogio} alvo={alvo} />
+    </>
+  );
+}
+
+/** A partir de 640 px: rótulo em cima e as caixas grandes embaixo. */
+function ContagemDueloLarga({ status, relogio, alvo }: { status: LiveStatus | undefined; relogio: number; alvo: number }) {
+  return (
+    <div className="mt-6 hidden border-t border-line pt-5 sm:block">
       <div className="flex items-center justify-between gap-3">
         <span className="inline-flex min-w-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-fg sm:text-[11.5px]">
           <Icon name="relogio" size={14} className="shrink-0 text-brand-fg" />

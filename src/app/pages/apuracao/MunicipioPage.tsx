@@ -51,7 +51,7 @@ import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { LocaisVotacao } from '@/app/components/pages/detalhe/LocaisVotacao';
 import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 
 type Agrupar = 'zona' | 'local';
 

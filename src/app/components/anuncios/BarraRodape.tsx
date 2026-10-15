@@ -1,10 +1,14 @@
 /**
  * Formato 'rodape': barra fixa no pé da tela do celular (< 768 px), logo acima da tab bar: logo, marca, título,
- * botão e "fechar" (lembrado até o fim da visita). Aparece depois da 1ª rolagem ou de 2 s; respeita a área segura;
- * some com diálogo/folha aberta (compartilhar, busca, menu) e enquanto ela está na tela a página ganha espaço no fim
- * (`--anuncio-rodape-h`, usado pelo rodapé do AppShell) para nada ficar escondido atrás dela.
+ * botão e "fechar" (lembrado até o fim da visita). Aparece só depois da 1ª rolagem (nunca sozinha, por tempo) e
+ * NUNCA por cima de resultado, foto, nome ou número de candidato: enquanto um bloco marcado com
+ * `data-sem-anuncio-fixo` (cartão do confronto, placares, retratos, avatares…) estiver na faixa de baixo da tela, ela
+ * fica escondida (faixaLivre.ts). Respeita a área segura; some com diálogo/folha aberta (compartilhar, busca, menu); a
+ * página ganha espaço no fim (`--anuncio-rodape-h`, usado pelo rodapé do AppShell) para nada ficar escondido atrás dela
+ * — reservado o tempo todo, então mostrar/esconder não faz a página pular.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { AnuncioPublico } from '@/shared/anuncios';
 import { cn } from '@/app/lib/cn';
@@ -12,12 +16,12 @@ import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { Icon } from '@/app/ui/Icon';
 import { useAnunciosDaPagina } from './contexto';
 import { useImpressaoVisivel } from './impressao';
+import { useFaixaLivre } from './faixaLivre';
 import { CtaAnuncio, LinkAnuncio, LogoMarca } from './pecas';
 import { fecharRodape, rodapeFechado } from './visita';
 
 /** Altura da barra (sem a área segura), também reservada no fim da página. */
 export const ALTURA_RODAPE_PX = 60;
-const ESPERA_MS = 2000;
 
 /** Há um diálogo/folha aberto? (Dialog e Sheet travam a rolagem do <html>; a busca e o menu usam aria-modal). */
 function useModalAberto(): boolean {
@@ -35,18 +39,16 @@ function useModalAberto(): boolean {
   return aberto;
 }
 
-/** Libera a barra depois da 1ª rolagem ou de 2 s. */
+/** Libera a barra depois da 1ª rolagem da visita (sem cronômetro: ela nunca entra sozinha na primeira tela). */
 function useLiberada(): boolean {
   const [ok, setOk] = useState(false);
   useEffect(() => {
     if (ok) return;
-    const liberar = () => setOk(true);
-    const t = window.setTimeout(liberar, ESPERA_MS);
-    window.addEventListener('scroll', liberar, { passive: true, once: true });
-    return () => {
-      window.clearTimeout(t);
-      window.removeEventListener('scroll', liberar);
+    const liberar = () => {
+      if (window.scrollY > 8) setOk(true);
     };
+    window.addEventListener('scroll', liberar, { passive: true });
+    return () => window.removeEventListener('scroll', liberar);
   }, [ok]);
   return ok;
 }
@@ -58,8 +60,12 @@ export function BarraRodape() {
   const [fechada, setFechada] = useState(rodapeFechado);
   const liberada = useLiberada();
   const modal = useModalAberto();
+  const { pathname } = useLocation();
   const a = semProvedor ? null : escolha.rodape;
-  const visivel = !!a && celular && !fechada && liberada && !modal;
+  const candidata = !!a && celular && !fechada && liberada && !modal;
+  // nenhum resultado/candidato na faixa de baixo da tela (refaz a medição a cada página)
+  const livre = useFaixaLivre(candidata, pathname);
+  const visivel = candidata && livre;
 
   // espaço no fim da página enquanto a barra existe (o rodapé do AppShell soma esta altura)
   const reserva = !!a && celular && !fechada;

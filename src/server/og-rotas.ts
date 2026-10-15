@@ -18,8 +18,10 @@
  *
  * Cache (ServicoOg): chave = rota normalizada; "versão|modo" = versão do admin + fonte/anonimização (ao vivo, 30 s
  * frescas e até 5 min vencidas do mesmo modo) ou versão dos arquivos de dados (estáticas: valem até o dado mudar).
- * Anúncio com o formato 'compartilhamento' no ar: faixa "Oferecimento: <marca>" no pé (og-oferecimento.ts) e o
- * conjunto de anunciantes entra no modo (`tagOferecimento`): trocar o anunciante espera a imagem nova.
+ * Anúncio com o formato 'compartilhamento' no ar: faixa "Oferecimento: <marca>" no pé (og-oferecimento.ts) SÓ nos
+ * cartões genéricos, sem candidato nem resultado (`CARTOES_COM_OFERECIMENTO`: Teste Cego, calculadora sem código e
+ * capa das curiosidades); nesses, o conjunto de anunciantes entra no modo (`tagOferecimento`) e trocar o anunciante
+ * espera a imagem nova. Placar, município, seção, ficha, eleitos, bancadas, governadores, fatos e cenários: nunca.
  * Parâmetros validados (zod); textos enormes nunca chegam ao decodificador.
  */
 import type { Context, Hono } from 'hono';
@@ -40,7 +42,7 @@ import type { PacotesFotos } from './fotos';
 import { casaEtag, etagFraco, hashCurto } from './http-cache';
 import type { Logger } from './log';
 import { layoutPlacar, layoutTeste, renderPng, type No } from './og';
-import { comOferecimento, oferecimentoDe, tagOferecimento } from './og-oferecimento';
+import { comOferecimento, oferecimentoDe, tagOferecimento, type CartaoComOferecimento } from './og-oferecimento';
 import {
   layoutCalculadora,
   layoutCandidato,
@@ -158,10 +160,13 @@ export function registrarOg(app: App, d: DepsOg): void {
     const t = tagOferecimento(st.anuncios);
     return t ? `|${t}` : '';
   };
-  /** "versão|modo" das imagens ao vivo. */
-  const subVivo = (st: LiveStatus) => `${st.versao}|${modoOg(st)}${tagOf(st)}`;
-  /** Cartão com a faixa "Oferecimento: <marca>" quando há anúncio de compartilhamento no ar. */
-  const comOf = (no: No, chave: string): No => {
+  /** "versão|modo" das imagens ao vivo (placares: nunca levam anúncio, então o anunciante não entra no modo). */
+  const subVivo = (st: LiveStatus) => `${st.versao}|${modoOg(st)}`;
+  /**
+   * Cartão GENÉRICO com a faixa "Oferecimento: <marca>" quando há anúncio de compartilhamento no ar. O tipo só aceita
+   * as chaves de `CARTOES_COM_OFERECIMENTO`: um cartão com candidato ou resultado não tem como pedir a faixa.
+   */
+  const comOf = (no: No, chave: CartaoComOferecimento): No => {
     const of = oferecimentoDe(dados.status().anuncios, chave);
     return of ? comOferecimento(no, of.marca) : no;
   };
@@ -181,10 +186,21 @@ export function registrarOg(app: App, d: DepsOg): void {
     return responder(c, c.req.method === 'HEAD' ? null : s.png, headers);
   };
 
-  /** Gera o PNG do cartão `chave` (rótulo do log: a chave, salvo quando ela traz dado do visitante). */
-  const gerar = async (chave: string, no: () => Promise<No> | No, sub: string, headers?: Record<string, string>, rotulo = chave): Promise<OgPronta> => {
+  /**
+   * Gera o PNG do cartão `chave` (rótulo do log: a chave, salvo quando ela traz dado do visitante). Sem anúncio, salvo
+   * nos cartões genéricos que pedem (`oferecimento`).
+   */
+  const gerar = async (
+    chave: string,
+    no: () => Promise<No> | No,
+    sub: string,
+    headers?: Record<string, string>,
+    rotulo = chave,
+    oferecimento: CartaoComOferecimento | null = null,
+  ): Promise<OgPronta> => {
     const t0 = perf();
-    const png = await renderPng(comOf(await no(), chave));
+    const base = await no();
+    const png = await renderPng(oferecimento ? comOf(base, oferecimento) : base);
     log.info(`OG ${rotulo} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB)`);
     return { png, sub, headers };
   };
@@ -207,24 +223,33 @@ export function registrarOg(app: App, d: DepsOg): void {
       ttlMs: OG_TTL_MS,
       staleMs: OG_STALE_MS,
       montar: () => montar(dados.status()),
-      modoAtual: () => {
-        const agora = dados.status();
-        return `${modoOg(agora)}${tagOf(agora)}`;
-      },
+      modoAtual: () => modoOg(dados.status()),
     });
     return enviarPng(c, chave, s, CC_OG.vivo);
   };
 
-  /** Imagem estática (dado oficial): vale enquanto a versão dos dados (e o modo, se houver) não mudar. */
-  const estatica = async (c: Ctx, chave: string, versao: string, modo: string, montar: (sub: string) => Promise<OgPronta>, modoAtual?: () => string) => {
-    const sub = `${versao}|${modo}${tagOf()}`;
+  /**
+   * Imagem estática (dado oficial): vale enquanto a versão dos dados (e o modo, se houver) não mudar. `comAnuncio`: o
+   * cartão genérico pode levar a faixa de oferecimento, então o conjunto de anunciantes entra no modo.
+   */
+  const estatica = async (
+    c: Ctx,
+    chave: string,
+    versao: string,
+    modo: string,
+    montar: (sub: string) => Promise<OgPronta>,
+    modoAtual?: () => string,
+    comAnuncio = false,
+  ) => {
+    const tag = () => (comAnuncio ? tagOf() : '');
+    const sub = `${versao}|${modo}${tag()}`;
     const s = await obterLimitado(c, {
       chave,
       sub,
       ttlMs: Infinity,
       staleMs: Infinity,
       montar: () => montar(sub),
-      modoAtual: () => `${modoAtual ? modoAtual() : modo}${tagOf()}`,
+      modoAtual: () => `${modoAtual ? modoAtual() : modo}${tag()}`,
     });
     return enviarPng(c, chave, s, CC_OG.estatica);
   };
@@ -273,20 +298,18 @@ export function registrarOg(app: App, d: DepsOg): void {
       const raceOg = pre && uf ? await comPrimeiroTurnoDaUf(races.get(snap.race) ?? r, uf) : (races.get(snap.race) ?? r);
       // foto oficial só com número real: nunca na simulação (nem com os nomes reais ligados no admin)
       const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
+      // placar: nunca leva anúncio (og-oferecimento.ts)
       const png = await renderPng(
-        comOf(
-          layoutPlacar({
-            // simulação anônima: nada de nome nem foto real em imagem com números fictícios
-            race: exibir(raceOg, anon),
-            uf,
-            resumo,
-            simulacao,
-            horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
-            pre,
-            fotos: fotosPlacar,
-          }),
-          chave,
-        ),
+        layoutPlacar({
+          // simulação anônima: nada de nome nem foto real em imagem com números fictícios
+          race: exibir(raceOg, anon),
+          uf,
+          resumo,
+          simulacao,
+          horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
+          pre,
+          fotos: fotosPlacar,
+        }),
       );
       log.info(
         `OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB` +
@@ -540,23 +563,30 @@ export function registrarOg(app: App, d: DepsOg): void {
     if (!lido) throw new NotFoundError('Curiosidades indisponíveis.');
     const fato = f ? lido.valor.fatos.find((x) => x.id === f) : undefined;
     const chave = `cur|${fato?.id ?? 'capa'}`;
-    return estatica(c, chave, lido.versao, 'estatico', (sub) =>
-      gerar(
-        chave,
-        () => {
-          if (fato) return layoutCuriosidade({ fato, finalistas: lido.valor.finalistas, dominio });
-          // os mesmos três destaques da home (DESTAQUES_PADRAO do app), completados com outros fatos com número
-          const comNumero = lido.valor.fatos.filter((x) => x.destaque);
-          const preferidos = ['finalistas-empate-municipio', 'finalistas-menor-diferenca', 'brasil-cidade-maior-que-estados'];
-          const ordem = [...comNumero].sort((x, y) => {
-            const px = preferidos.indexOf(x.id);
-            const py = preferidos.indexOf(y.id);
-            return (px < 0 ? 99 : px) - (py < 0 ? 99 : py);
-          });
-          return layoutCuriosidadesCapa({ fatos: ordem.slice(0, 3), total: lido.valor.fatos.length, dominio });
-        },
-        sub,
-      ),
+    if (fato) {
+      // fato isolado: muitos citam candidato, partido ou percentual de candidato → nunca leva anúncio
+      return estatica(c, chave, lido.versao, 'estatico', (sub) => gerar(chave, () => layoutCuriosidade({ fato, finalistas: lido.valor.finalistas, dominio }), sub));
+    }
+    // capa: os mesmos três destaques da home (DESTAQUES_PADRAO do app), completados com outros fatos com número
+    const comNumero = lido.valor.fatos.filter((x) => x.destaque);
+    const preferidos = ['finalistas-empate-municipio', 'finalistas-menor-diferenca', 'brasil-cidade-maior-que-estados'];
+    const ordem = [...comNumero].sort((x, y) => {
+      const px = preferidos.indexOf(x.id);
+      const py = preferidos.indexOf(y.id);
+      return (px < 0 ? 99 : px) - (py < 0 ? 99 : py);
+    });
+    const destaques = ordem.slice(0, 3);
+    // a capa só leva a faixa quando nenhum destaque é de cargo (percentual de um candidato)
+    const generica = destaques.every((x) => !x.id.startsWith('cargos-'));
+    return estatica(
+      c,
+      chave,
+      lido.versao,
+      'estatico',
+      (sub) =>
+        gerar(chave, () => layoutCuriosidadesCapa({ fatos: destaques, total: lido.valor.fatos.length, dominio }), sub, undefined, chave, generica ? 'cur|capa' : null),
+      undefined,
+      generica,
     );
   });
 
@@ -569,7 +599,8 @@ export function registrarOg(app: App, d: DepsOg): void {
     const cenario = ok && lido ? decodificarCenario(bruto, lido.valor) : null;
     if (!cenario || !lido) {
       const chave = 'cen|generico';
-      return estatica(c, chave, 'v1', 'estatico', (sub) => gerar(chave, () => layoutCalculadora({ dominio }), sub));
+      // calculadora sem código: cartão genérico, sem nome nem número de candidato → pode levar a faixa
+      return estatica(c, chave, 'v1', 'estatico', (sub) => gerar(chave, () => layoutCalculadora({ dominio }), sub, undefined, chave, 'cen|generico'), undefined, true);
     }
     // forma canônica: códigos equivalentes compartilham a mesma imagem
     const chave = `cen|${codificarCenario(cenario)}`;

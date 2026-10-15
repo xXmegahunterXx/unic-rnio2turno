@@ -4,6 +4,7 @@
  *    renderizada, mas muda na próxima visita). Não identifica ninguém e nunca é enviado.
  *  - `rodape-fechado`: a barra do rodapé foi fechada nesta visita.
  *  - `topo`: havia anúncio no topo na última consulta (reserva a altura da faixa antes de o status chegar).
+ *  - `tv`: idem para o quadro do Modo TV.
  * Tudo em try/catch: navegação privada, armazenamento bloqueado ou iframe sem acesso → valores só em memória.
  */
 const PREFIXO = 'sintonia:anuncios:';
@@ -57,3 +58,9 @@ export function topoEsperado(): boolean | null {
   return v === '1' ? true : v === '0' ? false : null;
 }
 export const lembrarTopo = (tem: boolean): void => gravar('topo', tem ? '1' : '0');
+
+/** Havia anúncio de Modo TV na última consulta? (reserva a altura do quadro antes de o status chegar) */
+export function tvEsperado(): boolean {
+  return typeof window !== 'undefined' && ler('tv') === '1';
+}
+export const lembrarTv = (tem: boolean): void => gravar('tv', tem ? '1' : '0');

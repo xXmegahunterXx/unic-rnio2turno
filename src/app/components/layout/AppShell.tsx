@@ -27,7 +27,10 @@ import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/
 import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompartilharSite, preCarregarIncorporar } from './acoesGlobais';
 import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
 import { propsPreCarregar } from './prefetch';
-import { FaixaTopo, ProvedorAnuncios, rodapePermitido } from '../anuncios';
+// direto dos módulos (não do index de anúncios): o JS inicial leva só o provedor, a decisão da faixa e as regras puras
+import { ProvedorAnuncios } from '../anuncios/contexto';
+import { FaixaTopo } from '../anuncios/FaixaTopo';
+import { rodapePermitido } from '../anuncios/nucleo';
 import { useIsDesktop, useMediaQuery } from '@/app/lib/useMediaQuery';
 import { instalarBarrasMoveis, mostrarTabBar } from '@/app/lib/barrasMoveis';
 
@@ -89,7 +92,8 @@ function dentroDoPainel(): boolean {
 
 /**
  * Barra de anúncio do celular (fora do Teste Cego e do Duelo — `rodapePermitido`). Chunk próprio: ela só aparece depois
- * da 1ª rolagem ou de 2 s, então não precisa pesar no JS inicial.
+ * da 1ª rolagem e nunca sobre resultado/candidato (blocos com `data-sem-anuncio-fixo`; anuncios/faixaLivre.ts), então
+ * não precisa pesar no JS inicial.
  */
 const BarraRodape = lazy(() => import('../anuncios/BarraRodape').then((m) => ({ default: m.BarraRodape })));
 function RodapeAnuncio() {

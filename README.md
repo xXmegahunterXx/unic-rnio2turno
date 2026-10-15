@@ -260,14 +260,19 @@ intervalo as requisições esperam (a CDN continua servindo o conteúdo anterior
   anúncio pela MESMA `validaAnuncio` do motor).
 - Simulação em produção só com `ALLOW_SIMULACAO=1` (senão: 403 com o motivo, que o painel também mostra).
 - Anúncios: imagens enviadas pelo admin servidas com `Content-Security-Policy: sandbox; default-src 'none';
-  style-src 'unsafe-inline'` e `nosniff`; o clique só redireciona para o link cadastrado (id desconhecido → `/`);
-  eventos só do próprio site, com repetição descartada e limite por visitante; robôs não contam.
+  style-src 'unsafe-inline'` e `nosniff`; o clique só redireciona para o link cadastrado (id desconhecido → `/`) e só
+  conta navegação vinda do site (GET, `Sec-Fetch-Dest` documento, `Sec-Fetch-Site` same-origin/none; repetição do mesmo
+  visitante em 30 min não conta); impressões só do próprio site (`Origin`/`Sec-Fetch-Site`) e só de formatos que
+  aparecem no site (imagens de compartilhamento: não medidas; Modo TV: sem clique), repetição em 5 min descartada e
+  limite por visitante; robôs não contam. Visitante = hash da rede (IPv4 inteiro, IPv6 /64), nunca o IP.
+- Conteúdo político-eleitoral recusado no cadastro (`src/shared/anuncios-politica.ts`): nomes de candidatos, termos
+  eleitorais, número de urna pedido como voto, siglas de partido e destinos de governo/partido/candidato.
 - Limites: URL ≤ 8 KB (414), corpo declarado ≤ 512 KB em qualquer rota, 1 MB no `/api/admin/command` (413); parâmetros validados por rota (UF,
   código, zona, seção, `?t=`, código de cenário ≤ 600 caracteres).
 - Cabeçalhos: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS de 1 ano em
   produção; nas páginas, **Content-Security-Policy** (scripts só do próprio site + os 2 scripts inline do `index.html`
-  autorizados pelo hash SHA-256, calculado do build na subida; estilos inline; imagens do site, `data:`/`blob:` e
-  `https:`; `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`), `frame-ancestors 'self'` +
+  autorizados pelo hash SHA-256, calculado do build na subida; estilos inline; imagens só do site (e da origem do
+  `PUBLIC_URL`), `data:` e `blob:` — nenhuma imagem de terceiros; `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`), `frame-ancestors 'self'` +
   `X-Frame-Options: SAMEORIGIN` (exceto `/embed/*`, com `frame-ancestors *`), `Permissions-Policy` (sem câmera,
   microfone, localização, pagamentos, USB, tópicos) e `Cross-Origin-Opener-Policy: same-origin-allow-popups`;
   `X-Robots-Tag: noindex` em `/admin`, `/duelo/*`, `/embed/*` e `/cenarios?c=`.

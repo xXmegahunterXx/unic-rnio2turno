@@ -9,7 +9,7 @@ import type { AnuncioPublico } from '@/shared/anuncios';
 import { useStatus } from '@/app/data/hooks';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { escolhaDaPagina, rodapePermitido, type EscolhaPagina } from './nucleo';
-import { idDaVisita, lembrarTopo } from './visita';
+import { idDaVisita, lembrarTopo, lembrarTv } from './visita';
 
 export interface AnunciosDaPagina {
   escolha: EscolhaPagina;
@@ -39,8 +39,11 @@ function useCalcular(): AnunciosDaPagina {
     [anuncios, pathname, rodapeNaTela],
   );
   useEffect(() => {
-    if (status.data) lembrarTopo(!!escolha.topo);
-  }, [status.data, escolha.topo]);
+    if (status.data) {
+      lembrarTopo(!!escolha.topo);
+      lembrarTv(!!escolha.tv);
+    }
+  }, [status.data, escolha.topo, escolha.tv]);
   return useMemo(() => ({ escolha, vista: `${pathname}#${key}`, pronto, anuncios: anuncios ?? [] }), [escolha, pathname, key, pronto, anuncios]);
 }
 

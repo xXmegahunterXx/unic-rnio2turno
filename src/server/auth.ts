@@ -101,7 +101,39 @@ export class LimiteTaxa {
   }
 }
 
-/** Identificador do cliente para limites/contagem: hash curto do IP (nunca o IP em claro). */
+/**
+ * Rede do cliente para limites e contagem: IPv4 inteiro; IPv6 só o prefixo /64 (uma casa ou um servidor recebe uma
+ * faixa /64 inteira — trocar o endereço dentro dela não pode zerar os limites). IPv4 dentro de IPv6 (::ffff:1.2.3.4)
+ * vira o IPv4. Endereço que não parece IP segue como está.
+ */
+export function redeDoCliente(ip: string): string {
+  let x = ip.trim().toLowerCase();
+  const zona = x.indexOf('%');
+  if (zona >= 0) x = x.slice(0, zona);
+  if (x.startsWith('[') && x.endsWith(']')) x = x.slice(1, -1);
+  if (!x.includes(':')) return x;
+  const v4 = /^(?:0{0,4}:){0,5}(?:0{0,4}:)?ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(x) ?? /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(x);
+  if (v4) return v4[1];
+  // expande "::" e um IPv4 no fim (…:1.2.3.4 = dois grupos)
+  let s = x;
+  const m4 = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s);
+  if (m4) {
+    const [a, b, c, d] = m4.slice(1).map(Number);
+    s = `${s.slice(0, m4.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+  const [esq, dir] = s.split('::');
+  const ge = esq ? esq.split(':') : [];
+  const gd = dir !== undefined ? (dir ? dir.split(':') : []) : [];
+  const meio = dir !== undefined ? Array(Math.max(0, 8 - ge.length - gd.length)).fill('0') : [];
+  const grupos = [...ge, ...meio, ...gd];
+  if (grupos.length !== 8 || grupos.some((g) => !/^[0-9a-f]{1,4}$/.test(g))) return x;
+  return `${grupos
+    .slice(0, 4)
+    .map((g) => parseInt(g, 16).toString(16))
+    .join(':')}::/64`;
+}
+
+/** Identificador do cliente para limites/contagem: hash curto da rede (IPv4 inteiro, IPv6 /64), nunca o IP em claro. */
 export function chaveCliente(ip: string, sal: Buffer): string {
-  return createHash('sha256').update(sal).update(ip).digest('base64url').slice(0, 16);
+  return createHash('sha256').update(sal).update(redeDoCliente(ip)).digest('base64url').slice(0, 16);
 }

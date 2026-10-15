@@ -5,15 +5,20 @@
  *  - 'topo'             faixa logo abaixo do cabeçalho, em todas as páginas (a cota MASTER tem prioridade aqui);
  *  - 'rodape'           barra fixa no rodapé do celular (pode ser fechada pelo visitante; volta na próxima visita);
  *  - 'nativo'           cartão "Patrocinado" no meio do conteúdo (home, apuração, curiosidades, governadores…);
- *  - 'teste'            "Resultado oferecido por" na tela de resultado do Teste Cego (o momento mais compartilhado);
- *  - 'tv'               logo grande no Modo TV (transmissões);
- *  - 'compartilhamento' "Oferecimento: <marca>" no rodapé das imagens de compartilhamento (cartões do X/WhatsApp).
+ *  - 'teste'            "Teste Cego oferecido por" na tela de resultado do Teste Cego, depois de revelar e longe do
+ *                       cartão do resultado (a marca fica com o Teste Cego, nunca com o resultado);
+ *  - 'tv'               logo grande no Modo TV (transmissões), fora do placar;
+ *  - 'compartilhamento' "Oferecimento: <marca>" no rodapé das imagens de compartilhamento GENÉRICAS (Teste Cego,
+ *                       calculadora, capa das curiosidades) — nunca nas de placar, candidato ou resultado.
  *
  * Regras que valem em todo lugar: sempre rotulado ("Publicidade"/"Patrocinado"/"Oferecido por"); link com
- * rel="sponsored noopener"; nunca colado a número, foto ou nome de candidato (separação visual clara); sem pop-up,
+ * rel="sponsored noopener"; nunca colado a número, foto ou nome de candidato (separação visual clara); nada
+ * político-eleitoral (declaração + `motivoPolitico`, src/shared/anuncios-politica.ts); sem pop-up,
  * sem som, sem animação piscante. Métricas só agregadas (impressões visíveis e cliques por anúncio/formato/hora),
  * sem cookie, sem IP e sem dado pessoal (LGPD).
  */
+
+import { motivoPolitico } from './anuncios-politica';
 
 export const FORMATOS_ANUNCIO = ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento'] as const;
 export type FormatoAnuncio = (typeof FORMATOS_ANUNCIO)[number];
@@ -22,10 +27,18 @@ export const ROTULO_FORMATO: Record<FormatoAnuncio, string> = {
   topo: 'Faixa no topo (todas as páginas)',
   rodape: 'Barra fixa no rodapé do celular',
   nativo: 'Cartão patrocinado no conteúdo',
-  teste: 'Resultado do Teste Cego',
+  teste: 'Tela de resultado do Teste Cego',
   tv: 'Modo TV',
   compartilhamento: 'Imagens de compartilhamento',
 };
+
+/**
+ * Formatos com impressão medida (o que aparece numa tela do site). 'compartilhamento' circula fora do site (a imagem
+ * vai para o X/WhatsApp): não é medido — o painel diz "não medido".
+ */
+export const FORMATOS_COM_IMPRESSAO: readonly FormatoAnuncio[] = ['topo', 'rodape', 'nativo', 'teste', 'tv'];
+/** Formatos com clique medido (têm link no site). O Modo TV é uma tela sem link; as imagens, idem. */
+export const FORMATOS_COM_CLIQUE: readonly FormatoAnuncio[] = ['topo', 'rodape', 'nativo', 'teste'];
 
 /** Cota: 'master' (patrocinador principal: prioridade no topo, na TV e nas imagens) ou 'apoio'. */
 export type CotaAnuncio = 'master' | 'apoio';
@@ -166,12 +179,19 @@ function epochOuNull(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : NaN;
 }
 
+/** Opções de `validaAnuncio`. */
+export interface OpcoesValidaAnuncio {
+  /** nomes de candidatos (nome de urna e nome completo, do dataset): anúncio que os cite é recusado */
+  nomesCandidatos?: readonly string[];
+}
+
 /**
  * Valida e normaliza um anúncio vindo do admin (ou do estado salvo). Devolve só os campos do contrato.
  * Imagens: data URI (limites acima) ou a URL que o próprio servidor serve (ida e volta pelo admin — o servidor
- * reconhece e mantém a imagem que já tem).
+ * reconhece e mantém a imagem que já tem). Conteúdo político-eleitoral é recusado (`motivoPolitico`), além da
+ * declaração obrigatória.
  */
-export function validaAnuncio(v: unknown): { ok: AnuncioConfig } | { erro: string } {
+export function validaAnuncio(v: unknown, opcoes: OpcoesValidaAnuncio = {}): { ok: AnuncioConfig } | { erro: string } {
   if (!isObj(v)) return { erro: 'Anúncio inválido.' };
   const L = ANUNCIO_LIMITES;
   const id = texto(v.id).toLowerCase();
@@ -187,6 +207,17 @@ export function validaAnuncio(v: unknown): { ok: AnuncioConfig } | { erro: strin
   const url = typeof v.url === 'string' ? v.url.trim() : '';
   if (!urlAnuncioValida(url)) return { erro: 'Anúncio: o link precisa ser um endereço https:// válido.' };
   if (v.naoPolitico !== true) return { erro: 'Anúncio: confirme que o anunciante e a peça não têm conteúdo político-eleitoral.' };
+  const politico = motivoPolitico(
+    [
+      { campo: 'marca', valor: marca },
+      { campo: 'título', valor: titulo },
+      { campo: 'texto', valor: t },
+      { campo: 'botão', valor: cta },
+    ],
+    url,
+    opcoes.nomesCandidatos,
+  );
+  if (politico) return { erro: politico };
 
   const formatos = Array.isArray(v.formatos) ? [...new Set(v.formatos)].filter((f): f is FormatoAnuncio => (FORMATOS_ANUNCIO as readonly unknown[]).includes(f)) : [];
   if (formatos.length === 0) return { erro: 'Anúncio: escolha pelo menos um formato.' };
@@ -259,12 +290,20 @@ export function anuncioNoAr(a: Pick<AnuncioConfig, 'ativo' | 'inicio' | 'fim'>, 
   return true;
 }
 
-/** URL de destino com UTM (utm_source=sintonia, utm_medium=<formato>, utm_campaign=<id>), sem apagar parâmetros do anunciante. */
+/**
+ * `utm_medium` de cada formato. O do Teste Cego sai neutro ('conteudo', como o cartão nativo seria lido): a UTM não
+ * conta ao anunciante que aquela visita fez o Teste Cego (opinião política é dado sensível — LGPD).
+ */
+export function mediumUtm(formato: FormatoAnuncio | 'link'): string {
+  return formato === 'teste' ? 'conteudo' : formato;
+}
+
+/** URL de destino com UTM (utm_source=sintonia, utm_medium=`mediumUtm(formato)`, utm_campaign=<id>), sem apagar parâmetros do anunciante. */
 export function urlComUtm(url: string, id: string, formato: FormatoAnuncio | 'link'): string {
   try {
     const u = new URL(url);
     if (!u.searchParams.has('utm_source')) u.searchParams.set('utm_source', 'sintonia');
-    if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', formato);
+    if (!u.searchParams.has('utm_medium')) u.searchParams.set('utm_medium', mediumUtm(formato));
     if (!u.searchParams.has('utm_campaign')) u.searchParams.set('utm_campaign', id);
     return u.toString();
   } catch {
@@ -272,41 +311,8 @@ export function urlComUtm(url: string, id: string, formato: FormatoAnuncio | 'li
   }
 }
 
-/** Hash FNV-1a 32 bits (escolha determinística por semente; não é criptografia). */
-function fnv(s: string): number {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return h >>> 0;
-}
-
 /**
- * Escolhe o anúncio de um formato. Rotação ponderada pelo `peso`, determinística pela `semente` (ex.: id da visita
- * + posição na página: a mesma posição não troca a cada renderização, mas muda entre visitas). No 'topo', na 'tv' e
- * em 'compartilhamento', a cota MASTER vence quando existe. `evitar` tira ids já mostrados em outra posição da mesma
- * página (se sobrar algum).
+ * Escolha do anúncio de cada posição: mora em `anuncios-escolha.ts` (módulo pequeno, sem a validação, que é tudo o que
+ * o site precisa no JS inicial) e é reexportada aqui — o contrato continua o mesmo.
  */
-export function escolherAnuncio<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota'>>(
-  anuncios: readonly T[] | null | undefined,
-  formato: FormatoAnuncio,
-  semente: string,
-  evitar: readonly string[] = [],
-): T | null {
-  let pool = (anuncios ?? []).filter((a) => a.formatos.includes(formato));
-  if (pool.length === 0) return null;
-  if (formato === 'topo' || formato === 'tv' || formato === 'compartilhamento') {
-    const master = pool.filter((a) => a.cota === 'master');
-    if (master.length) pool = master;
-  }
-  const sem = pool.filter((a) => !evitar.includes(a.id));
-  if (sem.length) pool = sem;
-  const total = pool.reduce((s, a) => s + Math.max(1, a.peso), 0);
-  let r = fnv(`${semente}|${formato}`) % total;
-  for (const a of pool) {
-    r -= Math.max(1, a.peso);
-    if (r < 0) return a;
-  }
-  return pool[pool.length - 1];
-}
+export { escolherAnuncio } from './anuncios-escolha';

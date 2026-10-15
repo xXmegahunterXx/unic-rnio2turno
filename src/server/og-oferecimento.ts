@@ -1,9 +1,15 @@
 /**
  * "Oferecimento: <marca>" nas imagens de compartilhamento (formato de anúncio 'compartilhamento', src/shared/anuncios.ts).
  *
+ * SÓ nos cartões genéricos, sem candidato e sem resultado (`CARTOES_COM_OFERECIMENTO`): Teste Cego, calculadora de
+ * cenários (sem código) e capa das curiosidades. NUNCA no placar, no município, na seção, na ficha do candidato, nos
+ * eleitos/bancadas, nos governadores, num fato isolado ou num cenário montado: são imagens com foto, nome, número ou
+ * resultado de candidato, feitas para circular e que não dá para recolher depois (a marca ficaria associada a um
+ * candidato — ARCHITECTURE §1.5).
+ *
  * Um rodapé discreto, só texto e sempre rotulado, numa faixa própria no pé da imagem (1200 × 32 px, com linha de
- * separação): nunca dentro do placar nem colado a foto, nome ou número de candidato. O cartão fica 32 px mais baixo,
- * com menos respiro em cima e embaixo (o conteúdo perde ~8 px; o que passasse ficaria atrás da faixa, nunca por cima).
+ * separação), centralizado (não fica embaixo de um lado do cartão). O cartão fica 32 px mais baixo, com menos respiro
+ * em cima e embaixo (o conteúdo perde ~8 px; o que passasse ficaria atrás da faixa, nunca por cima).
  *
  * O anunciante de cada cartão sai de `escolherAnuncio` (o master vence; entre os demais, rotação pelo peso, fixa por
  * cartão). A chave de cache das imagens leva `tagOferecimento`: trocar/tirar o anunciante gera imagens novas (e a
@@ -17,6 +23,21 @@ import { C, h, OG_H, OG_W, type No } from './og';
 export const FAIXA_OFERECIMENTO = 32;
 
 type Anuncios = readonly Pick<AnuncioPublico, 'id' | 'marca' | 'formatos' | 'peso' | 'cota'>[] | null | undefined;
+
+/**
+ * Cartões (chave do cache em og-rotas.ts) que podem levar a faixa: só os genéricos, sem candidato nem resultado.
+ * A capa das curiosidades só entra quando nenhum dos três destaques é de cargo (percentual de candidato).
+ */
+export const CARTOES_COM_OFERECIMENTO = ['teste', 'cen|generico', 'cur|capa'] as const;
+export type CartaoComOferecimento = (typeof CARTOES_COM_OFERECIMENTO)[number];
+
+/**
+ * Imagem das meta tags (caminho com query) que pode levar a faixa → o `&v=` leva o anunciante. As demais nunca têm
+ * anúncio, então trocar o anunciante não muda a URL delas.
+ */
+export function imagemComOferecimento(caminho: string): boolean {
+  return caminho === '/api/og/teste.png' || caminho === '/api/og/cenario.png' || caminho === '/api/og/curiosidade.png';
+}
 
 const comFormato = (anuncios: Anuncios) => (anuncios ?? []).filter((a) => a.formatos.includes('compartilhamento'));
 
@@ -81,7 +102,8 @@ export function comOferecimento(no: No, marca: string): No {
         width: OG_W,
         height: FAIXA_OFERECIMENTO,
         alignItems: 'center',
-        justifyContent: 'flex-end',
+        // centralizada: nunca embaixo de um dos lados do cartão
+        justifyContent: 'center',
         padding: '0 64px',
         background: C.surface,
         borderTop: `1px solid ${C.line}`,

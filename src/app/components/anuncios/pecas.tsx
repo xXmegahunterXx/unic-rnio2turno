@@ -44,7 +44,7 @@ export function LogoMarca({
           className,
         )}
       >
-        <img src={src} alt="" decoding="async" draggable={false} className="h-full w-full object-contain" />
+        <img src={src} alt="" decoding="async" loading="lazy" draggable={false} className="h-full w-full object-contain" />
       </span>
     );
   return (
@@ -98,12 +98,21 @@ export function CtaAnuncio({ texto, className, tamanho = 'md' }: { texto: string
  * Brilho decorativo com as cores da própria marca: a logo, muito ampliada e desfocada, atrás do conteúdo. Sem logo,
  * nada (o cartão fica neutro). Só decoração (`aria-hidden`), não interfere no clique.
  */
-export function BrilhoMarca({ anuncio, className }: { anuncio: Pick<AnuncioPublico, 'logo'>; className?: string }) {
+export function BrilhoMarca({ anuncio, className, adiado = true }: { anuncio: Pick<AnuncioPublico, 'logo'>; className?: string; adiado?: boolean }) {
   const src = imagemDoAnuncio(anuncio.logo);
   if (!src) return null;
   return (
     <span aria-hidden className={cn('pointer-events-none absolute select-none', className)}>
-      <img src={src} alt="" decoding="async" draggable={false} className="h-full w-full scale-150 object-cover opacity-60 blur-3xl saturate-150" />
+      {/* decoração: baixa prioridade e só perto da tela (`adiado`), para não disputar banda com a foto do topo da página */}
+      <img
+        src={src}
+        alt=""
+        decoding="async"
+        draggable={false}
+        loading={adiado ? 'lazy' : undefined}
+        fetchPriority="low"
+        className="h-full w-full scale-150 object-cover opacity-60 blur-3xl saturate-150"
+      />
     </span>
   );
 }
@@ -113,6 +122,8 @@ export interface LinkAnuncioProps {
   formato: FormatoAnuncio;
   /** prévia (admin, /anuncie): sem link nem contagem */
   previa?: boolean;
+  /** anel de foco por dentro (blocos com `overflow-hidden` em volta, como a faixa do topo: o anel de fora seria cortado) */
+  anelDentro?: boolean;
   className?: string;
   children: ReactNode;
 }
@@ -121,7 +132,7 @@ export interface LinkAnuncioProps {
  * O bloco inteiro é um link patrocinado (alvo grande no celular). Na prévia vira um <div> sem link. O rótulo de
  * leitor de tela sempre diz que é publicidade e que abre em nova aba.
  */
-export const LinkAnuncio = forwardRef<HTMLElement, LinkAnuncioProps>(function LinkAnuncio({ anuncio, formato, previa, className, children }, ref) {
+export const LinkAnuncio = forwardRef<HTMLElement, LinkAnuncioProps>(function LinkAnuncio({ anuncio, formato, previa, anelDentro, className, children }, ref) {
   const href = previa ? null : hrefDoAnuncio(anuncio.href, formato, __DEMO__);
   const rotulo = `Publicidade de ${anuncio.marca}: ${anuncio.titulo}. ${anuncio.cta}${anuncio.destino ? ` em ${anuncio.destino}` : ''}`;
   if (!href)
@@ -137,7 +148,11 @@ export const LinkAnuncio = forwardRef<HTMLElement, LinkAnuncioProps>(function Li
       target="_blank"
       rel="sponsored noopener noreferrer"
       aria-label={`${rotulo} (abre em nova aba)`}
-      className={cn('group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg', className)}
+      className={cn(
+        'group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+        anelDentro ? 'focus-visible:ring-inset' : 'focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+        className,
+      )}
     >
       {children}
     </a>

@@ -32,7 +32,10 @@ let antecipado: Promise<FotoPacote> | null = null;
  */
 export function anteciparFotosHd(): Promise<FotoPacote> {
   if (!antecipado) {
-    antecipado = fetch(assetUrl(CAMINHO_HD), { credentials: 'omit' })
+    // fetch padrão (mesma origem, credenciais 'same-origin'): reaproveita o `<link rel=preload as=fetch crossorigin>`
+    // que o index.html pede junto com a página (vite.config.ts, preCarregamentoCritico). Com `credentials: 'omit'` o
+    // navegador não casaria a pré-carga e baixaria de novo.
+    antecipado = fetch(assetUrl(CAMINHO_HD))
       .then(async (r) => {
         if (!r.ok) throw new DadoIndisponivelError(CAMINHO_HD, r.status);
         return (await r.json()) as FotoPacote;

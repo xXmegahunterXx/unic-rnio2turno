@@ -29,7 +29,7 @@ import { GovernadoresEleitosT1 } from '@/app/components/pages/cargos/Governadore
 import { cn } from '@/app/lib/cn';
 import { BotaoCompartilharGovernadores, type DisputaGov } from '@/app/components/share/cartoes/Governadores';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 
 type Ordem = 'apertadas' | 'apuradas' | 'az';
 const CHAVE_ORDEM = 'sintonia:governadores:ordem';

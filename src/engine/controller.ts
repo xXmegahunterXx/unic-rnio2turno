@@ -488,7 +488,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         const v = validaPatrocinio(cmd.patrocinio);
         if ('erro' in v) throw new CommandError(v.erro);
         const anterior = lista.find((a) => a.id === ID_PATROCINIO) ?? null;
-        const a = anuncioDoPatrocinio(v.ok, anterior);
+        const a = anuncioDoPatrocinio(v.ok, anterior, nomesCandidatos());
         if ('erro' in a) throw new CommandError(a.erro);
         if (!anterior && lista.length >= ANUNCIO_LIMITES.maxAnuncios)
           throw new CommandError(`Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios cadastrados: remova um antes de publicar o patrocínio.`);
@@ -501,7 +501,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         const bruto = cmd.anuncio as unknown;
         const id = bruto && typeof bruto === 'object' && typeof (bruto as { id?: unknown }).id === 'string' ? (bruto as { id: string }).id.trim().toLowerCase() : '';
         const anterior = lista.find((a) => a.id === id) ?? null;
-        const v = normalizaAnuncio(bruto, anterior);
+        const v = normalizaAnuncio(bruto, anterior, nomesCandidatos());
         if ('erro' in v) throw new CommandError(v.erro);
         if (!anterior && lista.length >= ANUNCIO_LIMITES.maxAnuncios)
           throw new CommandError(`Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios cadastrados: remova um antes de criar outro.`);
@@ -668,6 +668,12 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
   };
 
   const meta = (): PublicMeta => ({ races: ds.meta.races, ufs: ds.meta.ufs, inicioApuracao: INI });
+  /** Nomes de urna e completos dos candidatos do dataset: anúncio que os cite é recusado (anuncios-politica.ts). */
+  let nomesMemo: string[] | null = null;
+  const nomesCandidatos = (): string[] =>
+    (nomesMemo ??= [...new Set(ds.meta.races.flatMap((r) => r.candidatos.filter((c) => !c.agregado).flatMap((c) => [c.nomeUrna, c.nome])))].filter(
+      (n): n is string => typeof n === 'string' && n.trim().length > 0,
+    ));
 
   // ---- locais de votação (sob demanda por UF, com cache) -----------------------------------------
   interface LocaisUf {

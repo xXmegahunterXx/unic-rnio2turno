@@ -70,6 +70,8 @@ export function CandidateAvatar({ candidato, nome, cor, size = 'md', eleito, dim
   return (
     <span
       aria-hidden
+      // foto/monograma de candidato: a barra fixa de anúncio do celular nunca fica encostada (anuncios/faixaLivre.ts)
+      data-sem-anuncio-fixo
       className={cn(
         'relative inline-flex shrink-0 select-none items-center justify-center rounded-full font-display font-semibold tracking-[-0.02em]',
         t.box,
@@ -223,7 +225,7 @@ export function CandidateRetrato({
   const [falhou, setFalhou] = useState<string | null>(null);
   const comFoto = !!foto && falhou !== foto;
   return (
-    <span aria-hidden className={cn('relative isolate block aspect-[4/5] w-full select-none', dim && 'opacity-60', className)}>
+    <span aria-hidden data-sem-anuncio-fixo className={cn('relative isolate block aspect-[4/5] w-full select-none', dim && 'opacity-60', className)}>
       {brilho ? (
         <span
           className="pointer-events-none absolute -inset-x-[26%] -inset-y-[18%] -z-10 opacity-70 dark:opacity-100"

@@ -88,7 +88,7 @@ export function PlacarCenario({
   const premissas = premissasCenario(ds, cenario, r, { detalheCandidatos: 3 });
   const anuncio = useAnuncio(`${a.nomeUrna} ${fmtPct(pctFinalista(r.brasil, 0))}, ${b.nomeUrna} ${fmtPct(pctFinalista(r.brasil, 1))} dos votos válidos neste cenário.`);
   return (
-    <section aria-labelledby="placar-cenario" className="relative overflow-hidden rounded-3xl border border-line bg-surface shadow-card">
+    <section data-sem-anuncio-fixo aria-labelledby="placar-cenario" className="relative overflow-hidden rounded-3xl border border-line bg-surface shadow-card">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-48"

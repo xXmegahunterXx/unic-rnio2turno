@@ -407,6 +407,10 @@ describe('segurança', () => {
     expect(csp.match(/'sha256-/g)).toHaveLength(1);
     expect(csp).toContain("frame-ancestors 'self'");
     expect(cspPagina('', true)).toContain('frame-ancestors *');
+    // imagens: só do próprio site (e da origem pública), data: e blob: — nunca de qualquer https (pixel de terceiro)
+    expect(csp).toContain("img-src 'self' data: blob:");
+    expect(csp).not.toMatch(/img-src[^;]*https:(?!\/\/)/);
+    expect(cspPagina('', false, 'https://sintonia2026.com.br')).toContain("img-src 'self' https://sintonia2026.com.br data: blob:");
   });
 
   it('imagens OG: limite de imagens NOVAS por cliente; imagem pronta não conta', async () => {

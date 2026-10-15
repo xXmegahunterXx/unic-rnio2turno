@@ -20,7 +20,7 @@ import { Container } from '@/app/components/layout/Container';
 import { preCarregarQuandoOcioso } from '@/app/components/layout/prefetch';
 import { HeroHome } from '@/app/components/pages/home/HeroHome';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 
 const carregarAbaixo = () => import('@/app/components/pages/home/AbaixoDaDobra');
 const AbaixoDaDobra = lazy(carregarAbaixo);

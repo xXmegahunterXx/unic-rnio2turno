@@ -216,20 +216,78 @@ describe('clique: GET /api/anuncio/ir/:id', () => {
     expect(ms).toEqual([]);
   });
 
-  it('repetição do mesmo visitante em 10 s não conta; outro visitante conta; robô não conta', async () => {
+  it('repetição do mesmo visitante em 30 min não conta; outro visitante conta; robô não conta', async () => {
     const ir = (ip: string, ua = UA) => m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: { 'x-real-ip': ip, 'user-agent': ua } });
     await ir('198.51.100.1');
     await ir('198.51.100.1');
-    m.relogio.t += 5_000;
+    m.relogio.t += 20 * 60_000;
     await ir('198.51.100.1');
     await ir('198.51.100.2');
-    m.relogio.t += 21_000; // passou da janela (≤ 2 × 10 s)
+    m.relogio.t += 41 * 60_000; // passou da janela (≤ 2 × 30 min)
     await ir('198.51.100.1');
     const robo = await ir('198.51.100.9', 'Mozilla/5.0 (compatible; Twitterbot/1.0)');
     expect(robo.status).toBe(302);
     await ir('198.51.100.9', 'WhatsApp/2.23.20.0');
     const { metricas: ms } = await metricas(m, cookie);
     expect(total(ms, 'lynx', 'topo').cliques).toBe(3);
+  });
+});
+
+describe('clique e impressão: só do próprio site, só formatos medidos, rede IPv6 /64', () => {
+  let m: Montado;
+  let cookie: string;
+  beforeEach(async () => {
+    ({ m, cookie } = await novo());
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { formatos: ['topo', 'nativo', 'tv', 'compartilhamento'] }) });
+  });
+
+  it('clique: redireciona sempre, mas só conta navegação vinda do site (GET, documento, mesma origem) em formato com link', async () => {
+    const ir = (ip: string, f: string, extra: Record<string, string> = {}, method = 'GET') =>
+      m.app.request(`/api/anuncio/ir/lynx?f=${f}`, { method, headers: { ...como(ip), ...extra } });
+    // não contam (mas redirecionam): <img> em outro site, outro site, HEAD, formatos sem link (tv, imagens)
+    const img = await ir('198.51.100.40', 'topo', { 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'image' });
+    expect(img.status).toBe(302);
+    expect(img.headers.get('location')).toContain('https://lynx.com.br/');
+    expect((await ir('198.51.100.41', 'topo', { 'sec-fetch-site': 'cross-site', 'sec-fetch-dest': 'document' })).status).toBe(302);
+    expect((await ir('198.51.100.42', 'topo', {}, 'HEAD')).status).toBe(302);
+    expect((await ir('198.51.100.43', 'tv')).headers.get('location')).toContain('utm_medium=link');
+    expect((await ir('198.51.100.44', 'compartilhamento')).headers.get('location')).toContain('utm_medium=link');
+    expect((await metricas(m, cookie)).metricas).toEqual([]);
+    // contam: link no próprio site (same-origin, documento), endereço digitado (none) e navegador sem os cabeçalhos
+    await ir('198.51.100.50', 'topo', { 'sec-fetch-site': 'same-origin', 'sec-fetch-dest': 'document' });
+    await ir('198.51.100.51', 'topo', { 'sec-fetch-site': 'none', 'sec-fetch-dest': 'document' });
+    await ir('198.51.100.52', 'nativo');
+    const { metricas: ms } = await metricas(m, cookie);
+    expect(total(ms, 'lynx', 'topo').cliques).toBe(2);
+    expect(total(ms, 'lynx', 'nativo').cliques).toBe(1);
+  });
+
+  it('impressão: imagens de compartilhamento não são medidas; sem Origin nem Sec-Fetch-Site → 204 sem contar', async () => {
+    expect((await evento(m, { id: 'lynx', formato: 'compartilhamento' })).status).toBe(400);
+    const curl = await m.app.request('/api/anuncio/evento', {
+      method: 'POST',
+      headers: { 'content-type': 'text/plain', ...como('198.51.100.60') },
+      body: JSON.stringify({ id: 'lynx', formato: 'topo' }),
+    });
+    expect(curl.status).toBe(204);
+    expect((await metricas(m, cookie)).metricas).toEqual([]);
+    // Modo TV: só impressão (a tela não tem link)
+    expect((await evento(m, { id: 'lynx', formato: 'tv' }, como('198.51.100.61'))).status).toBe(204);
+    expect(total((await metricas(m, cookie)).metricas, 'lynx', 'tv').impressoes).toBe(1);
+  });
+
+  it('IPv6: trocar o endereço dentro da mesma faixa /64 não zera repetição nem limite', async () => {
+    const ip = (n: number) => `2001:db8:abcd:12::${n.toString(16)}`;
+    for (let i = 1; i <= 5; i++) await m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: como(ip(i)) });
+    for (let i = 1; i <= 5; i++) await evento(m, { id: 'lynx', formato: 'topo' }, como(ip(100 + i)));
+    let r: Response | null = null;
+    for (let i = 0; i <= EVENTOS_ANUNCIO_MIN; i++) r = await evento(m, { id: 'lynx', formato: 'nativo' }, como(ip(1000 + i)));
+    expect(r!.status).toBe(429);
+    // outra faixa /64 é outro visitante
+    await m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: como('2001:db8:abcd:13::1') });
+    const { metricas: ms } = await metricas(m, cookie);
+    expect(total(ms, 'lynx', 'topo').cliques).toBe(2);
+    expect(total(ms, 'lynx', 'topo').impressoes).toBe(1);
   });
 });
 
@@ -374,6 +432,13 @@ describe('peças puras', () => {
     expect([l.tentar('x'), l.tentar('x'), l.tentar('x'), l.tentar('y')]).toEqual([true, true, false, true]);
     t += 1000;
     expect(l.tentar('x')).toBe(true);
+    // teto de chaves na janela: visitante novo além do teto é recusado (não conta) até a janela virar
+    const lc = new LimiteJanela(5, 1000, () => t, 3);
+    expect(['a', 'b', 'c', 'd'].map((k) => lc.tentar(k))).toEqual([true, true, true, false]);
+    expect(lc.tentar('a')).toBe(true);
+    expect(lc.tamanho).toBe(3);
+    t += 1000;
+    expect(lc.tentar('d')).toBe(true);
     expect(numeroDe('abc')).toBe(numeroDe('abc'));
     expect(numeroDe('abc')).not.toBe(numeroDe('abd'));
     expect(Number.isSafeInteger(numeroDe('qualquer coisa longa'.repeat(10)))).toBe(true);

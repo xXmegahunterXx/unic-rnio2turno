@@ -141,6 +141,22 @@ describe('anúncios: comandos', () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
+  it('conteúdo político-eleitoral é recusado mesmo com a declaração; o motor confere os nomes dos candidatos do dataset', () => {
+    const { c } = novo();
+    const nomes = [...new Set(ds.meta.races.flatMap((r) => r.candidatos.filter((x) => !x.agregado).map((x) => x.nomeUrna)))];
+    // um finalista de governador (só a lista do dataset tem o nome)
+    const gov = nomes.find((n) => !/lula|bolsonaro/i.test(n))!;
+    expect(gov).toBeTruthy();
+    expect(() => c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('loja', { titulo: `Promoção com ${gov}` }) })).toThrow(CommandError);
+    expect(() => c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('loja', { marca: 'Lula Presidente 13', titulo: 'Vote 22' }) })).toThrow(/político-eleitoral/);
+    expect(() => c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('gov', { url: 'https://www.gov.br/x' }) })).toThrow(/governo/);
+    // patrocínio legado também passa pela barreira
+    expect(() => c.command({ tipo: 'patrocinio', patrocinio: { marca: 'PT', texto: 'Apoio', url: 'https://x.com.br' } })).toThrow(CommandError);
+    expect(c.state().anuncios).toEqual([]);
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { marca: 'Lynx', titulo: 'Pix na hora, sem tarifa' }) });
+    expect(c.state().anuncios!.map((a) => a.id)).toEqual(['lynx']);
+  });
+
   it(`limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios cadastrados (substituir continua valendo)`, () => {
     const { c } = novo();
     for (let i = 0; i < ANUNCIO_LIMITES.maxAnuncios; i++) c.command({ tipo: 'anuncio-salvar', anuncio: anuncio(`a${i}`) });

@@ -6,9 +6,9 @@ import type { ReactNode } from 'react';
 import type { AnuncioPublico, FormatoAnuncio } from '@/shared/anuncios';
 import { cn } from '@/app/lib/cn';
 import { LogoMark } from '@/app/components/layout/Logo';
-import { AnuncioNativoPeca } from './AnuncioNativo';
+import { AnuncioNativoPeca } from './AnuncioNativoPeca';
 import { BarraRodapePeca } from './BarraRodape';
-import { FaixaTopoPeca } from './FaixaTopo';
+import { FaixaTopoPeca } from './FaixaTopoPeca';
 import { imagemDoAnuncio } from './nucleo';
 import { OferecimentoTestePeca, OferecimentoTvPeca } from './Oferecimento';
 
@@ -108,23 +108,37 @@ export function VitrineFormato({
               <div className="mx-auto h-16 w-16 rounded-full border-[6px] border-surface-3" />
             </div>
           </div>
-          <OferecimentoTestePeca anuncio={anuncio} previa compacta={estreita} className="mt-3" />
+          {/* no site: só depois de revelar, longe do cartão do resultado (depois do compartilhar e dos avisos) */}
+          <div aria-hidden className="mt-3 grid grid-cols-2 gap-2">
+            <div className="h-9 rounded-xl bg-surface-2" />
+            <div className="h-9 rounded-xl bg-surface-2" />
+          </div>
+          <Conteudo linhas={2} className="mt-3" />
+          <OferecimentoTestePeca anuncio={anuncio} previa compacta={estreita} className="mt-5 border-t border-line pt-5" />
         </div>
       );
     case 'tv':
       return (
         <div className="overflow-hidden rounded-2xl border border-line bg-bg [--u:3.4px] sm:[--u:4.6px]">
           <div className="flex aspect-video flex-col p-3 sm:p-4">
-            <div aria-hidden className="flex items-center gap-2">
-              <LogoMark size={18} />
-              <span className="font-display text-[12px] font-semibold text-fg">Sintonia · Modo TV</span>
+            {/* barra do topo: Sintonia · Oferecimento (fora do placar) · relógio */}
+            <div className="flex items-center gap-2">
+              <span aria-hidden className="flex shrink-0 items-center gap-2">
+                <LogoMark size={18} />
+                <span className="hidden font-display text-[12px] font-semibold text-fg sm:inline">Sintonia · Modo TV</span>
+              </span>
+              <span className="flex min-w-0 flex-1 justify-center">
+                <span className="flex min-w-0 items-center border-l border-line pl-2.5">
+                  <OferecimentoTvPeca anuncio={anuncio} previa variante="cabecalho" />
+                </span>
+              </span>
+              <span aria-hidden className="num shrink-0 font-display text-[12px] font-semibold text-fg-muted">
+                21:04
+              </span>
             </div>
             <div aria-hidden className="mt-3 grid flex-1 grid-cols-[1fr_1.2fr] gap-3">
               <div className="rounded-xl bg-surface-2" />
               <div className="rounded-xl bg-surface-2" />
-            </div>
-            <div className="mt-3 flex items-center justify-end rounded-xl border border-line bg-surface/80 px-3 py-2">
-              <OferecimentoTvPeca anuncio={anuncio} previa />
             </div>
           </div>
         </div>
@@ -144,7 +158,7 @@ export function VitrineFormato({
                 <div className="h-3/4 flex-1 rounded-xl bg-surface-2" />
               </div>
             </div>
-            <div className="absolute inset-x-0 bottom-0 flex h-[11%] min-h-[22px] items-center justify-end gap-1.5 border-t border-line bg-surface px-[4%] text-[11px] sm:text-[13px]">
+            <div className="absolute inset-x-0 bottom-0 flex h-[11%] min-h-[22px] items-center justify-center gap-1.5 border-t border-line bg-surface px-[4%] text-[11px] sm:text-[13px]">
               <span className="text-fg-subtle">Oferecimento:</span>
               <span className="font-semibold text-fg">{anuncio.marca}</span>
             </div>

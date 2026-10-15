@@ -128,7 +128,7 @@ function Selo({ icone, children }: { icone: IconName; children: ReactNode }) {
   );
 }
 
-/** Vitrine do hero: as peças reais (nativo + "Resultado oferecido por") com o anúncio de exemplo. */
+/** Vitrine do hero: as peças reais (nativo + "Teste Cego oferecido por") com o anúncio de exemplo. */
 function Colagem() {
   return (
     // no celular a vitrine fica só na galeria de formatos (aqui ela empurraria o resto da página)
@@ -185,12 +185,12 @@ const MOTIVOS: { icone: IconName; titulo: string; texto: string }[] = [
   {
     icone: 'olho-fechado',
     titulo: 'Teste Cego, feito para circular',
-    texto: 'Quem faz o teste compartilha o resultado e desafia os amigos. A tela de resultado pode sair com “Resultado oferecido por” a sua marca.',
+    texto: 'Quem faz o teste compartilha o resultado e desafia os amigos. A tela de resultado traz “Teste Cego oferecido por” a sua marca, abaixo das ações de compartilhar.',
   },
   {
     icone: 'compartilhar',
     titulo: 'Sua marca nas imagens compartilhadas',
-    texto: 'Os cartões que vão para o X e o WhatsApp — placar, curiosidades, Teste Cego — levam “Oferecimento: sua marca” no rodapé.',
+    texto: 'Os cartões genéricos que vão para o X e o WhatsApp — Teste Cego, calculadora do 2º turno e capa das curiosidades — levam “Oferecimento: sua marca” no rodapé.',
   },
   {
     icone: 'grafico',
@@ -222,11 +222,11 @@ function PorQue() {
 
 const ONDE: Record<FormatoAnuncio, string> = {
   topo: 'Logo abaixo do cabeçalho, em todas as páginas. No computador acompanha a rolagem; no celular, em versão compacta.',
-  rodape: 'Barra no pé da tela do celular, acima do menu. Pode ser fechada pela pessoa e aparece de novo na próxima visita.',
+  rodape: 'Barra no pé da tela do celular, acima do menu, depois que a pessoa rola a página — e nunca por cima de placar ou de candidato. Pode ser fechada e aparece de novo na próxima visita.',
   nativo: 'Cartão “Patrocinado” entre as seções da página inicial, da apuração, dos governadores, das curiosidades e da calculadora.',
-  teste: 'Na tela de resultado do Teste Cego, logo abaixo do resultado e separado dele: “Resultado oferecido por”.',
-  tv: 'Logo grande com “Oferecimento” no Modo TV, a tela cheia para transmissões e telões.',
-  compartilhamento: '“Oferecimento: sua marca” no rodapé das imagens de compartilhamento postadas no X e no WhatsApp.',
+  teste: 'Na tela de resultado do Teste Cego, depois que a pessoa revela e abaixo das ações de compartilhar: “Teste Cego oferecido por”.',
+  tv: '“Oferecimento” com a sua logo na barra do topo do Modo TV, a tela cheia para transmissões e telões — fora do placar.',
+  compartilhamento: '“Oferecimento: sua marca” no rodapé das imagens genéricas (Teste Cego, calculadora, capa das curiosidades) postadas no X e no WhatsApp. Nunca nas imagens de placar ou de candidato.',
 };
 
 const MASTER_PRIMEIRO: FormatoAnuncio[] = ['topo', 'tv', 'compartilhamento'];
@@ -331,7 +331,7 @@ const REGRAS: { icone: IconName; titulo: string; texto: ReactNode }[] = [
   {
     icone: 'selo',
     titulo: 'Só anunciantes não políticos',
-    texto: 'Candidatos, partidos, campanhas e peças com conteúdo político-eleitoral não são aceitos. O cadastro de cada anúncio exige essa declaração.',
+    texto: 'Candidatos, partidos, campanhas, órgãos públicos e peças com conteúdo político-eleitoral não são aceitos. O cadastro exige essa declaração e recusa nomes de candidatos, números, siglas e termos de eleição.',
   },
   { icone: 'info', titulo: 'Sempre identificado', texto: '“Publicidade”, “Patrocinado” ou “Oferecido por” em todo formato.' },
   {
@@ -346,15 +346,15 @@ const REGRAS: { icone: IconName; titulo: string; texto: ReactNode }[] = [
     texto: (
       <>
         O clique abre o seu site em nova aba com <span className="font-mono text-[13px] text-fg">utm_source=sintonia</span>, o formato em{' '}
-        <span className="font-mono text-[13px] text-fg">utm_medium</span> e o anúncio em <span className="font-mono text-[13px] text-fg">utm_campaign</span>, para
-        você medir no seu analytics.
+        <span className="font-mono text-[13px] text-fg">utm_medium</span> (o do Teste Cego sai como <span className="font-mono text-[13px] text-fg">conteudo</span>)
+        e o anúncio em <span className="font-mono text-[13px] text-fg">utm_campaign</span>, para você medir no seu analytics.
       </>
     ),
   },
   {
     icone: 'olho-fechado',
     titulo: 'Contagem honesta e sem dado pessoal',
-    texto: 'Impressões e cliques são contados de forma agregada, sem cookie, sem guardar IP e sem identificar ninguém. Robôs e repetições não contam.',
+    texto: 'Impressões e cliques são contados de forma agregada, sem cookie, sem guardar IP e sem identificar ninguém. Robôs, repetições e cliques vindos de fora do site não contam.',
   },
 ];
 

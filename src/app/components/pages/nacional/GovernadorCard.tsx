@@ -63,6 +63,8 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
   return (
     <Link
       to={to}
+      // placar da disputa: sem barra fixa de anúncio por cima (anuncios/faixaLivre.ts)
+      data-sem-anuncio-fixo
       aria-label={`${rotuloAcessivel}: ${resumoTexto}.${eleito ? ` Resultado de ${eleito.nomeUrna} definido.` : ''} Ver detalhes.`}
       className={cn(
         'group relative block h-full overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5',

@@ -65,6 +65,8 @@ export function pollMs(status: LiveStatus | undefined, nivel: 'br' | 'uf' | 'mun
  */
 export function preCarregarDadosDaRota(qc: QueryClient, pathname: string, search = '') {
   void qc.prefetchQuery({ queryKey: ['meta'], queryFn: async () => (await getClient()).meta(), staleTime: Infinity });
+  // o status decide fotos, faixa de simulação e anúncios: pedido já, sem esperar o React montar o AppShell
+  void qc.prefetchQuery({ queryKey: ['status'], queryFn: async () => (await getClient()).status(), staleTime: 1000 });
   const rota = pathname.replace(/\/+$/, '') || '/';
   const race = new URLSearchParams(search).get('race');
   const placarPres = rota === '/' || (rota === '/apuracao' && (!race || race === 'pres' || race === 'pres-t1'));

@@ -1,0 +1,150 @@
+/**
+ * A barra fixa do rodapé (celular) nunca fica por cima de um resultado nem encostada em foto, nome ou número de
+ * candidato (ARCHITECTURE §1.5). Os blocos com resultado/candidato levam o atributo `data-sem-anuncio-fixo`
+ * (cartão do confronto na Home, topo da /apuracao, placares, retratos e avatares com foto, barras de votos, boletim de
+ * urna, grade de governadores…); enquanto algum deles estiver na faixa de baixo da tela — onde a barra fica, com
+ * respiro —, a barra fica escondida (o espaço no fim da página continua reservado: nada pula).
+ *
+ * Medição com IntersectionObserver (a raiz é só a faixa de baixo: `rootMargin` com o topo negativo), refeita ao trocar
+ * de página, ao mudar a altura da tela e quando a página ganha ou perde blocos marcados (MutationObserver, com atraso).
+ * Esconde na hora; para voltar espera um instante livre (sem pisca-pisca na borda de um bloco).
+ */
+import { useEffect, useState } from 'react';
+
+/** Atributo dos blocos que a barra fixa não pode cobrir (use `data-sem-anuncio-fixo` no elemento). */
+export const SELETOR_SEM_ANUNCIO_FIXO = '[data-sem-anuncio-fixo]';
+
+/**
+ * Altura da faixa de baixo vigiada (px): tab bar (60) + barra (60 + 8) + área segura típica (34) + respiro (~40).
+ * Quando a tab bar sai ao rolar, a barra desce 60 px: continua dentro da faixa.
+ */
+export const FAIXA_BARRA_PX = 200;
+
+/** Espera com a faixa livre antes de mostrar a barra (ms). */
+export const ESPERA_LIVRE_MS = 250;
+
+/** `rootMargin` do observador: corta o topo da tela e deixa só a faixa de baixo (`alturaTela` em px). */
+export function margemDaFaixa(alturaTela: number, faixa = FAIXA_BARRA_PX): string {
+  const corte = Math.max(0, Math.round(alturaTela - faixa));
+  return `-${corte}px 0px 0px 0px`;
+}
+
+/** Retângulo (posição na tela) dentro da faixa de baixo? Reserva sem IntersectionObserver e testes. */
+export function naFaixa(r: { top: number; bottom: number }, alturaTela: number, faixa = FAIXA_BARRA_PX): boolean {
+  const topoFaixa = Math.max(0, alturaTela - faixa);
+  return r.bottom > topoFaixa && r.top < alturaTela;
+}
+
+/**
+ * true quando nenhum bloco marcado está na faixa de baixo da tela. `chave` (ex.: o caminho) refaz a medição do zero
+ * ao trocar de página; enquanto mede, devolve false (a barra não aparece "por engano" sobre a página nova).
+ */
+export function useFaixaLivre(ativo: boolean, chave: string): boolean {
+  const [livre, setLivre] = useState(false);
+  useEffect(() => {
+    setLivre(false);
+    if (!ativo || typeof window === 'undefined') return;
+    if (typeof IntersectionObserver === 'undefined') {
+      // navegador muito antigo: confere na rolagem
+      const conferir = () => {
+        const els = document.querySelectorAll(SELETOR_SEM_ANUNCIO_FIXO);
+        let ocupado = false;
+        els.forEach((el) => {
+          if (!ocupado && naFaixa(el.getBoundingClientRect(), window.innerHeight)) ocupado = true;
+        });
+        setLivre(!ocupado);
+      };
+      conferir();
+      window.addEventListener('scroll', conferir, { passive: true });
+      window.addEventListener('resize', conferir);
+      return () => {
+        window.removeEventListener('scroll', conferir);
+        window.removeEventListener('resize', conferir);
+      };
+    }
+
+    const dentro = new Set<Element>();
+    const observados = new Set<Element>();
+    let io: IntersectionObserver | null = null;
+    let tMostrar = 0;
+    let tVarrer = 0;
+    let tAltura = 0;
+    let altura = window.innerHeight;
+
+    const aplicar = () => {
+      if (dentro.size > 0) {
+        if (tMostrar) window.clearTimeout(tMostrar);
+        tMostrar = 0;
+        setLivre(false);
+      } else if (!tMostrar) {
+        tMostrar = window.setTimeout(() => {
+          tMostrar = 0;
+          setLivre(dentro.size === 0);
+        }, ESPERA_LIVRE_MS);
+      }
+    };
+    const varrer = () => {
+      tVarrer = 0;
+      if (!io) return;
+      const atuais = new Set(document.querySelectorAll(SELETOR_SEM_ANUNCIO_FIXO));
+      for (const el of observados) {
+        if (!atuais.has(el)) {
+          io.unobserve(el);
+          observados.delete(el);
+          dentro.delete(el);
+        }
+      }
+      for (const el of atuais) {
+        if (!observados.has(el)) {
+          io.observe(el);
+          observados.add(el);
+          // até o observador responder (próximo quadro), confere na hora: nunca mostra sobre um bloco recém-chegado
+          if (naFaixa(el.getBoundingClientRect(), window.innerHeight)) dentro.add(el);
+        }
+      }
+      aplicar();
+    };
+    const criar = () => {
+      io?.disconnect();
+      dentro.clear();
+      observados.clear();
+      altura = window.innerHeight;
+      io = new IntersectionObserver(
+        (entradas) => {
+          for (const e of entradas) {
+            if (e.isIntersecting) dentro.add(e.target);
+            else dentro.delete(e.target);
+          }
+          aplicar();
+        },
+        { rootMargin: margemDaFaixa(altura), threshold: 0 },
+      );
+      varrer();
+    };
+    const agendarVarredura = () => {
+      if (!tVarrer) tVarrer = window.setTimeout(varrer, 120);
+    };
+    const aoMudarAltura = () => {
+      // a barra de endereço do celular muda a altura ao rolar: refaz só quando muda de verdade, com atraso
+      if (Math.abs(window.innerHeight - altura) < 24) return;
+      if (tAltura) window.clearTimeout(tAltura);
+      tAltura = window.setTimeout(() => {
+        tAltura = 0;
+        criar();
+      }, 150);
+    };
+
+    criar();
+    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(agendarVarredura) : null;
+    mo?.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('resize', aoMudarAltura);
+    return () => {
+      mo?.disconnect();
+      io?.disconnect();
+      io = null;
+      window.removeEventListener('resize', aoMudarAltura);
+      for (const t of [tMostrar, tVarrer, tAltura]) if (t) window.clearTimeout(t);
+    };
+  }, [ativo, chave]);
+  return livre;
+}

@@ -36,7 +36,7 @@ import { useCenario, usePresidenteT1 } from '@/app/components/pages/cenarios/dad
 import { ControleBrancos, ControleComparecimento, ControleTodos, ListaEliminados, Presets, nomesDe } from '@/app/components/pages/cenarios/Controles';
 import { BarraFixa, MiniPlacar, PlacarCenario, type CompartilharCenario } from '@/app/components/pages/cenarios/Placar';
 import { ListaUfs, PainelMapa } from '@/app/components/pages/cenarios/Estados';
-import { AnuncioNativo } from '@/app/components/anuncios';
+import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 import { CartaoCenario } from '@/app/components/pages/cenarios/CartaoCenario';
 import { coresCenario } from '@/app/components/pages/cenarios/cores';
 import { HASHTAGS_CENARIO, NOME_ARQUIVO_CENARIO, textoCenario } from '@/app/components/pages/cenarios/textos';
