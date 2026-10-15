@@ -55,7 +55,10 @@ export function Toaster() {
       aria-atomic="false"
       className={cn(
         'pointer-events-none fixed inset-x-0 z-[90] flex flex-col items-center gap-2 px-4 md:bottom-6 md:top-auto',
-        modalAberto ? 'top-[calc(12px+env(safe-area-inset-top))]' : 'bottom-[calc(76px+env(safe-area-inset-bottom))]',
+        // acima da tab bar e, quando existe, da barra de anúncio do rodapé (--anuncio-rodape-h, BarraRodape)
+        modalAberto
+          ? 'top-[calc(12px+env(safe-area-inset-top))]'
+          : 'bottom-[calc(76px+var(--anuncio-rodape-h,0px)+env(safe-area-inset-bottom))]',
       )}
     >
       <AnimatePresence initial={false}>

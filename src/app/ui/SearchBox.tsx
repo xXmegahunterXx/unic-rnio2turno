@@ -17,8 +17,13 @@ export interface SearchBoxProps extends Omit<InputHTMLAttributes<HTMLInputElemen
   trailing?: ReactNode;
 }
 
-// sm: 40 px no celular (alvo de toque), 36 px a partir de 640 px
-const alturas = { sm: 'h-10 sm:h-9 text-[13px] rounded-[10px] pl-9', md: 'h-11 text-[15px] rounded-xl pl-10', lg: 'h-14 text-base rounded-2xl pl-12' };
+// sm: 40 px no celular (alvo de toque), 36 px a partir de 640 px. Texto de 16 px no celular: abaixo disso o iPhone dá
+// zoom na página ao focar o campo (e não desfaz ao sair); do tablet em diante volta ao tamanho do desenho.
+const alturas = {
+  sm: 'h-10 sm:h-9 text-base sm:text-[13px] rounded-[10px] pl-9',
+  md: 'h-11 text-base sm:text-[15px] rounded-xl pl-10',
+  lg: 'h-14 text-base rounded-2xl pl-12',
+};
 const iconePos = { sm: 'left-2.5', md: 'left-3', lg: 'left-4' };
 
 export const SearchBox = forwardRef<HTMLInputElement, SearchBoxProps>(function SearchBox(
@@ -172,7 +177,7 @@ export function Combobox({
     }
   }
 
-  const h = size === 'lg' ? 'h-14 text-base rounded-2xl pl-12' : 'h-11 text-[15px] rounded-xl pl-10';
+  const h = size === 'lg' ? 'h-14 text-base rounded-2xl pl-12' : 'h-11 text-base sm:text-[15px] rounded-xl pl-10';
   return (
     <div className={cn('relative w-full', className)}>
       {label ? (

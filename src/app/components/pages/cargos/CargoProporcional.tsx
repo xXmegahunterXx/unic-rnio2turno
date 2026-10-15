@@ -12,6 +12,7 @@ import { cn } from '@/app/lib/cn';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { useNaTela } from '@/app/lib/useNaTela';
 import { emUf } from '@/app/components/pages/detalhe/fmt';
+import { Button } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
 import { SearchBox } from '@/app/ui/SearchBox';
 import { Segmented } from '@/app/ui/Segmented';
@@ -150,6 +151,9 @@ export function VisaoComposicao({
 
 type OrdemEleitos = 'votos' | 'partido';
 
+/** Quantos eleitos aparecem de saída no celular (o resto em "Ver todos"). */
+const LIMITE_ELEITOS_CELULAR = 20;
+
 /** Grade dos eleitos de uma UF com foto oficial (ordenável por votos ou por partido; busca por nome). */
 export function EleitosUf({
   cargo,
@@ -173,6 +177,11 @@ export function EleitosUf({
     const t = busca.trim();
     return t ? base.filter((c) => casa(`${c.nomeUrna} ${c.partido} ${c.numero}`, t)) : base;
   }, [comp.eleitos, ordem, busca]);
+  // Celular: uma coluna com foto por eleito (SP tem 94 na Assembleia e 70 na Câmara, ~11 mil px de rolagem). Mostra
+  // os primeiros e "Ver todos"; a busca sempre mostra tudo o que achar. Do tablet em diante, a grade inteira.
+  const grade = useMediaQuery('(min-width: 768px)', true);
+  const [todos, setTodos] = useState(false);
+  const corte = !grade && !todos && !busca.trim() && lista.length > LIMITE_ELEITOS_CELULAR + 6 ? LIMITE_ELEITOS_CELULAR : lista.length;
 
   if (comp.eleitos.length === 0) {
     return (
@@ -211,7 +220,7 @@ export function EleitosUf({
         <p className="rounded-2xl border border-dashed border-line px-4 py-8 text-center text-[14px] text-fg-muted">Ninguém com “{busca}”.</p>
       ) : (
         <ul className="grid grid-cols-1 gap-2 min-[560px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {lista.map((c) => {
+          {lista.slice(0, corte).map((c) => {
             const f = fichas.porSq.get(c.sqcand);
             return (
               <li key={c.sqcand} className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
@@ -237,6 +246,13 @@ export function EleitosUf({
           })}
         </ul>
       )}
+      {corte < lista.length ? (
+        <div className="mt-3 flex justify-center">
+          <Button variant="secondary" iconRight="chevron" onClick={() => setTodos(true)}>
+            Ver todos os <span className="num">{fmtInt(lista.length)}</span> eleitos
+          </Button>
+        </div>
+      ) : null}
       {comp.outros.length ? <MaisVotadosNaoEleitos lista={comp.outros} /> : null}
     </div>
   );

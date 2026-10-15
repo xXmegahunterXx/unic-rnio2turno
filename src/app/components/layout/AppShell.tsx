@@ -28,7 +28,8 @@ import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompar
 import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
 import { propsPreCarregar } from './prefetch';
 import { FaixaTopo, ProvedorAnuncios, rodapePermitido } from '../anuncios';
-import { useIsDesktop } from '@/app/lib/useMediaQuery';
+import { useIsDesktop, useMediaQuery } from '@/app/lib/useMediaQuery';
+import { instalarBarrasMoveis, mostrarTabBar } from '@/app/lib/barrasMoveis';
 
 export function AppShell({ children }: { children?: ReactNode }) {
   return (
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <Footer />
       <RodapeAnuncio />
       <TabBar />
+      <BarrasMoveis />
       <BuscaRapida />
       <AcoesGlobais />
       <Toaster />
@@ -101,6 +103,17 @@ function RodapeAnuncio() {
   );
 }
 
+/**
+ * Celular: a tab bar sai da frente ao rolar para baixo e volta ao rolar para cima; as barras do pé saem com o teclado
+ * aberto (src/app/lib/barrasMoveis.ts). Toda troca de página traz a tab bar de volta.
+ */
+function BarrasMoveis() {
+  const { pathname } = useLocation();
+  useEffect(() => instalarBarrasMoveis(), []);
+  useEffect(() => mostrarTabBar(), [pathname]);
+  return null;
+}
+
 /** Rotas que exibem números da apuração (e, portanto, a faixa de SIMULAÇÃO quando for o caso). */
 const comNumeros = (pathname: string) =>
   pathname === '/' || pathname.startsWith('/apuracao') || pathname.startsWith('/governadores');
@@ -124,8 +137,9 @@ function Header() {
   const paginaT1 = /[?&]race=[a-z-]*-t1(?:&|$)/.test(search);
   const [rolou, setRolou] = useState(false);
   // Faixa de anúncio do topo: no desktop dentro do cabeçalho fixo (sempre à vista, entra em --app-header-h); no
-  // celular logo abaixo dele, rolando com a página (o formato fixo do celular é a barra do rodapé).
-  const desktop = useIsDesktop();
+  // celular logo abaixo dele, rolando com a página (o formato fixo do celular é a barra do rodapé). Celular deitado
+  // (≥ 768 px de largura, mas ~390 px de altura) também rola: fixa, a faixa somaria 52 px a um cabeçalho de 64 px.
+  const desktop = useMediaQuery('(min-width: 768px) and (min-height: 560px)', true);
 
   // Expõe a altura do header para elementos "sticky" (ex.: cabeçalho de DataTable).
   useLayoutEffect(() => {
@@ -164,7 +178,8 @@ function Header() {
       <div ref={ref} className="sticky top-0 z-50">
         <header
           className={cn(
-            'glass border-b transition-[border-color,box-shadow] duration-200',
+            // pt: área segura do topo quando o site roda instalado na tela inicial (no navegador ela é 0)
+            'glass border-b pt-[env(safe-area-inset-top)] transition-[border-color,box-shadow] duration-200',
             rolou ? 'border-line shadow-[0_10px_30px_-20px_rgb(0_0_0/0.6)]' : 'border-transparent',
           )}
         >
@@ -319,7 +334,7 @@ function TabBar() {
           (pesado em Android de entrada e no navegador embutido do app do X). */}
       <nav
         aria-label="Principal"
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] md:hidden"
+        className="barra-tab fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/[0.97] pb-[env(safe-area-inset-bottom)] md:hidden"
       >
         <ul className="mx-auto grid h-[60px] max-w-md grid-cols-5">
           {NAV_TAB.slice(0, meio).map(item)}
@@ -464,11 +479,11 @@ function Footer() {
 }
 
 /**
- * Rodapé: no celular cada link tem 40 px de altura de toque (a lista perde o espaçamento entre itens, então o passo
+ * Rodapé: no celular cada link tem 44 px de altura de toque (a lista perde o espaçamento entre itens, então o passo
  * visual quase não muda); do tablet em diante volta ao desenho compacto.
  */
-const LISTA_RODAPE = 'mt-1.5 text-[14px] md:mt-3 md:space-y-2.5';
-const LINK_RODAPE = 'flex w-fit min-h-[40px] items-center text-fg transition-colors hover:text-brand-fg md:min-h-0';
+const LISTA_RODAPE = 'mt-1 text-[14.5px] md:mt-3 md:text-[14px] md:space-y-2.5';
+const LINK_RODAPE = 'flex w-fit min-h-[44px] items-center text-fg transition-colors hover:text-brand-fg md:min-h-0';
 
 function FooterCol({ titulo, links }: { titulo: string; links: { to: string; label: string }[] }) {
   return (

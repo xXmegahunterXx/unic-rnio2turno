@@ -16,6 +16,7 @@ import { decodeFaixas } from '@/shared/calc';
 import { fmtInt } from '@/shared/format';
 import { useLocais } from '@/app/data/estatico';
 import { cn } from '@/app/lib/cn';
+import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { useNaTela } from '@/app/lib/useNaTela';
 import { fillMosaico, MARGEM_ROTULOS } from '@/app/lib/raceUi';
 import { Button } from '@/app/ui/Button';
@@ -195,8 +196,11 @@ function Quadradinhos({
   tamanho?: number;
 }) {
   const ez = estados.get(l.zona);
+  // No toque, quadrados de 20 px (o de 12 px exigia pontaria): cada um abre o boletim da seção.
+  const dedo = useMediaQuery('(pointer: coarse)');
+  const lado = dedo ? Math.max(tamanho, 20) : tamanho;
   return (
-    <div className="flex flex-wrap gap-[3px]" role="group" aria-label={`Seções do local ${l.nome}`}>
+    <div className={cn('flex flex-wrap', dedo ? 'gap-1' : 'gap-[3px]')} role="group" aria-label={`Seções do local ${l.nome}`}>
       {l.nums.map((n) => {
         const ch = ez?.get(n);
         const rotulo = `Seção ${n}, zona ${l.zona}: ${descrever(ch, race)}`;
@@ -207,8 +211,11 @@ function Quadradinhos({
             title={rotulo}
             aria-label={rotulo}
             onClick={() => onSecao(l.zona, n)}
-            className="rounded-[3px] outline-none ring-offset-1 ring-offset-surface transition-transform hover:scale-125 focus-visible:ring-2 focus-visible:ring-brand"
-            style={{ width: tamanho, height: tamanho, background: fillMosaico(ch ?? '0', cores) }}
+            className={cn(
+              'outline-none ring-offset-1 ring-offset-surface transition-transform hover:scale-125 focus-visible:ring-2 focus-visible:ring-brand',
+              dedo ? 'rounded-[4px]' : 'rounded-[3px]',
+            )}
+            style={{ width: lado, height: lado, background: fillMosaico(ch ?? '0', cores) }}
           />
         );
       })}
@@ -248,9 +255,9 @@ function CartaoLocal({
           rel="noopener noreferrer"
           aria-label={`Abrir ${l.nome} no mapa (nova aba)`}
           title="Abrir no mapa"
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          className="toque relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-fg-muted transition-colors hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
         >
-          <Icon name="pin" size={15} />
+          <Icon name="pin" size={16} />
         </a>
       </div>
       <p className="num mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-fg-muted">

@@ -38,7 +38,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
             'w-full cursor-pointer appearance-none truncate border border-line bg-surface-2 pr-9 font-medium text-fg',
             'transition-colors hover:bg-surface-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            size === 'sm' ? 'h-8 rounded-[10px] pl-3 text-[13px]' : 'h-10 rounded-xl pl-3.5 text-sm',
+            // celular: 16 px (sem o zoom do iPhone ao abrir) e o sm com 40 px de altura de toque
+            size === 'sm' ? 'h-10 rounded-[10px] pl-3 text-base sm:h-8 sm:text-[13px]' : 'h-10 rounded-xl pl-3.5 text-base sm:text-sm',
             className,
           )}
           {...rest}

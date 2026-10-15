@@ -41,8 +41,8 @@ export function AdminLogin({ onEntrar, aviso }: { onEntrar: () => void; aviso?: 
   return (
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <Fundo />
-      <div className="relative flex items-center justify-between px-4 py-4 sm:px-6">
-        <a href={urlPublica('/')} className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] font-medium text-fg-muted hover:text-fg">
+      <div className="relative flex items-center justify-between px-4 py-2 sm:px-6 sm:py-4">
+        <a href={urlPublica('/')} className="-ml-1.5 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1.5 text-[13.5px] font-medium text-fg-muted hover:text-fg">
           <Icon name="seta-esquerda" size={16} />
           Voltar ao site
         </a>
@@ -85,7 +85,7 @@ export function AdminLogin({ onEntrar, aviso }: { onEntrar: () => void; aviso?: 
                 aria-invalid={erro ? true : undefined}
                 aria-describedby={erro ? 'admin-senha-erro' : __DEMO__ ? 'admin-senha-dica' : undefined}
                 className={cn(
-                  'h-12 w-full rounded-xl border bg-surface-2 pl-4 pr-24 text-[15px] text-fg placeholder:text-fg-subtle',
+                  'h-12 w-full rounded-xl border bg-surface-2 pl-4 pr-24 text-base text-fg placeholder:text-fg-subtle',
                   'transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/45',
                   erro ? 'border-alert/60' : 'border-line focus-visible:border-brand/60',
                 )}

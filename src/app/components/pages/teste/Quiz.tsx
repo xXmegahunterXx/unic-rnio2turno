@@ -86,18 +86,23 @@ export function Quiz({ seed, ids, inicial, onProgresso, onConcluir, onSair, selo
   }, [respostas, importantes, idx, onProgresso]);
 
   // A cada afirmação nova: foco no texto (leitores de tela) e, se o topo do quiz saiu da tela, volta para ele.
+  // No celular, também quando o pé do quiz (escala, "pesa mais", "Pular") ficaria atrás da tab bar: acontece quando há
+  // algo acima dele na página (a faixa de anúncio do topo, que no celular rola com a página) — o quiz sobe até encostar
+  // no cabeçalho e ocupa exatamente a altura útil. Vale também ao abrir (1ª pintura), sem animação.
   useEffect(() => {
-    if (primeiraPintura.current) {
-      primeiraPintura.current = false;
-      return;
-    }
-    titulo.current?.focus({ preventScroll: true });
+    const primeira = primeiraPintura.current;
+    primeiraPintura.current = false;
+    if (!primeira) titulo.current?.focus({ preventScroll: true });
     const el = topo.current;
     if (!el) return;
     const headerH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 56;
-    const y = el.getBoundingClientRect().top;
-    if (y < headerH - 1 || y > window.innerHeight * 0.4) {
-      window.scrollTo({ top: Math.max(0, window.scrollY + y - headerH - 4), behavior: reduzir ? 'auto' : 'smooth' });
+    const r = el.getBoundingClientRect();
+    // limite de baixo: onde começa a tab bar do celular (a altura dela já inclui a área segura do iPhone). Conta mesmo se
+    // ela estiver recolhida pela rolagem: perto do topo da página ela volta.
+    const tab = window.innerWidth < 768 ? document.querySelector<HTMLElement>('nav.barra-tab') : null;
+    const pePassa = !!tab && r.bottom > window.innerHeight - tab.offsetHeight + 1 && r.top > headerH + 4;
+    if (primeira ? pePassa : r.top < headerH - 1 || r.top > window.innerHeight * 0.4 || pePassa) {
+      window.scrollTo({ top: Math.max(0, window.scrollY + r.top - headerH - 4), behavior: reduzir || primeira ? 'auto' : 'smooth' });
     }
   }, [idx, reduzir]);
 

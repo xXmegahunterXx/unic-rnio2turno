@@ -100,7 +100,11 @@ function BarraRodapeMovel({ anuncio, vista, onFechar }: { anuncio: AnuncioPublic
       // logo acima da tab bar (60 px + área segura), abaixo dos diálogos (z-70) e da tab bar (z-50)
       className="fixed inset-x-0 bottom-[calc(60px+env(safe-area-inset-bottom))] z-40 px-2 pb-2 md:hidden"
     >
-      <BarraRodapePeca anuncio={anuncio} vista={vista} onFechar={onFechar} className="mx-auto max-w-md" />
+      {/* barra-anuncio-desloc (styles.css): quando a tab bar sai ao rolar para baixo, a barra desce para o pé da tela
+          e continua à vista; com o teclado aberto ela sai (src/app/lib/barrasMoveis.ts) */}
+      <div className="barra-anuncio-desloc">
+        <BarraRodapePeca anuncio={anuncio} vista={vista} onFechar={onFechar} className="mx-auto max-w-md" />
+      </div>
     </motion.div>
   );
 }
@@ -132,7 +136,7 @@ export function BarraRodapePeca({
       {/* rótulo na borda de cima: sempre visível, sem tirar espaço da marca e do título */}
       <span
         aria-hidden
-        className="pointer-events-none absolute -top-2 left-3 inline-flex h-4 items-center rounded-full border border-line bg-surface px-1.5 text-[9px] font-bold uppercase leading-none tracking-[0.12em] text-fg-subtle"
+        className="pointer-events-none absolute -top-2 left-3 inline-flex h-4 items-center rounded-full border border-line bg-surface px-1.5 text-[10px] font-bold uppercase leading-none tracking-[0.1em] text-fg-muted"
       >
         Publicidade
       </span>

@@ -166,8 +166,8 @@ function ForaDoAr({ erro, onTentar, tentando }: { erro: string; onTentar: () => 
   return (
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <Fundo />
-      <div className="relative flex items-center justify-between px-4 py-4 sm:px-6">
-        <a href={urlPublica('/')} className="inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-[13px] font-medium text-fg-muted hover:text-fg">
+      <div className="relative flex items-center justify-between px-4 py-2 sm:px-6 sm:py-4">
+        <a href={urlPublica('/')} className="-ml-1.5 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1.5 text-[13.5px] font-medium text-fg-muted hover:text-fg">
           <Icon name="seta-esquerda" size={16} />
           Voltar ao site
         </a>

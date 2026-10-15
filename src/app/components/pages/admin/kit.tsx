@@ -167,7 +167,8 @@ export function SepV({ className }: { className?: string }) {
 // ---- formulários -------------------------------------------------------------------------------------
 
 const inputBase =
-  'w-full rounded-xl border border-line bg-surface-2 px-3.5 text-sm text-fg placeholder:text-fg-subtle ' +
+  // 16 px no celular: o iPhone dá zoom na página ao focar campo com texto menor
+  'w-full rounded-xl border border-line bg-surface-2 px-3.5 text-base sm:text-sm text-fg placeholder:text-fg-subtle ' +
   'transition-colors hover:border-line/[2] focus-visible:border-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 ' +
   'disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -196,7 +197,7 @@ export function Campo({ rotulo, dica, erro, sufixo, mono, className, wrapperClas
           id={cid}
           aria-invalid={erro ? true : undefined}
           aria-describedby={dica || erro ? `${cid}-d` : undefined}
-          className={cn(inputBase, 'h-10', mono && 'font-mono text-[13px]', sufixo && 'pr-12', erro && 'border-alert/60', className)}
+          className={cn(inputBase, 'h-10', mono && 'font-mono sm:text-[13px]', sufixo && 'pr-12', erro && 'border-alert/60', className)}
           {...rest}
         />
         {sufixo ? (
