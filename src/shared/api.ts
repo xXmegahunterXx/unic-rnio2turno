@@ -15,6 +15,13 @@
  *   GET  /api/og/apuracao.png?race=pres                     → imagem 1200×630 para link preview
  *   GET  /api/patrocinio/logo?h=<hash>                      → logo do patrocínio enviada em data URI (no /api/status,
  *                                                             `patrocinio.imagem` vem como esta URL absoluta)
+ *   GET  /api/anuncio/img?h=<hash>                          → logo/peça de um anúncio (cache longo; no /api/status, as
+ *                                                             imagens dos anúncios vêm como esta URL)
+ *   GET  /api/anuncio/ir/:id?f=<formato>                    → conta o clique (agregado) e redireciona (302) para o
+ *                                                             destino com UTM (urlComUtm)
+ *   POST /api/anuncio/evento   { id, formato }              → conta uma impressão VISÍVEL (agregada, sem dado pessoal;
+ *                                                             204; limitada por visitante)
+ *   GET  /api/admin/anuncios/metricas                       → { metricas: MetricaAnuncio[]; desde: number }
  *
  *   POST /api/admin/login            { senha }                → { ok: true } + cookie httpOnly
  *   POST /api/admin/logout
@@ -27,6 +34,7 @@
  *
  * `:race` = RaceId ('pres', 'gov-df', 'pres-t1', 'gov-df-t1', ...). UF e race em minúsculas na URL.
  */
+import type { AnuncioConfig, ContatoAnuncie } from './anuncios';
 import type {
   AdminMetrics,
   AdminState,
@@ -71,8 +79,15 @@ export type AdminCommand =
   | { tipo: 'tse'; tse: Partial<TseConfig> }
   /** Mostra (true) ou oculta (false, padrão) os nomes reais dos candidatos na fonte 'simulacao'. */
   | { tipo: 'nomes-reais'; ativo: boolean }
-  /** Define (ou remove, com null) o patrocínio exibido no site. */
+  /** Define (ou remove, com null) o patrocínio exibido no site. LEGADO: vira/atualiza o anúncio master. */
   | { tipo: 'patrocinio'; patrocinio: Patrocinio | null }
+  /** Cria ou substitui (pelo id) um anúncio — src/shared/anuncios.ts (validaAnuncio). */
+  | { tipo: 'anuncio-salvar'; anuncio: AnuncioConfig }
+  | { tipo: 'anuncio-remover'; id: string }
+  /** Liga/desliga um anúncio sem apagar. */
+  | { tipo: 'anuncio-ativo'; id: string; ativo: boolean }
+  /** Contato da página /anuncie (null limpa). */
+  | { tipo: 'anuncie-contato'; contato: ContatoAnuncie | null }
   /**
    * Troca automática 'pre' → 'tse' (executada pelo servidor; ver `TrocaAutoEstado`):
    *  - 'ligar' (rearma: vale de novo mesmo se já foi feita) · 'desligar';

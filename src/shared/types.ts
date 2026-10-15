@@ -9,6 +9,8 @@
  *    (brancos e nulos não entram). Brancos/nulos são % do comparecimento. Abstenção é % do eleitorado.
  */
 
+import type { AnuncioConfig, AnuncioPublico, ContatoAnuncie } from './anuncios';
+
 export const UFS = [
   'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR',
   'RJ', 'RN', 'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO',
@@ -290,8 +292,12 @@ export interface LiveStatus {
   anonimizado?: boolean;
   /** Visitantes ativos estimados agora (só no servidor; ausente no demo — nunca inventar número). */
   pessoasAgora?: number;
-  /** Patrocínio exibido no site (anunciante NÃO político), configurado no admin. */
+  /** Patrocínio exibido no site (anunciante NÃO político), configurado no admin. LEGADO: derivado do anúncio master. */
   patrocinio?: Patrocinio | null;
+  /** Anúncios no ar (ativos e dentro da janela), com os formatos de cada um — src/shared/anuncios.ts. */
+  anuncios?: AnuncioPublico[];
+  /** Contato da página /anuncie (configurado no admin). */
+  anuncie?: ContatoAnuncie | null;
 }
 
 /** Patrocínio/anúncio institucional (nunca político — ARCHITECTURE §1.5). */
@@ -365,8 +371,12 @@ export interface AdminState {
   tse: TseConfig;
   /** Mostrar os nomes reais dos candidatos durante a SIMULAÇÃO (padrão false = "Candidato A/B"). Uso interno. */
   nomesReais?: boolean;
-  /** Patrocínio ativo (null/ausente = nenhum). */
+  /** Patrocínio ativo (null/ausente = nenhum). LEGADO: no carregamento vira um anúncio (ver `anuncios`). */
   patrocinio?: Patrocinio | null;
+  /** Anunciantes cadastrados (src/shared/anuncios.ts). */
+  anuncios?: AnuncioConfig[];
+  /** Contato da página /anuncie. */
+  anuncie?: ContatoAnuncie | null;
   /** Troca automática 'pre' → 'tse' no início da apuração (ausente = padrão: ligada, horário do servidor). */
   trocaAuto?: TrocaAutoEstado;
 }
