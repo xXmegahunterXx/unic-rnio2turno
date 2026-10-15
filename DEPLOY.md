@@ -300,8 +300,10 @@ Mudou só a senha ou outra variável do servidor (não de build)? Basta
 /opt/sintonia/deploy/auto-update.sh ligar      # desligar: … desligar · ver: … estado
 ```
 
-A cada 5 minutos a VPS confere o GitHub e, se houver versão nova, roda o `update.sh` acima (com ensaio e volta
-automática). Um commit que falhou não é tentado de novo até chegar outro. **Congelada na noite da eleição**: de
+A cada 5 minutos a VPS confere o GitHub e, se houver versão nova **marcada para produção** (commit com `[deploy]` na
+mensagem — os commits intermediários, de trabalho em andamento, nunca vão ao ar sozinhos), roda o `update.sh` acima
+até ela (com ensaio e volta automática). Para atualizar à mão até a última versão marcada:
+`/opt/sintonia/deploy/auto-update.sh rodar` (o `update.sh` sozinho vai até a ponta do branch). Um commit que falhou não é tentado de novo até chegar outro. **Congelada na noite da eleição**: de
 25/10 12:00 a 26/10 06:00 (Brasília) nada atualiza sozinho — mude com `AUTO_CONGELAR_DE` / `AUTO_CONGELAR_ATE`
 (ISO 8601) no `.env`. Registro em `/var/log/sintonia-auto-update.log`.
 

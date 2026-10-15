@@ -8,6 +8,9 @@
 #   sudo /opt/sintonia/deploy/auto-update.sh estado      ligado?, última conferência, último resultado
 #   sudo /opt/sintonia/deploy/auto-update.sh rodar       uma conferência agora (é o que o cron chama)
 #
+# Só publica versões MARCADAS: o commit mais novo do GitHub com "[deploy]" na mensagem (commits intermediários,
+# de trabalho em andamento, nunca vão ao ar sozinhos).
+#
 # Segurança:
 #   - CONGELAMENTO na noite da eleição: entre AUTO_CONGELAR_DE e AUTO_CONGELAR_ATE (padrão: 25/10/2026 12:00 até
 #     26/10/2026 06:00, Brasília) nada é atualizado sozinho — só à mão com update.sh. Mude no .env se precisar.
@@ -70,7 +73,8 @@ CRON
       exit 0
     fi
     local_=$(gitr rev-parse HEAD)
-    remoto=$(gitr rev-parse '@{u}' 2>/dev/null || true)
+    # só versões MARCADAS para produção: o commit mais novo com "[deploy]" na mensagem (os intermediários não vão ao ar)
+    remoto=$(gitr log --format=%H --grep='\[deploy\]' -n 1 'HEAD..@{u}' 2>/dev/null || true)
     [[ -n $remoto && $local_ != "$remoto" ]] || exit 0
     # só avança (fast-forward); histórico divergente fica para quem cuida à mão
     if ! gitr merge-base --is-ancestor "$local_" "$remoto"; then
@@ -82,7 +86,7 @@ CRON
       exit 0
     fi
     registrar "versão nova $curto: atualizando"
-    if "$DIR_DEPLOY/update.sh" >>"$LOG" 2>&1; then
+    if SINTONIA_ALVO="$remoto" "$DIR_DEPLOY/update.sh" >>"$LOG" 2>&1; then
       rm -f "$DIR_ESTADO/falhou"
       registrar "no ar: $(commit_atual)"
     else

@@ -93,7 +93,8 @@ if [[ -n $PULL ]]; then
     morrer "Há arquivos do repositório alterados nesta máquina (acima). Guarde-os (git stash) ou desfaça (git checkout -- <arquivo>) e rode de novo."
   fi
   gitr fetch --quiet --prune
-  if ! gitr merge --ff-only --quiet '@{u}' 2>/dev/null; then
+  # SINTONIA_ALVO: avança só até este commit (a atualização automática usa para publicar só versões marcadas)
+  if ! gitr merge --ff-only --quiet "${SINTONIA_ALVO:-@{u\}}" 2>/dev/null; then
     morrer "Não deu para avançar o código só com 'fast-forward' (histórico divergente). Veja: cd $RAIZ && git status"
   fi
   DEPOIS="$(commit_atual)"
