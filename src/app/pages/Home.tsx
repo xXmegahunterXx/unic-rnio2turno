@@ -1,12 +1,16 @@
 /**
  * Home (/): primeira impressão — pensada para quem chega do X no celular (muitas vezes no navegador embutido).
  *
- *  - Hero (1ª dobra, no chunk da página): título, contagem regressiva para as 17h de 25/10 (vira "AO VIVO" com o
- *    placar compacto), as três entradas (Teste Cego · sua cidade/seção · Apuração), Lembrar e Compartilhar.
+ *  - Hero (1ª dobra, no chunk da página): título e o confronto — as fotos oficiais de quem disputa, com o resultado
+ *    oficial do 1º turno e a contagem regressiva para as 17h de 25/10 (vira o placar do 2º turno ao vivo) —, e as
+ *    entradas (Teste Cego · Apuração · sua cidade/seção), Lembrar e Compartilhar.
  *  - Abaixo da dobra (chunk próprio, baixado quando o navegador fica ocioso e montado perto da tela): Curiosidades,
  *    entradas da Apuração e do Teste, "E se…?", governadores, sua seção, faixa final e confiança.
  *
  * Neutralidade: corridas via `useRace` (anônimas na simulação), ordem da urna, cores por slot.
+ *
+ * Estrutura em SEÇÕES irmãs (hero · abaixo da dobra): blocos de publicidade entram ENTRE seções, nunca dentro do hero
+ * (que tem placar, fotos e nomes de candidatos).
  */
 import { lazy, Suspense, useEffect } from 'react';
 import { useAnonimizado, useNacional, useRace, useStatus } from '@/app/data/hooks';
@@ -25,6 +29,8 @@ export default function Home() {
   const status = statusQ.data;
   const anonimizado = useAnonimizado();
   const race = useRace('pres');
+  // Antes das 17h o hero mostra o resultado oficial do 1º turno (os números vêm do `meta`, já pré-carregado).
+  const raceT1 = useRace('pres-t1');
   const q = useNacional('pres');
   const resumo = q.data && q.data.race === 'pres' ? q.data.resumo : undefined;
   const [sentinela, perto] = useNaTela<HTMLDivElement>('700px');
@@ -48,7 +54,7 @@ export default function Home() {
 
   return (
     <>
-      <HeroHome status={status} recebidoEm={statusQ.dataUpdatedAt} race={race} resumo={resumo} anonimizado={anonimizado} />
+      <HeroHome status={status} recebidoEm={statusQ.dataUpdatedAt} race={race} raceT1={raceT1} resumo={resumo} anonimizado={anonimizado} />
       <Container>
         <div ref={sentinela} className="min-h-[60vh]">
           {perto ? (

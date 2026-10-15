@@ -19,14 +19,16 @@
  *   - todos os snapshots aceitam `t` (epoch ms, "reveja a noite"), limitado a [16:59:30, agora];
  *   - `await ctrl.carregaLocais(uf)` antes de zona/seção traz `local` (escola/endereço) em cada seção; sem ele, a
  *     1ª consulta da UF dispara o carregamento em segundo plano;
- *   - comando 'patrocinio' (validado por `validaPatrocinio`), `status().patrocinio`.
+ *   - anúncios (src/shared/anuncios.ts): comandos 'anuncio-salvar' | 'anuncio-remover' | 'anuncio-ativo' |
+ *     'anuncie-contato'; `status().anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`), com o link já com UTM;
+ *     o comando legado 'patrocinio' vira o anúncio master 'patrocinio' e `status().patrocinio` é derivado dele.
  *
  * Fonte 'tse': o controller só guarda a escolha e `state.tse`; o servidor intercepta as rotas de apuração.
  * Nas fontes 'pre'/'tse' o controller responde o 2º turno em 0% ("aguardando") e o 1º turno (-t1) normal.
  * Mudança de cenário/preset reconstrói o modelo de forma síncrona (~0,5 s) mantendo o simNow.
  */
 export * from './api';
-export { loadDataset, createController, ENCERRAMENTO_MS, MARCOS_PCT } from './controller';
+export { loadDataset, createController, anuncioPublico, anuncioDoLegado, patrocinioLegado, ENCERRAMENTO_MS, MARCOS_PCT } from './controller';
 export {
   buildStructure,
   forEachFaixa,
@@ -68,6 +70,10 @@ export {
   parseAdminState,
   validaPatrocinio,
   PATROCINIO_LIMITES,
+  anuncioDoPatrocinio,
+  normalizaAnuncio,
+  parseAnunciosSalvos,
+  ID_PATROCINIO,
   serializeAdminState,
   simNowDe,
   tsePadrao,

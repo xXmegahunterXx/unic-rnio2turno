@@ -11,7 +11,8 @@
  * Encerramento (SIGTERM/SIGINT): /readyz passa a 503 e as respostas saem com `Connection: close` (por até 2 s ainda
  * aceitando pedidos: os clientes keep-alive fecham depois da resposta, sem reset); depois o servidor para de aceitar
  * conexões, espera as requisições em andamento (até ENCERRAMENTO_SEG, padrão 8 s, no total), fecha as que sobrarem,
- * para o polling do TSE e grava o estado pendente. Sai com código 0 (ou 1 se passar de ENCERRAMENTO_SEG + 5 s).
+ * para o polling do TSE e grava o estado pendente (e as métricas dos anúncios). Sai com código 0 (ou 1 se passar de
+ * ENCERRAMENTO_SEG + 5 s).
  */
 import { unwatchFile, watchFile } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -75,7 +76,12 @@ async function main() {
 
   // ---- HTTP ----------------------------------------------------------------------------------------
   // createApp aplica as travas (estado salvo em simulação sem ALLOW_SIMULACAO → 'pre') antes de ligar o TSE
-  const sintonia = createApp({ config, dataset: ds, controller, tse, log });
+  // métricas agregadas dos anúncios: lidas na subida, gravadas (atômico) a cada 60 s e no encerramento
+  const metricasAnunciosStore = createJsonStore(config.stateDir, 'anuncios-metricas.json', {
+    debounceMs: 0,
+    onErro: (e) => log.erro('Falha ao salvar as métricas dos anúncios', e),
+  });
+  const sintonia = createApp({ config, dataset: ds, controller, tse, log, metricasAnunciosStore });
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
   sintonia.agendador.iniciar();
@@ -140,6 +146,7 @@ async function main() {
   const resumo = setInterval(() => {
     const r = sintonia.resumoMinuto();
     if (r) log.info(r.msg, r.campos);
+    void sintonia.persistirMetricasAnuncios();
   }, 60_000);
   resumo.unref();
 
@@ -187,6 +194,7 @@ async function main() {
       // só grava o que estiver pendente: o estado já é salvo a cada comando, e regravar aqui poderia
       // sobrescrever um estado mais novo escrito por outra instância no mesmo STATE_DIR
       await store.flush();
+      await sintonia.persistirMetricasAnuncios();
     } catch (e) {
       log.erro('Erro ao gravar o estado no encerramento', e);
     }

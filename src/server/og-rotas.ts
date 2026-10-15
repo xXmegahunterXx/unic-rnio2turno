@@ -18,6 +18,8 @@
  *
  * Cache (ServicoOg): chave = rota normalizada; "versão|modo" = versão do admin + fonte/anonimização (ao vivo, 30 s
  * frescas e até 5 min vencidas do mesmo modo) ou versão dos arquivos de dados (estáticas: valem até o dado mudar).
+ * Anúncio com o formato 'compartilhamento' no ar: faixa "Oferecimento: <marca>" no pé (og-oferecimento.ts) e o
+ * conjunto de anunciantes entra no modo (`tagOferecimento`): trocar o anunciante espera a imagem nova.
  * Parâmetros validados (zod); textos enormes nunca chegam ao decodificador.
  */
 import type { Context, Hono } from 'hono';
@@ -38,6 +40,7 @@ import type { PacotesFotos } from './fotos';
 import { casaEtag, etagFraco, hashCurto } from './http-cache';
 import type { Logger } from './log';
 import { layoutPlacar, layoutTeste, renderPng, type No } from './og';
+import { comOferecimento, oferecimentoDe, tagOferecimento } from './og-oferecimento';
 import {
   layoutCalculadora,
   layoutCandidato,
@@ -150,6 +153,19 @@ export function registrarOg(app: App, d: DepsOg): void {
   const { dados, races, fotos, estaticos, log, servico } = d;
   const dominio = d.dominio ?? undefined;
 
+  /** Conjunto de anunciantes das imagens ('' = nenhum; '|of…' entra no modo do cache). */
+  const tagOf = (st: Pick<LiveStatus, 'anuncios'> = dados.status()) => {
+    const t = tagOferecimento(st.anuncios);
+    return t ? `|${t}` : '';
+  };
+  /** "versão|modo" das imagens ao vivo. */
+  const subVivo = (st: LiveStatus) => `${st.versao}|${modoOg(st)}${tagOf(st)}`;
+  /** Cartão com a faixa "Oferecimento: <marca>" quando há anúncio de compartilhamento no ar. */
+  const comOf = (no: No, chave: string): No => {
+    const of = oferecimentoDe(dados.status().anuncios, chave);
+    return of ? comOferecimento(no, of.marca) : no;
+  };
+
   /** PNG com ETag (rota + versão|modo + instante da geração), 304 e CORS (robôs de outras origens). */
   const enviarPng = (c: Ctx, chave: string, s: OgServida, cc: string) => {
     const etag = etagFraco('og', hashCurto(chave), hashCurto(s.sub), s.em.toString(36));
@@ -165,9 +181,10 @@ export function registrarOg(app: App, d: DepsOg): void {
     return responder(c, c.req.method === 'HEAD' ? null : s.png, headers);
   };
 
-  const gerar = async (rotulo: string, no: () => Promise<No> | No, sub: string, headers?: Record<string, string>): Promise<OgPronta> => {
+  /** Gera o PNG do cartão `chave` (rótulo do log: a chave, salvo quando ela traz dado do visitante). */
+  const gerar = async (chave: string, no: () => Promise<No> | No, sub: string, headers?: Record<string, string>, rotulo = chave): Promise<OgPronta> => {
     const t0 = perf();
-    const png = await renderPng(await no());
+    const png = await renderPng(comOf(await no(), chave));
     log.info(`OG ${rotulo} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB)`);
     return { png, sub, headers };
   };
@@ -186,19 +203,29 @@ export function registrarOg(app: App, d: DepsOg): void {
     const st = dados.status();
     const s = await obterLimitado(c, {
       chave,
-      sub: `${st.versao}|${modoOg(st)}`,
+      sub: subVivo(st),
       ttlMs: OG_TTL_MS,
       staleMs: OG_STALE_MS,
       montar: () => montar(dados.status()),
-      modoAtual: () => modoOg(dados.status()),
+      modoAtual: () => {
+        const agora = dados.status();
+        return `${modoOg(agora)}${tagOf(agora)}`;
+      },
     });
     return enviarPng(c, chave, s, CC_OG.vivo);
   };
 
   /** Imagem estática (dado oficial): vale enquanto a versão dos dados (e o modo, se houver) não mudar. */
   const estatica = async (c: Ctx, chave: string, versao: string, modo: string, montar: (sub: string) => Promise<OgPronta>, modoAtual?: () => string) => {
-    const sub = `${versao}|${modo}`;
-    const s = await obterLimitado(c, { chave, sub, ttlMs: Infinity, staleMs: Infinity, montar: () => montar(sub), modoAtual });
+    const sub = `${versao}|${modo}${tagOf()}`;
+    const s = await obterLimitado(c, {
+      chave,
+      sub,
+      ttlMs: Infinity,
+      staleMs: Infinity,
+      montar: () => montar(sub),
+      modoAtual: () => `${modoAtual ? modoAtual() : modo}${tagOf()}`,
+    });
     return enviarPng(c, chave, s, CC_OG.estatica);
   };
 
@@ -247,22 +274,25 @@ export function registrarOg(app: App, d: DepsOg): void {
       // foto oficial só com número real: nunca na simulação (nem com os nomes reais ligados no admin)
       const fotosPlacar = simulacao ? undefined : fotosOg(raceOg, anon);
       const png = await renderPng(
-        layoutPlacar({
-          // simulação anônima: nada de nome nem foto real em imagem com números fictícios
-          race: exibir(raceOg, anon),
-          uf,
-          resumo,
-          simulacao,
-          horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
-          pre,
-          fotos: fotosPlacar,
-        }),
+        comOf(
+          layoutPlacar({
+            // simulação anônima: nada de nome nem foto real em imagem com números fictícios
+            race: exibir(raceOg, anon),
+            uf,
+            resumo,
+            simulacao,
+            horario: simulacao ? snap.simNow : fonteTse ? (resumo.ultimaAtualizacao ?? snap.geradoEm) : snap.geradoEm,
+            pre,
+            fotos: fotosPlacar,
+          }),
+          chave,
+        ),
       );
       log.info(
         `OG ${r.id}${uf ? `/${uf}` : ''} gerada em ${Math.round(perf() - t0)} ms (${Math.round(png.length / 1024)} KB` +
           `${fotosPlacar ? ', com fotos oficiais' : ''})`,
       );
-      return { png, sub: `${st.versao}|${modoOg(st)}`, headers: { 'x-og-fotos': fotosPlacar ? '1' : '0' } };
+      return { png, sub: subVivo(st), headers: { 'x-og-fotos': fotosPlacar ? '1' : '0' } };
     });
   });
 
@@ -310,7 +340,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       const modo = `t1${st.anonimizado ? '-anon' : ''}`;
       return estatica(c, chave, d.versaoDataset, modo, (sub) => montar(dados.status(), sub), () => `t1${dados.status().anonimizado ? '-anon' : ''}`);
     }
-    return vivo(c, chave, (stM) => montar(stM, `${stM.versao}|${modoOg(stM)}`));
+    return vivo(c, chave, (stM) => montar(stM, subVivo(stM)));
   });
 
   // ---- seção (boletim de urna) ----------------------------------------------------------------------
@@ -365,7 +395,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       const modo = `t1${st.anonimizado ? '-anon' : ''}`;
       return estatica(c, chave, d.versaoDataset, modo, (sub) => montar(dados.status(), sub), () => `t1${dados.status().anonimizado ? '-anon' : ''}`);
     }
-    return vivo(c, chave, (stM) => montar(stM, `${stM.versao}|${modoOg(stM)}`));
+    return vivo(c, chave, (stM) => montar(stM, subVivo(stM)));
   });
 
   // ---- ficha do candidato (dado real) ---------------------------------------------------------------
@@ -499,7 +529,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       const modo = `t1${st.anonimizado ? '-anon' : ''}`;
       return estatica(c, chave, d.versaoDataset, modo, (sub) => montar(dados.status(), sub), () => `t1${dados.status().anonimizado ? '-anon' : ''}`);
     }
-    return vivo(c, chave, (stM) => montar(stM, `${stM.versao}|${modoOg(stM)}`));
+    return vivo(c, chave, (stM) => montar(stM, subVivo(stM)));
   });
 
   // ---- curiosidades (dado real) ---------------------------------------------------------------------
@@ -545,23 +575,33 @@ export function registrarOg(app: App, d: DepsOg): void {
     const chave = `cen|${codificarCenario(cenario)}`;
     return estatica(c, chave, lido.versao, 'estatico', (sub) =>
       gerar(
-        'cenário',
+        chave,
         () => {
           const resultado = calcularCenario(lido.valor, cenario);
           const premissas = premissasCenario(lido.valor, cenario, resultado, { nomesCurtos: true });
           return layoutCenario({ ds: lido.valor, cenario, resultado, premissas, dominio });
         },
         sub,
+        undefined,
+        'cenário',
       ),
     );
   });
 
   // ---- Teste Cego (genérico) ------------------------------------------------------------------------
-  let ogTeste: Promise<Buffer> | null = null;
+  /** Uma imagem por conjunto de anunciantes (sem nenhum: a de sempre). */
+  let ogTeste: { tag: string; png: Promise<Buffer> } | null = null;
   app.get('/api/og/teste.png', async (c) => {
-    ogTeste ??= renderPng(layoutTeste());
-    ogTeste.catch(() => (ogTeste = null));
-    const png = await ogTeste;
+    const tag = tagOf();
+    if (ogTeste?.tag !== tag) {
+      const pr = renderPng(comOf(layoutTeste(), 'teste'));
+      const atual = { tag, png: pr };
+      ogTeste = atual;
+      pr.catch(() => {
+        if (ogTeste === atual) ogTeste = null;
+      });
+    }
+    const png = await ogTeste.png;
     return responder(c, c.req.method === 'HEAD' ? null : png, {
       'content-type': 'image/png',
       'cache-control': CC_OG.teste,

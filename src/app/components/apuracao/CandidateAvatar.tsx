@@ -4,12 +4,13 @@
  * Quem decide se há foto é quem chama, via `useFotosRace` (./fotos.ts): nunca na simulação anonimizada, e só
  * quando os dois finalistas têm foto (mesmo tratamento para todos — ARCHITECTURE §1.1).
  * CandidateName: nome de urna + partido/número/vice.
+ * CandidateRetrato: retrato grande (hero), foto inteira em quadro 4:5 com anel e brilho na cor do slot.
  */
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Candidate, CorCandidato } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
-import { corSlot } from '@/app/lib/raceUi';
+import { corSlot, rgbSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 
 const TITULOS = new Set([
@@ -168,6 +169,101 @@ export function CandidateName({
       {meta ? <span className="num mt-1 whitespace-nowrap text-[12.5px] leading-tight text-fg-muted">{meta}</span> : null}
       {showVice && candidato.vice ? (
         <span className="mt-0.5 max-w-full truncate text-[12.5px] leading-tight text-fg-muted">Vice: {candidato.vice}</span>
+      ) : null}
+    </span>
+  );
+}
+
+// ── Retrato grande (hero) ─────────────────────────────────────────────────────────────────────────
+
+export interface CandidateRetratoProps {
+  /** Candidato (usa nomeUrna e cor) — ou passe `nome` + `cor`. */
+  candidato?: Pick<Candidate, 'nomeUrna' | 'cor'>;
+  nome?: string;
+  cor?: CorCandidato;
+  /**
+   * Foto oficial (data URI). Ausente/nula → monograma no MESMO quadro. Quem chama aplica as regras (`useFotosRace` ou
+   * `useFotosHero`): nunca na simulação anonimizada nem ao lado de número simulado, e tudo ou nada entre os finalistas.
+   */
+  foto?: string | null;
+  /** As fotos ainda podem chegar: quadro neutro (sem o monograma "piscar" antes da foto). */
+  carregando?: boolean;
+  /** Selo de check (eleito). */
+  eleito?: boolean;
+  /** Atenua. */
+  dim?: boolean;
+  /** Brilho suave na cor do slot atrás do quadro. Padrão true. */
+  brilho?: boolean;
+  /** Tamanho do monograma (o quadro acompanha a largura do pai). */
+  monogramaClassName?: string;
+  className?: string;
+}
+
+/**
+ * Retrato GRANDE do candidato (hero da Home, topo da apuração antes das 17h): a foto oficial num quadro 4:5 de cantos
+ * arredondados — só recorte mínimo (object-cover) e redimensionamento, sem filtro nem sobreposição no rosto —, com
+ * anel em degradê e brilho suave na cor do slot (tokens via `rgbSlot`, nunca hex). Sem foto, o monograma no mesmo
+ * quadro. Mesmo tamanho e tratamento para todos; a largura vem do pai (o quadro mantém a proporção: sem layout shift).
+ */
+export function CandidateRetrato({
+  candidato,
+  nome,
+  cor,
+  foto,
+  carregando,
+  eleito,
+  dim,
+  brilho = true,
+  monogramaClassName = 'text-[52px] sm:text-[68px]',
+  className,
+}: CandidateRetratoProps) {
+  const n = candidato?.nomeUrna ?? nome ?? '?';
+  const c = candidato?.cor ?? cor ?? 'outros';
+  const s = corSlot(c);
+  const [falhou, setFalhou] = useState<string | null>(null);
+  const comFoto = !!foto && falhou !== foto;
+  return (
+    <span aria-hidden className={cn('relative isolate block aspect-[4/5] w-full select-none', dim && 'opacity-60', className)}>
+      {brilho ? (
+        <span
+          className="pointer-events-none absolute -inset-x-[26%] -inset-y-[18%] -z-10 opacity-70 dark:opacity-100"
+          style={{ background: `radial-gradient(closest-side, ${rgbSlot(c, 0.46)}, ${rgbSlot(c, 0.16)} 58%, ${rgbSlot(c, 0)})` }}
+        />
+      ) : null}
+      <span
+        className="block h-full w-full rounded-[24px] p-[3px] shadow-card"
+        style={{ backgroundImage: `linear-gradient(165deg, ${rgbSlot(c)} 0%, ${rgbSlot(c, 0.45)} 48%, ${rgbSlot(c, 0.9)} 100%)` }}
+      >
+        <span className="relative block h-full w-full overflow-hidden rounded-[21px] bg-surface-2">
+          {comFoto ? (
+            <img
+              src={foto!}
+              alt=""
+              draggable={false}
+              decoding="async"
+              onError={() => setFalhou(foto!)}
+              className="h-full w-full object-cover object-[50%_16%]"
+            />
+          ) : carregando ? (
+            <span className="absolute inset-0 animate-pulse bg-surface-3/70" />
+          ) : (
+            <span
+              className={cn(
+                'flex h-full w-full items-center justify-center font-display font-semibold leading-none tracking-[-0.04em]',
+                s.bgSoft,
+                s.text,
+                monogramaClassName,
+              )}
+            >
+              {iniciais(n)}
+            </span>
+          )}
+        </span>
+      </span>
+      {eleito ? (
+        <span className={cn('absolute -bottom-2 -right-2 inline-flex h-9 w-9 items-center justify-center rounded-full ring-[3px] ring-surface', s.bg, s.ink)}>
+          <Icon name="check" size={20} strokeWidth={3} />
+        </span>
       ) : null}
     </span>
   );

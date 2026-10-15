@@ -12,12 +12,17 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
-import type { AdminCommand, MetricasServidor, ServidorInfo } from '../shared/api';
+import type { AdminCommand, AdminSnapshot, MetricasServidor, ServidorInfo } from '../shared/api';
+import { FORMATOS_ANUNCIO, urlComUtm, type FormatoAnuncio } from '../shared/anuncios';
 import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
 import type { LoadedDataset, Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
+import { anuncioDoLegado } from '../engine/controller';
+import { LimiteJanela, MetricasAnuncios, TabelaAnuncios, ehRobo } from './anuncios';
+import { tagOferecimento } from './og-oferecimento';
+import type { JsonStore } from './state-store';
 import { COOKIE_SESSAO, LimiteTaxa, Sessoes, chaveCliente, senhaConfere } from './auth';
 import { motivoSemSimulacao, type ServerConfig } from './config';
 import { Dados, type InstanteNormalizado, type NivelApuracao } from './dados';
@@ -64,6 +69,11 @@ export interface AppDeps {
   now?: () => number;
   /** Conferência do feed antes da troca automática (testes); padrão: `tse.testar`. */
   verificarTse?: (tse: TseConfig) => Promise<{ ok: boolean; detalhe: string }>;
+  /**
+   * Onde gravar as métricas agregadas dos anúncios (STATE_DIR/anuncios-metricas.json): lidas na criação do app;
+   * `persistirMetricasAnuncios()` grava (main.ts: a cada 60 s e no encerramento). Ausente = só em memória.
+   */
+  metricasAnunciosStore?: JsonStore;
 }
 
 /** Permissions-Policy das páginas: nada de câmera, microfone, localização, pagamentos, USB nem "tópicos" de anúncio. */
@@ -85,6 +95,8 @@ export const CC = {
   historicoSemVersao: 'public, max-age=0, s-maxage=30, stale-while-revalidate=60',
   /** logo do patrocínio com o hash do conteúdo na URL */
   imutavel: 'public, max-age=86400, s-maxage=86400, immutable',
+  /** imagem de anúncio endereçada pelo hash do conteúdo (outra imagem = outra URL) */
+  anuncioImg: 'public, max-age=31536000, s-maxage=31536000, immutable',
   og: CC_OG.vivo,
   /** imagens de dado oficial/real (cargos, ficha, curiosidades, cenários, 1º turno) */
   ogEstatica: CC_OG.estatica,
@@ -134,6 +146,11 @@ export function sitemapXml(origem: string, lastmod?: string): string {
 export const MAX_URL = 8192;
 /** Corpo máximo de qualquer requisição (o admin tem limites menores por rota). */
 export const MAX_CORPO = 512 * 1024;
+/**
+ * Corpo máximo do POST /api/admin/command: o anúncio leva a logo (≤ 150 KB) e a peça (≤ 400 KB) em data URI
+ * (base64 ≈ 4/3 → ~750 KB). Só esta rota (com sessão de admin) passa de MAX_CORPO.
+ */
+export const MAX_CORPO_COMANDO = 1024 * 1024;
 
 /**
  * Content-Security-Policy das páginas: scripts só do próprio site + os scripts inline do index.html autorizados pelo
@@ -167,9 +184,25 @@ export function cspPagina(template: string, embed: boolean): string {
   ].join('; ');
 }
 
-/** Rotas "quentes" (polling e estáticos): log por amostragem. */
+/** Rotas "quentes" (polling, estáticos e os eventos/cliques dos anúncios): log por amostragem. */
 const ehQuente = (p: string) =>
-  p === '/api/status' || p.startsWith('/api/apuracao/') || p.startsWith('/assets/') || p.startsWith('/data/') || p.startsWith('/geo/');
+  p === '/api/status' ||
+  p.startsWith('/api/apuracao/') ||
+  p.startsWith('/api/anuncio/') ||
+  p.startsWith('/assets/') ||
+  p.startsWith('/data/') ||
+  p.startsWith('/geo/');
+
+/**
+ * Imagens enviadas pelo admin (logo SVG inclusive), abertas direto no navegador: nunca executam script nem carregam
+ * nada (vale para /api/anuncio/img e /api/patrocinio/logo).
+ */
+export const CSP_IMAGEM = "sandbox; default-src 'none'; style-src 'unsafe-inline'";
+
+/** Eventos de anúncio (impressões) contados por visitante por minuto; acima disso → 429. */
+export const EVENTOS_ANUNCIO_MIN = 60;
+/** Cliques contados por visitante por minuto (acima disso o redirecionamento acontece, mas não conta). */
+export const CLIQUES_ANUNCIO_MIN = 20;
 
 /** Host (com porta) bem formado; o resto vira null (não entra em URL absoluta nem no cache). */
 const hostValido = (h: string | undefined | null): string | null =>
@@ -438,7 +471,7 @@ export function createApp(deps: AppDeps) {
     try {
       if (c.req.url.length > MAX_URL) {
         c.res = c.json({ erro: 'Endereço longo demais.' }, 414, { 'cache-control': CC.privado });
-      } else if (Number(c.req.header('content-length') ?? 0) > MAX_CORPO) {
+      } else if (Number(c.req.header('content-length') ?? 0) > (path === '/api/admin/command' ? MAX_CORPO_COMANDO : MAX_CORPO)) {
         c.res = c.json({ erro: 'Corpo grande demais.' }, 413, { 'cache-control': CC.privado, connection: 'close' });
       } else {
         if (api) metricas.clientes.registrar(ipDe(c)); // vira 1 bit com sal (ClientesAtivos); o IP não é guardado
@@ -538,6 +571,17 @@ export function createApp(deps: AppDeps) {
   app.get('/robots.txt', (c) => c.text(robotsTxt(origemDe(c)), 200, { 'cache-control': 'public, max-age=3600, s-maxage=86400' }));
 
   // ---- API pública -------------------------------------------------------------------------------
+  // anúncios: imagens por hash e configs (links de destino) — atualizados quando a versão do admin muda
+  const anuncios = new TabelaAnuncios();
+  const sincAnuncios = (versao = controller.status().versao) => anuncios.sincronizar(versao, () => controller.state().anuncios);
+  const metricasAnuncios = new MetricasAnuncios(now);
+  if (deps.metricasAnunciosStore) {
+    const salvo = deps.metricasAnunciosStore.ler();
+    if (salvo && metricasAnuncios.carregar(salvo)) log.info(`Métricas dos anúncios restauradas de ${deps.metricasAnunciosStore.caminho}`);
+  }
+  const limiteEventos = new LimiteJanela(EVENTOS_ANUNCIO_MIN, 60_000, now);
+  const limiteCliques = new LimiteJanela(CLIQUES_ANUNCIO_MIN, 60_000, now);
+
   // logo do patrocínio em data URI sai do status (consultado por todos a cada poucos segundos) e vira uma URL
   // com o hash do conteúdo, servida por /api/patrocinio/logo com cache longo
   let logoMemo: { img: string; h: string; tipo: string; corpo: Buffer } | null = null;
@@ -557,19 +601,31 @@ export function createApp(deps: AppDeps) {
     return encerradoTse.v;
   };
 
-  /** LiveStatus público: + pessoas agora (estimativa arredondada), logo do patrocínio por URL e fase 'encerrada' no TSE. */
+  /**
+   * Anúncios e patrocínio (legado) para o site: imagens por URL (/api/anuncio/img?h=…, cache imutável) e links de clique
+   * contado (/api/anuncio/ir/<id>; o app acrescenta `?f=<formato>`). O patrocínio das telas antigas aponta para o mesmo
+   * anúncio (formato 'topo') e mantém a logo em /api/patrocinio/logo.
+   */
+  const anunciosParaSite = (st: LiveStatus, origem: string): Pick<LiveStatus, 'anuncios' | 'patrocinio'> => {
+    sincAnuncios(st.versao);
+    const out: Pick<LiveStatus, 'anuncios' | 'patrocinio'> = { anuncios: (st.anuncios ?? []).map((a) => anuncios.publico(a, origem)) };
+    const p = st.patrocinio;
+    const a = p ? anuncioDoLegado(st.anuncios) : undefined;
+    if (p && a) {
+      const { imagem: img, ...resto } = p;
+      const l = img?.startsWith('data:') ? logo(img) : null;
+      out.patrocinio = { ...resto, url: `${origem}/api/anuncio/ir/${encodeURIComponent(a.id)}?f=topo`, ...(l ? { imagem: `${origem}/api/patrocinio/logo?h=${l.h}` } : {}) };
+    } else out.patrocinio = null;
+    return out;
+  };
+
+  /** LiveStatus público: + pessoas agora (estimativa arredondada), anúncios com imagens por URL e fase 'encerrada' no TSE. */
   const statusPublico = (c: Ctx): LiveStatus => {
     const st = dados.status();
-    const out: LiveStatus = { ...st, pessoasAgora: metricas.pessoasAgora() };
+    const out: LiveStatus = { ...st, pessoasAgora: metricas.pessoasAgora(), ...anunciosParaSite(st, origemDe(c)) };
     if (st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado()) out.fase = 'encerrada';
     // troca automática esperando o TSE responder: aviso discreto (só se o admin não publicou um aviso próprio)
     if (!st.aviso && agendador.avisoPublico()) out.aviso = { nivel: 'info', texto: AVISO_AGUARDANDO_TSE };
-    const p = st.patrocinio;
-    if (p?.imagem?.startsWith('data:')) {
-      const l = logo(p.imagem);
-      const { imagem: _, ...semImagem } = p;
-      out.patrocinio = l ? { ...semImagem, imagem: `${origemDe(c)}/api/patrocinio/logo?h=${l.h}` } : semImagem;
-    }
     return out;
   };
 
@@ -587,11 +643,89 @@ export function createApp(deps: AppDeps) {
       'access-control-allow-origin': '*',
       'cross-origin-resource-policy': 'cross-origin',
       // SVG enviado pelo admin: aberto direto no navegador, nunca executa script nem carrega nada
-      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      'content-security-policy': CSP_IMAGEM,
+      'x-content-type-options': 'nosniff',
     };
     if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
     return responder(c, c.req.method === 'HEAD' ? null : l.corpo, 200, headers);
   });
+
+  // ---- anúncios: imagem, clique e impressão ---------------------------------------------------------
+  /** Logo/peça de um anúncio pelo hash do conteúdo (cadastrado, no ar ou não). */
+  app.get('/api/anuncio/img', (c) => {
+    const h = c.req.query('h') ?? '';
+    if (!/^[a-f0-9]{8,64}$/.test(h)) throw new ErroValidacao('Use /api/anuncio/img?h=<hash>.');
+    sincAnuncios();
+    const img = anuncios.obter(h);
+    if (!img) throw new NotFoundError('Imagem de anúncio inexistente.');
+    const etag = `"a-${img.h}"`;
+    const headers: Record<string, string> = {
+      'content-type': img.tipo,
+      'cache-control': CC.anuncioImg,
+      etag,
+      'access-control-allow-origin': '*',
+      'cross-origin-resource-policy': 'cross-origin',
+      'content-security-policy': CSP_IMAGEM,
+      'x-content-type-options': 'nosniff',
+    };
+    if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
+    return responder(c, c.req.method === 'HEAD' ? null : img.corpo, 200, headers);
+  });
+
+  const formatoValido = (f: unknown, de: readonly FormatoAnuncio[]): f is FormatoAnuncio =>
+    typeof f === 'string' && (FORMATOS_ANUNCIO as readonly string[]).includes(f) && de.includes(f as FormatoAnuncio);
+
+  /**
+   * Clique: anúncio cadastrado e no ar → conta (agregado; repetido do mesmo visitante em 10 s não conta; robô não conta)
+   * e 302 para o destino com UTM. Id desconhecido ou fora do ar → 302 para a home (nunca redireciona para endereço
+   * vindo da URL: o destino é sempre o link cadastrado no painel).
+   */
+  app.get('/api/anuncio/ir/:id', (c) => {
+    const id = c.req.param('id');
+    const st = dados.status();
+    const noAr = /^[a-z0-9-]{2,40}$/.test(id) ? st.anuncios?.find((a) => a.id === id) : undefined;
+    sincAnuncios(st.versao);
+    const cfg = noAr ? anuncios.config(id) : undefined;
+    const h = { 'cache-control': CC.privado, 'x-robots-tag': 'noindex' };
+    if (!noAr || !cfg) return c.body(null, 302, { ...h, location: '/' });
+    const f = c.req.query('f');
+    const formato = formatoValido(f, noAr.formatos) ? f : null;
+    if (formato && !ehRobo(c.req.header('user-agent'))) {
+      const cliente = clienteDe(c);
+      if (limiteCliques.tentar(cliente)) metricasAnuncios.clique(id, formato, cliente);
+    }
+    return c.body(null, 302, { ...h, location: urlComUtm(cfg.url, cfg.id, formato ?? 'link') });
+  });
+
+  /**
+   * Impressão VISÍVEL (o app manda quando o anúncio aparece na tela; navigator.sendBeacon → corpo text/plain com JSON).
+   * Só do próprio site; anúncio no ar com aquele formato; repetida do mesmo visitante em 5 min não conta; robô não conta.
+   */
+  app.post(
+    '/api/anuncio/evento',
+    bodyLimit({ maxSize: 2048, onError: (c) => c.json({ erro: 'Corpo grande demais.' }, 413, { 'cache-control': CC.privado }) }),
+    async (c) => {
+      if (!origemPermitida(c)) throw new ErroHttp(403, 'Origem não permitida.');
+      const ct = c.req.header('content-type') ?? '';
+      if (ct && !/^(application\/json|text\/plain)\b/i.test(ct)) throw new ErroHttp(415, 'Envie { id, formato } em JSON.');
+      let corpo: unknown;
+      try {
+        corpo = JSON.parse(await c.req.text());
+      } catch {
+        throw new ErroValidacao('Envie { id, formato } em JSON.');
+      }
+      const { id, formato } = (corpo && typeof corpo === 'object' ? corpo : {}) as { id?: unknown; formato?: unknown };
+      if (typeof id !== 'string' || !/^[a-z0-9-]{2,40}$/.test(id) || typeof formato !== 'string')
+        throw new ErroValidacao('Envie { id, formato } em JSON.');
+      const a = dados.status().anuncios?.find((x) => x.id === id);
+      if (!a) throw new NotFoundError('Anúncio fora do ar.');
+      if (!formatoValido(formato, a.formatos)) throw new ErroValidacao('Formato que este anúncio não usa.');
+      const cliente = clienteDe(c);
+      if (!limiteEventos.tentar(cliente)) throw new ErroHttp(429, 'Muitos eventos; tente mais tarde.', { 'retry-after': '60' });
+      if (!ehRobo(c.req.header('user-agent'))) metricasAnuncios.impressao(id, formato, cliente);
+      return c.body(null, 204, { 'cache-control': CC.privado });
+    },
+  );
 
   app.get('/api/meta', async (c) => {
     const etag = etagFraco('meta', deps.dataset.meta.versao, hashCurto(deps.dataset.meta.geradoEm));
@@ -680,10 +814,10 @@ export function createApp(deps: AppDeps) {
     }
     await next();
   });
-  // 64 KB em geral; 256 KB no /command (o patrocínio pode trazer a logo em data URI de até 150 KB)
+  // 64 KB em geral; 1 MB no /command (o anúncio traz a logo e a peça em data URI: até ~750 KB)
   const limite = (kb: number) => bodyLimit({ maxSize: kb * 1024, onError: (c) => c.json({ erro: 'Corpo grande demais.' }, 413) });
   const limitePadrao = limite(64);
-  const limiteComando = limite(256);
+  const limiteComando = limite(MAX_CORPO_COMANDO / 1024);
   admin.use('*', (c, next) => (c.req.path.endsWith('/command') ? limiteComando(c, next) : limitePadrao(c, next)));
   // CSRF: POST só da própria origem (ver origemPermitida)
   admin.use('*', async (c, next) => {
@@ -764,17 +898,28 @@ export function createApp(deps: AppDeps) {
     metricas: metricasServidor(),
   });
 
-  /** AdminSnapshot com o `pessoasAgora` e o aviso do status público (o painel mostra o mesmo do site) + servidor. */
-  const snapshotAdmin = () => {
+  /**
+   * AdminSnapshot com o `pessoasAgora` e o aviso do status público (o painel mostra o mesmo do site) + servidor. As
+   * imagens dos anúncios vão por URL (o painel consulta a cada 1 s: os data URIs não viajam a cada consulta).
+   */
+  const snapshotAdmin = (c: Ctx): AdminSnapshot => {
     const snap = controller.adminSnapshot(extraMetricas());
+    const origem = origemDe(c);
     const aviso = !snap.status.aviso && agendador.avisoPublico() ? { nivel: 'info' as const, texto: AVISO_AGUARDANDO_TSE } : snap.status.aviso;
-    return { ...snap, status: { ...snap.status, aviso, pessoasAgora: metricas.pessoasAgora() }, servidor: servidorInfo() };
+    const status: LiveStatus = { ...snap.status, aviso, pessoasAgora: metricas.pessoasAgora(), ...anunciosParaSite(snap.status, origem) };
+    const state = { ...snap.state, anuncios: (snap.state.anuncios ?? []).map((a) => anuncios.paraPainel(a, origem)) };
+    return { ...snap, state, status, servidor: servidorInfo() };
   };
 
-  admin.get('/state', (c) => c.json(snapshotAdmin()));
+  admin.get('/state', (c) => c.json(snapshotAdmin(c)));
 
   admin.post('/command', async (c) => {
-    const cmd = parseAdminCommand(await lerJson(c));
+    let cmd = parseAdminCommand(await lerJson(c));
+    // imagem que voltou do painel como URL deste servidor → o conteúdo (editar sem trocar a imagem não a perde)
+    if (cmd.tipo === 'anuncio-salvar') {
+      sincAnuncios();
+      cmd = { ...cmd, anuncio: anuncios.resolverAnuncio(cmd.anuncio) };
+    }
     if (motivoSim && ligaSimulacao(cmd)) {
       log.aviso(`Admin: comando "${cmd.tipo}" recusado — simulação bloqueada em produção (ALLOW_SIMULACAO)`);
       throw new ErroHttp(403, motivoSim);
@@ -785,8 +930,11 @@ export function createApp(deps: AppDeps) {
     log.info(`Admin: comando "${cmd.tipo}"${'acao' in cmd ? ` (${cmd.acao})` : ''} aplicado (versão ${s.versao}, fonte ${s.fonte})`);
     // "tentar agora": não espera o próximo segundo do agendador
     if (cmd.tipo === 'troca-auto' && cmd.acao === 'agora') void agendador.tick();
-    return c.json(snapshotAdmin());
+    return c.json(snapshotAdmin(c));
   });
+
+  /** Relatório de entrega dos anúncios (agregado: impressões visíveis e cliques por anúncio × formato × hora). */
+  admin.get('/anuncios/metricas', (c) => c.json({ metricas: metricasAnuncios.lista(), desde: metricasAnuncios.desde }));
 
   admin.get('/presets', (c) => c.json(controller.presets()));
 
@@ -881,7 +1029,10 @@ export function createApp(deps: AppDeps) {
         const m = metaDaRota(path, url.searchParams, ctxMeta);
         const raceQ = url.searchParams.get('race');
         const canonico = m.canonico ?? `${path}${raceQ && races.has(raceQ.toLowerCase()) ? `?race=${raceQ.toLowerCase()}` : ''}`;
-        const html = injetarMeta(tpl, m, origem, `${origem}${canonico}`, m.imagemVersao ?? versaoImg, { twitterSite: config.twitterSite });
+        // anunciante das imagens ("Oferecimento") trocado → outra URL de imagem (CDN e apps buscam a nova)
+        const of = tagOferecimento(st.anuncios);
+        const vImg = `${m.imagemVersao ?? versaoImg}${of ? `-${of}` : ''}`;
+        const html = injetarMeta(tpl, m, origem, `${origem}${canonico}`, vImg, { twitterSite: config.twitterSite });
         return Object.assign({ bruto: Buffer.from(html) }, { status: m.status, noindex: !!m.noindex });
       });
       const corpo = (await p) as CorpoPronto & { status: 200 | 404; noindex: boolean };
@@ -940,7 +1091,33 @@ export function createApp(deps: AppDeps) {
     metricas.pararEventLoop();
   };
 
-  return { app, dados, metricas, respostas, sessoes, estaticos, resumoMinuto, msgErro, agendador, aplicarTravas, encerrar, prontidao };
+  /** Grava as métricas dos anúncios (se houver contagem nova) e espera terminar. */
+  const persistirMetricasAnuncios = async (): Promise<void> => {
+    const store = deps.metricasAnunciosStore;
+    if (!store) return;
+    if (metricasAnuncios.sujo) {
+      metricasAnuncios.sujo = false;
+      store.salvar(metricasAnuncios.toJSON());
+    }
+    await store.flush();
+  };
+
+  return {
+    app,
+    dados,
+    metricas,
+    respostas,
+    sessoes,
+    estaticos,
+    resumoMinuto,
+    msgErro,
+    agendador,
+    aplicarTravas,
+    encerrar,
+    prontidao,
+    metricasAnuncios,
+    persistirMetricasAnuncios,
+  };
 }
 
 export type SintoniaApp = ReturnType<typeof createApp>;

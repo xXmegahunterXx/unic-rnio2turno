@@ -38,6 +38,8 @@ export interface MontarOpcoes {
   escreverLog?: (linha: string, nivel: Nivel) => void;
   /** Conferência do feed antes da troca automática (padrão: o TseManager com o `fetch` dado). */
   verificarTse?: (tse: TseConfig) => Promise<{ ok: boolean; detalhe: string }>;
+  /** Grava as métricas dos anúncios em `stateDir/anuncios-metricas.json` (como o main.ts). */
+  metricasEmDisco?: boolean;
 }
 
 export async function montar(o: MontarOpcoes = {}) {
@@ -65,7 +67,8 @@ export async function montar(o: MontarOpcoes = {}) {
     now,
     historico: createJsonStore(stateDir, 'tse-historico.json', { debounceMs: 0 }),
   });
-  const s = createApp({ config, dataset: ds, controller, tse, log, now, verificarTse: o.verificarTse });
+  const metricasAnunciosStore = o.metricasEmDisco ? createJsonStore(stateDir, 'anuncios-metricas.json', { debounceMs: 0 }) : undefined;
+  const s = createApp({ config, dataset: ds, controller, tse, log, now, verificarTse: o.verificarTse, metricasAnunciosStore });
   return { ...s, ds, controller, tse, relogio, store, config, log, stateDir };
 }
 

@@ -2,6 +2,13 @@
  * AdminState: padrão por modo, relógio, (de)serialização e validação de estados persistidos/recebidos.
  */
 import { INICIO_APURACAO } from '../shared/constants';
+import {
+  ANUNCIO_LIMITES,
+  validaAnuncio,
+  validaContatoAnuncie,
+  type AnuncioConfig,
+  type ContatoAnuncie,
+} from '../shared/anuncios';
 import type { AdminState, Aviso, ClockState, FonteDados, Patrocinio, ScenarioConfig, TrocaAutoEstado, TseConfig } from '../shared/types';
 import { normalizaCenario } from './scenario';
 import type { Structure } from './structure';
@@ -52,6 +59,8 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     tse: tsePadrao(st),
     nomesReais: false,
     patrocinio: null,
+    anuncios: [],
+    anuncie: null,
     trocaAuto: trocaAutoPadrao(),
   };
 }
@@ -205,7 +214,10 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     versao: Math.max(0, Math.floor(finito(v.versao, fallback.versao))),
     tse,
     nomesReais: typeof v.nomesReais === 'boolean' ? v.nomesReais : (fallback.nomesReais ?? false),
-    patrocinio: parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null),
+    // LEGADO: o patrocínio único vira um anúncio (migrado uma vez; ver `migraPatrocinio`) e o campo fica null
+    patrocinio: null,
+    anuncios: migraPatrocinio(parseAnunciosSalvos(v.anuncios, fallback.anuncios ?? []), parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null)),
+    anuncie: parseContatoSalvo(v.anuncie, fallback.anuncie ?? null),
     trocaAuto: parseTrocaAuto(v.trocaAuto, fallback.trocaAuto ?? trocaAutoPadrao()),
   };
 }
@@ -216,4 +228,94 @@ function parsePatrocinioSalvo(v: unknown, fallback: Patrocinio | null): Patrocin
   if (v === null) return null;
   const r = validaPatrocinio(v);
   return 'ok' in r ? r.ok : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Anúncios (src/shared/anuncios.ts)
+// ---------------------------------------------------------------------------------------------
+
+/** Id do anúncio que o comando legado 'patrocinio' cria/atualiza (e a migração de estados antigos). */
+export const ID_PATROCINIO = 'patrocinio';
+
+/** Imagem guardada no estado: só data URI (a URL do servidor é resolvida antes de chegar ao motor). */
+const ehDataUri = (v: string | undefined): v is string => typeof v === 'string' && v.startsWith('data:');
+
+/**
+ * Anúncio validado para guardar no estado: só os campos do contrato e imagens em data URI. Uma imagem que veio como
+ * URL do próprio servidor (`/api/anuncio/img?h=…`, ida e volta pelo admin) e que o servidor não trocou pelo conteúdo
+ * mantém a imagem que o anúncio de mesmo id já tem; sem anterior, fica sem imagem.
+ */
+export function normalizaAnuncio(v: unknown, anterior?: AnuncioConfig | null): { ok: AnuncioConfig } | { erro: string } {
+  const r = validaAnuncio(v);
+  if ('erro' in r) return r;
+  const a = { ...r.ok };
+  for (const campo of ['logo', 'imagem'] as const) {
+    const x = a[campo];
+    if (x === undefined || ehDataUri(x)) continue;
+    const antes = anterior?.[campo];
+    if (ehDataUri(antes)) a[campo] = antes;
+    else delete a[campo];
+  }
+  return { ok: a };
+}
+
+/** Anúncios de um estado restaurado: inválidos e ids repetidos saem; no máximo `ANUNCIO_LIMITES.maxAnuncios` (nunca lança). */
+export function parseAnunciosSalvos(v: unknown, fallback: AnuncioConfig[]): AnuncioConfig[] {
+  if (v === undefined) return fallback.map((a) => ({ ...a, formatos: [...a.formatos] }));
+  if (!Array.isArray(v)) return [];
+  const out: AnuncioConfig[] = [];
+  const ids = new Set<string>();
+  for (const x of v) {
+    if (out.length >= ANUNCIO_LIMITES.maxAnuncios) break;
+    const r = normalizaAnuncio(x);
+    if (!('ok' in r) || ids.has(r.ok.id)) continue;
+    ids.add(r.ok.id);
+    out.push(r.ok);
+  }
+  return out;
+}
+
+/** Contato da página /anuncie de um estado restaurado (inválido/vazio → null; ausente → fallback). */
+function parseContatoSalvo(v: unknown, fallback: ContatoAnuncie | null): ContatoAnuncie | null {
+  if (v === undefined) return fallback ? { ...fallback } : null;
+  if (v === null) return null;
+  const r = validaContatoAnuncie(v);
+  return 'ok' in r && Object.keys(r.ok).length ? r.ok : null;
+}
+
+/** Corta em `max` caracteres com reticências, sem deixar espaço antes delas. */
+const cortarTexto = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Math.max(1, max - 1)).trimEnd()}…`);
+
+/**
+ * LEGADO: o patrocínio único (comando 'patrocinio' e estados salvos antes dos anúncios) como anúncio id 'patrocinio':
+ * cota master, formatos topo + nativo + tv, título = texto cortado em 60, botão "Saiba mais". Logo só em data URI (a
+ * logo por URL externa não é aceita nos anúncios: o site não carrega imagem de terceiros). Mantém o peso do anterior.
+ */
+export function anuncioDoPatrocinio(p: Patrocinio, anterior?: AnuncioConfig | null): { ok: AnuncioConfig } | { erro: string } {
+  return normalizaAnuncio({
+    id: ID_PATROCINIO,
+    marca: cortarTexto(p.marca.trim(), ANUNCIO_LIMITES.marca),
+    titulo: cortarTexto(p.texto.trim(), ANUNCIO_LIMITES.titulo),
+    texto: cortarTexto(p.texto.trim(), ANUNCIO_LIMITES.texto),
+    cta: 'Saiba mais',
+    url: p.url,
+    ...(ehDataUri(p.imagem) ? { logo: p.imagem } : {}),
+    formatos: ['topo', 'nativo', 'tv'],
+    peso: anterior?.peso ?? 5,
+    cota: 'master',
+    ativo: true,
+    inicio: null,
+    fim: null,
+    naoPolitico: true,
+  });
+}
+
+/**
+ * Migração (uma vez) de um estado salvo com o patrocínio antigo: vira o anúncio 'patrocinio', se ainda não houver um
+ * com esse id e couber na lista. Depois disso o estado guarda `patrocinio: null` e a migração não se repete.
+ */
+function migraPatrocinio(anuncios: AnuncioConfig[], p: Patrocinio | null): AnuncioConfig[] {
+  if (!p || anuncios.some((a) => a.id === ID_PATROCINIO) || anuncios.length >= ANUNCIO_LIMITES.maxAnuncios) return anuncios;
+  const r = anuncioDoPatrocinio(p);
+  return 'ok' in r ? [r.ok, ...anuncios] : anuncios;
 }

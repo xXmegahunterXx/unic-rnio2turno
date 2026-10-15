@@ -3,6 +3,7 @@
  */
 import { z } from 'zod';
 import type { AdminCommand } from '../shared/api';
+import { validaAnuncio, validaContatoAnuncie } from '../shared/anuncios';
 import { UFS, type UF } from '../shared/types';
 import { TROCA_AUTO_MAX, TROCA_AUTO_MIN } from '../engine/state';
 
@@ -154,6 +155,40 @@ const patrocinio = z
   })
   .strict();
 
+/** Campos aceitos num anúncio (o resto é recusado, como nos demais comandos). */
+const CAMPOS_ANUNCIO = new Set(['id', 'marca', 'titulo', 'texto', 'cta', 'url', 'logo', 'imagem', 'formatos', 'peso', 'cota', 'ativo', 'inicio', 'fim', 'naoPolitico']);
+
+/**
+ * Anúncio: a MESMA validação do motor (`validaAnuncio`, src/shared/anuncios.ts) — o que passa aqui nunca é recusado lá.
+ * A mensagem sai como está (já diz o campo).
+ */
+const anuncio = z.unknown().superRefine((v, ctx) => {
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const extra = Object.keys(v).find((k) => !CAMPOS_ANUNCIO.has(k));
+    if (extra) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Anúncio: campo desconhecido "${extra.slice(0, 24)}".`, params: { limpo: true } });
+      return;
+    }
+  }
+  const r = validaAnuncio(v);
+  if ('erro' in r) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.erro, params: { limpo: true } });
+});
+
+const contatoAnuncie = z.unknown().superRefine((v, ctx) => {
+  if (v === null) return;
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const extra = Object.keys(v).find((k) => !['email', 'whatsapp', 'chamada'].includes(k));
+    if (extra) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `Contato: campo desconhecido "${extra.slice(0, 24)}".`, params: { limpo: true } });
+      return;
+    }
+  }
+  const r = validaContatoAnuncie(v);
+  if ('erro' in r) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.erro, params: { limpo: true } });
+});
+
+const idAnuncio = z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, 'id de anúncio inválido');
+
 export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('relogio'), acao: z.enum(['iniciar', 'pausar', 'retomar', 'reiniciar']) }).strict(),
   z.object({ tipo: z.literal('velocidade'), velocidade: finito.gt(0).max(10_000) }).strict(),
@@ -167,6 +202,10 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('nomes-reais'), ativo: z.boolean() }).strict(),
   z.object({ tipo: z.literal('tse'), tse }).strict(),
   z.object({ tipo: z.literal('patrocinio'), patrocinio: patrocinio.nullable() }).strict(),
+  z.object({ tipo: z.literal('anuncio-salvar'), anuncio }).strict(),
+  z.object({ tipo: z.literal('anuncio-remover'), id: idAnuncio }).strict(),
+  z.object({ tipo: z.literal('anuncio-ativo'), id: idAnuncio, ativo: z.boolean() }).strict(),
+  z.object({ tipo: z.literal('anuncie-contato'), contato: contatoAnuncie }).strict(),
   // 'executar' e 'concluir' são internos do servidor (troca-auto.ts): nunca entram pela rota HTTP
   z
     .object({
@@ -182,6 +221,8 @@ export function parseAdminCommand(body: unknown): AdminCommand {
   const r = adminCommandSchema.safeParse(body);
   if (!r.success) {
     const i = r.error.issues[0];
+    // mensagens da validação compartilhada (anúncio/contato) já dizem o campo
+    if (i.code === z.ZodIssueCode.custom && (i.params as { limpo?: boolean } | undefined)?.limpo) throw new ErroValidacao(i.message);
     const onde = i.path.length ? `${i.path.join('.')}: ` : '';
     throw new ErroValidacao(`Comando inválido — ${onde}${i.message}`);
   }

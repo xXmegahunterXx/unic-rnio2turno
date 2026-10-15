@@ -1,17 +1,21 @@
 /**
  * Fase 'pre': hero com a contagem regressiva grande até o início da divulgação (17h de Brasília) e o
  * convite para ver o 1º turno enquanto isso. Neutro: candidatos na ordem da urna, cores por slot.
+ *
+ * Com a disputa do 2º turno (`race`, Presidente): o confronto com as FOTOS oficiais grandes, lado a lado, do mesmo
+ * tamanho e tratamento (`DueloPrimeiroTurno` da Home, variante compacta: nome, partido · número e o % oficial do
+ * 1º turno — o placar completo vem logo abaixo). Foto só com dado real e nome real (`useFotosHero`): o 1º turno é
+ * oficial; com os nomes ocultos na simulação, monograma. Nunca há número simulado aqui (fase 'pre').
+ * Sem `race` (governadores), o layout de antes: título, contagem e o conteúdo `extra`.
  */
 import type { ReactNode } from 'react';
 import type { Race } from '@/shared/types';
+import { useRace } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
-import { corSlot } from '@/app/lib/raceUi';
 import { Button, ButtonLink } from '@/app/ui/Button';
 import { Countdown } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
-import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
-import { useFotosRace } from '@/app/components/apuracao/fotos';
-import { partidoENumero } from '@/shared/anon';
+import { DueloPrimeiroTurno } from '@/app/components/pages/home/DueloPresidencia';
 
 export interface PreHeroProps {
   /** Instante do início da divulgação (epoch ms). */
@@ -43,8 +47,38 @@ export function PreHero({
     if (!ancora) return;
     document.getElementById(ancora)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
-  const finalistas = race?.candidatos.filter((c) => !c.agregado) ?? [];
-  const fotos = useFotosRace(race);
+  // A corrida do 1º turno correspondente ('pres' → 'pres-t1'): mesmos finalistas, com o resultado oficial.
+  const raceT1 = useRace(race ? `${race.id.replace(/-t1$/, '')}-t1` : undefined);
+  const duelo = race && raceT1 && raceT1.candidatos.filter((c) => !c.agregado).length === 2 ? raceT1 : undefined;
+
+  const sobrancelha = (
+    <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-brand-fg">
+      <Icon name="calendario" size={15} />
+      2º turno · domingo, 25 de outubro
+    </div>
+  );
+  const tituloEl = (
+    <h2 className="mt-2.5 text-balance font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg sm:text-[40px]">{titulo}</h2>
+  );
+  const contagem = (centro: boolean) => (
+    <div className={cn('flex flex-col', centro ? 'items-start lg:items-center' : 'items-start')}>
+      <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Faltam</div>
+      <Countdown target={alvo} now={agora} size="lg" hideZeroDays doneLabel="A apuração começou" />
+      <p className="mt-3 text-[12.5px] text-fg-muted">Horário de Brasília</p>
+    </div>
+  );
+  const botoes = (
+    <div className="mt-6 flex flex-wrap gap-2.5">
+      {ancora ? (
+        <Button variant="primary" iconRight="seta-baixo" onClick={irPara}>
+          Enquanto isso, veja o 1º turno
+        </Button>
+      ) : null}
+      <ButtonLink to="/teste" variant="outline" icon="olho-fechado">
+        Faça o Teste Cego
+      </ButtonLink>
+    </div>
+  );
 
   return (
     <section
@@ -58,62 +92,49 @@ export function PreHero({
         <div className="absolute inset-0 opacity-[0.35] [background-image:linear-gradient(rgb(var(--line)/var(--line-alpha))_1px,transparent_1px),linear-gradient(90deg,rgb(var(--line)/var(--line-alpha))_1px,transparent_1px)] [background-size:32px_32px] [mask-image:radial-gradient(ellipse_at_top_right,black_10%,transparent_65%)]" />
       </div>
 
-      {/*
-        Celular: título → contagem → texto e ações (a contagem é o assunto principal, sobe para a 1ª dobra).
-        Desktop: texto à esquerda e a contagem à direita, centrada na altura do cartão.
-      */}
-      <div className="grid grid-cols-1 gap-y-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:grid-rows-[auto_auto] lg:gap-x-12 lg:gap-y-0">
-        <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-end">
-          <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.14em] text-brand-fg">
-            <Icon name="calendario" size={15} />
-            2º turno · domingo, 25 de outubro
+      {duelo ? (
+        /*
+          Com o confronto. Celular: título → fotos → contagem → texto e ações.
+          Desktop: título, texto, contagem e ações à esquerda; as fotos à direita, centradas na altura do cartão.
+        */
+        <div className="grid grid-cols-1 gap-y-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.95fr)] lg:gap-x-12 xl:gap-x-16">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+            {sobrancelha}
+            {tituloEl}
           </div>
-          <h2 className="mt-2.5 text-balance font-display text-[28px] font-semibold leading-[1.05] tracking-[-0.03em] text-fg sm:text-[40px]">
-            {titulo}
-          </h2>
-        </div>
-
-        <div className="flex flex-col items-start lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:items-center lg:self-center">
-          <div className="mb-2.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg-muted">Faltam</div>
-          <Countdown target={alvo} now={agora} size="lg" hideZeroDays doneLabel="A apuração começou" />
-          <p className="mt-3 text-[12.5px] text-fg-muted">Horário de Brasília</p>
-        </div>
-
-        <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-start">
-          <p className="max-w-xl text-pretty text-[15px] leading-relaxed text-fg-muted lg:mt-3">{descricao}</p>
-
-          {finalistas.length === 2 ? (
-            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2" aria-label={`Quem disputa: ${finalistas.map((c) => c.nomeUrna).join(' e ')}`}>
-              {finalistas.map((c, i) => (
-                <span key={c.numero} className="contents">
-                  {i === 1 ? <span aria-hidden className="text-[13px] font-semibold text-fg-subtle">×</span> : null}
-                  <span className="inline-flex min-w-0 items-center gap-2 rounded-full border border-line bg-surface-2/70 py-1 pl-1 pr-3">
-                    <CandidateAvatar candidato={c} foto={fotos[race?.candidatos.indexOf(c) ?? -1]} size="sm" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-semibold leading-tight text-fg">{c.nomeUrna}</span>
-                      <span className={cn('num block text-[11.5px] font-medium leading-tight', corSlot(c.cor).text)}>
-                        {partidoENumero(c)}
-                      </span>
-                    </span>
-                  </span>
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {extra}
-
-          <div className="mt-6 flex flex-wrap gap-2.5">
-            {ancora ? (
-              <Button variant="primary" iconRight="seta-baixo" onClick={irPara}>
-                Enquanto isso, veja o 1º turno
-              </Button>
-            ) : null}
-            <ButtonLink to="/teste" variant="outline" icon="olho-fechado">
-              Faça o Teste Cego
-            </ButtonLink>
+          <DueloPrimeiroTurno
+            race={duelo}
+            variante="compacto"
+            retratoClassName="max-w-[168px] sm:max-w-[200px] lg:max-w-[210px]"
+            className="lg:col-start-2 lg:row-span-3 lg:row-start-1 lg:self-center"
+          />
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2">{contagem(false)}</div>
+          <div className="min-w-0 lg:col-start-1 lg:row-start-3">
+            <p className="max-w-xl text-pretty text-[15px] leading-relaxed text-fg-muted">{descricao}</p>
+            {extra}
+            {botoes}
           </div>
         </div>
-      </div>
+      ) : (
+        /*
+          Celular: título → contagem → texto e ações (a contagem é o assunto principal, sobe para a 1ª dobra).
+          Desktop: texto à esquerda e a contagem à direita, centrada na altura do cartão.
+        */
+        <div className="grid grid-cols-1 gap-y-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:grid-rows-[auto_auto] lg:gap-x-12 lg:gap-y-0">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:self-end">
+            {sobrancelha}
+            {tituloEl}
+          </div>
+
+          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-center">{contagem(true)}</div>
+
+          <div className="min-w-0 lg:col-start-1 lg:row-start-2 lg:self-start">
+            <p className="max-w-xl text-pretty text-[15px] leading-relaxed text-fg-muted lg:mt-3">{descricao}</p>
+            {extra}
+            {botoes}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

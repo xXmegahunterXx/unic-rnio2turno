@@ -250,39 +250,72 @@ describe('municipiosBr (mapa nacional por município)', () => {
 // Patrocínio
 // ---------------------------------------------------------------------------------------------
 
-describe('patrocínio', () => {
+describe('patrocínio (LEGADO: vira o anúncio master "patrocinio")', () => {
   const st = buildStructure(semSecao(ds));
   const valido: Patrocinio = { marca: '  Padaria Pão Quente ', texto: 'Oferecido por Padaria Pão Quente', url: 'https://exemplo.com.br/promo?x=1' };
   const compartilhado = novo(ds, 'servidor');
+  const comUtm = 'https://exemplo.com.br/promo?x=1&utm_source=sintonia&utm_medium=topo&utm_campaign=patrocinio';
 
-  it('desligado por padrão; define, aparece no status, persiste e remove', () => {
+  it('desligado por padrão; define (como anúncio), aparece no status, persiste e remove', () => {
     const { c, onStateChange } = novo(ds, 'servidor');
     expect(c.status().patrocinio).toBeNull();
+    expect(c.status().anuncios).toEqual([]);
     expect(c.state().patrocinio).toBeNull();
     const v0 = c.state().versao;
     c.command({ tipo: 'patrocinio', patrocinio: valido });
-    const p = { marca: 'Padaria Pão Quente', texto: 'Oferecido por Padaria Pão Quente', url: 'https://exemplo.com.br/promo?x=1' };
+    const p = { marca: 'Padaria Pão Quente', texto: 'Oferecido por Padaria Pão Quente', url: comUtm };
     expect(c.status().patrocinio).toEqual(p);
-    expect(c.state().patrocinio).toEqual(p);
+    expect(c.state().patrocinio).toBeNull();
+    expect(c.state().anuncios).toEqual([
+      {
+        id: 'patrocinio',
+        marca: 'Padaria Pão Quente',
+        titulo: 'Oferecido por Padaria Pão Quente',
+        texto: 'Oferecido por Padaria Pão Quente',
+        cta: 'Saiba mais',
+        url: 'https://exemplo.com.br/promo?x=1',
+        formatos: ['topo', 'nativo', 'tv'],
+        peso: 5,
+        cota: 'master',
+        ativo: true,
+        inicio: null,
+        fim: null,
+        naoPolitico: true,
+      },
+    ]);
+    expect(c.status().anuncios?.map((a) => a.id)).toEqual(['patrocinio']);
     expect(c.state().versao).toBe(v0 + 1);
     expect(onStateChange).toHaveBeenCalledTimes(1);
     // ida e volta (persistência do servidor / sincronização entre abas)
     const fb = estadoPadrao('servidor', 0, cenarioPadrao(st), st);
     const json = c.toJSON();
     const parsed = parseAdminState(json, fb, st);
-    expect(parsed.patrocinio).toEqual(p);
+    expect(parsed.anuncios).toEqual(c.state().anuncios);
     expect(JSON.stringify(parsed)).toBe(json);
     const c2 = createController(ds, { modo: 'servidor', initialState: parsed });
     expect(c2.status().patrocinio).toEqual(p);
-    // imagem opcional
+    // logo opcional em data URI; por URL externa não entra (o site não carrega imagem de terceiros)
     const img = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-    c.command({ tipo: 'patrocinio', patrocinio: { ...p, imagem: img } });
+    c.command({ tipo: 'patrocinio', patrocinio: { ...valido, imagem: img } });
     expect(c.status().patrocinio!.imagem).toBe(img);
-    c.command({ tipo: 'patrocinio', patrocinio: { ...p, imagem: 'https://cdn.exemplo.com/logo.svg' } });
-    expect(c.status().patrocinio!.imagem).toBe('https://cdn.exemplo.com/logo.svg');
+    expect(c.state().anuncios).toHaveLength(1);
+    c.command({ tipo: 'patrocinio', patrocinio: { ...valido, imagem: 'https://cdn.exemplo.com/logo.svg' } });
+    expect(c.status().patrocinio!.imagem).toBeUndefined();
     c.command({ tipo: 'patrocinio', patrocinio: null });
     expect(c.status().patrocinio).toBeNull();
-    expect(parseAdminState(c.toJSON(), fb, st).patrocinio).toBeNull();
+    expect(c.state().anuncios).toEqual([]);
+    expect(parseAdminState(c.toJSON(), fb, st).anuncios).toEqual([]);
+  });
+
+  it('textos longos do formato antigo cabem no anúncio (marca 40, título 60)', () => {
+    const { c } = novo(ds, 'servidor');
+    c.command({ tipo: 'patrocinio', patrocinio: { marca: 'M'.repeat(60), texto: 'palavra '.repeat(17).trim(), url: 'https://a.com.br' } });
+    const a = c.state().anuncios![0];
+    expect(a.marca.length).toBe(40);
+    expect(a.marca.endsWith('…')).toBe(true);
+    expect(a.titulo.length).toBeLessThanOrEqual(60);
+    expect(a.titulo.endsWith('…')).toBe(true);
+    expect(a.texto).toBe('palavra '.repeat(17).trim());
   });
 
   it.each([
@@ -308,15 +341,21 @@ describe('patrocínio', () => {
     expect(onStateChange).not.toHaveBeenCalled();
   });
 
-  it('estado restaurado com patrocínio inválido → null (nunca lança)', () => {
+  it('estado salvo com o patrocínio antigo: migrado UMA vez para o anúncio "patrocinio"; inválido é descartado', () => {
     const fb = estadoPadrao('demo', 0, cenarioPadrao(st), st);
-    const s = { ...fb, patrocinio: { marca: 'X', texto: 'Y', url: 'ftp://x.com' } } as unknown as AdminState;
-    expect(parseAdminState(s, fb, st).patrocinio).toBeNull();
-    expect(parseAdminState({ ...fb, patrocinio: undefined }, { ...fb, patrocinio: { marca: 'A', texto: 'B', url: 'https://a.com' } }, st).patrocinio).toEqual({
-      marca: 'A',
-      texto: 'B',
-      url: 'https://a.com',
-    });
+    const ruim = { ...fb, patrocinio: { marca: 'X', texto: 'Y', url: 'ftp://x.com' } } as unknown as AdminState;
+    const p1 = parseAdminState(ruim, fb, st);
+    expect(p1.patrocinio).toBeNull();
+    expect(p1.anuncios).toEqual([]);
+    const antigo = { ...fb, patrocinio: { marca: 'A', texto: 'B', url: 'https://a.com' } } as AdminState;
+    delete (antigo as Partial<AdminState>).anuncios;
+    const p2 = parseAdminState(antigo, fb, st);
+    expect(p2.patrocinio).toBeNull();
+    expect(p2.anuncios).toMatchObject([{ id: 'patrocinio', marca: 'A', titulo: 'B', cta: 'Saiba mais', cota: 'master', formatos: ['topo', 'nativo', 'tv'] }]);
+    // de novo (já migrado): nada muda; um anúncio "patrocinio" existente nunca é sobrescrito pela migração
+    expect(parseAdminState(p2, fb, st).anuncios).toEqual(p2.anuncios);
+    const editado = { ...p2, anuncios: [{ ...p2.anuncios![0], titulo: 'Editado no painel' }], patrocinio: { marca: 'A', texto: 'B', url: 'https://a.com' } };
+    expect(parseAdminState(editado, fb, st).anuncios![0].titulo).toBe('Editado no painel');
   });
 });
 
