@@ -159,3 +159,24 @@ describe('POST /api/anuncie/lead e painel "Interessados"', () => {
     expect(m.crescimento.leads.paraAdmin().leads).toHaveLength(3);
   });
 });
+
+describe('formulário "Quero anunciar" em produção: abre só com e-mail de privacidade configurado', () => {
+  it('sem contatos → 503 "abre em breve" (nada guardado); com o e-mail de privacidade no painel → aceito', async () => {
+    const m = await montar({ env: { NODE_ENV: 'production', PUBLIC_URL: 'http://localhost', TRUST_PROXY: '1' } });
+    const fechado = await lead(m, PEDIDO);
+    expect(fechado.status).toBe(503);
+    expect(await fechado.json()).toMatchObject({ ok: false, erro: 'O formulário abre em breve.' });
+    expect(m.crescimento.leads.paraAdmin().leads).toHaveLength(0);
+    const cookie = await login(m);
+    const cmd = (contatos: unknown) =>
+      m.app.request('/api/admin/command', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ tipo: 'contatos', contatos }) });
+    // só o geral não abre (o canal do art. 18 é o de privacidade)
+    expect((await cmd({ geral: 'contato@sintonia2026.com.br' })).status).toBe(200);
+    expect((await lead(m, PEDIDO)).status).toBe(503);
+    // endereço reservado (.example) é recusado pelo servidor
+    expect((await cmd({ privacidade: 'privacidade@sintonia.example' })).status).toBe(400);
+    expect((await cmd({ geral: 'contato@sintonia2026.com.br', privacidade: 'privacidade@sintonia2026.com.br' })).status).toBe(200);
+    expect((await lead(m, PEDIDO)).status).toBe(200);
+    expect(m.crescimento.leads.paraAdmin().leads).toHaveLength(1);
+  });
+});

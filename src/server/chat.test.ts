@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { DIA_ELEICAO_17H, DIA_ELEICAO_INICIO, LIMITES_CHAT, type ChatAdmin, type ChatPublico } from '../shared/chat';
-import { CC_CHAT, MENSAGEM_MAX_MS, SalaChat } from './chat';
+import { BLOQUEIO_ANTES_DA_ELEICAO, CC_CHAT, MENSAGEM_MAX_MS, SalaChat, type ConfigSalaChat } from './chat';
 import { AGORA_PADRAO, login, montar } from './test-helpers';
 
 const TOKEN = (i: number) => `token-de-teste-${String(i).padStart(6, '0')}`;
 
-function sala(o: { producao?: boolean; agora?: number } = {}) {
+function sala(o: { producao?: boolean; agora?: number; ensaio?: boolean } = {}) {
   const relogio = { t: o.agora ?? AGORA_PADRAO };
-  const s = new SalaChat({ now: () => relogio.t, producao: o.producao, municipios: ['Gado Bravo'], nomesCandidatos: ['Omar Aziz'] });
+  const s = new SalaChat({ now: () => relogio.t, producao: o.producao, ensaio: o.ensaio, municipios: ['Gado Bravo'], nomesCandidatos: ['Omar Aziz'] });
   return { s, relogio };
 }
 
@@ -292,6 +292,56 @@ describe('SalaChat: denúncias e moderação', () => {
   });
 });
 
+describe('SalaChat: antes da eleição e reinício', () => {
+  it('produção antes de 25/10: o painel abre, mas a sala só recebe mensagens às 17h de 25/10 (CHAT_ENSAIO libera)', () => {
+    const { s, relogio } = sala({ producao: true }); // 09/10
+    const r = s.comando({ acao: 'abrir' });
+    expect(r.ok && r.log).toMatch(/só depois do bloqueio/);
+    expect(s.publico().aberta).toBe(false);
+    expect(s.publico().bloqueio).toBe(BLOQUEIO_ANTES_DA_ELEICAO);
+    expect(s.paraAdmin().aberta).toBe(true);
+    const e = enviar(s, 1, 'teste do operador');
+    expect(!e.ok && e.motivo).toBe('fechada');
+    relogio.t = DIA_ELEICAO_INICIO + 3600_000; // manhã de 25/10: bloqueio legal
+    expect(s.publico().bloqueio).toMatch(/17h, quando terminar a votação/);
+    relogio.t = DIA_ELEICAO_17H;
+    expect(s.publico().aberta).toBe(true);
+    expect(enviar(s, 1, 'boa noite').ok).toBe(true);
+    // ensaio (cópia do site): antes de 25/10 vale; no dia, o bloqueio legal continua
+    const ens = sala({ producao: true, ensaio: true });
+    ens.s.comando({ acao: 'abrir' });
+    expect(ens.s.publico().aberta).toBe(true);
+    ens.relogio.t = DIA_ELEICAO_INICIO + 60_000;
+    expect(ens.s.publico().aberta).toBe(false);
+  });
+
+  it('a configuração (aberta, modo lento, fixada) é avisada a cada mudança e restaurada; mensagens não', () => {
+    const salvas: ConfigSalaChat[] = [];
+    const relogio = { t: AGORA_PADRAO };
+    const a = new SalaChat({ now: () => relogio.t, aoMudarConfig: (c) => salvas.push(c) });
+    a.comando({ acao: 'abrir' });
+    a.comando({ acao: 'lento', segundos: 20 });
+    a.comando({ acao: 'fixar', texto: 'Bem-vindos' });
+    a.enviar({ apelido: 'Ana', texto: 'oi', token: TOKEN(1) }, 'r');
+    expect(salvas).toHaveLength(3);
+    const ultima = salvas.at(-1)!;
+    expect(ultima).toEqual({ aberta: true, lentoS: 20, fixada: { texto: 'Bem-vindos', em: AGORA_PADRAO } });
+    // "reinício": nova sala com a configuração salva (JSON de ida e volta)
+    const b = new SalaChat({ now: () => relogio.t, configInicial: JSON.parse(JSON.stringify(ultima)) });
+    const pub = b.publico();
+    expect(pub.aberta).toBe(true);
+    expect(pub.lentoS).toBe(20);
+    expect(pub.fixada?.texto).toBe('Bem-vindos');
+    expect(pub.mensagens).toHaveLength(0);
+    // arquivo inválido: ignorado, a sala nasce fechada
+    for (const lixo of [{ aberta: 'sim' }, { aberta: true, lentoS: 1, fixada: null }, 'x', [], { aberta: true, lentoS: 10, fixada: { texto: '', em: 1 } }]) {
+      const c = new SalaChat({ configInicial: lixo });
+      expect(c.publico().aberta).toBe(false);
+      expect(c.restaurarConfig(lixo)).toBe(false);
+    }
+  });
+});
+
 describe('SalaChat: presença, reações e intervalo', () => {
   it('presença: estimativa conservadora (até 10 por rede) e janela', () => {
     const { s, relogio } = sala();
@@ -438,5 +488,42 @@ describe('rotas do chat', () => {
     const pub = (await (await m.app.request('/api/chat')).json()) as ChatPublico;
     expect(pub.reacoes).toBe(2);
     expect(pub.pessoas).toBe(1);
+  });
+});
+
+describe('rotas do chat: reinício', () => {
+  it('STATE_DIR/chat.json: a sala aberta pelo painel continua aberta depois de reiniciar (mesmo STATE_DIR)', async () => {
+    const m = await montar({ env: { TRUST_PROXY: '1' }, chatEmDisco: true });
+    const cookie = await login(m);
+    const h = { ...json({}).headers, cookie };
+    await m.app.request('/api/admin/chat', { method: 'POST', headers: h, body: JSON.stringify({ acao: 'abrir' }) });
+    await m.app.request('/api/admin/chat', { method: 'POST', headers: h, body: JSON.stringify({ acao: 'lento', segundos: 20 }) });
+    await m.app.request('/api/admin/chat', { method: 'POST', headers: h, body: JSON.stringify({ acao: 'fixar', texto: 'Bem-vindos' }) });
+    expect((await m.app.request('/api/chat', json({ apelido: 'Ana', texto: 'boa noite', token: TOKEN(1) }, { 'x-real-ip': '203.0.113.40' }))).status).toBe(200);
+    await m.chatStore!.flush();
+    const m2 = await montar({ env: { TRUST_PROXY: '1' }, chatEmDisco: true, stateDir: m.stateDir });
+    const pub = (await (await m2.app.request('/api/chat')).json()) as ChatPublico;
+    expect(pub).toMatchObject({ aberta: true, lentoS: 20, fixada: { texto: 'Bem-vindos' } });
+    expect(pub.mensagens).toHaveLength(0);
+  });
+});
+
+describe('SalaChat: duplicadas com números e emojis', () => {
+  it('a mesma pessoa comenta dois percentuais diferentes; emoji e número de muitas pessoas não viram "raid"', () => {
+    const { s, relogio } = sala();
+    s.comando({ acao: 'abrir' });
+    expect(enviar(s, 1, 'SP com 45% apurado').ok).toBe(true);
+    relogio.t += 30_000;
+    expect(enviar(s, 1, 'SP com 80% apurado').ok).toBe(true);
+    relogio.t += 30_000;
+    const dup = enviar(s, 1, 'sp com 80% APURADO!!');
+    expect(!dup.ok && dup.motivo).toBe('duplicada');
+    // 6 pessoas de redes diferentes: emojis e números passam (não há "raid" sem texto)
+    const curtas = ['😮', '🔥', '👏', '👀', '50,1%', '17:42', '😮', '😮', '😮', '😮'];
+    curtas.forEach((t, i) => expect(enviar(s, 100 + i, t, `rede-c${i}`).ok).toBe(true));
+    // texto de verdade continua parando na 4ª
+    expect([4, 5, 6].map((i) => enviar(s, 300 + i, 'que noite linda', `rede-q${i}`).ok)).toEqual([true, true, true]);
+    const raid = enviar(s, 307, 'Que noite linda!', 'rede-q7');
+    expect(!raid.ok && raid.motivo).toBe('duplicada');
   });
 });

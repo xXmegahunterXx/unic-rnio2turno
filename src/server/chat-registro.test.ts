@@ -46,6 +46,27 @@ describe('registro de envios do chat (chat-registro.ts)', () => {
     expect(() => new RegistroEnvios({ dir, chavePublicaPem: fraca })).toThrow(/2048/);
   });
 
+  it('chave errada (caminho inexistente ou PEM inválido) não derruba o site: registro desligado e sala TRAVADA fechada', async () => {
+    const pasta = mkdtempSync(join(tmpdir(), 'sintonia-chave-'));
+    const lixo = join(pasta, 'lixo.pem');
+    writeFileSync(lixo, 'lixo');
+    for (const chave of [join(pasta, 'registro-pubica.pem'), lixo]) {
+      const linhas: string[] = [];
+      const m = await montar({ env: { TRUST_PROXY: '1', CHAT_REGISTRO_CHAVE: chave }, escreverLog: (l) => linhas.push(l) });
+      expect(linhas.join('\n')).toMatch(/CHAT_REGISTRO_CHAVE .* registro DESLIGADO e sala TRAVADA/);
+      expect((await m.app.request('/healthz')).status).toBe(200);
+      const cookie = await login(m);
+      const h = { 'content-type': 'application/json', origin: 'http://localhost', 'sec-fetch-site': 'same-origin' };
+      const r = await m.app.request('/api/admin/chat', { method: 'POST', headers: { ...h, cookie }, body: JSON.stringify({ acao: 'abrir' }) });
+      expect(r.status).toBe(400);
+      expect(((await r.json()) as { erro: string }).erro).toMatch(/inválido/);
+      const adm = (await (await m.app.request('/api/admin/chat', { headers: { cookie } })).json()) as { aberta: boolean; travada?: string };
+      expect(adm.aberta).toBe(false);
+      expect(adm.travada).toMatch(/CHAT_REGISTRO_CHAVE/);
+      expect(((await (await m.app.request('/api/chat')).json()) as ChatPublico).aberta).toBe(false);
+    }
+  });
+
   it('desligado por padrão: nada é gravado e a sala não avisa', async () => {
     const m = await montar({ env: { TRUST_PROXY: '1' } });
     const cookie = await login(m);
@@ -77,7 +98,8 @@ describe('registro de envios do chat (chat-registro.ts)', () => {
     const linhas = readdirSync(dir).flatMap((f) => readFileSync(join(dir, f), 'utf8').trim().split('\n'));
     expect(linhas).toHaveLength(1);
     expect(linhas[0]).not.toContain('203.0.113.31');
-    expect(decifrarLinha(PRIV, linhas[0])).toMatchObject({ id: msg.id, ip: '203.0.113.31', porta: 50123 });
+    expect(decifrarLinha(PRIV, linhas[0])).toMatchObject({ id: msg.id, ip: '203.0.113.31', porta: 50123, apelido: 'Ana', texto: 'boa noite' });
+    expect(linhas[0]).not.toContain('boa noite');
     expect(((await (await m.app.request('/api/chat')).json()) as ChatPublico).registro).toBe(true);
   });
 });

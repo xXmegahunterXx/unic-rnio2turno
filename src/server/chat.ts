@@ -17,11 +17,15 @@
  * da rede e cada rede ganha no máximo 8 autores novos por hora; o painel pode silenciar a REDE inteira. Denúncia só conta
  * de quem está com a sala na tela há 2 min, por rede larga (IPv6 /48), com teto de mensagens escondidas por rede e
  * limiar que cresce com o público da sala.
- * Reiniciar o processo esvazia a sala e a deixa FECHADA (padrão seguro). Com réplicas, cada uma teria a sua sala:
- * o chat pressupõe 1 instância (a topologia recomendada, ARCHITECTURE §12.5).
+ * Reiniciar o processo esvazia a sala (mensagens, silenciados e limites são só da memória). A CONFIGURAÇÃO da sala
+ * (aberta/fechada, modo lento e mensagem fixada) fica em STATE_DIR/chat.json e volta igual na subida — um update ou o
+ * vigia do healthcheck não fecham a sala na noite. Sem o arquivo, a sala nasce FECHADA (padrão seguro). Com réplicas,
+ * cada uma teria a sua sala: o chat pressupõe 1 instância (a topologia recomendada, ARCHITECTURE §12.5).
  *
  * Dia da eleição: em produção, de 0h às 17h de 25/10 (Brasília) a sala não recebe mensagens (propaganda no dia da
- * eleição é crime — Lei 9.504/97, art. 39, § 5º), mesmo aberta no painel.
+ * eleição é crime — Lei 9.504/97, art. 39, § 5º), mesmo aberta no painel. Antes de 25/10 também não (a sala é da noite
+ * da apuração, como prometem a /ao-vivo e a sala: um teste do operador na produção não abre uma sala pública durante a
+ * campanha), salvo com CHAT_ENSAIO=1 numa cópia de ensaio. O painel pode abrir antes: a sala fica "abre às 17h".
  */
 import { randomBytes } from 'node:crypto';
 import type { Context, Hono } from 'hono';
@@ -29,6 +33,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type { HttpBindings } from '@hono/node-server';
 import { z } from 'zod';
 import {
+  DIA_ELEICAO_INICIO,
   LIMITES_CHAT,
   REACOES,
   arredondarPessoasSala,
@@ -36,6 +41,8 @@ import {
   avaliarTexto,
   bloqueioDiaEleicao,
   chaveDuplicada,
+  LETRAS_DUPLICADA_GLOBAL,
+  letrasDaChave,
   prepararExcecoes,
   prepararNomesApelido,
   tokenValido,
@@ -197,7 +204,34 @@ export interface OpcoesSalaChat {
   municipios?: readonly string[];
   /** registro cifrado dos envios ligado (chat-registro.ts): a sala avisa nas regras */
   registro?: boolean;
+  /** produção com CHAT_ENSAIO=1: sem o bloqueio de ANTES de 25/10 (o de 0h–17h de 25/10 vale sempre) */
+  ensaio?: boolean;
+  /**
+   * Sala TRAVADA fechada (motivo para o painel): ex.: CHAT_REGISTRO_CHAVE configurada mas ilegível — o dono decidiu
+   * exigir o registro, então a sala não abre sem ele (o site continua no ar).
+   */
+  travada?: string;
+  /** configuração salva (STATE_DIR/chat.json): aberta, modo lento e fixada voltam iguais depois de um reinício */
+  configInicial?: unknown;
+  /** a configuração mudou (abrir, fechar, modo lento, fixar): gravar em STATE_DIR/chat.json */
+  aoMudarConfig?: (c: ConfigSalaChat) => void;
 }
+
+/** O que sobrevive a um reinício: só a configuração da sala (nunca mensagens, autores ou redes). */
+export interface ConfigSalaChat {
+  aberta: boolean;
+  lentoS: number;
+  fixada: FixadaChat | null;
+}
+
+const configSalaSchema = z.object({
+  aberta: z.boolean(),
+  lentoS: z.number().int().min(LIMITES_CHAT.lento.min).max(LIMITES_CHAT.lento.max),
+  fixada: z.object({ texto: z.string().min(1).max(LIMITES_CHAT.fixada), em: z.number().finite() }).nullable(),
+});
+
+/** Antes de 25/10, em produção: a sala só abre na noite da apuração. */
+export const BLOQUEIO_ANTES_DA_ELEICAO = 'A sala abre em 25 de outubro, às 17h (horário de Brasília), quando terminar a votação.';
 
 const zerarReacoes = (): Record<ReacaoId, number> => ({ fogo: 0, uau: 0, palmas: 0, olhos: 0 });
 
@@ -206,6 +240,9 @@ export class SalaChat {
   private readonly now: () => number;
   private readonly producao: boolean;
   private readonly registro: boolean;
+  private readonly ensaio: boolean;
+  readonly travada: string | null;
+  private readonly aoMudarConfig?: (c: ConfigSalaChat) => void;
   private readonly nomes: string[];
   private readonly excecoes: string[];
   aberta = false;
@@ -255,6 +292,9 @@ export class SalaChat {
     this.now = o.now ?? Date.now;
     this.producao = !!o.producao;
     this.registro = !!o.registro;
+    this.ensaio = !!o.ensaio;
+    this.travada = o.travada ?? null;
+    this.aoMudarConfig = o.aoMudarConfig;
     this.nomes = prepararNomesApelido(o.nomesCandidatos ?? []);
     this.excecoes = prepararExcecoes(o.municipios ?? []);
     this.tentativas = new LimiteJanela(TENTATIVAS_MIN, 60_000, this.now);
@@ -270,6 +310,23 @@ export class SalaChat {
     this.reacaoLimite = new LimiteJanela(REACAO_LOTES_MIN, 60_000, this.now);
     this.reacaoRede = new LimiteJanela(REACAO_REDE_MIN, 60_000, this.now);
     this.contadores = { publicadas: 0, recusadas: {}, denuncias: 0, ocultadas: 0, desde: this.now() };
+    if (o.configInicial !== undefined && o.configInicial !== null) this.restaurarConfig(o.configInicial);
+  }
+
+  /** Configuração atual (o que vai para STATE_DIR/chat.json). */
+  config(): ConfigSalaChat {
+    return { aberta: this.aberta, lentoS: this.lentoS, fixada: this.fixada };
+  }
+
+  /** Adota uma configuração salva; inválida (arquivo corrompido, versão antiga) → ignorada, a sala fica como está. */
+  restaurarConfig(v: unknown): boolean {
+    const p = configSalaSchema.safeParse(v);
+    if (!p.success) return false;
+    this.aberta = p.data.aberta && !this.travada;
+    this.lentoS = p.data.lentoS;
+    this.fixada = p.data.fixada;
+    this.mudou();
+    return true;
   }
 
   /** Sala montada a partir do dataset (nomes de candidatos e de municípios). */
@@ -327,7 +384,11 @@ export class SalaChat {
   // ---- estado ------------------------------------------------------------------------------------------------------
 
   bloqueio(): string | null {
-    return this.producao ? bloqueioDiaEleicao(this.now()) : null;
+    if (!this.producao) return null;
+    const agora = this.now();
+    const dia = bloqueioDiaEleicao(agora);
+    if (dia) return dia;
+    return !this.ensaio && agora < DIA_ELEICAO_INICIO ? BLOQUEIO_ANTES_DA_ELEICAO : null;
   }
 
   abertaAgora(): boolean {
@@ -336,6 +397,11 @@ export class SalaChat {
 
   private mudou() {
     this.versao++;
+  }
+
+  private mudouConfig() {
+    this.mudou();
+    this.aoMudarConfig?.(this.config());
   }
 
   /** Tira da memória as mensagens com mais de 12 h. */
@@ -397,7 +463,9 @@ export class SalaChat {
       if (autor.recentes.some((r) => r.chave === chave)) return this.recusar('duplicada', 'Você já enviou essa mensagem agora há pouco.');
     }
     const globais = (this.duplicadasGlobais.get(chave) ?? []).filter((t) => t > agora - DUPLICADA_GLOBAL_MS);
-    if (globais.length >= DUPLICADA_GLOBAL_MAX) return this.recusar('duplicada', 'Essa mesma mensagem já foi enviada várias vezes agora há pouco.');
+    // "raid" (a mesma mensagem de muitas pessoas): só para texto de verdade — "😮", "50,1%" e "kkk" repetem naturalmente
+    if (letrasDaChave(chave) >= LETRAS_DUPLICADA_GLOBAL && globais.length >= DUPLICADA_GLOBAL_MAX)
+      return this.recusar('duplicada', 'Essa mesma mensagem já foi enviada várias vezes agora há pouco.');
     if (!this.porRede.tentar(String(rede))) return this.recusar('limite', 'Muitas mensagens saindo da sua rede agora. Tente em instantes.', 30);
 
     // publica
@@ -647,23 +715,26 @@ export class SalaChat {
   comando(cmd: ComandoChat): { ok: true; log: string } | { ok: false; erro: string } {
     const agora = this.now();
     switch (cmd.acao) {
-      case 'abrir':
+      case 'abrir': {
+        if (this.travada) return { ok: false, erro: this.travada };
         this.aberta = true;
-        this.mudou();
-        return { ok: true, log: 'sala aberta' };
+        this.mudouConfig();
+        const b = this.bloqueio();
+        return { ok: true, log: b ? `sala aberta (recebe mensagens só depois do bloqueio: ${b})` : 'sala aberta' };
+      }
       case 'fechar':
         this.aberta = false;
-        this.mudou();
+        this.mudouConfig();
         return { ok: true, log: 'sala fechada' };
       case 'lento':
         this.lentoS = cmd.segundos;
-        this.mudou();
+        this.mudouConfig();
         return { ok: true, log: `modo lento ${cmd.segundos} s` };
       case 'fixar': {
         const t = (cmd.texto ?? '').replace(/\s+/g, ' ').trim();
         if (t.length > LIMITES_CHAT.fixada) return { ok: false, erro: `A mensagem fixada pode ter até ${LIMITES_CHAT.fixada} caracteres.` };
         this.fixada = t ? { texto: t, em: agora } : null;
-        this.mudou();
+        this.mudouConfig();
         return { ok: true, log: t ? 'mensagem fixada' : 'mensagem fixada removida' };
       }
       case 'apagar': {
@@ -739,6 +810,7 @@ export class SalaChat {
         ...[...this.redesSilenciadas].map(([k, s]) => ({ autor: SalaChat.idRede(k), apelido: s.apelido, ate: s.ate, rede: true })),
         ...[...this.silenciados].map(([k, s]) => ({ autor: SalaChat.idAutor(k), apelido: s.apelido, ate: s.ate })),
       ],
+      ...(this.travada ? { travada: this.travada } : {}),
       limiarDenuncias: this.limiarDenuncias(),
       alertaDenuncias: { redes: this.ajudouOcultar.chavesCom(ALERTA_REDE_OCULTAS), ocultadasHora: this.ocultadasHora.quantos(0) },
       contadores: this.contadores,
@@ -763,7 +835,7 @@ export interface DepsRotasChat {
   /** rede LARGA para contar denúncias (IPv6 /48; IPv4 inteiro); padrão = clienteDe */
   redeDenunciaDe?: (c: Ctx) => string;
   /** mensagem publicada (registro opcional de envios, desligado por padrão: chat-registro.ts) */
-  aoPublicar?: (c: Ctx, id: string, em: number) => void;
+  aoPublicar?: (c: Ctx, m: MensagemChat) => void;
   /** pedido do próprio site (Origin/Referer/Sec-Fetch-Site) */
   origemPermitida: (c: Ctx) => boolean;
   log: Logger;
@@ -832,7 +904,7 @@ export function registrarChatPublico(app: App, deps: DepsRotasChat): void {
     if (corpo instanceof Response) return corpo;
     const r = sala.enviar(corpo, deps.clienteDe(c));
     if (r.ok) {
-      deps.aoPublicar?.(c, r.mensagem.id, r.mensagem.em);
+      deps.aoPublicar?.(c, r.mensagem);
       return c.json(r, 200, { 'cache-control': CC_PRIVADO });
     }
     const headers: Record<string, string> = { 'cache-control': CC_PRIVADO };

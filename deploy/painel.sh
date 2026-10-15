@@ -23,17 +23,32 @@
 #   sudo /opt/sintonia/deploy/painel.sh alerta "texto"    idem, com destaque (use para instabilidade do TSE)
 #   sudo /opt/sintonia/deploy/painel.sh sem-aviso         tira o aviso do site
 #
+#   sudo /opt/sintonia/deploy/painel.sh chat-estado       sala do chat: aberta/fechada, modo lento, fixada, pessoas, denúncias
+#   sudo /opt/sintonia/deploy/painel.sh chat-abrir        abre a sala (em produção só recebe mensagens a partir das 17h de 25/10)
+#   sudo /opt/sintonia/deploy/painel.sh chat-fechar       fecha a sala (emergência: enxurrada de desinformação, ataque)
+#   sudo /opt/sintonia/deploy/painel.sh chat-limpar       apaga TODAS as mensagens da sala (as abas abertas também limpam)
+#   sudo /opt/sintonia/deploy/painel.sh chat-lento 20     modo lento: segundos entre mensagens da mesma pessoa (3–300)
+#   sudo /opt/sintonia/deploy/painel.sh chat-fixar "texto"  fixa uma mensagem no topo da sala · chat-sem-fixada tira
+#
 # A SIMULAÇÃO nunca é ligada por aqui (no site público ela não pode ir ao ar). Roteiro da noite: RUNBOOK-ELEICAO.md.
+# Usa o mesmo login do painel: sujeito ao mesmo limite de tentativas (HTTP 429 → espere 1 min).
 # =====================================================================================================
 # shellcheck source=deploy/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 case ${1:-} in
   '' | -h | --help | ajuda)
-    sed -n '2,27p' "$0"
+    sed -n '2,35p' "$0"
     exit 0
     ;;
   estado | tse | testar-tse | trocar-agora | horario-padrao | desligar-troca | ligar-troca | sem-aviso) ;;
+  chat-estado | chat-abrir | chat-fechar | chat-limpar | chat-sem-fixada) ;;
+  chat-lento)
+    [[ ${2:-} =~ ^[0-9]{1,3}$ && $2 -ge 3 && $2 -le 300 ]] || morrer "Use: painel.sh chat-lento <segundos>   (3 a 300; ex.: painel.sh chat-lento 20)"
+    ;;
+  chat-fixar)
+    [[ -n ${2:-} ]] || morrer "Use: painel.sh chat-fixar \"texto\"   (para tirar: painel.sh chat-sem-fixada)"
+    ;;
   adiar)
     [[ ${2:-} =~ ^[0-9]{1,4}$ && $2 -ge 1 ]] || morrer "Use: painel.sh adiar <minutos>   (ex.: painel.sh adiar 15)"
     ;;
@@ -149,11 +164,26 @@ async function estado() {
   const t = s.state.tse;
   console.log(`Códigos do TSE:   pleito ${t.pleito} · Presidente ${t.eleicaoPres} · Governador ${t.eleicaoGov} · a cada ${t.intervaloSeg} s`);
   console.log(`Versão:           estado ${s.state.versao} · build ${sv.build?.commit ?? '?'}` + (typeof st.pessoasAgora === 'number' ? ` · pessoas agora ~${st.pessoasAgora} (que chegaram a este servidor)` : ''));
+  const { j: c } = await req('/api/admin/chat');
+  console.log('Chat ao vivo:     ' + linhaChat(c));
   if (s.state.fonte === 'tse') {
     const { j: h } = await req('/api/admin/tse/health');
     console.log('TSE:');
     for (const l of resumoTse(h)) console.log(l);
   }
+}
+
+function linhaChat(c) {
+  if (!c) return '(indisponível)';
+  const sala = c.aberta ? (c.bloqueio ? `ABERTA no painel, mas ainda sem receber mensagens: ${c.bloqueio}` : 'ABERTA (recebendo mensagens)') : 'fechada';
+  return `${sala} · modo lento ${c.lentoS} s` + (c.fixada ? ` · fixada: "${c.fixada.texto}"` : ' · sem mensagem fixada') +
+    (typeof c.pessoas === 'number' ? ` · ~${c.pessoas} pessoa(s) na sala` : '');
+}
+
+async function chat(corpo) {
+  const { ok: certo, status, j } = corpo === undefined ? await req('/api/admin/chat') : await req('/api/admin/chat', corpo);
+  if (!certo) throw new Error(`o servidor recusou o comando do chat (HTTP ${status}): ${j?.erro ?? ''}`);
+  return j;
 }
 
 async function esperarTroca(limiteMs) {
@@ -249,6 +279,21 @@ function horarioDe(txt) {
         ok(`Aviso no ar (${r.status.aviso?.nivel}): "${r.status.aviso?.texto}"`);
         break;
       }
+      case 'chat-estado': {
+        const c = await chat();
+        console.log('Sala:        ' + linhaChat(c));
+        console.log(`Mensagens:   ${c.mensagens?.length ?? 0} na sala · ${c.denunciadas?.length ?? 0} denunciada(s) para revisar · ${c.silenciados?.length ?? 0} silenciado(s)`);
+        const rec = Object.entries(c.contadores?.recusadas ?? {}).map(([k, v]) => `${k} ${v}`).join(', ');
+        console.log(`Desde ${hora(c.contadores?.desde)}: ${c.contadores?.publicadas ?? 0} publicada(s)` + (rec ? ` · recusadas: ${rec}` : ''));
+        console.log('Moderar (apagar, silenciar, denúncias): painel /admin → Chat ao vivo.');
+        break;
+      }
+      case 'chat-abrir': ok('Chat: ' + linhaChat(await chat({ acao: 'abrir' }))); break;
+      case 'chat-fechar': ok('Chat: ' + linhaChat(await chat({ acao: 'fechar' }))); break;
+      case 'chat-limpar': ok('Chat: todas as mensagens apagadas. ' + linhaChat(await chat({ acao: 'limpar' }))); break;
+      case 'chat-lento': ok('Chat: ' + linhaChat(await chat({ acao: 'lento', segundos: Number(arg) }))); break;
+      case 'chat-fixar': ok('Chat: ' + linhaChat(await chat({ acao: 'fixar', texto: arg }))); break;
+      case 'chat-sem-fixada': ok('Chat: ' + linhaChat(await chat({ acao: 'fixar', texto: null }))); break;
       case 'sem-aviso': {
         const r = await comando({ tipo: 'aviso', aviso: null });
         ok('Aviso retirado.' + (r.status.aviso ? ` (continua o aviso automático: "${r.status.aviso.texto}")` : ''));

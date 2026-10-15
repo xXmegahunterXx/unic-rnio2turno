@@ -3,8 +3,10 @@
  *
  * Por desenho o Sintonia não guarda IP (ARCHITECTURE §1.3). Um site com anúncios que publica conteúdo de usuários pode,
  * porém, ser obrigado a identificar o autor de uma mensagem por ordem judicial. Se o dono, com o advogado, decidir que é
- * preciso, este registro guarda o MÍNIMO de cada mensagem PUBLICADA no chat — id da mensagem, data e hora UTC, IP e
- * porta de origem — e nada mais (nem texto, nem apelido, nem navegador):
+ * preciso, este registro guarda, de cada mensagem PUBLICADA no chat, o necessário para ligar um print a quem a enviou —
+ * id da mensagem, data e hora UTC, IP e porta de origem, o apelido e o texto publicados — e nada mais (nem navegador,
+ * nem token). Sem o apelido e o texto, um print (apelido, HH:MM e texto) não liga a nenhuma linha depois que a mensagem
+ * sai da memória (12 h ou um reinício): no mesmo minuto há dezenas de envios.
  *
  *  - liga só com `CHAT_REGISTRO_CHAVE` = caminho de uma chave PÚBLICA RSA (PEM, ≥ 2048 bits). A chave PRIVADA fica FORA
  *    da VPS: o servidor consegue gravar, mas não consegue ler o que gravou (cifra híbrida: AES-256-GCM por linha, chave
@@ -33,6 +35,9 @@ export interface EnvioRegistrado {
   em: number;
   ip: string;
   porta: number | null;
+  /** apelido e texto PUBLICADOS (já normalizados pela sala) — opcionais: linhas antigas não têm */
+  apelido?: string;
+  texto?: string;
 }
 
 const b64 = (b: Buffer) => b.toString('base64');
@@ -98,7 +103,7 @@ export class RegistroEnvios {
       const dia = new Date(e.em).toISOString().slice(0, 10);
       const arq = join(this.o.dir, `${dia}.reg`);
       const novo = !existsSync(arq);
-      appendFileSync(arq, `${cifrarLinha(this.chave, JSON.stringify({ id: e.id, em: e.em, utc: new Date(e.em).toISOString(), ip: e.ip, porta: e.porta }))}\n`, { mode: 0o600 });
+      appendFileSync(arq, `${cifrarLinha(this.chave, JSON.stringify({ id: e.id, em: e.em, utc: new Date(e.em).toISOString(), ip: e.ip, porta: e.porta, apelido: e.apelido ?? null, texto: e.texto ?? null }))}\n`, { mode: 0o600 });
       if (novo) chmodSync(arq, 0o600);
       if (this.podadoEm !== dia) {
         this.podadoEm = dia;

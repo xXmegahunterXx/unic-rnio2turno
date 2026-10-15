@@ -171,6 +171,18 @@ describe('cache HTTP', () => {
     expect(semBr.headers.get('content-encoding')).toBe('gzip');
   });
 
+  it('/api/status: corpo montado no máximo 1×/s (a query não fura); comando do admin aparece na hora', async () => {
+    const m2 = await montar();
+    const antes = m2.respostas.tamanho;
+    const [a, b] = await Promise.all([m2.app.request('/api/status'), m2.app.request('/api/status?x=123')]);
+    expect(await a.text()).toBe(await b.text());
+    expect(m2.respostas.tamanho).toBe(antes + 1);
+    const cookie = await login(m2);
+    await comando(m2, cookie, { tipo: 'aviso', aviso: { nivel: 'info', texto: 'Teste de aviso' } });
+    const s = (await (await m2.app.request('/api/status')).json()) as LiveStatus;
+    expect(s.aviso?.texto).toBe('Teste de aviso');
+  });
+
   it('respostas iguais no mesmo segundo vêm do cache da origem', async () => {
     const antes = m.respostas.tamanho;
     const [a, b] = await Promise.all([get('/api/apuracao/pres-t1/uf/ba'), get('/api/apuracao/pres-t1/uf/ba')]);

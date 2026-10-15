@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { AdminCommand } from '../shared/api';
 import { validaAnuncio, validaContatoAnuncie } from '../shared/anuncios';
+import { validaContatosPublicos } from '../shared/contatos';
 import { UFS, type UF } from '../shared/types';
 import { TROCA_AUTO_MAX, TROCA_AUTO_MIN } from '../engine/state';
 
@@ -189,6 +190,13 @@ const contatoAnuncie = z.unknown().superRefine((v, ctx) => {
   if ('erro' in r) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.erro, params: { limpo: true } });
 });
 
+/** Contatos públicos e responsável pelo site (src/shared/contatos.ts): só os campos conhecidos, e-mails reais. */
+const contatosPublicos = z.unknown().superRefine((v, ctx) => {
+  if (v === null) return;
+  const r = validaContatosPublicos(v);
+  if ('erro' in r) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.erro, params: { limpo: true } });
+});
+
 const idAnuncio = z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, 'id de anúncio inválido');
 
 export const adminCommandSchema = z.discriminatedUnion('tipo', [
@@ -208,6 +216,7 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('anuncio-remover'), id: idAnuncio }).strict(),
   z.object({ tipo: z.literal('anuncio-ativo'), id: idAnuncio, ativo: z.boolean() }).strict(),
   z.object({ tipo: z.literal('anuncie-contato'), contato: contatoAnuncie }).strict(),
+  z.object({ tipo: z.literal('contatos'), contatos: contatosPublicos }).strict(),
   // 'executar' e 'concluir' são internos do servidor (troca-auto.ts): nunca entram pela rota HTTP
   z
     .object({

@@ -3,8 +3,11 @@
  * VPS, com a chave PRIVADA (que nunca vai para o servidor).
  *
  *   npx tsx scripts/chat-registro-abrir.ts --chave privada.pem --dir ./chat-registro [--id <id da mensagem>] [--dia AAAA-MM-DD]
+ *                                          [--apelido <apelido>] [--texto <trecho do texto>]
  *
- * Saída: uma linha JSON por envio ({ id, utc, ip, porta }). Sem --id, todos os envios dos arquivos escolhidos.
+ * Saída: uma linha JSON por envio ({ id, utc, ip, porta, apelido, texto }). Sem filtro, todos os envios dos arquivos
+ * escolhidos. Para casar um print (apelido, HH:MM e texto): --dia, --apelido e um trecho do texto (sem diferenciar
+ * maiúsculas).
  *
  * Gerar o par de chaves (uma vez, num computador seguro; só a PÚBLICA vai para a VPS, em CHAT_REGISTRO_CHAVE):
  *   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out chat-registro-privada.pem
@@ -23,6 +26,8 @@ const chave = arg('chave');
 const dir = arg('dir');
 const id = arg('id');
 const dia = arg('dia');
+const apelido = arg('apelido')?.toLowerCase();
+const trecho = arg('texto')?.toLowerCase();
 if (!chave || !dir) {
   console.error('Uso: npx tsx scripts/chat-registro-abrir.ts --chave privada.pem --dir <pasta chat-registro> [--id <id>] [--dia AAAA-MM-DD]');
   process.exit(2);
@@ -42,7 +47,9 @@ for (const f of arquivos) {
       continue;
     }
     if (id && e.id !== id) continue;
-    console.log(JSON.stringify({ id: e.id, utc: new Date(e.em).toISOString(), ip: e.ip, porta: e.porta }));
+    if (apelido && (e.apelido ?? '').toLowerCase() !== apelido) continue;
+    if (trecho && !(e.texto ?? '').toLowerCase().includes(trecho)) continue;
+    console.log(JSON.stringify({ id: e.id, utc: new Date(e.em).toISOString(), ip: e.ip, porta: e.porta, apelido: e.apelido ?? null, texto: e.texto ?? null }));
     n++;
   }
 }

@@ -14,12 +14,13 @@
  * para o polling do TSE e grava o estado pendente (e as métricas dos anúncios). Sai com código 0 (ou 1 se passar de
  * ENCERRAMENTO_SEG + 5 s).
  */
-import { unwatchFile, watchFile } from 'node:fs';
+import { unwatchFile, watchFile, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
-import type { AdminState, UF } from '../shared/types';
+import type { AdminState, Patrocinio, UF } from '../shared/types';
 import { createController, loadDataset } from '../engine/controller';
+import { anuncioDoPatrocinio } from '../engine/state';
 import type { JsonLoader } from '../engine/api';
 import { createApp } from './app';
 import { loadConfig } from './config';
@@ -49,6 +50,31 @@ async function main() {
     log: (m) => log.info(`motor: ${m}`),
   });
   if (salvo) log.info(`Estado do admin restaurado de ${store.caminho} (versão ${controller.state().versao}, fonte ${controller.state().fonte})`);
+  // LEGADO: o patrocínio antigo vira o anúncio 'patrocinio' na 1ª subida (state.ts). Perdas dessa migração vão para o log
+  // (o dono revisa o anúncio no painel): título cortado, logo por URL descartada ou patrocínio recusado pelas regras novas.
+  const patAntigo = salvo && typeof salvo === 'object' ? ((salvo as { patrocinio?: unknown }).patrocinio as Patrocinio | null | undefined) : null;
+  if (patAntigo && typeof patAntigo === 'object' && typeof patAntigo.marca === 'string' && typeof patAntigo.texto === 'string') {
+    const migrado = controller.state().anuncios?.find((a) => a.id === 'patrocinio');
+    if (!migrado) {
+      const r = anuncioDoPatrocinio(patAntigo);
+      log.aviso(`Patrocínio antigo NÃO virou anúncio${'erro' in r ? `: ${r.erro}` : ' (lista de anúncios cheia)'} — recadastre-o no painel (Anúncios)`);
+    } else {
+      const perdas: string[] = [];
+      if (patAntigo.texto.trim().length > migrado.titulo.length) perdas.push(`título cortado em ${migrado.titulo.length} caracteres`);
+      if (patAntigo.imagem && !migrado.logo) perdas.push('logo por endereço externo descartada (envie o arquivo da logo)');
+      if (perdas.length) log.aviso(`Patrocínio antigo virou o anúncio 'patrocinio' com ajustes: ${perdas.join('; ')} — revise no painel (Anúncios)`);
+    }
+  }
+  // admin.json sem a lista de anúncios = gravado por uma versão anterior a out/2026 (ex.: depois de um rollback para ela,
+  // qualquer gravação lá tira 'anuncios' e 'anuncie' do arquivo). Na 1ª atualização para esta versão é o esperado (o
+  // patrocínio antigo vira anúncio); depois disso, significa anúncios perdidos.
+  if (salvo && typeof salvo === 'object' && !('anuncios' in salvo)) {
+    log.aviso(
+      `${store.caminho} sem a lista de anúncios (formato anterior a out/2026). Se esta versão já tinha anúncios ou o contato da ` +
+        '/anuncie cadastrados, uma versão antiga regravou o arquivo (rollback): refaça-os no painel ou restaure só o admin.json do ' +
+        'último backup feito nesta versão (RUNBOOK §3.5).',
+    );
+  }
 
   // SIM_AUTOSTART: simulação a 20× (dev / demonstrações; em produção só com ALLOW_SIMULACAO — config.ts zera).
   // 'auto' respeita uma simulação ou TSE em curso.
@@ -89,7 +115,9 @@ async function main() {
     leads: storeCrescimento('leads.json', 250, 'os pedidos de anunciantes'),
     divulgacao: storeCrescimento('divulgacao.json', 0, 'as redes do Sintonia'),
   };
-  const sintonia = createApp({ config, dataset: ds, controller, tse, log, metricasAnunciosStore, crescimentoStores });
+  // configuração da sala do chat (aberta, modo lento, fixada): sobrevive a update/restart/vigia do healthcheck
+  const chatStore = createJsonStore(config.stateDir, 'chat.json', { debounceMs: 0, onErro: (e) => log.erro('Falha ao salvar a configuração do chat', e) });
+  const sintonia = createApp({ config, dataset: ds, controller, tse, log, metricasAnunciosStore, crescimentoStores, chatStore });
   sintonia.crescimento.iniciar();
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
@@ -152,9 +180,32 @@ async function main() {
   // requisição inteira (cabeçalhos + corpo) em até 30 s: conexões lentas de propósito não prendem o processo
   srv.requestTimeout = 30_000;
 
+  // Batimento para o vigia do healthcheck (deploy/healthcheck.mjs): prova que o laço de eventos gira. Com a CPU saturada,
+  // o /healthz numa conexão nova pode passar de 5 s; o vigia só reinicia se o batimento também parar (travamento real).
+  // Só em produção (ou com BATIMENTO_ARQ): no contêiner, /tmp é um tmpfs só deste app.
+  const arqBatimento = process.env.BATIMENTO_ARQ || (config.producao ? '/tmp/sintonia-batimento' : '');
+  if (arqBatimento) {
+    let falhouBatimento = false;
+    const bater = () => {
+      try {
+        writeFileSync(arqBatimento, JSON.stringify({ pid: process.pid, t: Date.now() }));
+      } catch (e) {
+        if (!falhouBatimento) log.aviso(`Batimento do vigia desligado: não consegui gravar ${arqBatimento} (${msgErro(e)})`);
+        falhouBatimento = true;
+      }
+    };
+    bater();
+    setInterval(bater, 1000).unref();
+  }
+
+  // ensaio do update.sh (contêiner ao lado do que está no ar, mesmo volume): não grava audiência nem métricas — o app no
+  // ar é quem conta (senão cada update somaria um "reinício" e poderia regravar contagens velhas)
+  const ensaio = /^(1|true|sim)$/i.test(process.env.SINTONIA_ENSAIO?.trim() ?? '');
+  if (ensaio) log.info('SINTONIA_ENSAIO: contêiner de ensaio — audiência e métricas dos anúncios não são gravadas');
   const resumo = setInterval(() => {
     const r = sintonia.resumoMinuto();
     if (r) log.info(r.msg, r.campos);
+    if (ensaio) return;
     void sintonia.persistirMetricasAnuncios();
     void sintonia.crescimento.persistir();
   }, 60_000);
@@ -204,9 +255,12 @@ async function main() {
       // só grava o que estiver pendente: o estado já é salvo a cada comando, e regravar aqui poderia
       // sobrescrever um estado mais novo escrito por outra instância no mesmo STATE_DIR
       await store.flush();
-      await sintonia.persistirMetricasAnuncios();
+      await chatStore.flush();
       sintonia.crescimento.parar();
-      await sintonia.crescimento.persistir();
+      if (!ensaio) {
+        await sintonia.persistirMetricasAnuncios();
+        await sintonia.crescimento.persistir();
+      }
     } catch (e) {
       log.erro('Erro ao gravar o estado no encerramento', e);
     }

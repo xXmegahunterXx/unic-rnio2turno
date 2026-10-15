@@ -42,6 +42,9 @@
  *                     IP e porta; Marco Civil, art. 15) em STATE_DIR/chat-registro — DESLIGADO por padrão; só com
  *                     decisão do dono e do advogado (chat-registro.ts). A chave privada fica fora da VPS
  *   CHAT_REGISTRO_HEADER_PORTA cabeçalho com a porta de origem do visitante, quando o proxy a repassa (opcional)
+ *   CHAT_ENSAIO       '1' (só para ensaio numa cópia do site): em produção, a sala aberta no painel recebe mensagens antes
+ *                     de 25/10. Sem ela (o padrão), a sala só recebe mensagens a partir das 17h de 25/10 (o painel pode
+ *                     abri-la antes e ela fica "abre às 17h"). O bloqueio legal de 0h–17h de 25/10 vale sempre
  *
  * Log:
  *   LOG_FORMAT        'json' (padrão em produção: 1 objeto por linha) ou 'texto' (padrão em dev)
@@ -72,6 +75,8 @@ export interface ServerConfig {
   chatRegistroChave: string | null;
   /** cabeçalho com a porta de origem (atrás de proxy) */
   chatRegistroHeaderPorta: string | null;
+  /** CHAT_ENSAIO=1: em produção a sala pode receber mensagens antes de 25/10 (ensaio numa cópia do site) */
+  chatEnsaio: boolean;
   /** null → admin desabilitado (produção sem ADMIN_PASSWORD) */
   adminPassword: string | null;
   /** true quando a senha é o padrão de desenvolvimento */
@@ -194,6 +199,9 @@ export function loadConfig(env: Env = process.env, cwd = process.cwd()): ServerC
     avisos.push('SIM_AUTOSTART ignorado: em produção a simulação só vai ao ar com ALLOW_SIMULACAO=1');
     simAutostart = 'nao';
   }
+  if (producao && sim(env.CHAT_ENSAIO)) {
+    avisos.push('CHAT_ENSAIO=1 em produção: a sala do chat, se aberta no painel, recebe mensagens antes de 25/10 (só para ensaio)');
+  }
   if (producao && permitirSimulacao) {
     avisos.push('ALLOW_SIMULACAO=1 em produção: o painel pode pôr números SIMULADOS no ar (sempre com a faixa "SIMULAÇÃO")');
   }
@@ -247,6 +255,7 @@ export function loadConfig(env: Env = process.env, cwd = process.cwd()): ServerC
     serveStatic,
     stateDir,
     chatRegistroChave: env.CHAT_REGISTRO_CHAVE?.trim() ? resolve(cwd, env.CHAT_REGISTRO_CHAVE.trim()) : null,
+    chatEnsaio: sim(env.CHAT_ENSAIO),
     chatRegistroHeaderPorta: /^[a-z0-9-]{1,64}$/i.test(env.CHAT_REGISTRO_HEADER_PORTA?.trim() ?? '') ? env.CHAT_REGISTRO_HEADER_PORTA!.trim().toLowerCase() : null,
     adminPassword,
     adminPasswordPadrao,

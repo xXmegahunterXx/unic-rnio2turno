@@ -5,12 +5,13 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { REGRAS_CHAT } from '@/shared/chat';
+import { AVISO_REGISTRO_CHAT, REGRAS_CHAT } from '@/shared/chat';
 import { Container } from '@/app/components/layout/Container';
 import { ButtonLink } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { Sala } from '@/app/components/chat/Sala';
+import { useSala } from '@/app/components/chat/sala';
 
 /** Tab bar do celular (60) + respiro (12): a sala termina acima dela. */
 const RESERVA_PE_PX = 72;
@@ -48,6 +49,8 @@ export default function AoVivoPage() {
   useTitulo('Chat ao vivo · Sala da apuração');
   const sala = useRef<HTMLDivElement>(null);
   const altura = useAlturaAteOPe(sala);
+  // só lê o estado da sala (quem consulta é a própria <Sala>): com o registro de envios ligado, o texto muda
+  const registro = !!useSala(null).pub?.registro;
   return (
     <Container className="pb-6 pt-3 sm:pb-12 sm:pt-8">
       {/* celular: cabeçalho de uma linha (a sala ocupa o resto da tela, até a tab bar) */}
@@ -100,7 +103,8 @@ export default function AoVivoPage() {
               </li>
               <li className="text-pretty">As reações (🔥 😮 👏 👀) são só do momento: não têm relação com candidato e não são enquete.</li>
               <li className="text-pretty">
-                Privacidade: o servidor guarda só as últimas mensagens publicadas, em memória e por até 12 horas, e nunca o seu IP. Veja a{' '}
+                Privacidade: o servidor guarda as últimas mensagens publicadas em memória, por até 12 horas.{' '}
+                {registro ? AVISO_REGISTRO_CHAT : 'O seu IP não é guardado.'} Veja a{' '}
                 <Link to="/privacidade" className="font-medium text-fg underline decoration-line underline-offset-2">
                   política de privacidade
                 </Link>

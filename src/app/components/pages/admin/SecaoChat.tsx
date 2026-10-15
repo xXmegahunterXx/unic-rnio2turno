@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { EMOJI_REACAO, LIMITES_CHAT, REACOES, type ChatAdmin, type ComandoChat, type MensagemAdmin, type MotivoRecusa } from '@/shared/chat';
+import { DIA_ELEICAO_17H, DIA_ELEICAO_INICIO, EMOJI_REACAO, LIMITES_CHAT, REACOES, type ChatAdmin, type ComandoChat, type MensagemAdmin, type MotivoRecusa } from '@/shared/chat';
 import { fmtHora, fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Badge, Button, Segmented, toast } from '@/app/ui';
@@ -162,13 +162,26 @@ function SecaoChatServidor() {
                 Fechar a sala
               </Button>
             ) : (
-              <Button variant="primary" block icon="play" loading={ocupado === 'abrir'} onClick={() => void cmd({ acao: 'abrir' }, 'Sala aberta')}>
+              <Button
+                variant="primary"
+                block
+                icon="play"
+                disabled={!!d.travada}
+                loading={ocupado === 'abrir'}
+                onClick={() => void cmd({ acao: 'abrir' }, d.bloqueio ? 'Sala aberta: recebe mensagens às 17h de 25/10' : 'Sala aberta')}
+              >
                 Abrir a sala
               </Button>
             )}
-            {d.bloqueio ? (
-              <Callout tom="alerta" titulo="Dia da eleição">
-                {d.bloqueio} Até lá ninguém consegue enviar mensagens, mesmo com a sala aberta (propaganda no dia da eleição é crime).
+            {d.travada ? (
+              <Callout tom="alerta" titulo="Sala travada pelo servidor">
+                {d.travada}
+              </Callout>
+            ) : d.bloqueio ? (
+              <Callout tom="alerta" titulo={d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? 'Dia da eleição' : 'Antes da apuração'}>
+                {d.bloqueio} Até lá ninguém consegue enviar mensagens, mesmo com a sala aberta
+                {d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? ' (propaganda no dia da eleição é crime)' : ''}. Abrir antes deixa a sala
+                pronta: ela passa a receber mensagens sozinha às 17h. A configuração (aberta, modo lento, fixada) sobrevive a reinícios.
               </Callout>
             ) : null}
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">

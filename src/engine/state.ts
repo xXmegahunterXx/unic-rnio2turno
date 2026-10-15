@@ -10,6 +10,7 @@ import {
   type ContatoAnuncie,
 } from '../shared/anuncios';
 import type { AdminState, Aviso, ClockState, FonteDados, Patrocinio, ScenarioConfig, TrocaAutoEstado, TseConfig } from '../shared/types';
+import { validaContatosPublicos, type ContatosPublicos } from '../shared/contatos';
 import { normalizaCenario } from './scenario';
 import type { Structure } from './structure';
 
@@ -62,6 +63,7 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     patrocinio: null,
     anuncios: [],
     anuncie: null,
+    contatos: null,
     trocaAuto: trocaAutoPadrao(),
   };
 }
@@ -220,6 +222,7 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     patrocinio: null,
     anuncios: migraPatrocinio(parseAnunciosSalvos(v.anuncios, fallback.anuncios ?? []), parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null)),
     anuncie: parseContatoSalvo(v.anuncie, fallback.anuncie ?? null),
+    contatos: parseContatosSalvos(v.contatos, fallback.contatos ?? null),
     trocaAuto: parseTrocaAuto(v.trocaAuto, fallback.trocaAuto ?? trocaAutoPadrao()),
   };
 }
@@ -287,6 +290,14 @@ function parseContatoSalvo(v: unknown, fallback: ContatoAnuncie | null): Contato
   if (v === undefined) return fallback ? { ...fallback } : null;
   if (v === null) return null;
   const r = validaContatoAnuncie(v);
+  return 'ok' in r && Object.keys(r.ok).length ? r.ok : null;
+}
+
+/** Contatos públicos de um estado restaurado (inválido/vazio → null; ausente → fallback). */
+function parseContatosSalvos(v: unknown, fallback: ContatosPublicos | null): ContatosPublicos | null {
+  if (v === undefined) return fallback ? { ...fallback } : null;
+  if (v === null) return null;
+  const r = validaContatosPublicos(v);
   return 'ok' in r && Object.keys(r.ok).length ? r.ok : null;
 }
 

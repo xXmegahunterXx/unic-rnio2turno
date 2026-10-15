@@ -82,7 +82,7 @@ export interface ChatPublico {
 
 /** Aviso das regras quando o registro de envios está ligado. */
 export const AVISO_REGISTRO_CHAT =
-  'Para cumprir a lei, o Sintonia guarda por 6 meses, cifrados, o IP e a hora de cada mensagem publicada; só são abertos por ordem judicial.';
+  'Para cumprir a lei, o Sintonia guarda por 6 meses, cifrados, o IP, a hora, o apelido e o texto de cada mensagem publicada; só são abertos por ordem judicial.';
 
 /** `POST /api/chat` */
 export interface EnvioChat {
@@ -137,6 +137,8 @@ export interface ChatAdmin {
   limiarDenuncias?: number;
   /** redes que ajudaram a esconder 3+ mensagens na última hora e mensagens escondidas por denúncia na última hora */
   alertaDenuncias?: { redes: number; ocultadasHora: number };
+  /** sala TRAVADA fechada pelo servidor (ex.: registro de envios configurado mas inválido): o motivo; abrir é recusado */
+  travada?: string;
   intervaloS: number;
   presencaS: number;
   agora: number;
@@ -294,11 +296,13 @@ const OFENSAS_EXATAS = [
   // xingamentos partidários (os dois campos)
   'gado', 'mortadela', 'mortadelas', 'petralha', 'petralhas', 'bolsominion', 'bolsominions', 'minion', 'minions',
   'esquerdopata', 'esquerdopatas', 'direitopata', 'bolsonazi', 'bolsonazis', 'bozo', 'bozonaro', 'luladrao', 'lularapio',
-  'molusco', 'cachaceiro', 'presidiario', 'descondenado', 'bolsonero', 'familicia', 'rachadinha', 'mamata', 'isentao',
-  'comunopata', 'fascistoide', 'nove dedos', 'apedeuta',
+  'molusco', 'cachaceiro', 'presidiario', 'bolsonero', 'familicia', 'rachadinha', 'mamata', 'isentao',
+  'comunopata', 'fascistoide', 'nove dedos', 'apedeuta', 'analfabeto', 'analfabeta', 'analfabetos', 'analfabetas',
+  'bolsotario', 'bolsotarios', 'lulatario', 'lulatarios', 'petario', 'petarios',
   // acusações de crime (calúnia) e rótulos de ódio
   'ladrao', 'ladroes', 'ladra', 'bandido', 'bandidos', 'bandida', 'criminoso', 'criminosa', 'corrupto', 'corrupta', 'corruptos',
   'genocida', 'genocidas', 'assassino', 'assassina', 'assassinos', 'miliciano', 'milicianos', 'nazista', 'nazistas', 'nazi',
+  'golpista', 'golpistas',
   'terrorista', 'terroristas', 'traidor', 'traidora', 'estuprador', 'pedofilo', 'pedofila',
 ] as const;
 
@@ -323,9 +327,14 @@ const PROPAGANDA: readonly RegExp[] = [
   /\bvot(e|em|a|ar|ando|emos)\s+(em|no|na|nos|nas|nele|nela|com|pelo|pela|de)\b/,
   /\b(vote|votem|votar|digite|digitem|aperte|apertem|tecle|teclem|confirma|confirme|confirmem)\s+((no|na|o|a|em)\s+)?\d{1,5}\b/,
   /\b\d{2,5}\s+(e\s+)?confirm(a|e|ar|em|ado)\b/,
-  /\b(e|eh|so da|so pode ser|fecha com|fechado com|vamos de|vamo de|bora de|vai de)\s+(13|22|treze|vinte e dois|lula|flavio|bolsonaro|pt|pl)\b/,
+  /\b(eh|so da|so pode ser|fecha com|fechado com|vamos de|vamo de|bora de|vai de)\s+(13|22|treze|vinte e dois|lula|flavio|bolsonaro|pt|pl)\b/,
+  // "e" sem acento: depois de tirar o acento, a conjunção ("Lula e Flávio empatados", "seção 22 e 13") é igual ao verbo
+  // ("é 13"). Só vale como verbo quando NÃO vem logo depois de nome/número de candidato ou de outro número; "é"
+  // acentuado no texto original é conferido à parte (temPropaganda). "Lula e 13" / "PL e 22" = nome + "é" + número.
+  /(?<!\b(\d+|lula|flavio|bolsonaro|pt|pl|treze|dois)\s)\be\s+(13|22|treze|vinte e dois|lula|flavio|bolsonaro|pt|pl)\b/,
+  /\b(lula|flavio|bolsonaro|pt|pl)\s+e\s+(13|22|treze|vinte e dois)\b/,
   /\b(lula|flavio|bolsonaro|pt|pl)\s*(13|22)\b|\b(13|22)\s*(lula|flavio|bolsonaro|pt|pl)\b/,
-  /\bfora\s+(lula|flavio|bolsonaro|pt|pl|petistas?|bolsonaristas?|lulistas?)\b/,
+  /\bfora\s+(lula|flavio|bolsonaro|pt|pl|petistas?|bolsonaristas?|lulistas?|flavistas?)\b/,
   /\b(lula|flavio|bolsonaro)\s+(la|sim|presidente|neles|eleito ja|ja ganhou)\b/,
   /\b(eu )?(sou|somos) (lula|flavio|bolsonaro|petista|bolsonarista|lulista)\b/,
   /\b(lula|flavio|bolsonaro|pt|pl) nunca mais\b|\bnunca mais (lula|flavio|bolsonaro|pt|pl)\b/,
@@ -341,8 +350,9 @@ const PROPAGANDA: readonly RegExp[] = [
 ];
 
 /** Hashtags e "chamadas" de campanha (texto original). */
+// "#PT"/"#PL" só como sigla (com número ou slogan colado): "#plantão" e "#ptbr" são outra coisa
 const RE_HASHTAG_CAMPANHA =
-  /#\s*(lula|flavio|fl[áa]vio|bolsonaro|pt|pl|13|22|elenao|ele\s*n[ãa]o|elesim|ele\s*sim|fora\s*(pt|pl|lula|flavio|fl[áa]vio|bolsonaro|petistas?|bolsonaristas?)|lulala|fazol|faz\s*o\s*l\b|arminha|vote|voto)\w*/iu;
+  /#\s*((pt|pl)(13|22|sim|n[ãa]o|nunca\s*mais|l[áa]|presidente|neles)?(?![\p{L}\d])|(lula|flavio|fl[áa]vio|bolsonaro|13|22|elenao|ele\s*n[ãa]o|elesim|ele\s*sim|fora\s*(pt|pl|lula|flavio|fl[áa]vio|bolsonaro|petistas?|bolsonaristas?|lulistas?|flavistas?)|lulala|fazol|faz\s*o\s*l\b|faz\s*(a\s*)?arminha|arminha|vote|voto)\w*)/iu;
 
 /** Desinformação sobre o processo eleitoral (a fonte oficial é o TSE). */
 const FRAUDE: readonly RegExp[] = [
@@ -553,10 +563,15 @@ const RE_REACAO_ENQUETE = new RegExp(
   'iu',
 );
 
+/** "é" acentuado (verbo) + nome/número de candidato, no texto original (minúsculas, com acento). */
+const RE_E_VERBO = /(^|[^\p{L}\d])(é|eh)\s+(13|22|treze|vinte e dois|lula|fl[aá]vio|bolsonaro|pt|pl)(?![\p{L}\d])/u;
+
 /** Pedido de voto / propaganda eleitoral (inclui reação usada como enquete)? */
 export function temPropaganda(texto: string): boolean {
   const latim = paraLatim(texto);
   if (RE_HASHTAG_CAMPANHA.test(texto) || RE_HASHTAG_CAMPANHA.test(latim) || RE_REACAO_ENQUETE.test(texto) || RE_REACAO_ENQUETE.test(latim)) return true;
+  // "é" ACENTUADO (verbo) antes de nome/número de candidato: "Lula é 13", "agora é Flávio" — no texto original
+  if (RE_E_VERBO.test(latim)) return true;
   const leituras = [normalizarSemLeet(texto), normalizarLeetMisto(texto)];
   return leituras.some((n) => PROPAGANDA.some((re) => re.test(n) || re.test(juntarLetrasSoltas(n))));
 }
@@ -652,8 +667,29 @@ export function tokenValido(t: unknown): t is string {
   return typeof t === 'string' && t.length >= LIMITES_CHAT.token.min && t.length <= LIMITES_CHAT.token.max && /^[A-Za-z0-9_-]+$/.test(t);
 }
 
-/** Texto normalizado para detectar duplicadas (mesmo conteúdo com outra caixa/pontuação). */
-export const chaveDuplicada = (texto: string) => colapsar(normalizarFiltro(texto, false));
+/**
+ * Chave do "mesmo conteúdo" para o anti-duplicada: caixa, acento, pontuação, espaços e letras ou emojis repetidos não
+ * contam ("Que noite!!!" = "que noite"; "kkkk" = "kk"; "🔥🔥" = "🔥"); números e emojis CONTAM ("SP com 45%" ≠
+ * "SP com 80%", "Faltam 10" ≠ "Faltam 20", "😮" ≠ "🔥") — numa noite de apuração os comentários são sobre números.
+ * Sem leetspeak (aqui "4" é número, não letra). Texto sem letra, número nem emoji: a chave é o próprio texto aparado.
+ */
+export function chaveDuplicada(texto: string): string {
+  const k = semAcento(texto)
+    .replace(/[^\p{L}\p{N}\p{Extended_Pictographic}]+/gu, ' ')
+    .replace(/(\p{L})\1+/gu, '$1')
+    .replace(/(\p{Extended_Pictographic})\1+/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return k || texto.trim();
+}
+
+/**
+ * Letras na chave. Abaixo de `LETRAS_DUPLICADA_GLOBAL` (só emoji, só número, "kkk") a regra "a mesma mensagem de muitas
+ * pessoas" NÃO vale — reações curtas repetem naturalmente numa sala cheia, e o modo lento e os limites por pessoa e por
+ * rede já contêm o abuso. A regra da própria pessoa (não repetir em 10 min) vale sempre.
+ */
+export const letrasDaChave = (chave: string) => (chave.match(/\p{L}/gu) ?? []).length;
+export const LETRAS_DUPLICADA_GLOBAL = 4;
 
 // ---- dia da eleição ------------------------------------------------------------------------------------------------
 

@@ -35,6 +35,7 @@
  * `:race` = RaceId ('pres', 'gov-df', 'pres-t1', 'gov-df-t1', ...). UF e race em minúsculas na URL.
  */
 import type { AnuncioConfig, ContatoAnuncie } from './anuncios';
+import type { ContatosPublicos } from './contatos';
 import type {
   AdminMetrics,
   AdminState,
@@ -88,6 +89,8 @@ export type AdminCommand =
   | { tipo: 'anuncio-ativo'; id: string; ativo: boolean }
   /** Contato da página /anuncie (null limpa). */
   | { tipo: 'anuncie-contato'; contato: ContatoAnuncie | null }
+  /** Contatos públicos (geral, privacidade, imprensa, correções) e responsável pelo site (null limpa). */
+  | { tipo: 'contatos'; contatos: ContatosPublicos | null }
   /**
    * Troca automática 'pre' → 'tse' (executada pelo servidor; ver `TrocaAutoEstado`):
    *  - 'ligar' (rearma: vale de novo mesmo se já foi feita) · 'desligar';

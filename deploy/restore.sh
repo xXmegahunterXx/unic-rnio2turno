@@ -86,7 +86,9 @@ dc stop app >/dev/null 2>&1 || true
 # shellcheck disable=SC2016 # o $V_ATUAL é do contêiner
 tar -C "$TMP/estado" -cf - . | dc run --rm --no-deps -T -e "V_ATUAL=${V_ATUAL:-0}" --entrypoint sh app -c '
   set -e
-  find /var/lib/sintonia -mindepth 1 -delete
+  # preserva o registro cifrado dos envios do chat (guarda de 6 meses, Marco Civil; por desenho fora do backup) e a
+  # chave PÚBLICA do registro (*.pem: um backup de antes da chave não a tem, e o .env atual aponta para ela)
+  find /var/lib/sintonia -mindepth 1 -maxdepth 1 ! -name chat-registro ! -name "*.pem" -exec rm -rf {} +
   tar -C /var/lib/sintonia -xf -
   node -e "
     const fs = require(\"node:fs\"), f = \"/var/lib/sintonia/admin.json\", min = Number(process.env.V_ATUAL) || 0;

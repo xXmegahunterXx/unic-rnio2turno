@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { preCarregarDadosDaRota } from './data/hooks';
+import { recarregarUmaVez } from './lib/recarga';
 import './styles.css';
 
 /** 400/404 são respostas definitivas (endereço inexistente ou malformado): repetir só atrasaria a tela de "não encontrado". */
@@ -16,6 +17,12 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: (n, e) => n < 2 && !definitivo(e), refetchOnWindowFocus: true, staleTime: 1000 },
   },
+});
+
+// Pedaço do app que não existe mais (aba aberta antes de um deploy): o Vite avisa ao pré-carregar; recarrega uma vez.
+// As falhas que passam direto pelo import() caem na tela de erro das rotas (ErroRota), que faz o mesmo.
+window.addEventListener('vite:preloadError', (e) => {
+  if (recarregarUmaVez()) e.preventDefault();
 });
 
 // Dados da rota de entrada pedidos já agora, em paralelo com o chunk da página (ver preCarregarDadosDaRota).

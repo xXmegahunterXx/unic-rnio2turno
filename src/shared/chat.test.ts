@@ -97,6 +97,25 @@ describe('chat: neutralidade (os dois lados têm o mesmo tratamento)', () => {
     ['cachaceiro', 'miliciano', 'ofensa'],
     ['esquerdopata', 'bolsonazi', 'ofensa'],
     ['Lula ladrão', 'Flávio ladrão', 'ofensa'],
+    // vocabulário típico de cada campo, lado a lado (conferência final)
+    ['Lula ladrão', 'Bolsonaro golpista', 'ofensa'],
+    ['ladrões', 'golpistas', 'ofensa'],
+    ['Bolsonaro burro', 'Lula analfabeto', 'ofensa'],
+    ['petista otário', 'bolsotário', 'ofensa'],
+    ['lulatário', 'bolsotário', 'ofensa'],
+    ['#FazoL', '#FazArminha', 'propaganda'],
+    ['Fora lulistas', 'Fora flavistas', 'propaganda'],
+    ['#ForaLulistas', '#ForaFlavistas', 'propaganda'],
+    ['Lula é 13', 'Flávio é 22', 'propaganda'],
+    ['agora é Lula', 'agora é Flávio', 'propaganda'],
+    ['#PT13', '#PL22', 'propaganda'],
+    // fato (situação jurídica) é livre para os dois
+    ['Lula descondenado', 'Bolsonaro condenado', 'ok'],
+    // comentário neutro com os dois finalistas lado a lado (o "e" é conjunção, não o verbo "é")
+    ['Lula e Flávio empatados agora', 'Flávio e Lula empatados agora', 'ok'],
+    ['Bolsonaro e Lula empatados', 'Lula e Bolsonaro empatados', 'ok'],
+    ['Fila na seção 22 e 13', 'Fila na seção 13 e 22', 'ok'],
+    ['#plantão da apuração', 'Boa noite #ptbr', 'ok'],
   ];
   it.each(pares)('%s × %s', (a, b, m) => {
     expect(motivo(a)).toBe(m);
@@ -214,6 +233,22 @@ describe('chat: utilidades', () => {
   });
   it('duplicada ignora caixa, acento e pontuação', () => {
     expect(chaveDuplicada('Que noite!!!')).toBe(chaveDuplicada('que noite'));
+    expect(chaveDuplicada('Que NOITE')).toBe(chaveDuplicada('quê noite'));
+    expect(chaveDuplicada('kkkk')).toBe(chaveDuplicada('kk'));
+    expect(chaveDuplicada('🔥🔥🔥')).toBe(chaveDuplicada('🔥'));
+  });
+  it('duplicada: números e emojis CONTAM (comentários de apuração são sobre números)', () => {
+    const dif = (a: string, b: string) => expect(chaveDuplicada(a)).not.toBe(chaveDuplicada(b));
+    dif('SP com 45% apurado', 'SP com 80% apurado');
+    dif('Em SP já são 40% apurados', 'Em SP já são 60% apurados');
+    dif('Faltam 10 minutos', 'Faltam 20 minutos');
+    dif('Faltam 30%', 'Faltam 5%');
+    dif('Conferência 69749 — boa noite, pessoal!', 'Conferência 19444 — boa noite, pessoal!');
+    dif('😮', '🔥');
+    dif('👏', '👀');
+    dif('50,1%', '49,9%');
+    dif('17:42', '17:43');
+    for (const t of ['😮', '🔥🔥', '👏', '17:42', '50,1%']) expect(chaveDuplicada(t)).not.toBe('');
   });
   it('dia da eleição: sem mensagens de 0h às 17h de Brasília', () => {
     expect(bloqueioDiaEleicao(DIA_ELEICAO_INICIO - 1)).toBeNull();

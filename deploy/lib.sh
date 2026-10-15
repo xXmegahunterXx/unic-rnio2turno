@@ -64,11 +64,15 @@ exigir_env() {
 }
 
 # trava para dois scripts não mexerem nos contêineres ao mesmo tempo
+# Código de saída de "ocupado: outra operação de deploy em andamento" (a atualização automática tenta de novo depois,
+# sem marcar o commit como falho)
+SAIDA_OCUPADO=75
 travar() {
   local arq="${TMPDIR:-/tmp}/sintonia-deploy.lock"
   exec 9>"$arq"
   if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
-    morrer "Outra operação de deploy (update/restore) está em andamento. Espere terminar."
+    erro "Outra operação de deploy (update/restore) está em andamento. Espere terminar."
+    exit "$SAIDA_OCUPADO"
   fi
 }
 

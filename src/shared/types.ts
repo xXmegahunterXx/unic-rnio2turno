@@ -10,6 +10,7 @@
  */
 
 import type { AnuncioConfig, AnuncioPublico, ContatoAnuncie } from './anuncios';
+import type { ContatosPublicos } from './contatos';
 
 export const UFS = [
   'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR',
@@ -299,6 +300,11 @@ export interface LiveStatus {
   /** Contato da página /anuncie (configurado no admin). */
   anuncie?: ContatoAnuncie | null;
   /**
+   * Contatos públicos (geral, privacidade, imprensa, correções) e o responsável pelo site — painel → Comunicação.
+   * Opcional: ausente/null = nenhum contato configurado (o site não mostra e-mail nenhum).
+   */
+  contatos?: ContatosPublicos | null;
+  /**
    * Frescor do feed oficial por disputa do 2º turno (só na fonte 'tse', no servidor; ausente no demo e nas outras fontes).
    * O app reconsulta o placar assim que a `marca` muda, sem esperar o próximo ciclo de consulta.
    */
@@ -396,6 +402,8 @@ export interface AdminState {
   anuncios?: AnuncioConfig[];
   /** Contato da página /anuncie. */
   anuncie?: ContatoAnuncie | null;
+  /** Contatos públicos e responsável pelo site (src/shared/contatos.ts). Ausente = nenhum. */
+  contatos?: ContatosPublicos | null;
   /** Troca automática 'pre' → 'tse' no início da apuração (ausente = padrão: ligada, horário do servidor). */
   trocaAuto?: TrocaAutoEstado;
 }

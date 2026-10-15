@@ -40,6 +40,8 @@ export interface MontarOpcoes {
   verificarTse?: (tse: TseConfig) => Promise<{ ok: boolean; detalhe: string }>;
   /** Grava as métricas dos anúncios em `stateDir/anuncios-metricas.json` (como o main.ts). */
   metricasEmDisco?: boolean;
+  /** Grava a configuração da sala do chat em `stateDir/chat.json` (como o main.ts). */
+  chatEmDisco?: boolean;
 }
 
 export async function montar(o: MontarOpcoes = {}) {
@@ -68,8 +70,9 @@ export async function montar(o: MontarOpcoes = {}) {
     historico: createJsonStore(stateDir, 'tse-historico.json', { debounceMs: 0 }),
   });
   const metricasAnunciosStore = o.metricasEmDisco ? createJsonStore(stateDir, 'anuncios-metricas.json', { debounceMs: 0 }) : undefined;
-  const s = createApp({ config, dataset: ds, controller, tse, log, now, verificarTse: o.verificarTse, metricasAnunciosStore });
-  return { ...s, ds, controller, tse, relogio, store, config, log, stateDir };
+  const chatStore = o.chatEmDisco ? createJsonStore(stateDir, 'chat.json', { debounceMs: 0 }) : undefined;
+  const s = createApp({ config, dataset: ds, controller, tse, log, now, verificarTse: o.verificarTse, metricasAnunciosStore, chatStore });
+  return { ...s, ds, controller, tse, relogio, store, config, log, stateDir, chatStore };
 }
 
 export type Montado = Awaited<ReturnType<typeof montar>>;

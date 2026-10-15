@@ -12,9 +12,11 @@
 # de trabalho em andamento, nunca vão ao ar sozinhos).
 #
 # Segurança:
-#   - CONGELAMENTO na noite da eleição: entre AUTO_CONGELAR_DE e AUTO_CONGELAR_ATE (padrão: 25/10/2026 12:00 até
-#     26/10/2026 06:00, Brasília) nada é atualizado sozinho — só à mão com update.sh. Mude no .env se precisar.
-#   - um commit que falhou no update não é tentado de novo a cada 5 min (só quando chegar outro commit);
+#   - CONGELAMENTO da véspera à manhã seguinte à eleição: entre AUTO_CONGELAR_DE e AUTO_CONGELAR_ATE (padrão: 24/10/2026
+#     12:00 até 26/10/2026 06:00, Brasília — o mesmo congelamento de código do RUNBOOK) nada é atualizado sozinho; só à
+#     mão com update.sh. Mude no .env se precisar.
+#   - um commit que falhou no update não é tentado de novo a cada 5 min (só quando chegar outro commit); se o update
+#     só não rodou porque outra operação de deploy estava em andamento (saída 75), tenta de novo na próxima conferência;
 #   - nunca roda dois ao mesmo tempo (trava do update.sh) e registra tudo em /var/log/sintonia-auto-update.log.
 # =====================================================================================================
 # shellcheck source=deploy/lib.sh
@@ -26,6 +28,9 @@ DIR_ESTADO=/var/lib/sintonia-auto-update
 acao=${1:-estado}
 
 registrar() { printf '%s %s\n' "$(date '+%d/%m %H:%M:%S')" "$*" >>"$LOG"; }
+# congelamento padrão = o do RUNBOOK (código congelado das 12h da véspera até a manhã seguinte à eleição)
+CONGELAR_DE_PADRAO='2026-10-24T12:00:00-03:00'
+CONGELAR_ATE_PADRAO='2026-10-26T06:00:00-03:00'
 
 case $acao in
   ligar)
@@ -40,7 +45,7 @@ CRON
     install -d -m 700 "$DIR_ESTADO"
     registrar "ligado"
     ok "Atualização automática LIGADA: a cada 5 min confere o GitHub e, se houver versão nova, atualiza sem tirar o site do ar."
-    fraco "   Congelada de $(cfg AUTO_CONGELAR_DE '2026-10-25T12:00:00-03:00') até $(cfg AUTO_CONGELAR_ATE '2026-10-26T06:00:00-03:00'). Log: $LOG"
+    fraco "   Congelada de $(cfg AUTO_CONGELAR_DE "$CONGELAR_DE_PADRAO") até $(cfg AUTO_CONGELAR_ATE "$CONGELAR_ATE_PADRAO"). Log: $LOG"
     ;;
   desligar)
     [[ $EUID -eq 0 ]] || morrer "Rode como root."
@@ -50,6 +55,7 @@ CRON
     ;;
   estado)
     if [[ -f $CRON ]]; then ok "Atualização automática: LIGADA (a cada 5 min)"; else aviso "Atualização automática: desligada"; fi
+    echo "   congelada de $(cfg AUTO_CONGELAR_DE "$CONGELAR_DE_PADRAO") até $(cfg AUTO_CONGELAR_ATE "$CONGELAR_ATE_PADRAO") (nada é publicado sozinho nesse intervalo)"
     echo "   código local: $(commit_atual) · imagem no ar: $(revisao_rodando || true)"
     [[ -f $DIR_ESTADO/falhou ]] && aviso "   commit que falhou (não será tentado de novo): $(cat "$DIR_ESTADO/falhou")"
     if [[ -f $LOG ]]; then
@@ -63,8 +69,8 @@ CRON
     exec 8>"$DIR_ESTADO/trava"
     flock -n 8 || exit 0 # uma conferência ainda rodando
     agora=$(date +%s)
-    de=$(date -d "$(cfg AUTO_CONGELAR_DE '2026-10-25T12:00:00-03:00')" +%s 2>/dev/null || echo 0)
-    ate=$(date -d "$(cfg AUTO_CONGELAR_ATE '2026-10-26T06:00:00-03:00')" +%s 2>/dev/null || echo 0)
+    de=$(date -d "$(cfg AUTO_CONGELAR_DE "$CONGELAR_DE_PADRAO")" +%s 2>/dev/null || echo 0)
+    ate=$(date -d "$(cfg AUTO_CONGELAR_ATE "$CONGELAR_ATE_PADRAO")" +%s 2>/dev/null || echo 0)
     if ((agora >= de && agora < ate)); then
       exit 0 # congelado: noite da eleição
     fi
@@ -86,9 +92,13 @@ CRON
       exit 0
     fi
     registrar "versão nova $curto: atualizando"
-    if SINTONIA_ALVO="$remoto" "$DIR_DEPLOY/update.sh" >>"$LOG" 2>&1; then
+    saida=0
+    SINTONIA_ALVO="$remoto" "$DIR_DEPLOY/update.sh" >>"$LOG" 2>&1 || saida=$?
+    if ((saida == 0)); then
       rm -f "$DIR_ESTADO/falhou"
       registrar "no ar: $(commit_atual)"
+    elif ((saida == SAIDA_OCUPADO)); then
+      registrar "outra operação de deploy (update/restore) em andamento: tento $curto de novo na próxima conferência"
     else
       echo "$curto" >"$DIR_ESTADO/falhou"
       registrar "FALHOU ao atualizar para $curto (o site seguiu na versão anterior); não tento este commit de novo"

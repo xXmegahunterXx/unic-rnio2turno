@@ -28,6 +28,7 @@ import {
   type AnuncioConfig,
   type AnuncioPublico,
 } from '../shared/anuncios';
+import { validaContatosPublicos } from '../shared/contatos';
 import { INICIO_APURACAO } from '../shared/constants';
 import { fmtDataHora, fmtHoraSeg } from '../shared/format';
 import { UFS } from '../shared/types';
@@ -528,6 +529,14 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         log(`Anúncio ${cmd.ativo ? 'ativado' : 'pausado'}: ${a.marca} (${a.id})`);
         break;
       }
+      case 'contatos': {
+        const v = validaContatosPublicos(cmd.contatos);
+        if ('erro' in v) throw new CommandError(v.erro);
+        const contatos = Object.keys(v.ok).length ? v.ok : null;
+        state = { ...state, contatos };
+        log(contatos ? 'Contatos públicos atualizados' : 'Contatos públicos removidos');
+        break;
+      }
       case 'anuncie-contato': {
         const v = validaContatoAnuncie(cmd.contato);
         if ('erro' in v) throw new CommandError(v.erro);
@@ -650,6 +659,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       patrocinio: pub.patrocinio,
       anuncios: pub.anuncios,
       anuncie: state.anuncie ? { ...state.anuncie } : null,
+      contatos: state.contatos ? { ...state.contatos } : null,
     };
   };
 

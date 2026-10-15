@@ -53,6 +53,12 @@ export interface DepsCrescimento {
   /** estimativa que o servidor já tinha (Metricas.pessoasAgora) */
   pessoasAgora: () => number;
   stores?: StoresCrescimento;
+  /**
+   * Motivo de o formulário "Quero anunciar" estar FECHADO agora (null = aberto). Em produção, fechado enquanto não houver
+   * e-mail de privacidade configurado no painel (Comunicação → Contatos públicos): é o canal para retirar o
+   * consentimento (LGPD art. 18) — a mesma regra que fecha o formulário no app.
+   */
+  formularioFechado?: () => string | null;
 }
 
 /** Configuração do painel: redes do Sintonia e o interruptor da audiência na /anuncie (padrão: desligado). */
@@ -172,6 +178,8 @@ export function registrarCrescimento(app: App, admin: App, deps: DepsCrescimento
     if (!deps.origemPermitida(c) || (sfs ? sfs !== 'same-origin' : !c.req.header('origin'))) return erroJson(c, 403, 'Origem não permitida.');
     const ct = c.req.header('content-type') ?? '';
     if (!/^application\/json\b/i.test(ct)) return erroJson(c, 415, 'Envie o formulário em JSON.');
+    const fechado = deps.formularioFechado?.() ?? null;
+    if (fechado) return erroJson(c, 503, fechado);
     let corpo: unknown;
     try {
       corpo = await c.req.json();

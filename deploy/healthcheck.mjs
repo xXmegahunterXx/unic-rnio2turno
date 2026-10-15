@@ -10,6 +10,13 @@
  * `restart: unless-stopped` sobe o contêiner de novo. Exige um PID 1 de verdade (`init: true` no compose ou
  * `docker run --init`). Desligue com AUTORREINICIO=0.
  *
+ * LENTO não é TRAVADO: com a CPU saturada (pico da noite, ataque que fura a CDN), conexão NOVA pode esperar mais que o
+ * limite de 5 s enquanto o processo segue atendendo o pool keep-alive do proxy. Reiniciar nessa hora esfria os caches e
+ * não resolve a carga. Por isso o servidor grava um batimento a cada 1 s (BATIMENTO_ARQ, padrão /tmp/sintonia-batimento:
+ * `{"pid":…,"t":…}`, main.ts) e uma falha do /healthz só conta para o autorreinício quando o batimento do MESMO
+ * processo estiver parado há mais de BATIMENTO_MAX_SEG (padrão 30 s) — num travamento de verdade o laço de eventos para
+ * e o batimento também. Sem batimento legível (versão antiga, /tmp somente leitura), vale a regra antiga (só o /healthz).
+ *
  * Sem dependências: só node:fs e o fetch nativo do Node 22.
  */
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -19,6 +26,19 @@ const TIMEOUT_MS = Number(process.env.HEALTHCHECK_TIMEOUT_MS) || 5000;
 const LIMITE = Math.max(2, Number(process.env.AUTORREINICIO_FALHAS) || 5);
 const AUTO = !/^(0|false|n|nao|não|no|off)$/i.test((process.env.AUTORREINICIO ?? '1').trim());
 const ARQ = '/tmp/sintonia-healthcheck.json';
+const BATIMENTO = process.env.BATIMENTO_ARQ || '/tmp/sintonia-batimento';
+const BATIMENTO_MAX_MS = Math.max(5, Number(process.env.BATIMENTO_MAX_SEG) || 30) * 1000;
+
+/** Idade (ms) do batimento do servidor `pid`, ou null se não houver batimento desse processo. */
+function idadeBatimento(pid) {
+  try {
+    const b = JSON.parse(readFileSync(BATIMENTO, 'utf8'));
+    if (!b || b.pid !== pid || typeof b.t !== 'number') return null;
+    return Math.max(0, Date.now() - b.t);
+  } catch {
+    return null;
+  }
+}
 
 /** PID do servidor (node … dist-server/main.js) e o instante em que ele começou (para detectar reinícios). */
 function servidor() {
@@ -76,6 +96,13 @@ try {
   process.exit(0);
 } catch (e) {
   const motivo = e instanceof Error ? (e.name === 'TimeoutError' ? `sem resposta em ${TIMEOUT_MS} ms` : e.message) : String(e);
+  const idade = proc ? idadeBatimento(proc.pid) : null;
+  if (idade !== null && idade <= BATIMENTO_MAX_MS) {
+    // processo vivo (laço de eventos girando): sobrecarga, não travamento — não conta para o autorreinício
+    gravarEstado({ id: estado.id, ok: estado.ok, falhas: 0, lentas: (Number(estado.lentas) || 0) + 1 });
+    console.error(`/healthz falhou: ${motivo} — mas o processo está vivo (batimento há ${Math.round(idade / 1000)} s): sobrecarga, SEM reinício`);
+    process.exit(1);
+  }
   estado.falhas = (Number(estado.falhas) || 0) + 1;
   let acao = '';
   if (AUTO && estado.ok && proc && estado.falhas >= LIMITE) {
@@ -88,6 +115,7 @@ try {
     }
   }
   gravarEstado(estado);
-  console.error(`/healthz falhou (${estado.falhas}× seguidas): ${motivo}${acao}`);
+  const bat = idade === null ? 'sem batimento' : `batimento parado há ${Math.round(idade / 1000)} s`;
+  console.error(`/healthz falhou (${estado.falhas}× seguidas): ${motivo} · ${bat}${acao}`);
   process.exit(1);
 }

@@ -14,6 +14,7 @@ import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
 import type { AdminCommand, AdminSnapshot, MetricasServidor, ServidorInfo } from '../shared/api';
 import { FORMATOS_COM_CLIQUE, FORMATOS_COM_IMPRESSAO, urlComUtm, type FormatoAnuncio } from '../shared/anuncios';
+import { contatosEfetivos } from '../shared/contatos';
 import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
@@ -80,6 +81,11 @@ export interface AppDeps {
   metricasAnunciosStore?: JsonStore;
   /** STATE_DIR/audiencia.json, leads.json e divulgacao.json (crescimento.ts). Ausentes = só em memória. */
   crescimentoStores?: StoresCrescimento;
+  /**
+   * STATE_DIR/chat.json: configuração da sala do chat (aberta, modo lento, fixada) — volta igual depois de um reinício.
+   * Ausente = só em memória (a sala nasce fechada a cada subida).
+   */
+  chatStore?: JsonStore;
 }
 
 /** Permissions-Policy das páginas: nada de câmera, microfone, localização, pagamentos, USB nem "tópicos" de anúncio. */
@@ -655,7 +661,17 @@ export function createApp(deps: AppDeps) {
     return out;
   };
 
-  app.get('/api/status', (c) => json(c, statusPublico(c), { 'cache-control': CC.status, 'access-control-allow-origin': '*' }));
+  // Com anúncios o corpo passa de 1 KB e sai comprimido (brotli): montado e comprimido no máximo 1×/s por origem e por
+  // estado (versão, fase, aviso, marca dos números) — sem CDN (contingência), o status é ~40% do tráfego. O relógio
+  // (wallNow) e "pessoas agora" ficam até 1 s defasados, como já ficam na CDN (s-maxage=1).
+  app.get('/api/status', async (c) => {
+    const st = dados.status();
+    const fr = dados.frescor();
+    const chave = `status|${origemDe(c)}|${st.versao}|${st.fase}|${st.aviso?.texto ?? ''}|${agendador.avisoPublico() ? 1 : 0}|${tseEncerrado() ? 1 : 0}|${fr ? Object.values(fr).map((f) => f?.marca).join(',') : ''}`;
+    const { p, hit } = respostas.obter(chave, () => ({ bruto: Buffer.from(JSON.stringify(statusPublico(c))) }));
+    metricas.cache(hit);
+    return enviar(c, await p, { 'cache-control': CC.status, 'access-control-allow-origin': '*' });
+  });
 
   app.get('/api/patrocinio/logo', (c) => {
     const img = dados.status().patrocinio?.imagem;
@@ -784,28 +800,53 @@ export function createApp(deps: AppDeps) {
 
   // chat ao vivo moderado (src/server/chat.ts): GET com cache de 1 s na CDN; POSTs só do próprio site; memória só.
   // Registro cifrado dos envios (chat-registro.ts): DESLIGADO sem CHAT_REGISTRO_CHAVE (decisão do dono e do advogado).
-  const registroChat = config.chatRegistroChave
-    ? new RegistroEnvios({
+  // Chave errada (caminho com erro de digitação, PEM inválido, backup restaurado sem ela) NÃO derruba o site: o registro
+  // fica desligado e a sala TRAVADA fechada (o dono decidiu exigir o registro; sem ele, a sala não abre).
+  let registroChat: RegistroEnvios | null = null;
+  let chatTravado: string | undefined;
+  if (config.chatRegistroChave) {
+    try {
+      registroChat = new RegistroEnvios({
         dir: join(config.stateDir, 'chat-registro'),
         chavePublicaPem: readFileSync(config.chatRegistroChave, 'utf8'),
         now,
         aoFalhar: (e) => log.erro('Chat: falha ao gravar o registro de envios', e),
-      })
-    : null;
+      });
+    } catch (e) {
+      chatTravado = 'Registro de envios configurado (CHAT_REGISTRO_CHAVE) mas inválido: a sala não abre sem ele. Veja os logs do servidor.';
+      log.erro(`Chat: CHAT_REGISTRO_CHAVE (${config.chatRegistroChave}) ilegível ou inválida — registro DESLIGADO e sala TRAVADA fechada`, e);
+    }
+  }
   if (registroChat) log.aviso('Chat: registro cifrado dos envios LIGADO (CHAT_REGISTRO_CHAVE) — confira a /privacidade');
   const portaDe = (c: Ctx): number | null => {
     const h = config.chatRegistroHeaderPorta && config.trustProxy ? c.req.header(config.chatRegistroHeaderPorta) : undefined;
     const p = h !== undefined ? Number(h) : config.trustProxy ? NaN : Number(c.env?.incoming?.socket?.remotePort);
     return Number.isInteger(p) && p > 0 && p < 65536 ? p : null;
   };
-  const salaChat = SalaChat.doDataset(deps.dataset, { now, producao: config.producao, registro: !!registroChat });
+  const chatSalvo = deps.chatStore?.ler() ?? null;
+  const salaChat = SalaChat.doDataset(deps.dataset, {
+    now,
+    producao: config.producao,
+    ensaio: config.chatEnsaio,
+    registro: !!registroChat,
+    travada: chatTravado,
+    aoMudarConfig: deps.chatStore ? (cfg) => deps.chatStore!.salvar(cfg) : undefined,
+  });
+  if (chatSalvo !== null) {
+    if (salaChat.restaurarConfig(chatSalvo)) {
+      const cfg = salaChat.config();
+      log.info(`Chat: configuração da sala restaurada (${cfg.aberta ? 'ABERTA' : 'fechada'}, modo lento ${cfg.lentoS} s${cfg.fixada ? ', com mensagem fixada' : ''})`);
+    } else log.aviso(`Chat: ${deps.chatStore!.caminho} inválido — ignorado (a sala começa fechada)`);
+  }
   registrarChatPublico(app, {
     sala: salaChat,
     clienteDe,
     redeDenunciaDe: redeLargaDe(48),
     origemPermitida,
     log,
-    aoPublicar: registroChat ? (c, id, em) => registroChat.registrar({ id, em, ip: ipDe(c), porta: portaDe(c) }) : undefined,
+    aoPublicar: registroChat
+      ? (c, m) => registroChat.registrar({ id: m.id, em: m.em, ip: ipDe(c), porta: portaDe(c), apelido: m.apelido, texto: m.texto })
+      : undefined,
   });
 
   app.get('/api/meta', async (c) => {
@@ -1045,6 +1086,8 @@ export function createApp(deps: AppDeps) {
     origemPermitida,
     pessoasAgora: () => metricas.pessoasAgora(),
     stores: deps.crescimentoStores,
+    // produção: o formulário só abre com um e-mail de privacidade configurado no painel (canal para retirar o consentimento)
+    formularioFechado: () => (config.producao && !contatosEfetivos(dados.status().contatos).privacidade ? 'O formulário abre em breve.' : null),
   });
 
   app.route('/api/admin', admin);

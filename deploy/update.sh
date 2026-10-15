@@ -6,6 +6,11 @@
 #   sudo /opt/sintonia/deploy/update.sh --sem-pull   só reconstrói e troca (ex.: mudou o .env ou o VITE_SITE_URL)
 #   sudo /opt/sintonia/deploy/update.sh --forcar     reconstrói mesmo sem código novo
 #   sudo /opt/sintonia/deploy/update.sh --rollback   volta para a imagem anterior (a da última atualização)
+#   sudo /opt/sintonia/deploy/update.sh --qualquer-commit   publica a ponta do branch mesmo SEM "[deploy]" na mensagem
+#
+# Só publica sozinho um commit MARCADO: se a ponta do branch não tiver "[deploy]" na mensagem (ex.: "WIP … (não
+# publicar)"), o script mostra o assunto e pergunta (no terminal) ou para (sem terminal). Para ir só até o último
+# commit marcado, use: deploy/auto-update.sh rodar.
 #
 # Como funciona:
 #   1. a imagem nova é construída enquanto a atual continua servindo;
@@ -18,14 +23,15 @@
 # shellcheck source=deploy/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-PULL=1 FORCAR='' ROLLBACK=''
+PULL=1 FORCAR='' ROLLBACK='' QUALQUER=''
 for a in "$@"; do
   case $a in
     --sem-pull) PULL='' ;;
     --forcar) FORCAR=1 ;;
     --rollback) ROLLBACK=1 ;;
+    --qualquer-commit) QUALQUER=1 ;;
     -h | --help)
-      sed -n '2,17p' "$0"
+      sed -n '2,22p' "$0"
       exit 0
       ;;
     *) morrer "Opção desconhecida: $a (use --help)" ;;
@@ -60,7 +66,8 @@ voltar_para_anterior() {
 # "app", logo sem visitantes) precisa ficar saudável. Na fonte TSE ele também consulta o TSE por ~10 s.
 ensaio() {
   local limite=$((SECONDS + ${1:-120})) est
-  dc run -d --no-deps --name "$CANARIO" app >/dev/null
+  # SINTONIA_ENSAIO=1: o ensaio não grava audiência nem métricas no volume (não conta como "reinício" do dia)
+  dc run -d --no-deps --name "$CANARIO" -e SINTONIA_ENSAIO=1 app >/dev/null
   while ((SECONDS < limite)); do
     est="$(docker inspect -f '{{.State.Status}}/{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$CANARIO" 2>/dev/null || echo sumiu/)"
     case $est in
@@ -93,6 +100,22 @@ if [[ -n $PULL ]]; then
     morrer "Há arquivos do repositório alterados nesta máquina (acima). Guarde-os (git stash) ou desfaça (git checkout -- <arquivo>) e rode de novo."
   fi
   gitr fetch --quiet --prune
+  # Só commits MARCADOS vão ao ar sem perguntar: a ponta do branch pode ser trabalho em andamento ("não publicar")
+  if [[ -z ${SINTONIA_ALVO:-} && -z $QUALQUER ]] && ! gitr merge-base --is-ancestor '@{u}' HEAD 2>/dev/null; then
+    ASSUNTO="$(gitr log -1 --format=%s '@{u}' 2>/dev/null || true)"
+    if [[ $ASSUNTO != *'[deploy]'* ]]; then
+      aviso "O commit mais novo do GitHub NÃO está marcado para produção ([deploy]):"
+      fraco "   $(gitr log -1 --format='%h %s' '@{u}' 2>/dev/null)"
+      MARCADO="$(gitr log --format='%h %s' --grep='\[deploy\]' -n 1 'HEAD..@{u}' 2>/dev/null || true)"
+      [[ -n $MARCADO ]] && fraco "   último marcado depois do que está aqui: $MARCADO (para ir só até ele: $DIR_DEPLOY/auto-update.sh rodar)"
+      if [[ -t 0 ]]; then
+        read -r -p "Publicar mesmo assim? [s/N] " RESP
+        [[ $RESP =~ ^[sSyY]$ ]] || morrer "Nada foi trocado. Marque o commit com [deploy] ou use --qualquer-commit."
+      else
+        morrer "Nada foi trocado. Marque o commit com [deploy] ou rode com --qualquer-commit."
+      fi
+    fi
+  fi
   # SINTONIA_ALVO: avança só até este commit (a atualização automática usa para publicar só versões marcadas)
   if ! gitr merge --ff-only --quiet "${SINTONIA_ALVO:-@{u\}}" 2>/dev/null; then
     morrer "Não deu para avançar o código só com 'fast-forward' (histórico divergente). Veja: cd $RAIZ && git status"

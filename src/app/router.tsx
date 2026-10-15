@@ -5,6 +5,7 @@
 import { lazy, Suspense, type ComponentType } from 'react';
 import { createBrowserRouter, createHashRouter, type RouteObject } from 'react-router-dom';
 import { AppShell } from './components/layout/AppShell';
+import { ErroRota } from './components/layout/ErroRota';
 
 function page(loader: () => Promise<{ default: ComponentType }>) {
   const C = lazy(loader);
@@ -20,7 +21,13 @@ function page(loader: () => Promise<{ default: ComponentType }>) {
 const routes: RouteObject[] = [
   {
     element: <AppShell />,
+    // erro de uma página (ex.: aba aberta antes de um deploy, pedaço que não existe mais): a tela de erro aparece DENTRO
+    // do AppShell (cabeçalho e navegação continuam) e recarrega sozinha uma vez quando é versão nova
+    errorElement: <ErroRota variante="tela" />,
     children: [
+      {
+        errorElement: <ErroRota />,
+        children: [
       { path: '/', element: page(() => import('./pages/Home')) },
       { path: '/teste', element: page(() => import('./pages/teste/TestePage')) },
       { path: '/teste/resultado', element: page(() => import('./pages/teste/ResultadoPage')) },
@@ -54,16 +61,18 @@ const routes: RouteObject[] = [
           ]
         : []),
       { path: '*', element: page(() => import('./pages/static/NotFoundPage')) },
+        ],
+      },
     ],
   },
   // Admin fica fora do AppShell público (layout próprio).
-  { path: '/admin', element: page(() => import('./pages/admin/AdminPage')) },
+  { path: '/admin', element: page(() => import('./pages/admin/AdminPage')), errorElement: <ErroRota variante="tela" /> },
   // Modo TV: tela cheia própria (fora do AppShell), para transmissão.
-  { path: '/tv', element: page(() => import('./pages/tv/TvPage')) },
-  // Modo streamer: fonte de navegador do OBS/Streamlabs (fora do AppShell, fundo transparente).
-  { path: '/live', element: page(() => import('./pages/live/LivePage')) },
+  { path: '/tv', element: page(() => import('./pages/tv/TvPage')), errorElement: <ErroRota variante="tela" /> },
+  // Modo streamer: fonte de navegador do OBS/Streamlabs (fora do AppShell, fundo transparente): erro = nada na cena
+  { path: '/live', element: page(() => import('./pages/live/LivePage')), errorElement: <ErroRota variante="transparente" /> },
   // Widgets para incorporar (iframe em sites de terceiros): sem AppShell.
-  { path: '/embed/:tipo', element: page(() => import('./pages/embed/EmbedPage')) },
+  { path: '/embed/:tipo', element: page(() => import('./pages/embed/EmbedPage')), errorElement: <ErroRota variante="tela" /> },
 ];
 
 export const router = __DEMO__ ? createHashRouter(routes) : createBrowserRouter(routes);
