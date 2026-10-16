@@ -371,7 +371,10 @@ export interface AudienciaAdmin {
   curvaMinuto?: MinutoAudiencia[];
   /** páginas vistas por pessoas por UF (`cf-region-code` com `cf-ipcountry` = BR), por dia; chave = sigla ou 'ND' */
   porUf?: ContagemDiaAudiencia[];
-  /** páginas vistas por pessoas por país (`cf-ipcountry`, ISO 3166-1 alfa-2), por dia; chave = 'BR', 'PT'… ou 'ND' */
+  /**
+   * páginas vistas por pessoas por país (`cf-ipcountry`, ISO 3166-1 alfa-2), por dia; chave = 'BR', 'PT'… ou 'ND'
+   * ('ZZ' = outros países, acima do teto de 250 distintos no dia)
+   */
   porPais?: ContagemDiaAudiencia[];
   /** páginas vistas por pessoas por aparelho, por dia; chave = `Aparelho` */
   porAparelho?: ContagemDiaAudiencia[];

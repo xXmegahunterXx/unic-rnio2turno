@@ -48,12 +48,15 @@ import { EstadosSecao, LiderancaCard, ParticipacaoSecao, RegioesCard } from '@/a
 import { NacionalEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
 import { ehSimulado, ehT1, raceExibida, semT1, ufDaRace } from '@/app/components/pages/nacional/fase';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { momentoTitulo, tituloNacional } from '@/shared/titulos';
 import { useNaTela } from '@/app/lib/useNaTela';
 
 // Fora do pedaço da página (LCP e peso de /apuracao): a chamada do Palpite só existe na fase 'pre'; o "Desde o 1º turno"
 // fica no fim da página e só monta perto da tela.
 const ChamadaPalpite = lazy(() => import('@/app/components/palpite/ChamadaPalpite').then((m) => ({ default: m.ChamadaPalpite })));
 const DesdePrimeiroTurnoBrasil = lazy(() => import('@/app/components/apuracao/DesdePrimeiroTurno').then((m) => ({ default: m.DesdePrimeiroTurnoBrasil })));
+// I28: "Siga o Sintonia" só com a apuração encerrada (chunk próprio; sem rede configurada, nada aparece)
+const SigaSintonia = lazy(() => import('@/app/components/crescimento/SigaSintonia'));
 
 /**
  * "Desde o 1º turno" só quando chega perto da tela (useNaTela), com a altura reservada antes: assim ele nunca pinta no
@@ -102,8 +105,8 @@ export default function NacionalPage() {
   const qVivo = useNacional(raceId);
   // 1º turno sempre à mão: modo "variação" do mapa, comparação e Sheet da UF (em t1 é a mesma consulta).
   const qT1 = useNacional(`${semT1(raceId)}-t1`);
-  // Título da aba na navegação do cliente (o servidor injeta o da 1ª carga).
-  useTitulo(race ? `${t1 ? 'Resultado' : 'Apuração ao vivo'} · ${race.titulo}` : 'Apuração ao vivo');
+  // Título da aba: o mesmo das meta tags, por fase (I07; o robô de busca lê este depois de rodar o JavaScript).
+  useTitulo(tituloNacional((race2T ?? race)?.titulo ?? 'Presidente', momentoTitulo(ehT1(raceParam), status?.fase)));
 
   const trocarDisputa = useCallback(
     (id: RaceId) => {
@@ -277,6 +280,7 @@ export default function NacionalPage() {
               simulado={simulado}
               anonimizado={anonimizado}
               t={t}
+              resumo={resumo}
             />
             {definido ? (
               <EleitoBanner className="order-3 min-[1360px]:order-none" race={race} resumo={resumo} restante={data.restante} />
@@ -294,6 +298,12 @@ export default function NacionalPage() {
 
           <ParticipacaoSecao className="order-8 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" t={resumo} />
           <GovernadoresFaixa className="order-9 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" races={races} t1={false} />
+          {/* I28: com a apuração encerrada, "Siga o Sintonia" — longe do placar e do banner do eleito */}
+          {status?.fase === 'encerrada' ? (
+            <Suspense fallback={null}>
+              <SigaSintonia variante="faixa" className="order-9 mt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:mt-4" />
+            </Suspense>
+          ) : null}
 
           <EstadosSecao className="order-10 pt-2 min-[1360px]:order-none min-[1360px]:col-span-8 min-[1360px]:pt-4" race={race} ufs={data.ufs} raceLink={raceParam} t={t} />
           <div className={cn(COLUNA, 'min-[1360px]:col-span-4 min-[1360px]:pt-[5.25rem]')}>

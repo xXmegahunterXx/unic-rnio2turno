@@ -242,7 +242,7 @@ describe('textos da aba "Postar" (I26)', () => {
       const t = textoPostarEvento(ev, true);
       conferir(t);
       expect(t.startsWith(PREFIXO_SIMULACAO)).toBe(true);
-      expect(t).toContain('Apuração ao vivo, seção por seção.');
+      expect(t).toContain('Acompanhe seção por seção.');
     }
     const longo = textoPostarEvento({ t: Date.UTC(2026, 9, 25, 21, 47), titulo: 'palavra '.repeat(60) });
     conferir(longo);

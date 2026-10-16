@@ -60,9 +60,12 @@ import {
 import { caminhoParaLog, msgErro, type Logger } from './log';
 import { AVISO_AGUARDANDO_TSE, AgendadorTse } from './troca-auto';
 import { consultaNormalizada, injetarMeta, metaDaRota, type ContextoMeta } from './meta-tags';
+import { ligarMetaNoite } from './meta-placar'; // I07a (frente E)
+import { registrarSitemap } from './sitemap'; // I07b (frente E)
 import { MAX_CODIGO, calcularCenario, codificarCenario, decodificarCenario, placarCenarioTexto } from '../shared/cenarios';
 import { Metricas } from './metrics';
 import { CC_OG, registrarOg } from './og-rotas';
+import { registrarOgAudiencia } from './og-audiencia';
 import { registrarDesdeT1 } from './desde-t1';
 import { ServicoOg } from './og-servico';
 import { DadosEstaticos } from './dados-estaticos';
@@ -226,39 +229,8 @@ export const ROBOTS_TXT = [
 /** robots.txt com o endereço do sitemap (absoluto, como o protocolo exige). */
 export const robotsTxt = (origem: string) => `${ROBOTS_TXT}\nSitemap: ${origem}/sitemap.xml\n`;
 
-/** Páginas públicas indexáveis (sitemap.xml): [caminho, changefreq, prioridade]. */
-export function rotasSitemap(): [string, string, string][] {
-  const ufs = UFS.map((u) => u.toLowerCase());
-  return [
-    ['/', 'hourly', '1.0'],
-    ['/apuracao', 'hourly', '0.9'],
-    ...ufs.map((u): [string, string, string] => [`/apuracao/${u}`, 'hourly', '0.7']),
-    ['/governadores', 'hourly', '0.8'],
-    ['/teste', 'weekly', '0.9'],
-    ['/curiosidades', 'weekly', '0.7'],
-    ['/cenarios', 'weekly', '0.7'],
-    ['/senado', 'weekly', '0.6'],
-    ['/camara', 'weekly', '0.6'],
-    ['/assembleias', 'weekly', '0.5'],
-    ...ufs.map((u): [string, string, string] => [`/assembleias/${u}`, 'weekly', '0.4']),
-    ['/metodologia', 'monthly', '0.4'],
-    ['/sobre', 'monthly', '0.3'],
-    ['/privacidade', 'monthly', '0.3'],
-    ['/anuncie', 'monthly', '0.3'],
-    ['/streamers', 'weekly', '0.5'],
-    ['/palpite', 'daily', '0.7'],
-    ['/ao-vivo', 'hourly', '0.6'],
-  ];
-}
-
-export function sitemapXml(origem: string, lastmod?: string): string {
-  const esc = (x: string) => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const urls = rotasSitemap().map(
-    ([p, f, pr]) =>
-      `  <url><loc>${esc(origem + p)}</loc>${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}<changefreq>${f}</changefreq><priority>${pr}</priority></url>`,
-  );
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
-}
+/** Páginas do sitemap (I07b: o sitemap inteiro — índice, páginas, municípios, candidatos e cargos — está em sitemap.ts). */
+export { rotasSitemap } from './sitemap';
 
 /** Tamanho máximo da URL (caminho + query). Maior → 414. */
 export const MAX_URL = 8192;
@@ -734,12 +706,7 @@ export function createApp(deps: AppDeps) {
   );
 
   // ---- SEO: sitemap.xml e robots.txt (com a origem pública; valem mesmo se o build trouxer os seus) ----
-  app.get('/sitemap.xml', (c) =>
-    c.body(sitemapXml(origemDe(c), config.build.data?.slice(0, 10)), 200, {
-      'content-type': 'application/xml; charset=utf-8',
-      'cache-control': 'public, max-age=3600, s-maxage=86400',
-    }),
-  );
+  registrarSitemap(app, { dataset: deps.dataset, dataDir: config.dataDir, buildData: config.build.data, origemDe, aviso: (m) => log.aviso(m) }); // I07b: índice + 4 arquivos (frente E)
   // 1 h também na borda (antes, 1 dia): uma mudança de regra chega aos robôs no mesmo dia sem depender de purga
   app.get('/robots.txt', (c) => c.text(robotsTxt(origemDe(c)), 200, { 'cache-control': 'public, max-age=3600, s-maxage=3600' }));
 
@@ -1221,6 +1188,7 @@ export function createApp(deps: AppDeps) {
     borda: cdnCc,
     leve: () => noite().freio.leve,
   });
+  registrarOgAudiencia(app, { pessoas: () => pessoasPublico(noite()), dominio: config.publicUrl ? new URL(config.publicUrl).host : null, borda: cdnCc, log }); // I26 (frente F)
 
   // ---- Admin ---------------------------------------------------------------------------------------
   const admin = new Hono<{ Bindings: HttpBindings }>();
@@ -1545,6 +1513,7 @@ export function createApp(deps: AppDeps) {
         return { codigo: codificarCenario(cen), placar: placarCenarioTexto(ds.valor, calcularCenario(ds.valor, cen)), versao: ds.versao };
       },
     };
+    ligarMetaNoite(ctxMeta, { tse: deps.tse, fonteDe: (r) => dados.fonteDe(r), races, now, anonimizado: () => dados.status().anonimizado }); // I07a: placar do cache do TSE e relógio (frente E)
 
     /** CSP por template (os hashes dos scripts inline mudam a cada build). */
     let cspMemo: { tpl: string; pagina: string; embed: string } | null = null;

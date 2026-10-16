@@ -7,7 +7,8 @@
  * - Tooltip com o placar do município (hover; no toque, 1º toque mostra e 2º toque seleciona).
  * - Capital com contorno e rótulo; município selecionado e resultados de busca (`destaque`) realçados.
  * - Encartes (ilhas fora de escala, ex.: Fernando de Noronha) com moldura tracejada e rótulo.
- * - `carimbo` (I10): o carimbo do print (`CarimboPrint`) no canto inferior esquerdo do quadro, fora do zoom.
+ * - `carimbo` (I10): o carimbo do print (`CarimboPrint`) logo abaixo do desenho, à esquerda, fora do zoom (cada UF tem
+ *   um formato: não há canto vazio garantido para pôr por cima).
  * - Desempenho (MG = 853 paths): os paths são memoizados e só o `fill` muda entre atualizações;
  *   hover/seleção ficam numa camada separada; o gesto de zoom não re-renderiza nada.
  */
@@ -34,7 +35,7 @@ import { MapHatchPattern } from './MapHatch';
 import { MapTooltip } from './MapTooltip';
 import { useClickOutside, useElementSize } from './MapHooks';
 import { useMapZoom } from './MapZoom';
-import { CLASSE_CANTO_CARIMBO } from './CarimboPrint';
+import { CLASSE_PE_CARIMBO } from './CarimboPrint';
 
 export interface UfMapProps {
   uf: UF;
@@ -56,7 +57,7 @@ export interface UfMapProps {
   /** Enquadra automaticamente o destaque único (padrão: sim). */
   zoomNoDestaque?: boolean;
   rotuloAcao?: (m: MunicipioResumo) => string;
-  /** Carimbo do print (`<CarimboPrint onde="mapa" …/>` com o resumo do mesmo snapshot), no canto inferior esquerdo. */
+  /** Carimbo do print (`<CarimboPrint onde="mapa" …/>` com o resumo do mesmo snapshot), logo abaixo do desenho. */
   carimbo?: ReactNode;
   className?: string;
   ariaLabel?: string;
@@ -391,7 +392,7 @@ export function UfMap({
           ) : null}
         </div>
 
-        {carimbo && geo && W > 0 ? <div className={CLASSE_CANTO_CARIMBO}>{carimbo}</div> : null}
+        {carimbo && geo && W > 0 ? <div className={CLASSE_PE_CARIMBO}>{carimbo}</div> : null}
 
         {/* Controles de zoom */}
         {geo && W > 0 ? (

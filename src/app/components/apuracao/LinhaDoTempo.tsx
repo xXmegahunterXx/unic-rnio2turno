@@ -14,8 +14,10 @@
  *    pela margem, como no mapa) — as viradas ficam visíveis. O trecho depois do instante exibido fica esmaecido.
  *  - Teclado: ←/→ ±1 min, Shift ou PageUp/PageDown ±10 min, Home = início, End = ao vivo, Espaço = play/pause.
  *  - Na fase 'pre' (ou sem nada apurado ainda) não aparece.
+ *  - I28 (reter o pico): com a apuração encerrada, a reprise que chega ao fim mostra uma linha "Siga o Sintonia" (redes
+ *    do painel; sem rede configurada, nada) — some ao tocar de novo ou arrastar. Chunk próprio, só carregado nessa hora.
  */
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useIsFetching, useQueryClient, type Query } from '@tanstack/react-query';
 import { instanteChave, useRace } from '@/app/data/hooks';
@@ -30,6 +32,8 @@ import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
 import { useElementSize } from './MapHooks';
 import { BotaoInstante } from '@/app/components/share/cartoes/Momento';
+
+const SigaSintonia = lazy(() => import('@/app/components/crescimento/SigaSintonia'));
 
 const MIN = 60_000;
 /** Quanto a noite anda por passo do play (1 min simulado)… */
@@ -268,6 +272,8 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
 
   const [tocando, setTocando] = useState(false);
   const [arrasto, setArrasto] = useState<number | null>(null);
+  /** a reprise chegou ao fim (I28: com a apuração encerrada, aparece o "Siga o Sintonia") */
+  const [fimReprise, setFimReprise] = useState(false);
   useLimparInstantes(t);
   // O play só avança quando nada do instante atual está a caminho (placar, mapa por município, UF…).
   const buscando = useIsFetching({ predicate: ehConsultaDeInstante }) > 0;
@@ -305,6 +311,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
       const prox = q(atual) + PASSO_SIM;
       if (prox >= r.ultimo) {
         setTocando(false);
+        setFimReprise(true);
         r.onChange(undefined);
       } else r.onChange(prox);
     }, PASSO_MS);
@@ -312,6 +319,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
   }, [tocando, ini]);
 
   const alternarPlay = () => {
+    setFimReprise(false);
     if (tocando) {
       setTocando(false);
       return;
@@ -352,6 +360,7 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
     setTocando(false);
+    setFimReprise(false);
     const tt = instanteDoPonteiro(e.clientX);
     setArrasto(tt);
     confirmar(tt);
@@ -544,6 +553,11 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
           </div>
         </div>
       </div>
+      {fimReprise && vivo && status.fase === 'encerrada' ? (
+        <Suspense fallback={null}>
+          <SigaSintonia variante="linha" className="mt-2 border-t border-line pt-2" />
+        </Suspense>
+      ) : null}
     </section>
   );
 });

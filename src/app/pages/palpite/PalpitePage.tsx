@@ -33,6 +33,7 @@ import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { useAnunciosDaPagina } from '@/app/components/anuncios/contexto';
 import { OferecimentoPalpite } from '@/app/components/anuncios/OferecimentoPalpite';
 import { BotaoCompartilhar } from '@/app/components/share/BotaoCompartilhar';
+import { BotaoLembrete, lembreteDisponivel } from '@/app/components/pages/home/BotaoLembrete';
 import { CartaoPalpite } from '@/app/components/palpite/CartaoPalpite';
 import { useAgoraServidor, useFinalistas, usePalpiteSalvo } from '@/app/components/palpite/estado';
 import {
@@ -215,6 +216,8 @@ function Conteudo({
         ) : (
           <SemPalpite votacao={votacao} fase={status?.simulacao ? 'apurando' : status?.fase} />
         )}
+        {/* I29: depois de cravar, o lembrete da apuração (o evento abre /palpite; o palpite nunca vai no link) */}
+        {salvo ? <LembretePalpite agora={agora} /> : null}
       </div>
       <aside className="min-w-0 lg:pt-1">
         <ComoFunciona />
@@ -222,6 +225,38 @@ function Conteudo({
       {/* publicidade: no fim, longe do divisor e dos números (a marca fica com a ferramenta, nunca com um palpite) */}
       <OferecimentoPalpite className="border-t border-line pt-8 sm:pt-10 lg:col-span-2" />
     </div>
+  );
+}
+
+// ---- lembrete da apuração (I29) ---------------------------------------------------------------------------------------
+
+/**
+ * "Compare com o resultado oficial": depois de cravar e até as 17h de 25/10 (relógio do servidor), o lembrete na agenda
+ * gerado no aparelho, apontando para /palpite (+ utm_source=agenda). O palpite fica neste aparelho e a página o mostra
+ * de volta: o código dele nunca vai no evento.
+ */
+function LembretePalpite({ agora }: { agora: number }) {
+  if (!lembreteDisponivel(agora)) return null;
+  return (
+    <section
+      aria-labelledby="lembrete-palpite"
+      className="flex flex-col gap-3.5 rounded-2xl border border-line bg-surface p-4 shadow-card sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:p-5"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand-fg">
+          <Icon name="calendario" size={19} />
+        </span>
+        <div className="min-w-0">
+          <h3 id="lembrete-palpite" className="text-[15px] font-semibold leading-snug text-fg">
+            Compare com o resultado oficial
+          </h3>
+          <p className="mt-0.5 text-pretty text-[13.5px] leading-snug text-fg-muted">
+            A apuração começa no domingo, 25/10, às 17h (Brasília). O lembrete abre esta página, que guarda o seu palpite neste aparelho.
+          </p>
+        </div>
+      </div>
+      <BotaoLembrete caminho="/palpite" variant="outline" className="w-full shrink-0 sm:w-auto" />
+    </section>
   );
 }
 

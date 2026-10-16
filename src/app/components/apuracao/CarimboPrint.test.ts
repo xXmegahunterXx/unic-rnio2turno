@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { CarimboPrint, ehInstanteReveja, partesCarimbo, textoCarimbo, type ResumoCarimbo } from './CarimboPrint';
+import { CarimboPrint, ehInstanteReveja, itensCarimbo, partesCarimbo, textoCarimbo, type ResumoCarimbo } from './CarimboPrint';
 
 /** 25/10/2026, hh:mm:ss de Brasília (UTC−3). */
 const brt = (h: number, m: number, s = 0) => Date.UTC(2026, 9, 25, h + 3, m, s);
@@ -51,6 +51,25 @@ describe('partesCarimbo / textoCarimbo (I10)', () => {
   });
 });
 
+describe('itensCarimbo (o que vai em cada pedaço que pode quebrar linha)', () => {
+  it('selo em duas partes; marca; rótulo; % apurado; hora — na ordem', () => {
+    const it = itensCarimbo(partesCarimbo({ host: HOST, resumo: resumo(5000), simulado: true }));
+    expect(it.map((i) => i.texto)).toEqual(['SIMULAÇÃO', 'dados fictícios', HOST, '50,00% apurado']);
+    expect(it.map((i) => i.tipo)).toEqual(['selo', 'selo', 'marca', 'info']);
+    const vivo = itensCarimbo(partesCarimbo({ host: HOST, resumo: resumo(6321), reveja: true }));
+    expect(vivo.map((i) => i.texto)).toEqual([HOST, 'Reveja a noite', '63,21% apurado', '18:47:12 (Brasília)']);
+  });
+  it('cada parte cabe na área do cartograma no celular (≤ 23 caracteres por linha da pilha)', () => {
+    for (const d of [
+      { host: HOST, resumo: resumo(9999), reveja: true },
+      { host: HOST, resumo: resumo(9999), simulado: true },
+      { host: HOST, resumo: resumo(10_000), turno1: true },
+    ]) {
+      for (const i of itensCarimbo(partesCarimbo(d))) expect(i.texto.length, i.texto).toBeLessThanOrEqual(23);
+    }
+  });
+});
+
 describe('ehInstanteReveja (?t= da URL)', () => {
   it('aceita os formatos de LinhaDoTempo e recusa o resto', () => {
     for (const ok of ['18h42', '18:42', '1842', '9h05', String(brt(19, 0))]) expect(ehInstanteReveja(ok), ok).toBe(true);
@@ -82,6 +101,20 @@ describe('<CarimboPrint> (marcação)', () => {
     const h = renderToStaticMarkup(createElement(CarimboPrint, { resumo: resumo(6321), onde: 'mapa' }));
     expect(h).toContain('63,21% apurado');
     expect(h).toContain('bg-surface/80');
+  });
+
+  it('separadores sem sobra: o "·" é decoração (::before) e o texto não leva ponto solto', () => {
+    const h = html('/apuracao', { resumo: resumo(6321), onde: 'mapa' });
+    expect(h).toContain("before:content-[&#x27;·&#x27;]");
+    expect(h).not.toMatch(/>\s*·\s*</);
+    expect(h).toContain('overflow-hidden');
+  });
+
+  it('pilha (cartograma): uma parte por linha, sem separador, com a pílula', () => {
+    const h = html('/apuracao', { resumo: resumo(6321), onde: 'mapa', forma: 'pilha' });
+    expect(h).toContain('flex-col');
+    expect(h).not.toContain('before:content');
+    expect(h).toContain('rounded-md bg-surface/80');
   });
 
   it('sem resumo, nada', () => {

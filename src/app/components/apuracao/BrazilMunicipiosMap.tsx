@@ -32,7 +32,7 @@ import { parseViewBox, useGeo, type ViewBox } from './geo';
 import { useMapZoom, type View } from './MapZoom';
 import { useClickOutside, useElementSize, prefersReducedMotion } from './MapHooks';
 import { MAP_MODES, pctsMunBr, rotuloApurado, valorMunBr, type MapMode } from './mapModes';
-import { CLASSE_CANTO_CARIMBO } from './CarimboPrint';
+import { CLASSE_CANTO_CARIMBO, CLASSE_PE_CARIMBO_CELULAR } from './CarimboPrint';
 
 // =============================================================================================
 // Preparo da geometria (uma vez por sessão)
@@ -247,7 +247,10 @@ export interface BrazilMunicipiosMapProps {
   busca?: boolean;
   /** Recebe os tempos medidos (ms). */
   onMedida?: (m: { preparo: number; preenchimento: number; divisas: number }) => void;
-  /** Carimbo do print (I10, `<CarimboPrint onde="mapa" …/>`), no canto inferior esquerdo do quadro (sudoeste vazio). */
+  /**
+   * Carimbo do print (I10, `<CarimboPrint onde="mapa" …/>`): de 640 px para cima, no canto inferior esquerdo do quadro
+   * (sudoeste vazio); no celular, logo abaixo do desenho (no canto cobriria RS e SC).
+   */
   carimbo?: ReactNode;
   ariaLabel?: string;
   className?: string;
@@ -765,6 +768,7 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
           ) : null}
         </div>
       )}
+      {carimbo && !carregando && !erro ? <div className={CLASSE_PE_CARIMBO_CELULAR}>{carimbo}</div> : null}
       {/* Celular: o tooltip fixo fica encaixado abaixo do mapa (não cobre os municípios). */}
       {tip && tipM && tip.fixo && W < 520 && !estatico ? (
         <TooltipMunicipio

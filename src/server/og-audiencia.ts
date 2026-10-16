@@ -6,8 +6,8 @@
  * O número NUNCA vem da URL: vem do servidor (`pessoas()`, o MESMO "pessoas agora" público do status — some abaixo do
  * piso de 500 ou com a chave 'contador-publico' desligada) e é arredondado PARA BAIXO ao marco (`marcoAtingido`). O
  * `?m=` só pode baixar o marco (o cartão do painel pede o dele; se o servidor contar menos, sai o que ele contar):
- * ninguém fabrica "1 milhão de pessoas" mudando o endereço. Abaixo do 1º marco (ou sem número), sai o convite
- * genérico "Apuração ao vivo, seção por seção", sem número.
+ * ninguém fabrica "1 milhão de pessoas" mudando o endereço. Abaixo do 1º marco (ou sem número, ou com `?m=0`), sai o
+ * convite genérico "Apuração ao vivo", sem número.
  *
  * Formatos (`?formato=`): og 1200×630 (padrão), x 1200×675 e story 1080×1920 (Status/Stories).
  * Cache: em memória, uma imagem por (marco, formato) — no máximo 12, cada uma gerada uma vez; HTTP com 60 s
@@ -46,10 +46,11 @@ export function marcoAtingido(n: number | null | undefined): MarcoAudiencia | nu
 }
 
 /**
- * Marco exibido: o do servidor, no máximo o pedido em `?m=` (que só pode baixar). `pedido` fora da lista = ignorado.
- * Puro (testado: a URL nunca aumenta o número).
+ * Marco exibido: o do servidor, no máximo o pedido em `?m=` (que só pode baixar). `?m=0` = convite sem número (o
+ * cartão "Convite" da aba Postar). `pedido` fora da lista = ignorado. Puro (testado: a URL nunca aumenta o número).
  */
 export function marcoExibido(nServidor: number | null | undefined, pedido: string | null | undefined): MarcoAudiencia | null {
+  if (pedido === '0') return null;
   const doServidor = marcoAtingido(nServidor);
   const p = Number(pedido);
   const pedidoValido = (MARCOS_AUDIENCIA as readonly number[]).includes(p) ? (p as MarcoAudiencia) : null;

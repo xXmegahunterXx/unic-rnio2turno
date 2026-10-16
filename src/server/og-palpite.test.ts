@@ -101,7 +101,7 @@ describe('rota, meta tags e sitemap', () => {
     expect((await bytes(ROTA_OG_PALPITE)).equals(sem)).toBe(true);
     expect(vDe(await html())).toBe('v1');
 
-    const sitemap = await (await m.app.request('/sitemap.xml')).text();
+    const sitemap = await (await m.app.request('/sitemap-paginas.xml') /* I07b: /sitemap.xml virou índice */).text();
     expect(sitemap).toContain('/palpite</loc>');
   }, 120_000);
 });

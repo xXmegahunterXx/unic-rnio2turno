@@ -157,17 +157,32 @@ export function tituloResultadoDefinido(race: Pick<Race, 'cargo'>, nome: string,
 }
 
 /**
- * Texto do cartão "Postar" do painel (I26) para um evento do feed AO VIVO: hora + título do evento (já neutro e
- * anonimizado quando preciso) + chamada. ≤ 220 de peso, "[SIMULAÇÃO]" quando simulado. Puro.
+ * Texto do cartão "Postar" do painel (I26) para um evento do feed: hora + título do evento (já neutro e anonimizado
+ * quando preciso) + chamada que vale durante e depois da apuração ("Acompanhe seção por seção."). ≤ 220 de peso,
+ * "[SIMULAÇÃO]" quando simulado. Puro.
  */
 export function textoPostarEvento(evento: Pick<FeedEvent, 't' | 'titulo'>, simulado?: boolean): string {
   const titulo = evento.titulo.replace(/[.\s]+$/, '');
-  return finalizar(`${fmtHora(evento.t)} · ${titulo}. Apuração ao vivo, seção por seção.`, simulado);
+  return finalizar(`${fmtHora(evento.t)} · ${titulo}. Acompanhe seção por seção.`, simulado);
 }
 
 /** Texto do cartão "Postar" para um marco de audiência (I26): só a contagem arredondada ao marco, sem candidato. Puro. */
 export function textoPostarAudiencia(marco: number): string {
   return finalizar(`Mais de ${fmtCompact(marco)} pessoas acompanham a apuração no Sintonia agora. Ao vivo, seção por seção.`);
+}
+
+/**
+ * Texto do cartão "Convite" da aba "Postar" (I26): sem nome, sem número, pela fase da noite. Antes das 17h, a data e a
+ * hora; apurando, o convite para acompanhar; encerrada, o resultado completo para consultar. Puro.
+ */
+export function textoPostarConvite(fase: 'pre' | 'apurando' | 'encerrada', simulado?: boolean): string {
+  const t =
+    fase === 'pre'
+      ? 'Domingo, 25/10, às 17h (Brasília), começa a divulgação dos resultados do 2º turno. Acompanhe a apuração ao vivo no Sintonia, do Brasil inteiro até a sua seção.'
+      : fase === 'apurando'
+        ? 'Apuração do 2º turno ao vivo no Sintonia: do Brasil inteiro até a sua seção.'
+        : 'Resultado do 2º turno no Sintonia: do Brasil inteiro até a sua seção.';
+  return finalizar(t, simulado);
 }
 
 /** Evento do feed ("momento" da noite). O título do evento já é neutro (e anonimizado quando preciso). */

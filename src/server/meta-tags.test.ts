@@ -43,25 +43,26 @@ describe('imagem específica por página', () => {
     const m = metaDaRota('/apuracao/sp/71072', q(), ctx);
     expect(m.status).toBe(200);
     expect(m.imagem).toBe('/api/og/municipio.png?race=pres&uf=sp&cod=71072');
-    expect(m.titulo).toBe('Apuração em São Paulo (SP) · Presidente · Sintonia');
+    expect(m.titulo).toBe('Eleição 2026 em São Paulo (SP): 1º turno e apuração do 2º turno · Sintonia');
     const s = metaDaRota('/apuracao/sp/71072/1/15', q('race=pres'), ctx);
     expect(s.imagem).toBe('/api/og/secao.png?race=pres&uf=sp&cod=71072&zona=1&secao=15');
     expect(s.titulo).toContain('Boletim de urna · Zona 1, Seção 15 · São Paulo (SP)');
     // governador de outra UF: a página cai em Presidente, a imagem e o título também
     const g = metaDaRota('/apuracao/sp/71072', q('race=gov-am'), ctx);
     expect(g.imagem).toContain('race=pres&');
-    expect(g.titulo).toContain('· Presidente ·');
+    expect(g.titulo).toBe(m.titulo);
+    expect(g.imagemAlt).toContain('· Presidente');
     expect(metaDaRota('/apuracao/sp/99999', q(), ctx).status).toBe(404);
     expect(metaDaRota('/apuracao/sp/71072/0/15', q(), ctx).status).toBe(404);
   });
 
   it('UF: título e alt com a corrida mostrada na UF, sem repetir o estado (ensaio geral 12/10/2026)', () => {
     const am = metaDaRota('/apuracao/am', q('race=gov-am'), ctx);
-    expect(am.titulo).toBe('Apuração no Amazonas · Governador · Sintonia');
+    expect(am.titulo).toBe('Eleição 2026 no Amazonas: 1º turno e apuração do 2º turno · Governador · Sintonia');
     expect(am.imagemAlt).toBe('Placar da apuração · Governador · Amazonas');
     // governador de outra UF: título, alt e imagem seguem Presidente, como a página
     const sp = metaDaRota('/apuracao/sp', q('race=gov-am'), ctx);
-    expect(sp.titulo).toBe('Apuração em São Paulo · Presidente · Sintonia');
+    expect(sp.titulo).toBe('Eleição 2026 em São Paulo: 1º turno e apuração do 2º turno · Sintonia');
     expect(sp.imagemAlt).toBe('Placar da apuração · Presidente · São Paulo');
     expect(sp.imagem).toContain('race=pres&');
   });
@@ -226,7 +227,146 @@ describe('título depois do fim da apuração', () => {
     fase = 'apurando';
     expect(metaDaRota('/apuracao', q(), ctx)?.titulo).toMatch(/^Apuração ao vivo · Presidente/);
     fase = 'encerrada';
-    expect(metaDaRota('/apuracao', q(), ctx)?.titulo).toMatch(/^Resultado do 2º turno · Presidente/);
+    expect(metaDaRota('/apuracao', q(), ctx)?.titulo).toMatch(/^Resultado do 2º turno 2026 · Presidente/);
     fase = 'pre';
+  });
+});
+
+// ---- leva 3: títulos por fase, placar na descrição, dia da votação e parâmetros de origem (I07, I08) ----------------
+
+/** Termos de torcida/projeção que nunca podem aparecer (união das listas PROIBIDAS dos textos do app). */
+const PROIBIDAS = /vai ganhar|vitória|esmagador|derrota|virou o jogo|lavada|surra|favorito|torcida|imbat|vence|ganh|lidera|previs/i;
+/** 20/10/2026 12h de Brasília (antes do dia da votação). */
+const ANTES = Date.UTC(2026, 9, 20, 15, 0, 0);
+
+/** Contexto com placar fixo em toda corrida (votos na ordem da urna; 1º turno com "Outros"). */
+function comPlacarFixo(base: ContextoMeta, agora = ANTES): ContextoMeta & { pedidos: string[] } {
+  const pedidos: string[] = [];
+  const placar = (race: string) => {
+    pedidos.push(race);
+    const r = base.races.get(race)!;
+    const votos = r.turno === 1 ? [430, 470, 100] : [480, 520];
+    return {
+      race: r,
+      simulacao: false,
+      resumo: { secoes: 10, secoesTotalizadas: r.turno === 1 ? 10 : 7, eleitorado: 1000, eleitoradoTotalizado: 900, comparecimento: 800, abstencao: 100, votos, brancos: 0, nulos: 0, status: 'apurando' as const, lider: 1, eleito: null, ultimaAtualizacao: null },
+    };
+  };
+  return { ...base, agora: () => agora, placar: (race) => placar(race), placarMunicipio: (race) => placar(race), pedidos };
+}
+
+describe('I07: títulos e descrições por fase (Brasil, UF e município)', () => {
+  it('município: os três títulos do plano, sem nome de candidato; cargo só fora de Presidente', () => {
+    const c = comPlacarFixo(ctx);
+    const titulo = (f: typeof fase, path = '/apuracao/sp/62910', qs = '') => {
+      fase = f;
+      return metaDaRota(path, q(qs), c).titulo;
+    };
+    expect(titulo('pre')).toBe('Eleição 2026 em Campinas (SP): 1º turno e apuração do 2º turno · Sintonia');
+    expect(titulo('apurando')).toBe('Apuração ao vivo em Campinas (SP) · 2º turno 2026 · Sintonia');
+    expect(titulo('encerrada')).toBe('Resultado do 2º turno 2026 em Campinas (SP) · Sintonia');
+    // 1º turno pedido na URL: sempre o resultado oficial
+    expect(titulo('apurando', '/apuracao/sp/62910', 'race=pres-t1')).toBe('1º turno 2026 em Campinas (SP): resultado oficial · Sintonia');
+    // governador na própria UF: o cargo vai no fim
+    expect(titulo('apurando', '/apuracao/am/02550', 'race=gov-am')).toBe('Apuração ao vivo em Manaus (AM) · 2º turno 2026 · Governador · Sintonia');
+    // exterior
+    expect(titulo('encerrada', '/apuracao/zz/29254')).toBe('Resultado do 2º turno 2026 em Abidjã (Exterior) · Sintonia');
+    for (const f of ['pre', 'apurando', 'encerrada'] as const) {
+      fase = f;
+      const m = metaDaRota('/apuracao/sp/62910', q(), c);
+      expect(m.titulo).not.toMatch(/Lula|Flávio/);
+      expect(m.descricao).not.toMatch(PROIBIDAS);
+    }
+    fase = 'pre';
+  });
+
+  it('município: antes da apuração o placar é o do 1º turno; durante e depois, o do 2º turno, na ordem da urna', () => {
+    const c = comPlacarFixo(ctx);
+    fase = 'pre';
+    const pre = metaDaRota('/apuracao/sp/62910', q(), c);
+    expect(c.pedidos.at(-1)).toBe('pres-t1');
+    expect(pre.descricao).toBe('Campinas (SP) · 1º turno (resultado oficial): Lula 43,00% · Flávio Bolsonaro 47,00% dos votos válidos. Zonas, mosaico de seções e, em 25/10, o 2º turno ao vivo.');
+    fase = 'apurando';
+    const ap = metaDaRota('/apuracao/sp/62910', q(), c);
+    expect(c.pedidos.at(-1)).toBe('pres');
+    expect(ap.descricao).toBe('Campinas (SP) · Com 70,00% das seções totalizadas: Lula 48,00% · Flávio Bolsonaro 52,00% dos votos válidos. Zonas eleitorais e mosaico de seções, ao vivo.');
+    // ordem da urna (13 antes de 22), mesmo com o 22 à frente
+    expect(ap.descricao.indexOf('Lula')).toBeLessThan(ap.descricao.indexOf('Flávio'));
+    fase = 'encerrada';
+    expect(metaDaRota('/apuracao/sp/62910', q(), c).descricao).toMatch(/comparação com o 1º turno\.$/);
+    fase = 'pre';
+  });
+
+  it('sem placar (TSE sem o município em cache): descrição neutra por fase, sem número', () => {
+    const semPlacar: ContextoMeta = { ...ctx, agora: () => ANTES, placarMunicipio: () => null, placar: () => null };
+    fase = 'apurando';
+    expect(metaDaRota('/apuracao/sp/62910', q(), semPlacar).descricao).toBe(
+      'Apuração do 2º turno em Campinas (SP) ao vivo, com os dados do TSE: placar, zonas eleitorais e mosaico de seções.',
+    );
+    fase = 'encerrada';
+    expect(metaDaRota('/apuracao/sp/62910', q(), semPlacar).descricao).toMatch(/^Resultado do 2º turno em Campinas \(SP\): votos por candidato/);
+    fase = 'pre';
+  });
+
+  it('UF e Brasil: títulos por fase; antes da apuração, o 1º turno oficial na descrição', () => {
+    const c = comPlacarFixo(ctx);
+    fase = 'pre';
+    const ba = metaDaRota('/apuracao/ba', q(), c);
+    expect(ba.titulo).toBe('Eleição 2026 na Bahia: 1º turno e apuração do 2º turno · Sintonia');
+    expect(c.pedidos.at(-1)).toBe('pres-t1');
+    expect(ba.descricao).toMatch(/^1º turno \(resultado oficial\): Lula 43,00% · Flávio Bolsonaro 47,00% dos votos válidos\. Resultado do 1º turno na Bahia/);
+    const br = metaDaRota('/apuracao', q(), c);
+    expect(br.titulo).toBe('Eleição 2026 para Presidente: 1º turno e apuração do 2º turno · Sintonia');
+    expect(br.descricao).toMatch(/^1º turno \(resultado oficial\): Lula/);
+    fase = 'apurando';
+    expect(metaDaRota('/apuracao/ba', q(), c).titulo).toBe('Apuração ao vivo na Bahia · 2º turno 2026 · Sintonia');
+    expect(metaDaRota('/apuracao/zz', q(), c).titulo).toBe('Apuração ao vivo no exterior · 2º turno 2026 · Sintonia');
+    expect(metaDaRota('/apuracao', q(), c).titulo).toBe('Apuração ao vivo · Presidente · 2º turno 2026 · Sintonia');
+    expect(metaDaRota('/apuracao', q(), c).descricao).toMatch(/^Com 70,00% das seções totalizadas: Lula 48,00% · Flávio Bolsonaro 52,00%/);
+    fase = 'encerrada';
+    expect(metaDaRota('/apuracao/ba', q(), c).titulo).toBe('Resultado do 2º turno 2026 na Bahia · Sintonia');
+    expect(metaDaRota('/apuracao/df', q('race=gov-df'), c).titulo).toBe('Resultado do 2º turno 2026 no Distrito Federal · Governador · Sintonia');
+    // 1º turno pedido na URL (antes, saía "Apuração ao vivo · Presidente · 1º turno")
+    expect(metaDaRota('/apuracao', q('race=pres-t1'), c).titulo).toBe('Resultado do 1º turno 2026 · Presidente · Sintonia');
+    fase = 'pre';
+  });
+
+  it('dia da votação (0h–17h de 25/10): nenhuma descrição com nome ou número de candidato; às 17h volta', () => {
+    const manha = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 13, 0, 0)); // 10h de Brasília
+    fase = 'pre';
+    for (const p of ['/apuracao', '/apuracao/sp', '/apuracao/sp/62910', '/tv', '/embed/placar']) {
+      const m = metaDaRota(p, q(), manha);
+      expect(m.descricao, p).not.toMatch(/Lula|Flávio|%/);
+    }
+    expect(manha.pedidos).toEqual([]);
+    expect(metaDaRota('/apuracao/sp/62910', q(), manha).descricao).toMatch(/^Resultado do 1º turno em Campinas \(SP\) e, em 25\/10/);
+    const vespera = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 2, 59, 0)); // 23h59 de 24/10
+    expect(metaDaRota('/apuracao/sp/62910', q(), vespera).descricao).toMatch(/Lula 43,00%/);
+    const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 20, 0, 0)); // 17h
+    fase = 'apurando';
+    expect(metaDaRota('/apuracao/sp/62910', q(), apuracao).descricao).toMatch(/Lula 48,00%/);
+    fase = 'pre';
+  });
+
+  it('simulação: o placar da descrição leva a marca SIMULAÇÃO', () => {
+    const c = comPlacarFixo(ctx);
+    const sim: ContextoMeta = { ...c, placar: (race) => ({ ...c.placar!(race)!, simulacao: true }) };
+    fase = 'apurando';
+    expect(metaDaRota('/apuracao', q(), sim).descricao).toMatch(/^SIMULAÇÃO \(dados fictícios\)\. Com 70,00%/);
+    fase = 'pre';
+  });
+});
+
+describe('I08: parâmetros de origem do link não mudam a página', () => {
+  it('utm_*, h e via ficam fora da chave do cache do HTML e do canônico; o canônico do município é o caminho', () => {
+    const base = consultaNormalizada(q('race=pres'));
+    expect(consultaNormalizada(q('race=pres&utm_source=x&h=1845&via=embed&utm_medium=social'))).toBe(base);
+    expect(consultaNormalizada(q('utm_source=whatsapp&h=2010'))).toBe('');
+    for (const p of ['/apuracao', '/apuracao/sp', '/apuracao/sp/62910', '/palpite', '/teste']) {
+      const a = metaDaRota(p, q(), ctx);
+      const b = metaDaRota(p, q('utm_source=x&h=1845&via=embed'), ctx);
+      expect(b, p).toEqual(a);
+      expect(`${b.canonico ?? ''}${b.imagem}`).not.toMatch(/utm_|[?&]h=|via=/);
+    }
   });
 });

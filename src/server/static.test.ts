@@ -123,23 +123,23 @@ describe('SPA com meta tags por rota', () => {
 
   it('/apuracao?race=gov-am → título e imagem da corrida', async () => {
     const html = await (await get('/apuracao?race=gov-am')).text();
-    expect(html).toContain('<title>Apuração ao vivo · Governador · Amazonas · Sintonia</title>');
+    expect(html).toContain('<title>Eleição 2026 no Amazonas: 1º turno e apuração do 2º turno · Governador · Sintonia</title>'); // I07: título por fase
     expect(html).toContain('apuracao.png?race=gov-am');
     expect(html).toContain('<meta property="og:url" content="https://sintonia.exemplo.br/apuracao?race=gov-am" />');
   });
 
   it('link antigo de uma UF que saiu do 2º turno (gov-rj, 10/10/2026) cai em Presidente', async () => {
     const html = await (await get('/apuracao?race=gov-rj')).text();
-    expect(html).toContain('<title>Apuração ao vivo · Presidente · Sintonia</title>');
+    expect(html).toContain('<title>Eleição 2026 para Presidente: 1º turno e apuração do 2º turno · Sintonia</title>'); // I07: título por fase
     expect(html).toContain('apuracao.png?race=pres');
   });
 
   it('/apuracao/:uf e /apuracao/:uf/:cod usam nomes do dataset', async () => {
     const uf = await (await get('/apuracao/sp')).text();
-    expect(uf).toContain('Apuração em São Paulo · Presidente');
+    expect(uf).toContain('Eleição 2026 em São Paulo: 1º turno e apuração do 2º turno'); // I07: título por fase
     expect(uf).toContain('apuracao.png?race=pres&amp;uf=sp');
     const mun = await (await get('/apuracao/ac/1066')).text();
-    expect(mun).toContain('Apuração em Porto Walter (AC)');
+    expect(mun).toContain('Eleição 2026 em Porto Walter (AC)'); // I07: título por fase
     const bu = await (await get('/apuracao/sp/71072/1/15')).text();
     expect(bu).toContain('Boletim de urna · Zona 1, Seção 15 · São Paulo (SP)');
   });

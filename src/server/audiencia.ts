@@ -2,8 +2,8 @@
  * Audiência real, só AGREGADA e sem dado pessoal (contrato: src/shared/audiencia.ts; ARCHITECTURE §11.12).
  *
  * O que é medido (e o que fica em STATE_DIR/audiencia.json, gravado de forma atômica):
- *  - páginas vistas por dia, por grupo de rota e por hora (últimas 48 h) — o app manda um sinal a cada troca de página,
- *    só com o GRUPO (nunca o caminho nem a query string);
+ *  - páginas vistas por dia, por grupo de rota e por hora (últimas 336 h = 14 dias, desde a leva 3; eram 48 h) — o app
+ *    manda um sinal a cada troca de página, só com o GRUPO (nunca o caminho nem a query string);
  *  - entradas por origem (família da rede social/buscador ou domínio registrável; nunca a URL de origem);
  *  - visitantes únicos estimados por dia: conjunto em memória de chaves de 32 bits = hash(sal DIÁRIO, rede, navegador).
  *    O sal nasce aleatório, nunca é gravado e é trocado à meia-noite de Brasília junto com o conjunto: só a CONTAGEM
@@ -21,21 +21,39 @@
  * Abuso: limite de sinais por rede por minuto, de páginas por pessoa por minuto e de "pessoas" novas por rede (50 por
  * dia nos únicos, 10 por janela de 30 s na presença) — trocar o User-Agent a cada pedido não infla os números. O painel
  * mostra a CONCENTRAÇÃO (quanto as 10 maiores redes somam) agora e no pico, para conferir antes de vender.
+ *
+ * Medição da noite (I14, leva 3), também só contagens:
+ *  - curva minuto a minuto: o MAIOR número de pessoas ao mesmo tempo (a mesma amostra de 10 s do pico) em cada minuto
+ *    das últimas 24 h (1.440 minutos; minuto sem amostra = servidor fora do ar);
+ *  - horas de tela: pessoas presentes × tempo da amostra (10 s), somadas por hora (mesma janela de 14 dias) e por dia;
+ *  - páginas vistas por UF, por país e por aparelho, por dia. UF e país vêm dos cabeçalhos que a CLOUDFLARE acrescenta
+ *    (`cf-ipcountry`; `cf-region-code`, com a transformação gerenciada "Add visitor location headers" ligada — deploy/
+ *    cloudflare.mjs): o servidor só soma 1 na sigla e descarta o cabeçalho; cidade, CEP e coordenadas nunca são lidos.
+ *    Aparelho = `Sec-CH-UA-Mobile` (Chrome/Edge); sem ele, o User-Agent ("Mobi", iPhone…); sem os dois, "não informado".
+ *    Sem Cloudflare (ou sem a transformação) tudo cai em "não informado" — nada quebra.
+ *  `AUDIENCIA_LOCAL=0` (ambiente; reinício) desliga só os contadores por UF, país e aparelho. Falha nessa parte nunca
+ *  derruba a contagem de páginas, únicos e pico.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  APARELHOS,
   AUDIENCIA,
   GRUPOS_FORA_DE_PESSOAS,
   diaBrasilia,
   ehGrupoRota,
   intervaloPresenca,
   normalizarOrigem,
+  type Aparelho,
   type AudienciaAdmin,
   type AudienciaPublica,
+  type ContagemDiaAudiencia,
   type DiaAudiencia,
   type HoraAudiencia,
+  type MinutoAudiencia,
   type PicoAudiencia,
+  type TelaAudiencia,
 } from '../shared/audiencia';
+import { UFS } from '../shared/types';
 import { LimiteJanela, numeroDe } from './anuncios';
 import { arredondarPessoas } from './metrics';
 import type { JsonStore } from './state-store';
@@ -70,6 +88,86 @@ export function ehRoboAudiencia(ua: string | undefined | null): boolean {
     ua,
   );
 }
+
+// ---- I14: UF, país e aparelho (só a sigla; nada da pessoa) ---------------------------------------------------------
+
+/** Minutos na curva da noite (24 h). */
+export const MINUTOS_CURVA = 1440;
+const MINUTO_MS = 60_000;
+/** Chave de "não informado" em UF e país. */
+export const ND = 'ND';
+/** Países distintos por dia (cabeçalho forjado direto na origem não enche o arquivo): acima disso, 'ZZ' = outros. */
+export const MAX_PAISES_DIA = 250;
+/** País acima do teto do dia. */
+export const OUTROS_PAISES = 'ZZ';
+
+const UFS_BR = new Set<string>(UFS);
+const PAIS_RE = /^[A-Z]{2}$/;
+
+/** Leitor de cabeçalho do pedido (Hono: `(n) => c.req.header(n)`, sem diferença de maiúsculas). */
+export type CabecalhoDe = (nome: string) => string | undefined;
+
+/** Onde e em que tipo de aparelho uma página foi vista — só siglas agregáveis. */
+export interface LocalSinal {
+  /** ISO 3166-1 alfa-2 ('BR', 'PT'…) ou 'ND' */
+  pais: string;
+  /** sigla da UF (só com país BR) ou 'ND'; `null` = fora do Brasil (não entra na tabela por UF) */
+  uf: string | null;
+  aparelho: Aparelho;
+}
+
+/**
+ * País pelo `cf-ipcountry` da Cloudflare ('XX' = desconhecido e 'T1' = Tor viram 'ND'); sem o cabeçalho, 'ND'.
+ */
+export function paisDoCabecalho(v: string | undefined | null): string {
+  const p = (v ?? '').trim().toUpperCase();
+  if (!PAIS_RE.test(p) || p === 'XX' || p === 'T1') return ND;
+  return p;
+}
+
+/** UF pelo `cf-region-code` ("SP"; aceita "BR-SP"), só quando o país é o Brasil; fora do Brasil, `null`. */
+export function ufDoCabecalho(regiao: string | undefined | null, pais: string): string | null {
+  if (pais !== 'BR' && pais !== ND) return null;
+  if (pais !== 'BR') return ND;
+  const r = (regiao ?? '').trim().toUpperCase().replace(/^BR-/, '');
+  return UFS_BR.has(r) ? r : ND;
+}
+
+/**
+ * Aparelho: `Sec-CH-UA-Mobile` ("?1" celular, "?0" computador ou tablet — o mesmo critério do navegador); sem ele, o
+ * User-Agent ("Mobi", iPhone…; tablets e iPad contam como computador, como no cabeçalho); sem os dois, 'nd'.
+ */
+export function aparelhoDe(mobile: string | undefined | null, ua: string | undefined | null): Aparelho {
+  const m = (mobile ?? '').trim();
+  if (m === '?1') return 'celular';
+  if (m === '?0') return 'computador';
+  const u = ua ?? '';
+  if (/Mobi|iPhone|iPod|Windows Phone|Opera Mini|BlackBerry|KaiOS/i.test(u)) return 'celular';
+  if (/Windows NT|Macintosh|X11|CrOS|Linux|iPad|Android/i.test(u)) return 'computador';
+  return 'nd';
+}
+
+/** Local de um sinal a partir dos cabeçalhos (sem leitor: tudo 'ND', aparelho pelo User-Agent). */
+export function localDoPedido(cab: CabecalhoDe | undefined, ua: string | undefined): LocalSinal {
+  const pais = paisDoCabecalho(cab?.('cf-ipcountry'));
+  return { pais, uf: ufDoCabecalho(cab?.('cf-region-code'), pais), aparelho: aparelhoDe(cab?.('sec-ch-ua-mobile'), ua) };
+}
+
+/** Contagens de um dia que não cabem no `DiaAudiencia` do contrato (I14). */
+interface ExtraDia {
+  uf: Record<string, number>;
+  pais: Record<string, number>;
+  aparelho: Record<string, number>;
+  /** segundos de tela (pessoas × tempo da amostra) */
+  telaS: number;
+}
+
+const extraVazio = (): ExtraDia => ({ uf: {}, pais: {}, aparelho: {}, telaS: 0 });
+const somar = (o: Record<string, number>, k: string) => {
+  o[k] = (o[k] ?? 0) + 1;
+};
+/** Segundos → horas com 2 casas (o painel formata). */
+const emHoras = (s: number) => Math.round(s / 36) / 100;
 
 /** 32 bits de um hash (nunca 0: 0 marca posição vazia no conjunto). */
 function chave32(sal: Buffer, ...partes: string[]): number {
@@ -220,13 +318,22 @@ export class Presenca {
   }
 }
 
-/** Formato do arquivo (versão 1). */
+/**
+ * Formato do arquivo (versão 1). Os campos da leva 3 (I14) são opcionais e ficam em chaves próprias: a versão anterior
+ * lê o arquivo novo ignorando-os, e a nova lê o antigo sem eles.
+ */
 export interface AudienciaArquivo {
   v: 1;
   desde: number | null;
   pico: PicoAudiencia | null;
   dias: DiaAudiencia[];
   horas: HoraAudiencia[];
+  /** I14: [início do minuto (epoch ms), maior número de pessoas ao mesmo tempo] das últimas 24 h */
+  curva?: [number, number][];
+  /** I14: por dia, páginas por UF, país e aparelho e os segundos de tela */
+  local?: ({ dia: string } & Partial<ExtraDia>)[];
+  /** I14: [início da hora (epoch ms), segundos de tela] na janela de `horas` */
+  telaHoras?: [number, number][];
 }
 
 export interface OpcoesAudiencia {
@@ -234,6 +341,8 @@ export interface OpcoesAudiencia {
   /** estimativa que o servidor já tinha (Metricas.pessoasAgora, arredondada) */
   pessoasServidor?: () => number;
   store?: JsonStore | null;
+  /** contar UF, país e aparelho (I14); padrão: ligado, salvo `AUDIENCIA_LOCAL=0` no ambiente */
+  medirLocal?: boolean;
 }
 
 const ehNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
@@ -276,6 +385,16 @@ export class Audiencia {
   private pico: PicoAudiencia | null = null;
   private dias: DiaAudiencia[] = [];
   private horas = new Map<number, HoraAudiencia>();
+  // I14 (leva 3)
+  /** início do minuto → maior número de pessoas ao mesmo tempo no minuto (últimas 24 h) */
+  private curva = new Map<number, number>();
+  /** dia → UF, país, aparelho e segundos de tela */
+  private extras = new Map<string, ExtraDia>();
+  /** início da hora → segundos de tela (mesma janela de `horas`) */
+  private telaHora = new Map<number, number>();
+  /** instante da última amostra (horas de tela: o tempo de verdade entre amostras, até 20 s) */
+  private ultimaAmostra = 0;
+  private readonly medirLocal: boolean;
 
   // ---- só memória (nunca gravado) ----
   private diaAtual = '';
@@ -304,6 +423,7 @@ export class Audiencia {
     this.now = o.now ?? Date.now;
     this.pessoasServidor = o.pessoasServidor ?? (() => 0);
     this.store = o.store ?? null;
+    this.medirLocal = o.medirLocal ?? process.env.AUDIENCIA_LOCAL?.trim() !== '0';
     this.presenca = new Presenca(this.now);
     this.limiteRede = new LimiteJanela(SINAIS_REDE_MIN, 60_000, this.now, 300_000);
     this.limitePaginas = new LimiteJanela(PAGINAS_PESSOA_MIN, 60_000, this.now, 300_000);
@@ -317,9 +437,11 @@ export class Audiencia {
   /**
    * Sinal do app (`POST /api/audiencia`). `rede` = chave anonimizada da rede LARGA (IPv4 inteiro, IPv6 /56), `ua` =
    * User-Agent (usado só para o hash, nunca guardado). Corpo: página vista `{ g, o? }` ou presença `{ p: 1, g }` (o
-   * grupo da página aberta). Devolve o intervalo do próximo sinal de presença (s). Corpo inválido → null.
+   * grupo da página aberta). `cab` lê os cabeçalhos do pedido (I14: `cf-ipcountry`, `cf-region-code`,
+   * `Sec-CH-UA-Mobile`; só viram +1 numa sigla). Devolve o intervalo do próximo sinal de presença (s). Corpo inválido →
+   * null.
    */
-  sinal(rede: string, ua: string | undefined, corpo: unknown): { s: number } | null {
+  sinal(rede: string, ua: string | undefined, corpo: unknown, cab?: CabecalhoDe): { s: number } | null {
     const c = (corpo && typeof corpo === 'object' && !Array.isArray(corpo) ? corpo : null) as Record<string, unknown> | null;
     if (!c) return null;
     const g = ehGrupoRota(c.g) ? c.g : null;
@@ -357,9 +479,24 @@ export class Audiencia {
         else d.origens.outros = (d.origens.outros ?? 0) + 1;
       }
       this.hora(agora).paginas++;
+      if (this.medirLocal) this.contarLocal(cab, ua);
     }
     this.marcarInicio(agora);
     return resposta;
+  }
+
+  /** I14: +1 na UF, no país e no aparelho do dia. Isolado: um erro aqui nunca derruba a contagem de páginas. */
+  private contarLocal(cab: CabecalhoDe | undefined, ua: string | undefined) {
+    try {
+      const l = localDoPedido(cab, ua);
+      const x = this.extraHoje();
+      if (l.pais in x.pais || l.pais === ND || Object.keys(x.pais).length < MAX_PAISES_DIA) somar(x.pais, l.pais);
+      else somar(x.pais, OUTROS_PAISES);
+      if (l.uf) somar(x.uf, l.uf);
+      somar(x.aparelho, l.aparelho);
+    } catch {
+      /* cabeçalho estranho: fica sem a sigla, o resto já foi contado */
+    }
   }
 
   /**
@@ -376,7 +513,12 @@ export class Audiencia {
     const concentracao = this.presenca.concentracao(janela);
     const valor = sinal;
     this.ultimo = { em: agora, sinal, servidor, intervaloS: intervaloPresenca(Math.max(sinal, servidor)), concentracao };
+    // I14: tempo real desde a amostra anterior (timer atrasado não infla: no máximo 2 amostras)
+    const dt = this.ultimaAmostra ? Math.min(Math.max(agora - this.ultimaAmostra, 0), 2 * AMOSTRA_MS) : AMOSTRA_MS;
+    this.ultimaAmostra = agora;
+    this.registrarCurva(agora, valor);
     if (valor <= 0) return;
+    this.somarTela(agora, (valor * dt) / 1000);
     if (this.desde === null) {
       this.desde = agora;
       this.sujo = true;
@@ -432,11 +574,18 @@ export class Audiencia {
     const agora = this.now();
     const h0 = Math.floor(agora / HORA_MS) * HORA_MS - (AUDIENCIA.horas - 1) * HORA_MS;
     const horas: HoraAudiencia[] = [];
+    const telaPorHora: TelaAudiencia['porHora'] = [];
     for (let i = 0; i < AUDIENCIA.horas; i++) {
       const hora = h0 + i * HORA_MS;
       const h = this.horas.get(hora);
       horas.push({ hora, paginas: h?.paginas ?? 0, pico: h?.pico ?? 0 });
+      telaPorHora.push({ hora, horas: emHoras(this.telaHora.get(hora) ?? 0) });
     }
+    this.podarCurva();
+    const curvaMinuto: MinutoAudiencia[] = [...this.curva].sort((a, b) => a[0] - b[0]).map(([minuto, pessoas]) => ({ minuto, pessoas }));
+    const extras = [...this.extras].sort((a, b) => a[0].localeCompare(b[0]));
+    const porDia = (k: 'uf' | 'pais' | 'aparelho'): ContagemDiaAudiencia[] =>
+      extras.filter(([, x]) => Object.keys(x[k]).length).map(([dia, x]) => ({ dia, n: { ...x[k] } }));
     return {
       agora: {
         pessoas: this.ultimo.sinal,
@@ -451,6 +600,11 @@ export class Audiencia {
       dias: this.diasComHoje().map((d) => ({ ...d, porGrupo: { ...d.porGrupo }, origens: { ...d.origens } })),
       horas,
       publico: this.publico(),
+      curvaMinuto,
+      porUf: porDia('uf'),
+      porPais: porDia('pais'),
+      porAparelho: porDia('aparelho'),
+      horasTela: { porHora: telaPorHora, porDia: extras.filter(([, x]) => x.telaS > 0).map(([dia, x]) => ({ dia, horas: emHoras(x.telaS) })) },
     };
   }
 
@@ -460,6 +614,9 @@ export class Audiencia {
     this.pico = null;
     this.dias = [];
     this.horas.clear();
+    this.curva.clear();
+    this.extras.clear();
+    this.telaHora.clear();
     this.unicos = new ConjuntoU32();
     this.unicosAntes = 0;
     this.pessoasPorRede.fill(0);
@@ -473,7 +630,17 @@ export class Audiencia {
 
   toJSON(): AudienciaArquivo {
     this.podarHoras();
-    return { v: 1, desde: this.desde, pico: this.pico, dias: this.diasComHoje(), horas: [...this.horas.values()].sort((a, b) => a.hora - b.hora) };
+    this.podarCurva();
+    return {
+      v: 1,
+      desde: this.desde,
+      pico: this.pico,
+      dias: this.diasComHoje(),
+      horas: [...this.horas.values()].sort((a, b) => a.hora - b.hora),
+      curva: [...this.curva].sort((a, b) => a[0] - b[0]),
+      local: [...this.extras].sort((a, b) => a[0].localeCompare(b[0])).map(([dia, x]) => ({ dia, uf: x.uf, pais: x.pais, aparelho: x.aparelho, telaS: Math.round(x.telaS) })),
+      telaHoras: [...this.telaHora].sort((a, b) => a[0] - b[0]).map(([h, seg]) => [h, Math.round(seg)]),
+    };
   }
 
   /** Restaura o arquivo (valores inválidos são ignorados). Mesmo dia = reinício: os únicos já contados ficam como piso. */
@@ -502,7 +669,9 @@ export class Audiencia {
     for (const h of Array.isArray(a.horas) ? a.horas : []) {
       if (h && ehNum(h.hora) && h.hora % HORA_MS === 0) this.horas.set(h.hora, { hora: h.hora, paginas: ehNum(h.paginas) ? Math.round(h.paginas) : 0, pico: ehNum(h.pico) ? Math.round(h.pico) : 0 });
     }
+    this.carregarNoite(a);
     this.podarHoras();
+    this.podarCurva();
     const hoje = diaBrasilia(this.now());
     const d = this.dias[this.dias.length - 1];
     if (d && d.dia === hoje) {
@@ -537,6 +706,36 @@ export class Audiencia {
   }
 
   // ---- internos ---------------------------------------------------------------------------------------------------
+
+  /** I14: lê curva, contagens por dia e horas de tela do arquivo (ausentes = arquivo da versão anterior). */
+  private carregarNoite(a: AudienciaArquivo) {
+    this.curva.clear();
+    this.extras.clear();
+    this.telaHora.clear();
+    const par = (x: unknown, passo: number): [number, number] | null =>
+      Array.isArray(x) && x.length === 2 && ehNum(x[0]) && x[0] % passo === 0 && ehNum(x[1]) ? [x[0], Math.round(x[1])] : null;
+    for (const x of Array.isArray(a.curva) ? a.curva.slice(-MINUTOS_CURVA * 2) : []) {
+      const p = par(x, MINUTO_MS);
+      if (p) this.curva.set(p[0], p[1]);
+    }
+    for (const x of Array.isArray(a.telaHoras) ? a.telaHoras.slice(-AUDIENCIA.horas * 2) : []) {
+      const p = par(x, HORA_MS);
+      if (p) this.telaHora.set(p[0], p[1]);
+    }
+    const ehPais = (k: string) => (PAIS_RE.test(k) && k !== 'XX' && k !== 'T1') || k === ND;
+    const ehUf = (k: string) => UFS_BR.has(k) || k === ND;
+    const ehAparelho = (k: string) => (APARELHOS as readonly string[]).includes(k);
+    const local = Array.isArray(a.local) ? a.local : [];
+    for (const d of local.slice(-AUDIENCIA.maxDias)) {
+      if (!d || typeof d !== 'object' || typeof d.dia !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d.dia)) continue;
+      this.extras.set(d.dia, {
+        uf: contagens(d.uf, ehUf, UFS.length + 1),
+        pais: contagens(d.pais, ehPais, MAX_PAISES_DIA + 2),
+        aparelho: contagens(d.aparelho, ehAparelho, APARELHOS.length),
+        telaS: ehNum(d.telaS) ? d.telaS : 0,
+      });
+    }
+  }
 
   private marcarInicio(t: number) {
     if (this.desde === null) this.desde = t;
@@ -580,6 +779,52 @@ export class Audiencia {
     return this.dias;
   }
 
+  /** Contagens do dia corrente (I14), podadas junto com os dias guardados. */
+  private extraHoje(): ExtraDia {
+    let x = this.extras.get(this.diaAtual);
+    if (!x) {
+      x = extraVazio();
+      this.extras.set(this.diaAtual, x);
+      if (this.extras.size > AUDIENCIA.maxDias) {
+        const velhos = [...this.extras.keys()].sort().slice(0, this.extras.size - AUDIENCIA.maxDias);
+        for (const k of velhos) this.extras.delete(k);
+      }
+    }
+    return x;
+  }
+
+  /** Maior número de pessoas no minuto (só depois que a medição começou; zero também é medida). */
+  private registrarCurva(t: number, pessoas: number) {
+    if (this.desde === null && pessoas <= 0) return;
+    const m = Math.floor(t / MINUTO_MS) * MINUTO_MS;
+    const atual = this.curva.get(m);
+    if (atual === undefined) {
+      this.curva.set(m, pessoas);
+      this.podarCurva();
+      this.sujo = true;
+    } else if (pessoas > atual) {
+      this.curva.set(m, pessoas);
+      this.sujo = true;
+    }
+  }
+
+  private somarTela(t: number, segundos: number) {
+    if (!(segundos > 0)) return;
+    const h = Math.floor(t / HORA_MS) * HORA_MS;
+    if (!this.telaHora.has(h)) {
+      this.telaHora.set(h, 0);
+      this.podarHoras();
+    }
+    this.telaHora.set(h, (this.telaHora.get(h) ?? 0) + segundos);
+    this.extraHoje().telaS += segundos;
+    this.sujo = true;
+  }
+
+  private podarCurva() {
+    const lim = Math.floor(this.now() / MINUTO_MS) * MINUTO_MS - (MINUTOS_CURVA - 1) * MINUTO_MS;
+    for (const k of this.curva.keys()) if (k < lim) this.curva.delete(k);
+  }
+
   private hora(t: number): HoraAudiencia {
     const hora = Math.floor(t / HORA_MS) * HORA_MS;
     let h = this.horas.get(hora);
@@ -594,5 +839,6 @@ export class Audiencia {
   private podarHoras() {
     const lim = Math.floor(this.now() / HORA_MS) * HORA_MS - (AUDIENCIA.horas - 1) * HORA_MS;
     for (const k of this.horas.keys()) if (k < lim) this.horas.delete(k);
+    for (const k of this.telaHora.keys()) if (k < lim) this.telaHora.delete(k);
   }
 }

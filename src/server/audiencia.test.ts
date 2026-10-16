@@ -3,19 +3,41 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AUDIENCIA } from '../shared/audiencia';
-import { Audiencia, ConjuntoU32, PESSOAS_REDE_BALDE, PESSOAS_REDE_DIA, Presenca, ehRoboAudiencia } from './audiencia';
+import {
+  Audiencia,
+  ConjuntoU32,
+  MAX_PAISES_DIA,
+  MINUTOS_CURVA,
+  PESSOAS_REDE_BALDE,
+  PESSOAS_REDE_DIA,
+  Presenca,
+  aparelhoDe,
+  ehRoboAudiencia,
+  localDoPedido,
+  paisDoCabecalho,
+  ufDoCabecalho,
+  type CabecalhoDe,
+} from './audiencia';
 import { createJsonStore } from './state-store';
 
 /** 25/10/2026 19:00 de Brasília. */
 const NOITE = Date.UTC(2026, 9, 25, 22, 0, 0);
 const UA = (i: number) => `Mozilla/5.0 (Linux; Android 14; Aparelho ${i}) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36`;
 
-function montar(o: { agora?: number; servidor?: number; dir?: string } = {}) {
+function montar(o: { agora?: number; servidor?: number; dir?: string; medirLocal?: boolean } = {}) {
   const relogio = { t: o.agora ?? NOITE, servidor: o.servidor ?? 0 };
   const store = o.dir ? createJsonStore(o.dir, 'audiencia.json', { debounceMs: 0 }) : null;
-  const a = new Audiencia({ now: () => relogio.t, pessoasServidor: () => relogio.servidor, store });
+  const a = new Audiencia({ now: () => relogio.t, pessoasServidor: () => relogio.servidor, store, medirLocal: o.medirLocal });
   return { a, relogio, store };
 }
+
+/** Cabeçalhos de um pedido (como `c.req.header`, sem diferença de maiúsculas). */
+const cab =
+  (h: Record<string, string>): CabecalhoDe =>
+  (n) =>
+    Object.entries(h).find(([k]) => k.toLowerCase() === n.toLowerCase())?.[1];
+const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1';
+const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15';
 
 describe('ConjuntoU32', () => {
   it('conta chaves distintas, cresce e não confunde 0', () => {
@@ -218,7 +240,7 @@ describe('Audiencia: persistência', () => {
     expect(texto).not.toContain('rede-secreta');
     expect(texto).not.toContain('Android');
     const j = JSON.parse(texto);
-    expect(Object.keys(j).sort()).toEqual(['desde', 'dias', 'horas', 'pico', 'v']);
+    expect(Object.keys(j).sort()).toEqual(['curva', 'desde', 'dias', 'horas', 'local', 'pico', 'telaHoras', 'v']);
     expect(j.dias[0]).toMatchObject({ dia: '2026-10-25', unicos: 2, paginas: 2, origens: { twitch: 1 } });
 
     // reinício no mesmo dia: os únicos de antes ficam como piso (o conjunto se perdeu) e o reinício é anotado
@@ -267,5 +289,237 @@ describe('ehRoboAudiencia', () => {
     expect(ehRoboAudiencia('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148 Twitter for iPhone/10.60')).toBe(false);
     expect(ehRoboAudiencia('Mozilla/5.0 (Linux; Android 14) Chrome/130 Mobile Safari/537.36 Instagram 350.0')).toBe(false);
     expect(ehRoboAudiencia('Mozilla/5.0 (Linux; Android 14; wv) Chrome/130 Mobile Safari/537.36 Telegram-Android/11.2')).toBe(false);
+  });
+});
+
+describe('I14: UF, país e aparelho pelos cabeçalhos', () => {
+  it('país pelo cf-ipcountry; desconhecido, Tor ou lixo viram "ND"', () => {
+    expect(paisDoCabecalho('BR')).toBe('BR');
+    expect(paisDoCabecalho(' pt ')).toBe('PT');
+    expect(paisDoCabecalho('XX')).toBe('ND');
+    expect(paisDoCabecalho('T1')).toBe('ND');
+    expect(paisDoCabecalho(undefined)).toBe('ND');
+    expect(paisDoCabecalho('<script>')).toBe('ND');
+    expect(paisDoCabecalho('BRA')).toBe('ND');
+  });
+
+  it('UF só no Brasil (com "BR-" ou minúsculas); fora do Brasil não entra na tabela por UF', () => {
+    expect(ufDoCabecalho('SP', 'BR')).toBe('SP');
+    expect(ufDoCabecalho('br-rj', 'BR')).toBe('RJ');
+    expect(ufDoCabecalho('ZZ', 'BR')).toBe('ND');
+    expect(ufDoCabecalho(undefined, 'BR')).toBe('ND');
+    expect(ufDoCabecalho('SP', 'ND')).toBe('ND'); // país desconhecido: pode ser o Brasil, mas sem UF confiável
+    expect(ufDoCabecalho('11', 'PT')).toBeNull();
+  });
+
+  it('aparelho: Sec-CH-UA-Mobile primeiro; senão o User-Agent; senão "nd"', () => {
+    expect(aparelhoDe('?1', MAC)).toBe('celular');
+    expect(aparelhoDe('?0', UA(1))).toBe('computador');
+    expect(aparelhoDe(undefined, IPHONE)).toBe('celular');
+    expect(aparelhoDe(undefined, UA(1))).toBe('celular'); // Android "Mobile"
+    expect(aparelhoDe(undefined, MAC)).toBe('computador');
+    expect(aparelhoDe(undefined, 'Mozilla/5.0 (Linux; Android 14; SM-X710) AppleWebKit/537.36 Chrome/130 Safari/537.36')).toBe('computador'); // tablet
+    expect(aparelhoDe(undefined, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130')).toBe('computador');
+    expect(aparelhoDe(undefined, 'AlgumNavegadorEstranho/1.0')).toBe('nd');
+    expect(localDoPedido(undefined, IPHONE)).toEqual({ pais: 'ND', uf: 'ND', aparelho: 'celular' });
+  });
+
+  it('conta páginas por UF, país e aparelho (com e sem os cabeçalhos); presença e widgets não entram', () => {
+    const { a } = montar();
+    a.sinal('r1', UA(1), { g: 'inicio' }, cab({ 'CF-IPCountry': 'BR', 'CF-Region-Code': 'SP', 'Sec-CH-UA-Mobile': '?1' }));
+    a.sinal('r2', MAC, { g: 'apuracao' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'RJ', 'sec-ch-ua-mobile': '?0' }));
+    a.sinal('r3', IPHONE, { g: 'apuracao' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'SP' }));
+    a.sinal('r4', IPHONE, { g: 'apuracao' }, cab({ 'cf-ipcountry': 'PT', 'cf-region-code': '11' }));
+    a.sinal('r5', IPHONE, { g: 'apuracao' }, cab({ 'cf-ipcountry': 'BR' })); // sem a transformação de localização
+    a.sinal('r6', MAC, { g: 'apuracao' }); // sem Cloudflare
+    a.sinal('r1', UA(1), { p: 1, g: 'inicio' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'SP' })); // presença
+    a.sinal('r7', UA(7), { g: 'widgets' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'MG' })); // widget
+    const adm = a.paraAdmin();
+    expect(adm.dias.at(-1)!.paginas).toBe(6);
+    expect(adm.porUf).toEqual([{ dia: '2026-10-25', n: { SP: 2, RJ: 1, ND: 2 } }]);
+    expect(adm.porPais).toEqual([{ dia: '2026-10-25', n: { BR: 4, PT: 1, ND: 1 } }]);
+    expect(adm.porAparelho).toEqual([{ dia: '2026-10-25', n: { celular: 4, computador: 2 } }]);
+    // as somas batem com as páginas vistas
+    const soma = (n: Record<string, number>) => Object.values(n).reduce((s, x) => s + x, 0);
+    expect(soma(adm.porAparelho![0].n)).toBe(6);
+    expect(soma(adm.porPais![0].n)).toBe(6);
+    expect(soma(adm.porUf![0].n) + (adm.porPais![0].n.PT ?? 0)).toBe(6);
+  });
+
+  it('o limite de páginas por pessoa vale também aqui (20/min), e a chave desligada não conta nada', () => {
+    const { a } = montar();
+    for (let i = 0; i < 50; i++) a.sinal('rede', UA(1), { g: 'apuracao' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'SP' }));
+    expect(a.paraAdmin().porUf![0].n).toEqual({ SP: 20 });
+    const off = montar({ medirLocal: false }).a;
+    off.sinal('r', UA(1), { g: 'inicio' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'SP' }));
+    const adm = off.paraAdmin();
+    expect(adm.dias.at(-1)!.paginas).toBe(1);
+    expect(adm.porUf).toEqual([]);
+    expect(adm.porPais).toEqual([]);
+    expect(adm.porAparelho).toEqual([]);
+  });
+
+  it('países distintos por dia têm teto (cabeçalho forjado direto na origem não enche o arquivo)', () => {
+    const { a } = montar();
+    const letras = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let i = 0;
+    for (const x of letras) for (const y of letras) {
+      if (i >= 400) break;
+      a.sinal(`r${i}`, UA(i), { g: 'inicio' }, cab({ 'cf-ipcountry': x + y }));
+      i++;
+    }
+    const n = a.paraAdmin().porPais![0].n;
+    expect(Object.keys(n).length).toBeLessThanOrEqual(MAX_PAISES_DIA + 2);
+    expect(n.ZZ).toBeGreaterThan(0);
+    expect(Object.values(n).reduce((s, v) => s + v, 0)).toBe(400);
+  });
+
+  it('um leitor de cabeçalho que falha não derruba a contagem de páginas', () => {
+    const { a } = montar();
+    const quebrado: CabecalhoDe = () => {
+      throw new Error('x');
+    };
+    expect(a.sinal('r', UA(1), { g: 'inicio' }, quebrado)).toEqual({ s: 60 });
+    expect(a.paraAdmin().dias.at(-1)!.paginas).toBe(1);
+  });
+});
+
+describe('I14: curva minuto a minuto e horas de tela', () => {
+  /** n pessoas com presença agora (redes distintas). */
+  const presentes = (a: Audiencia, n: number, base = 0) => {
+    for (let i = 0; i < n; i++) a.sinal(`rede-${base + i}`, UA(base + i), { p: 1, g: 'apuracao' });
+  };
+
+  it('o maior número de pessoas em cada minuto, só depois que a medição começa (zero também é medida)', () => {
+    const { a, relogio } = montar();
+    a.amostrar(); // nada medido ainda: não abre a curva
+    expect(a.paraAdmin().curvaMinuto).toEqual([]);
+    presentes(a, 30);
+    a.amostrar();
+    relogio.t += 10_000;
+    presentes(a, 20, 100);
+    a.amostrar(); // 50 no mesmo minuto
+    relogio.t += 10 * 60_000; // a presença expirou
+    a.amostrar();
+    const c = a.paraAdmin().curvaMinuto!;
+    expect(c).toEqual([
+      { minuto: NOITE, pessoas: 50 },
+      { minuto: NOITE + 10 * 60_000 + 0, pessoas: 0 },
+    ]);
+  });
+
+  it('guarda só as últimas 24 h (1.440 minutos)', () => {
+    const { a, relogio } = montar();
+    presentes(a, 5);
+    for (let m = 0; m < MINUTOS_CURVA + 120; m++) {
+      a.amostrar();
+      relogio.t += 60_000;
+    }
+    const c = a.paraAdmin().curvaMinuto!;
+    expect(c.length).toBeLessThanOrEqual(MINUTOS_CURVA);
+    expect(c.at(-1)!.minuto - c[0].minuto).toBeLessThanOrEqual((MINUTOS_CURVA - 1) * 60_000);
+    expect(c[0].minuto).toBeGreaterThan(NOITE);
+  });
+
+  it('horas de tela = pessoas × tempo de cada amostra (10 s), por hora e por dia; timer parado não infla', () => {
+    const { a, relogio } = montar();
+    presentes(a, 360);
+    // 1 minuto de amostras com 360 pessoas: 6 × 360 × 10 s = 21.600 s = 6 h
+    for (let i = 0; i < 6; i++) {
+      a.amostrar();
+      relogio.t += 10_000;
+    }
+    let adm = a.paraAdmin();
+    expect(adm.horasTela!.porDia).toEqual([{ dia: '2026-10-25', horas: 6 }]);
+    expect(adm.horasTela!.porHora).toHaveLength(AUDIENCIA.horas);
+    expect(adm.horasTela!.porHora.at(-1)).toEqual({ hora: NOITE, horas: 6 });
+    // a amostra seguinte soma mais 10 s × 360 = 1 h; outra no mesmo instante não soma nada
+    a.amostrar();
+    a.amostrar();
+    expect(a.paraAdmin().horasTela!.porDia[0].horas).toBe(7);
+    // timer parado 5 min: soma no máximo 20 s (360 × 20 s = 2 h), nunca os 5 min
+    relogio.t += 5 * 60_000;
+    presentes(a, 360, 1000);
+    a.amostrar();
+    adm = a.paraAdmin();
+    expect(adm.horasTela!.porDia[0].horas).toBe(9);
+  });
+});
+
+describe('I14: persistência e privacidade', () => {
+  it('grava só siglas e números (nada de IP, rede, navegador ou cidade) e restaura depois de reiniciar', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'sintonia-aud14-'));
+    const m1 = montar({ dir });
+    const h = cab({
+      'cf-ipcountry': 'BR',
+      'cf-region-code': 'PE',
+      'cf-ipcity': 'Recife',
+      'cf-postal-code': '50000-000',
+      'cf-iplatitude': '-8.05',
+      'cf-connecting-ip': '203.0.113.77',
+      'x-real-ip': '203.0.113.77',
+      'sec-ch-ua-mobile': '?1',
+    });
+    m1.a.sinal('rede-203.0.113.77', UA(1), { g: 'apuracao', o: 'whatsapp' }, h);
+    m1.a.sinal('rede-203.0.113.77', UA(1), { p: 1, g: 'apuracao' }, h);
+    m1.a.amostrar();
+    m1.relogio.t += 10_000;
+    m1.a.amostrar();
+    await m1.a.persistir();
+    const texto = readFileSync(join(dir, 'audiencia.json'), 'utf8');
+    for (const proibido of ['203.0.113', 'rede-', 'Recife', '50000', '-8.05', 'Android', 'Mozilla']) expect(texto).not.toContain(proibido);
+    const j = JSON.parse(texto);
+    expect(j.local).toEqual([{ dia: '2026-10-25', uf: { PE: 1 }, pais: { BR: 1 }, aparelho: { celular: 1 }, telaS: 20 }]);
+    expect(j.curva).toEqual([[NOITE, 1]]);
+    expect(j.telaHoras).toEqual([[NOITE, 20]]);
+
+    const m2 = montar({ dir, agora: NOITE + 60_000 });
+    const adm = m2.a.paraAdmin();
+    expect(adm.porUf).toEqual([{ dia: '2026-10-25', n: { PE: 1 } }]);
+    expect(adm.curvaMinuto).toEqual([{ minuto: NOITE, pessoas: 1 }]);
+    expect(adm.horasTela!.porDia).toEqual([{ dia: '2026-10-25', horas: 0.01 }]);
+  });
+
+  it('arquivo da versão anterior (sem os campos novos) carrega; lixo nos campos novos é ignorado', () => {
+    const { a } = montar();
+    expect(a.carregar({ v: 1, desde: NOITE, pico: null, dias: [{ dia: '2026-10-24', unicos: 3, paginas: 9 }], horas: [] })).toBe(true);
+    let adm = a.paraAdmin();
+    expect(adm.dias[0]).toMatchObject({ dia: '2026-10-24', paginas: 9 });
+    expect(adm.porUf).toEqual([]);
+    expect(adm.curvaMinuto).toEqual([]);
+    expect(
+      a.carregar({
+        v: 1,
+        desde: NOITE,
+        dias: [],
+        horas: [],
+        curva: [[NOITE, 10], [NOITE + 1, 5], ['x', 1], [NOITE + 60_000, -3], 'lixo'],
+        telaHoras: [[NOITE, 3600], [NOITE + 5, 1]],
+        local: [
+          { dia: '2026-10-25', uf: { SP: 2, XX: 9, '<b>': 1 }, pais: { BR: 2, XX: 4, br: 1 }, aparelho: { celular: 2, relogio: 1 }, telaS: 'x' },
+          { dia: 'ontem', uf: { SP: 1 } },
+          null,
+        ],
+      }),
+    ).toBe(true);
+    adm = a.paraAdmin();
+    expect(adm.curvaMinuto).toEqual([{ minuto: NOITE, pessoas: 10 }]);
+    expect(adm.porUf).toEqual([{ dia: '2026-10-25', n: { SP: 2 } }]);
+    expect(adm.porPais).toEqual([{ dia: '2026-10-25', n: { BR: 2 } }]);
+    expect(adm.porAparelho).toEqual([{ dia: '2026-10-25', n: { celular: 2 } }]);
+    expect(adm.horasTela!.porHora.at(-1)).toEqual({ hora: NOITE, horas: 1 });
+    expect(adm.horasTela!.porDia).toEqual([]);
+  });
+
+  it('zerar apaga também a curva, as siglas e as horas de tela', () => {
+    const { a } = montar();
+    a.sinal('r', UA(1), { g: 'inicio' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'SP' }));
+    a.amostrar();
+    a.zerar();
+    const adm = a.paraAdmin();
+    expect(adm.curvaMinuto).toEqual([]);
+    expect(adm.porUf).toEqual([]);
+    expect(adm.horasTela!.porDia).toEqual([]);
+    expect(adm.horasTela!.porHora.every((h) => h.horas === 0)).toBe(true);
   });
 });

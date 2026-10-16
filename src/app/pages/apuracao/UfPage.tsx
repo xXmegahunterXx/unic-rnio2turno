@@ -9,7 +9,7 @@
  * "Quem vota aqui": perfil do eleitorado da UF (dados abertos do TSE), baixado só quando chega perto da tela.
  * Patrocínio discreto quando configurado no admin.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { MunicipioResumo } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
@@ -30,6 +30,7 @@ import { RaceSwitcher } from '@/app/components/apuracao/RaceSwitcher';
 import { ShareButton } from '@/app/components/apuracao/ShareCard';
 import { ChamadaChat } from '@/app/components/chat/ChamadaChat';
 import { UfMap } from '@/app/components/apuracao/UfMap';
+import { CarimboPrint } from '@/app/components/apuracao/CarimboPrint';
 import { MapLegend } from '@/app/components/apuracao/MapLegend';
 import { MapModeSwitch } from '@/app/components/apuracao/MapModeSwitch';
 import { MunicipioTable } from '@/app/components/apuracao/MunicipioTable';
@@ -63,6 +64,11 @@ import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
 import { emUf } from '@/app/components/pages/detalhe/fmt';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
+import { ehT1 } from '@/app/components/pages/nacional/fase';
+import { momentoTitulo, tituloApuracao } from '@/shared/titulos';
+
+// I28: "Siga o Sintonia" só com a apuração encerrada (chunk próprio; sem rede configurada, nada aparece)
+const SigaSintonia = lazy(() => import('@/app/components/crescimento/SigaSintonia'));
 
 const MODOS_2T: MapMode[] = ['vencedor', 'margem', 'apurado', 'comparecimento', 'variacao'];
 const MODOS_1T: MapMode[] = ['vencedor', 'margem', 'comparecimento'];
@@ -121,7 +127,9 @@ export default function UfPage() {
 
   const ufMeta = ctx.meta?.ufs.find((u) => u.uf === uf);
   const nomeUf = uf ? UF_NOMES[uf] : '';
-  useTitulo(uf ? `Apuração ${emUf(uf, nomeUf)}` : null);
+  // título da aba: o mesmo das meta tags, por fase (I07; o robô de busca lê este depois de rodar o JavaScript)
+  const cargoTitulo = ctx.races?.find((x) => x.id === ctx.idT2)?.cargo;
+  useTitulo(uf ? tituloApuracao(emUf(uf, nomeUf), momentoTitulo(ehT1(ctx.pedida), ctx.fase), cargoTitulo) : null);
   // UF de um município só (DF): no lugar do mapa, as seções do município.
   const codUnico = ufMeta && ufMeta.uf !== 'ZZ' && ufMeta.municipios === 1 && ufMeta.capitalCod ? ufMeta.capitalCod : undefined;
   const qUnico = useMunicipio(ctx.id, uf ?? undefined, codUnico, t);
@@ -380,6 +388,7 @@ export default function UfPage() {
                 onSelect={(cod) => selecionar(cod)}
                 rotuloAcao={(m) => `Ver ${m.nome}`}
                 alturaMax={lg ? 640 : undefined}
+                carimbo={<CarimboPrint resumo={r} simulado={simulado} turno={race.turno} instante={t} onde="mapa" />}
               />
               <MapLegend modo={modoAtual} race={race} compacta className="mt-3 border-t border-line pt-3" />
             </div>
@@ -507,6 +516,14 @@ export default function UfPage() {
             />
           </Section>
         </div>
+      ) : null}
+
+      {/* ------------------------------------------------------------ I28: "Siga o Sintonia", só com a apuração encerrada
+          (longe do placar; sem rede configurada no painel, nada aparece) */}
+      {!t1 && ctx.fase === 'encerrada' ? (
+        <Suspense fallback={null}>
+          <SigaSintonia variante="faixa" className="mt-8 sm:mt-10" />
+        </Suspense>
       ) : null}
 
       {/* ------------------------------------------------------------ tabela completa */}

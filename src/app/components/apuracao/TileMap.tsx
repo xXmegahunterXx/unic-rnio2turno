@@ -64,8 +64,8 @@ export interface TileMapProps {
   valores?: boolean;
   rotuloAcao?: (uf: UF) => string;
   /**
-   * Carimbo do print (I10, `<CarimboPrint onde="mapa" …/>`): vai na área sem blocos do canto de baixo (colunas 2 a 4 das
-   * duas últimas linhas, entre RS/SC e o Exterior), sem cobrir estado nenhum.
+   * Carimbo do print (I10, `<CarimboPrint onde="mapa" forma="pilha" …/>`): vai na área sem blocos do canto de baixo
+   * (colunas 2 a 4 das duas últimas linhas, entre RS/SC e o Exterior), sem cobrir estado nenhum.
    */
   carimbo?: ReactNode;
   className?: string;
@@ -275,9 +275,10 @@ export function TileMap({
             })
           : null}
         {carimbo && tile > 0 ? (
-          // área livre da grade: colunas 2–4 das linhas 6–7 (TILE_LAYOUT), encostada embaixo
+          // área livre da grade: colunas 2–4 das linhas 6–7 (TILE_LAYOUT), encostada embaixo; nunca passa dela (o Exterior
+          // fica na coluna 5)
           <div
-            className="pointer-events-none absolute z-[5] flex items-end"
+            className="pointer-events-none absolute z-[5] flex items-end overflow-hidden"
             style={{ left: 2 * (tile + gap), bottom: 0, width: 3 * tile + 2 * gap, height: 2 * tile + gap }}
           >
             {carimbo}

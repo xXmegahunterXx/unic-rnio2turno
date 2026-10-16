@@ -16,8 +16,8 @@ import { toast } from '@/app/ui/Toast';
 import { eventoApuracao, googleAgendaUrl, icsDataUrl, outlookAgendaUrl } from './agenda';
 import { rotuloFaltam } from './textosHome';
 
-export default function DialogoLembrete({ aberto, onFechar }: { aberto: boolean; onFechar: () => void }) {
-  const url = useMemo(() => urlAbsoluta('/apuracao'), []);
+export default function DialogoLembrete({ aberto, onFechar, caminho = '/apuracao' }: { aberto: boolean; onFechar: () => void; caminho?: string }) {
+  const url = useMemo(() => urlAbsoluta(caminho), [caminho]); // I29: /palpite no Palpite (só o caminho; BotaoLembrete.tsx)
   const ev = useMemo(() => eventoApuracao(url), [url]);
   const ics = useMemo(() => (aberto ? icsDataUrl(ev) : '#'), [aberto, ev]);
   const embutido = useMemo(() => navegadorEmbutido(), []);

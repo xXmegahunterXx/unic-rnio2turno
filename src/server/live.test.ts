@@ -87,7 +87,7 @@ describe('/streamers', () => {
     const rotas = rotasSitemap().map(([p]) => p);
     expect(rotas).toContain('/streamers');
     expect(rotas).not.toContain('/live');
-    const x = await (await get('/sitemap.xml')).text();
+    const x = await (await get('/sitemap-paginas.xml') /* I07b: /sitemap.xml virou índice */).text();
     expect(x).toContain('<loc>https://sintonia2026.com.br/streamers</loc>');
     expect(x).not.toContain('/live<');
   });

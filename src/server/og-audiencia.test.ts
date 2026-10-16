@@ -55,6 +55,8 @@ describe('marcos', () => {
     expect(marcoExibido(60_000, '1000000')).toBe(50_000);
     expect(marcoExibido(60_000, '20000')).toBe(50_000);
     expect(marcoExibido(60_000, 'abc')).toBe(50_000);
+    // ?m=0: o convite sem número (cartão "Convite" da aba Postar)
+    expect(marcoExibido(143_000, '0')).toBeNull();
   });
 
   it('a lista é a mesma do painel (aba Postar)', () => {

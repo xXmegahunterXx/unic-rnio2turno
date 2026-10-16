@@ -26,6 +26,7 @@ import { caminhoTeste, codificar, decodificar, ehCodigoV1, novaSemente } from '@
 import { PainelCompartilhar, PainelDuelo } from '@/app/components/pages/teste/Compartilhar';
 import { OferecimentoTeste } from '@/app/components/anuncios/Oferecimento';
 import { SigaSintonia } from '@/app/components/crescimento/SigaSintonia';
+import { BotaoLembrete, lembreteDisponivel } from '@/app/components/pages/home/BotaoLembrete';
 import { SemResultado, VersaoAnterior } from '@/app/components/pages/teste/Estados';
 import { Aviso, EM_REVISAO } from '@/app/components/pages/teste/IntroTeste';
 import { PorTema } from '@/app/components/pages/teste/PorTema';
@@ -325,14 +326,16 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
           </section>
 
           <section className="mt-10 overflow-hidden rounded-3xl border border-line bg-surface p-5 shadow-card sm:mt-14 sm:p-8">
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">E no dia 25?</h2>
                 <p className="mt-1 max-w-xl text-[14.5px] leading-relaxed text-fg-muted">
                   A partir das 17h, acompanhe a apuração ao vivo — do Brasil inteiro até a urna da sua seção.
                 </p>
               </div>
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-nowrap">
+                {/* I29: lembrete na agenda (evento gerado no aparelho; o link é /apuracao — nada do resultado vai junto) */}
+                {lembreteDisponivel() ? <BotaoLembrete variant="primary" size="lg" /> : null}
                 <ButtonLink to="/apuracao" variant="secondary" size="lg" icon="ao-vivo">
                   Apuração
                 </ButtonLink>

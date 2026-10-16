@@ -11,9 +11,15 @@
  *  - 1º turno oficial: domínio · 1º turno · resultado oficial (TSE) (o dado é de 04/10; uma hora sem data confundiria).
  * Nunca leva anúncio, nome, foto nem cor de candidato. Só texto em `text-fg-subtle`, números com `.num`.
  *
- * Onde: `onde="mapa"` = pílula translúcida (como a atribuição de um mapa), empilhada em 2 linhas no celular para cobrir o
- * mínimo do mapa; o mapa a recebe pela prop `carimbo` e a põe no canto inferior esquerdo do quadro
- * (`CLASSE_CANTO_CARIMBO`; o cartograma, numa área sem blocos). `onde="placar"` = linha no pé do placar, à direita.
+ * Onde (sem empurrar nem encolher o mapa):
+ *  - `onde="placar"`: linha no pé do placar (à esquerda no celular, à direita de 640 px para cima);
+ *  - `onde="mapa"`, mapas do Brasil (`CLASSE_CANTO_CARIMBO`): no celular, legenda logo abaixo do desenho, dentro do quadro
+ *    (no canto cobriria território — RS/SC no mapa por município); de 640 px para cima, pílula translúcida no canto
+ *    inferior esquerdo (sudoeste vazio, como a atribuição de um mapa);
+ *  - `onde="mapa"`, mapa de uma UF (`CLASSE_PE_CARIMBO`): sempre abaixo do desenho (cada estado tem um formato; não há
+ *    canto vazio garantido);
+ *  - `forma="pilha"` (cartograma): uma parte por linha, para caber na área sem blocos da grade.
+ * As partes quebram linha sem deixar "·" sobrando no fim ou no começo (o separador do começo de linha fica escondido).
  */
 import { useInRouterContext, useSearchParams } from 'react-router-dom';
 import type { Tally } from '@/shared/types';
@@ -22,9 +28,18 @@ import { fmtHoraSeg, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { siteExibicao } from '@/app/lib/share';
 
-/** Posição do carimbo dentro do quadro de um mapa (o quadro precisa de `relative`): canto inferior esquerdo, sem capturar
- * toque nem clique (o mapa continua respondendo por baixo), abaixo de tooltips e botões, sem chegar aos botões de zoom. */
-export const CLASSE_CANTO_CARIMBO = 'pointer-events-none absolute bottom-2 left-2 z-[5] max-w-[calc(100%-3.5rem)]';
+/**
+ * Posição do carimbo nos mapas do Brasil, de 640 px para cima: no canto inferior esquerdo do quadro (que precisa de
+ * `relative`), longe dos botões de zoom. Abaixo de 640 px some — o mapa usa `CLASSE_PE_CARIMBO_CELULAR`, logo abaixo do
+ * desenho. Nunca captura toque nem clique.
+ */
+export const CLASSE_CANTO_CARIMBO = 'pointer-events-none absolute bottom-2 left-2 z-[5] hidden max-w-[calc(100%-3.5rem)] sm:block';
+
+/** Mapas do Brasil no celular (abaixo de 640 px): o carimbo em fluxo, logo abaixo do desenho, dentro do quadro. */
+export const CLASSE_PE_CARIMBO_CELULAR = 'pointer-events-none relative mt-2 sm:hidden';
+
+/** Mapa de uma UF: sempre abaixo do desenho, à esquerda (a coluna dos botões de zoom fica livre). */
+export const CLASSE_PE_CARIMBO = 'pointer-events-none relative z-[5] mt-2 max-w-[calc(100%-3.5rem)]';
 
 /** O mínimo do resumo exibido de que o carimbo precisa (Summary, MunicipioResumo…). */
 export type ResumoCarimbo = Pick<Tally, 'secoes' | 'secoesTotalizadas'> & { ultimaAtualizacao: number | null };
@@ -92,6 +107,8 @@ export interface CarimboPrintProps {
   /** "Reveja a noite": instante exibido. Sem ele, o carimbo olha o `?t=` da URL. */
   instante?: number;
   onde?: 'mapa' | 'placar';
+  /** 'linha' (padrão): partes em sequência, quebrando linha quando falta espaço; 'pilha': uma parte por linha. */
+  forma?: 'linha' | 'pilha';
   className?: string;
 }
 
@@ -105,55 +122,57 @@ function CarimboComRota(props: CarimboPrintProps) {
   return <CarimboCorpo {...props} reveja={props.instante !== undefined || ehInstanteReveja(params.get('t'))} />;
 }
 
-function CarimboCorpo({ resumo, simulado, turno, onde = 'placar', className, reveja }: CarimboPrintProps & { reveja: boolean }) {
+/** Itens exibidos, na ordem (o selo da simulação em duas partes, para quebrar bem em telas estreitas). Puro. */
+export function itensCarimbo(p: PartesCarimbo): { texto: string; tipo: 'selo' | 'marca' | 'info' }[] {
+  return [
+    ...(p.selo ? p.selo.split(' · ').map((texto) => ({ texto, tipo: 'selo' as const })) : []),
+    { texto: p.marca, tipo: 'marca' as const },
+    ...(p.rotulo ? [{ texto: p.rotulo, tipo: 'info' as const }] : []),
+    { texto: p.apurado, tipo: 'info' as const },
+    ...(p.hora ? [{ texto: p.hora, tipo: 'info' as const }] : []),
+  ];
+}
+
+/** Separador "·" antes de cada parte; no começo de linha ele cai na margem negativa e o `overflow-hidden` o esconde. */
+const SEP = "before:inline-block before:w-[1.1em] before:text-center before:opacity-70 before:content-['·']";
+
+function CarimboCorpo({ resumo, simulado, turno, onde = 'placar', forma = 'linha', className, reveja }: CarimboPrintProps & { reveja: boolean }) {
   if (!resumo) return null;
   const d: DadosCarimbo = { host: siteExibicao(), resumo, simulado: !!simulado && turno !== 1, reveja: reveja && turno !== 1, turno1: turno === 1 };
-  const p = partesCarimbo(d);
+  const itens = itensCarimbo(partesCarimbo(d));
   const mapa = onde === 'mapa';
-  const sep = (cls?: string) => (
-    <span aria-hidden className={cn('px-1 opacity-70', cls)}>
-      ·
-    </span>
-  );
-  // Duas partes: [selo ·] marca [· rótulo]  |  % apurado [· hora]. No celular, uma embaixo da outra (o mapa fica
-  // coberto o mínimo possível e nada é cortado); de 640 px para cima, numa linha só.
+  const pilha = forma === 'pilha';
   return (
     <p
       data-carimbo-print
       title={textoCarimbo(d)}
       className={cn(
-        'num flex flex-col text-[10.5px] leading-[1.35] text-fg-subtle sm:flex-row sm:flex-wrap sm:items-center',
+        'num text-[10.5px] leading-[1.4] text-fg-subtle',
         mapa
-          ? // como a atribuição de um mapa (o mapa põe no canto com `CLASSE_CANTO_CARIMBO` ou numa posição própria)
-            'w-fit items-start rounded-md bg-surface/80 px-1.5 py-1 shadow-sm'
-          : 'items-end text-right sm:justify-end',
+          ? // no mapa: pílula translúcida quando fica SOBRE o desenho (de 640 px para cima, ou na pilha do cartograma)
+            cn('w-fit max-w-full', pilha ? 'rounded-md bg-surface/80 px-1.5 py-1 shadow-sm' : 'sm:rounded-md sm:bg-surface/80 sm:px-1.5 sm:py-1 sm:shadow-sm')
+          : 'w-full',
         className,
       )}
     >
-      <span className="flex flex-wrap items-center whitespace-nowrap">
-        {p.selo ? (
-          <>
-            <span className="font-semibold uppercase tracking-[0.06em] text-brand-fg">{p.selo}</span>
-            {sep()}
-          </>
-        ) : null}
-        <span className="font-semibold text-fg-muted">{p.marca}</span>
-        {p.rotulo ? (
-          <>
-            {sep()}
-            {p.rotulo}
-          </>
-        ) : null}
-      </span>
-      {sep('max-sm:hidden')}
-      <span className="whitespace-nowrap">
-        {p.apurado}
-        {p.hora ? (
-          <>
-            {sep()}
-            {p.hora}
-          </>
-        ) : null}
+      {/* o recorte fica no conteúdo (não no padding da pílula): o "·" do começo de cada linha some */}
+      <span className="block overflow-hidden">
+        <span className={cn('flex', pilha ? 'flex-col' : '-ml-[1.1em] flex-wrap', !mapa && 'sm:ml-0 sm:justify-end')}>
+          {itens.map((it, i) => (
+            <span
+              key={i}
+              className={cn(
+                'whitespace-nowrap',
+                !pilha && SEP,
+                !mapa && 'sm:first:before:hidden',
+                it.tipo === 'selo' && 'font-semibold uppercase tracking-[0.06em] text-brand-fg',
+                it.tipo === 'marca' && 'font-semibold text-fg-muted',
+              )}
+            >
+              {it.texto}
+            </span>
+          ))}
+        </span>
       </span>
     </p>
   );

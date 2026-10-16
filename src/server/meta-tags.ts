@@ -9,15 +9,23 @@
  * O código do Duelo (/duelo/:codigo) NUNCA é lido nem decodificado aqui: ele carrega respostas do Teste Cego (dado
  * sensível, LGPD). Cenários (/cenarios?c=) são hipóteses de quem compartilha: o texto diz "cenário hipotético · não é
  * pesquisa nem previsão" e a página não é indexada.
+ *
+ * Leva 3 (I07, busca): as páginas de apuração (Brasil, UF e município) têm título por FASE — "Eleição 2026 em Campinas
+ * (SP): 1º turno e apuração do 2º turno" (antes), "Apuração ao vivo em Campinas (SP) · 2º turno 2026" (durante),
+ * "Resultado do 2º turno 2026 em Campinas (SP)" (depois) — sem nome de candidato no título; nomes e números só na
+ * descrição, na ordem da urna (antes da apuração, o 1º turno oficial; durante e depois, o placar — na fonte TSE, só o que
+ * já está em cache: meta-placar.ts). No dia da votação, das 0h às 17h, nenhuma descrição leva nome ou número de
+ * candidato. Parâmetros de origem do link (`utm_*`, `h`, `via`) nunca mudam o canônico, a chave do cache nem a imagem.
  */
 import { pctTotalizadas, pctValidos } from '../shared/calc';
-import { APP_NAME, UF_NOMES } from '../shared/constants';
+import { APP_NAME, INICIO_APURACAO, UF_NOMES } from '../shared/constants';
 import { fmtInt, fmtPct } from '../shared/format';
 import { SIGLAS_GOV_2T, asDisputasGov } from '../shared/gov2t';
 import type { CandidatoFicha, CargoDataset } from '../shared/dataset';
 import type { Curiosidade } from '../shared/curiosidades';
 import type { Fase, Race, Summary, UF } from '../shared/types';
 import { UFS } from '../shared/types';
+import { ondeMunicipio, tituloApuracao, tituloNacional, type MomentoTitulo } from '../shared/titulos';
 import { emUf } from '../engine/events';
 import { cargoExibicao, ehEleito, situacaoTexto } from './dados-estaticos';
 
@@ -57,15 +65,24 @@ export interface ResumoCenarioMeta {
   versao: string;
 }
 
+/** Placar para a descrição: o resumo, a corrida (na ordem da urna; anonimizada quando for o caso) e a marca de simulação. */
+export interface PlacarMeta {
+  resumo: Summary;
+  simulacao: boolean;
+  race: Race;
+}
+
 export interface ContextoMeta {
   races: Map<string, Race>;
   nomeMunicipio(uf: UF, cod: string): string | undefined;
   /** Placar atual (opcional; só se já estiver em cache, sem custo de cálculo). */
-  placar?(race: string, uf?: UF): { resumo: Summary; simulacao: boolean; race: Race } | null;
+  placar?(race: string, uf?: UF): PlacarMeta | null;
   /** Placar do município na corrida pedida (opcional). */
-  placarMunicipio?(race: string, uf: UF, cod: string): { resumo: Summary; simulacao: boolean; race: Race } | null;
+  placarMunicipio?(race: string, uf: UF, cod: string): PlacarMeta | null;
   /** Fase da apuração agora ('pre' → as páginas de apuração mostram o 1º turno). */
   fase?(): Fase;
+  /** Relógio de parede (epoch ms; padrão Date.now): no dia da votação, antes das 17h, as descrições ficam sem nomes. */
+  agora?(): number;
   /** Ficha do candidato; `existe` diz se o índice conhece o sequencial ('sem-indice' = não dá para saber). */
   ficha?(sq: string): { lida: ComVersao<CandidatoFicha> | null; existe: 'existe' | 'nao-existe' | 'sem-indice' };
   cargo?(nome: 'senado' | 'camara' | 'assembleia'): ComVersao<CargoDataset> | null;
@@ -114,6 +131,23 @@ const cortar = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, 
 /** Parâmetros de busca que mudam o conteúdo da página (entram na chave do cache do HTML). */
 export const PARAMS_RELEVANTES = ['race', 'uf', 'fato', 'f', 'tema', 'c'] as const;
 
+/**
+ * Parâmetros de ORIGEM do link (I08): `utm_*` (canal), `h` (hora do compartilhamento no X e no Telegram, para o cartão não
+ * ser o velho) e `via`. Nunca entram na chave do cache do HTML, no canônico (og:url) nem na URL da imagem OG: o cartão e
+ * a página são os mesmos para todos. Como só `PARAMS_RELEVANTES` passam, basta não estarem lá (teste em meta-tags.test.ts).
+ */
+export const PARAMS_ORIGEM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'h', 'via'] as const;
+
+/** 0h de 25/10/2026 em Brasília: do início do dia da votação até as 17h, nenhuma descrição leva nome ou número de candidato. */
+export const INICIO_DIA_VOTACAO = Date.UTC(2026, 9, 25, 3, 0, 0);
+/** Dia da votação, antes do início da apuração (0h–17h de 25/10, Brasília)? */
+export const diaDeVotacao = (agora: number) => agora >= INICIO_DIA_VOTACAO && agora < INICIO_APURACAO;
+
+/** Momento de uma página de apuração (I07): a corrida de 1º turno é sempre o resultado oficial; senão, a fase pública. */
+export type MomentoMeta = MomentoTitulo;
+/** Títulos por fase: fonte única em src/shared/titulos.ts (o app usa os mesmos no título da aba). */
+export { tituloApuracao, tituloNacional };
+
 /** Query normalizada (só os parâmetros relevantes, em ordem fixa, valores limitados) — chave de cache do HTML. */
 export function consultaNormalizada(q: URLSearchParams): string {
   const p = new URLSearchParams();
@@ -150,11 +184,22 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       return null;
     }
   };
+  // dia da votação (0h–17h de 25/10): descrições sem nome nem número de candidato
+  const comNomes = !diaDeVotacao(tentar(() => ctx.agora?.()) ?? Date.now());
+  /** Texto do placar da corrida `r` (no Brasil ou na UF), se houver número e nomes forem permitidos agora. */
+  const placarTexto = (r: string, uf?: UF) => {
+    if (!comNomes) return null;
+    const p = tentar(() => ctx.placar?.(r, uf) ?? null);
+    return p ? textoPlacar(p) : null;
+  };
   const comPlacar = (descr: string, uf?: UF) => {
-    const p = tentar(() => ctx.placar?.(raceId, uf) ?? null);
-    const t = p ? textoPlacar(p) : null;
+    const t = placarTexto(raceId, uf);
     return t ? `${t} ${descr}` : descr;
   };
+  /** Momento da página para a corrida `r` (1º turno = resultado oficial; senão a fase pública, padrão 'pre'). */
+  const momentoDe = (r: Race | undefined): MomentoMeta => (r?.turno === 1 ? 't1' : (tentar(() => ctx.fase?.()) ?? 'pre'));
+  /** Corrida cujo placar vai na descrição: antes da apuração, o 1º turno oficial da mesma disputa (o que a página mostra). */
+  const corridaDoPlacar = (id: string, m: MomentoMeta) => (m === 'pre' && ctx.races.has(`${id}-t1`) ? `${id}-t1` : id);
 
   const pagina = (m: Omit<MetaPagina, 'status'> & { status?: 200 | 404 }): MetaPagina => ({ status: 200, ...m });
 
@@ -170,11 +215,21 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
   const [s0, s1, s2, s3, s4] = seg;
   if (s0 === 'apuracao') {
     if (seg.length === 1) {
+      // título por fase (depois do fim, "ao vivo" não vale mais: a prévia do link continua circulando)
+      const mom = momentoDe(race);
+      const corrida = tituloRace.replace(/ · 1º turno$/, '');
+      const t = placarTexto(corridaDoPlacar(raceId, mom));
+      const resto: Record<MomentoMeta, string> = {
+        t1: 'Resultado oficial do 1º turno, com mapa por estado e por município, zonas e seções.',
+        pre: 'Em 25/10, a partir das 17h, a apuração do 2º turno ao vivo: estado por estado, cidade por cidade, seção por seção.',
+        apurando: 'Resultados do 2º turno seção por seção, com mapa por estado, gráfico da apuração e o que falta apurar.',
+        encerrada: 'Resultado do 2º turno seção por seção, com mapa por estado, gráfico da apuração e comparação com o 1º turno.',
+      };
+      // disputa de um estado (?race=gov-am, que o app leva para a página da UF): o título da UF
+      const abr = race && race.abrangencia !== 'BR' ? race.abrangencia : null;
       return pagina({
-        // depois do fim, "ao vivo" não vale mais (a prévia do link continua circulando)
-        titulo:
-          race?.turno !== 1 && ctx.fase?.() === 'encerrada' ? `Resultado do 2º turno · ${tituloRace} · ${APP_NAME}` : `Apuração ao vivo · ${tituloRace} · ${APP_NAME}`,
-        descricao: comPlacar('Resultados do 2º turno seção por seção, com mapa por estado, gráfico da apuração e o que falta apurar.'),
+        titulo: abr && race ? tituloApuracao(emUf(abr, UF_NOMES[abr]), mom, race.cargo) : tituloNacional(corrida, mom),
+        descricao: t ? `${t} ${resto[mom]}` : resto[mom],
         imagem: ogApuracao(),
         imagemAlt: altPlacar('Brasil'),
       });
@@ -190,12 +245,25 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
     const uf = ufDe(s1);
     if (uf && seg.length <= 5 && seg.length !== 4) {
       const nomeUf = UF_NOMES[uf];
+      const ondeUf = emUf(uf, nomeUf);
+      const raceUf = raceNaUf(uf);
+      const rUf = ctx.races.get(raceUf);
+      /** cargo no título só quando não é Presidente (o padrão das páginas) */
+      const cargoTitulo = rUf && rUf.cargo !== 'Presidente' ? rUf.cargo : undefined;
       if (seg.length === 2) {
         // corrida que a página mostra nesta UF; "Governador · Amazonas" vira "Governador" (o estado já está no título)
-        const tituloUf = (ctx.races.get(raceNaUf(uf))?.titulo ?? 'Presidente').replace(` · ${nomeUf}`, '');
+        const tituloUf = (rUf?.titulo ?? 'Presidente').replace(` · ${nomeUf}`, '').replace(/ · 1º turno$/, '');
+        const mom = momentoDe(rUf);
+        const t = placarTexto(corridaDoPlacar(raceUf, mom), uf);
+        const resto: Record<MomentoMeta, string> = {
+          t1: `Resultado oficial do 1º turno ${ondeUf} por município, com mapa e a tabela completa.`,
+          pre: `Resultado do 1º turno ${ondeUf} por município e, em 25/10, a partir das 17h, a apuração do 2º turno ao vivo.`,
+          apurando: `Resultado por município ${ondeUf}, com mapa, gráfico da apuração e eventos da noite.`,
+          encerrada: `Resultado por município ${ondeUf}, com mapa, gráfico da apuração e comparação com o 1º turno.`,
+        };
         return pagina({
-          titulo: `Apuração ${emUf(uf, nomeUf)} · ${tituloUf} · ${APP_NAME}`,
-          descricao: comPlacar(`Resultado por município ${emUf(uf, nomeUf)}, com mapa, gráfico da apuração e eventos da noite.`, uf),
+          titulo: tituloApuracao(ondeUf, mom, cargoTitulo),
+          descricao: t ? `${t} ${resto[mom]}` : resto[mom],
           imagem: ogApuracao(uf),
           imagemAlt: `Placar da apuração · ${tituloUf} · ${nomeUf}`,
         });
@@ -204,22 +272,31 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       const nomeMun = cod ? ctx.nomeMunicipio(uf, cod) : undefined;
       if (nomeMun && cod) {
         const onde = `${nomeMun} (${uf === 'ZZ' ? 'Exterior' : uf})`;
-        const raceMun = raceNaUf(uf);
-        const tituloMun = ctx.races.get(raceMun)?.titulo ?? tituloRace;
+        const raceMun = raceUf;
+        const tituloMun = rUf?.titulo ?? tituloRace;
         const qsMun = `race=${encodeURIComponent(raceMun)}&uf=${uf.toLowerCase()}&cod=${cod}`;
         if (seg.length === 3) {
-          // a página mostra o 1º turno quando pedido (-t1) ou antes da apuração; a imagem segue a mesma regra
-          const p = tentar(() => {
-            const r = ctx.races.get(raceMun);
-            const alvo = r && r.turno === 2 && ctx.fase?.() === 'pre' ? `${raceMun}-t1` : raceMun;
-            return ctx.placarMunicipio?.(ctx.races.has(alvo) ? alvo : raceMun, uf, cod) ?? null;
-          });
+          // a página mostra o 1º turno quando pedido (-t1) ou antes da apuração; a descrição segue a mesma regra
+          const mom = momentoDe(rUf);
+          const emOnde = ondeMunicipio(nomeMun, uf);
+          const alvo = corridaDoPlacar(raceMun, mom);
+          const p = comNomes ? tentar(() => ctx.placarMunicipio?.(alvo, uf, cod) ?? null) : null;
           const t = p ? textoPlacar(p) : null;
-          const resto = `Resultado em ${onde}: zonas eleitorais, mosaico de seções e comparação com o 1º turno.`;
-          const cauda = p?.race.turno === 1 ? 'Zonas, mosaico de seções e, em 25/10, o 2º turno ao vivo.' : 'Zonas eleitorais e mosaico de seções, ao vivo.';
+          const cauda: Record<MomentoMeta, string> = {
+            t1: 'Zonas eleitorais, mosaico de seções e o boletim de cada urna.',
+            pre: 'Zonas, mosaico de seções e, em 25/10, o 2º turno ao vivo.',
+            apurando: 'Zonas eleitorais e mosaico de seções, ao vivo.',
+            encerrada: 'Zonas eleitorais, mosaico de seções e comparação com o 1º turno.',
+          };
+          const semPlacar: Record<MomentoMeta, string> = {
+            t1: `Resultado oficial do 1º turno ${emOnde}: votos por candidato, zonas eleitorais e mosaico de seções.`,
+            pre: `Resultado do 1º turno ${emOnde} e, em 25/10, a apuração do 2º turno ao vivo: zonas eleitorais e mosaico de seções.`,
+            apurando: `Apuração do 2º turno ${emOnde} ao vivo, com os dados do TSE: placar, zonas eleitorais e mosaico de seções.`,
+            encerrada: `Resultado do 2º turno ${emOnde}: votos por candidato, zonas eleitorais, mosaico de seções e comparação com o 1º turno.`,
+          };
           return pagina({
-            titulo: `Apuração em ${onde} · ${tituloMun} · ${APP_NAME}`,
-            descricao: t ? `${onde} · ${t} ${cauda}` : resto,
+            titulo: tituloApuracao(ondeMunicipio(nomeMun, uf), mom, cargoTitulo),
+            descricao: t ? `${onde} · ${t} ${cauda[mom]}` : semPlacar[mom],
             imagem: `/api/og/municipio.png?${qsMun}`,
             imagemAlt: `Placar em ${onde} · ${tituloMun}`,
           });

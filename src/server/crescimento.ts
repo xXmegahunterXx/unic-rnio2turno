@@ -154,7 +154,7 @@ export function registrarCrescimento(app: App, admin: App, deps: DepsCrescimento
       return erroJson(c, 400, 'Sinal inválido.');
     }
     const doSite = c.req.header('sec-fetch-site') === 'same-origin';
-    const r = doSite ? audiencia.sinal((deps.redeLargaDe ?? deps.clienteDe)(c), c.req.header('user-agent'), corpo) : { s: audiencia.intervaloS };
+    const r = doSite ? audiencia.sinal((deps.redeLargaDe ?? deps.clienteDe)(c), c.req.header('user-agent'), corpo, (n) => c.req.header(n)) : { s: audiencia.intervaloS };
     if (!r) return erroJson(c, 400, 'Sinal inválido.');
     return c.json(r, 200, { 'cache-control': CC_PRIVADO });
   });

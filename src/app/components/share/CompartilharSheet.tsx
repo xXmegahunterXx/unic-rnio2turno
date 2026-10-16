@@ -535,7 +535,7 @@ export function CompartilharSheet({
           <p className="mt-1 truncate text-[12.5px] text-fg-muted">{snap?.url}</p>
         </div>
         {/* depois de "Copiado": quem copia o link é quem volta — "Siga o Sintonia" (some sem redes configuradas) */}
-        {copiou ? <SigaSintonia variante="rodape" className="mt-4 rounded-xl border border-line px-3.5 py-3" /> : null}
+        {copiou ? <SigaSintonia variante="linha" className="mt-4 rounded-xl border border-line px-3.5 py-3" /> : null}
         {temImagem ? (
           <p className="mt-2.5 flex items-start gap-1.5 text-[12px] leading-snug text-fg-subtle">
             <Icon name="info" size={13} className="mt-px shrink-0" />

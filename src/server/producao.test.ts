@@ -520,7 +520,7 @@ describe('operação', () => {
 describe('SEO', () => {
   it('sitemap.xml com PUBLIC_URL: home, apuração, 27 UFs, cargos, assembleias por UF e institucionais', async () => {
     const m = await montar({ env: { PUBLIC_URL: 'https://sintonia.exemplo.br/qualquer' } });
-    const r = await m.app.request('/sitemap.xml');
+    const r = await m.app.request('/sitemap-paginas.xml') /* I07b: /sitemap.xml virou índice (sitemap.test.ts) */;
     expect(r.status).toBe(200);
     expect(r.headers.get('content-type')).toContain('application/xml');
     const x = await r.text();
