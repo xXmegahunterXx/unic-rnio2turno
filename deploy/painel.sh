@@ -35,6 +35,22 @@
 #                                                         imagens), sem apagar nada; o motivo (opcional, ≤ 140) vai ao registro
 #   sudo /opt/sintonia/deploy/painel.sh anuncios-voltar   devolve exatamente o que estava no ar
 #
+#   CHAVES DA NOITE (as mesmas do painel → Controle; valem na hora para todos, sem publicar nada):
+#   sudo /opt/sintonia/deploy/painel.sh chaves            mostra todas as chaves e o que está fora do padrão
+#   sudo /opt/sintonia/deploy/painel.sh freio 2           FREIO DE CARGA: o site consulta 2× mais espaçado (2, 3 ou 5)
+#   sudo /opt/sintonia/deploy/painel.sh freio 3 leve      idem 3×, e "leve": para o mapa por município e o "desde o 1º turno"
+#                                                         e deixa o chat 2× mais lento
+#   sudo /opt/sintonia/deploy/painel.sh freio 1           SOLTA o freio (ritmo normal)
+#   sudo /opt/sintonia/deploy/painel.sh contador-publico ligar|desligar   "N pessoas agora" no site (só a partir de 500)
+#   sudo /opt/sintonia/deploy/painel.sh html-borda ligar|desligar   HTML guardado na Cloudflare: só depois do ensaio
+#                                                         (24/10, 12h); antes de publicar versão nova, desligar e esperar 30 s
+#   sudo /opt/sintonia/deploy/painel.sh medir-anuncios ligar|desligar     contar as impressões dos anúncios
+#   sudo /opt/sintonia/deploy/painel.sh texto-bots ligar|desligar   !apuracao dos bots de chat (desligado: só o endereço)
+#   sudo /opt/sintonia/deploy/painel.sh contar-lives ligar|desligar contagem anônima de lives
+#   sudo /opt/sintonia/deploy/painel.sh aviso-nacional auto|off     aviso "o arquivo nacional do TSE não atualiza desde…"
+#   sudo /opt/sintonia/deploy/painel.sh tse-retomar       retoma JÁ as leituras do TSE pausadas por bloqueio (falso positivo)
+#   sudo /opt/sintonia/deploy/painel.sh alerta-teste      manda uma mensagem de teste ao Telegram dos alertas
+#
 # A SIMULAÇÃO nunca é ligada por aqui (no site público ela não pode ir ao ar). Roteiro da noite: RUNBOOK-ELEICAO.md.
 # Usa o mesmo login do painel: sujeito ao mesmo limite de tentativas (HTTP 429 → espere 1 min).
 # =====================================================================================================
@@ -43,13 +59,24 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 case ${1:-} in
   '' | -h | --help | ajuda)
-    sed -n '2,40p' "$0"
+    sed -n '2,/^# =====/p' "$0"
     exit 0
     ;;
   estado | tse | testar-tse | trocar-agora | horario-padrao | desligar-troca | ligar-troca | sem-aviso) ;;
   chat-estado | chat-abrir | chat-fechar | chat-limpar | chat-sem-fixada) ;;
   anuncios-estado | anuncios-voltar) ;;
   anuncios-suspender) ;; # o motivo é opcional (≤ 140 caracteres; o servidor confere)
+  chaves | tse-retomar | alerta-teste) ;;
+  freio)
+    [[ ${2:-} =~ ^[1235]$ ]] || morrer "Use: painel.sh freio 2   (1 = solta; 2, 3 ou 5; acrescente \"leve\" para o modo leve: painel.sh freio 3 leve)"
+    [[ -z ${3:-} || ${3:-} == leve ]] || morrer "Use: painel.sh freio $2 leve   (ou sem o \"leve\")"
+    ;;
+  contador-publico | html-borda | medir-anuncios | texto-bots | contar-lives)
+    [[ ${2:-} =~ ^(ligar|desligar)$ ]] || morrer "Use: painel.sh $1 ligar   ou   painel.sh $1 desligar"
+    ;;
+  aviso-nacional)
+    [[ ${2:-} =~ ^(auto|off)$ ]] || morrer "Use: painel.sh aviso-nacional auto   ou   painel.sh aviso-nacional off"
+    ;;
   chat-lento)
     [[ ${2:-} =~ ^[0-9]{1,3}$ && $2 -ge 3 && $2 -le 300 ]] || morrer "Use: painel.sh chat-lento <segundos>   (3 a 300; ex.: painel.sh chat-lento 20)"
     ;;
@@ -83,7 +110,7 @@ app_rodando || morrer "O app não está rodando. Veja: $DIR_DEPLOY/status.sh"
 
 # O script abaixo roda no Node do contêiner do app (fetch para 127.0.0.1, senha lida do ambiente do contêiner).
 read -r -d '' JS <<'NODE' || true
-const [cmd, arg] = process.argv.slice(1);
+const [cmd, arg, arg2] = process.argv.slice(1);
 const base = 'http://127.0.0.1:' + (process.env.PORT || 8787);
 const TZ = 'America/Sao_Paulo';
 const fmt = new Intl.DateTimeFormat('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -140,9 +167,21 @@ function linhaTroca(t) {
 
 function resumoTse(h) {
   if (!h) return ['   (o feed do TSE só é lido com a fonte "TSE ao vivo")'];
-  const linhas = [`   feed: ${h.ok ? 'ok' : 'COM FALHAS'} · ${h.rodando ? 'consultando' : 'parado'} a cada ${h.intervaloSeg} s` +
+  const linhas = [];
+  // I03: pausa por bloqueio do TSE (429, 403 da borda dele) e o teto de pedidos por segundo
+  const ate = h.bloqueadoAte ?? h.bloqueio?.ate;
+  if (h.bloqueio || ate) {
+    linhas.push(`   TSE LIMITANDO AS LEITURAS${h.bloqueio?.motivoTexto ? ` (${h.bloqueio.motivoTexto})` : ''}: pausa até ${hora(ate)}` +
+      ' · falso positivo? painel.sh tse-retomar');
+  }
+  if (h.http && typeof h.http.limitePorSeg === 'number') {
+    linhas.push(`   pedidos ao TSE: teto ${h.http.limitePorSeg}/s` +
+      (h.http.ritmo ? ` · últimos 10 s: ${h.http.ritmo.ultimos10s} · pico ${h.http.ritmo.picoSeg}/s` : '') +
+      (h.http.bloqueios ? ` · ${h.http.bloqueios} bloqueio(s) desde o início` : ''));
+  }
+  linhas.push(`   feed: ${h.ok ? 'ok' : 'COM FALHAS'} · ${h.rodando ? 'consultando' : 'parado'} a cada ${h.intervaloSeg} s` +
     (h.ultimoCiclo ? ` · último ciclo ${hora(h.ultimoCiclo.inicio)} (${h.ultimoCiclo.ms} ms, ${h.ultimoCiclo.erros} erro(s))` : '') +
-    (h.esperaSeg && h.esperaSeg > h.intervaloSeg ? ` · ESPAÇADO para ${h.esperaSeg} s (TSE falhando)` : '')];
+    (h.esperaSeg && h.esperaSeg > h.intervaloSeg ? ` · ESPAÇADO para ${h.esperaSeg} s (TSE falhando)` : ''));
   const p = h.prioritario;
   if (p) {
     linhas.push(`   placar nacional (Presidente): ${p.ativo ? `a cada ${p.intervaloSeg} s` : 'no ciclo normal'} · lido às ${hora(p.ultimaLeituraOk)}` +
@@ -160,6 +199,49 @@ function resumoTse(h) {
   return linhas;
 }
 
+// ---- chaves da noite (leva 3; padrões = CHAVES_NOITE_PADRAO em src/shared/chaves-noite.ts) ----------------------
+const PADRAO_NOITE = { freio: { fator: 1, leve: false }, contadorPublico: true, htmlBorda: false, medirAnuncios: true, avisoNacional: 'auto', textoBots: true, contarLives: true };
+/** comando → [campo em AdminState.noite, rótulo] */
+const CHAVES = {
+  'contador-publico': ['contadorPublico', '"Pessoas agora" no site'],
+  'html-borda': ['htmlBorda', 'HTML guardado na borda'],
+  'medir-anuncios': ['medirAnuncios', 'Medição das impressões dos anúncios'],
+  'texto-bots': ['textoBots', 'Texto do placar para bots de chat'],
+  'contar-lives': ['contarLives', 'Contagem de lives'],
+};
+const EXPLICA = {
+  contadorPublico: (v) => (v ? 'o site mostra "N pessoas agora" a partir de 500 pessoas' : 'o site não mostra (o painel vê)'),
+  htmlBorda: (v) => (v ? 'a Cloudflare guarda as páginas por 15 s · antes de publicar versão nova: painel.sh html-borda desligar e esperar 30 s' : 'as páginas não ficam guardadas na Cloudflare'),
+  medirAnuncios: (v) => (v ? 'impressões contadas' : 'impressões NÃO contadas (o relatório dos anunciantes fica sem esse período)'),
+  textoBots: (v) => (v ? '!apuracao responde o placar' : '!apuracao responde só o endereço do site'),
+  contarLives: (v) => (v ? 'lives contadas (anônimo)' : 'lives não contadas'),
+};
+
+function chavesDe(s) {
+  const n = s?.state?.noite ?? {};
+  return { ...PADRAO_NOITE, ...n, freio: { ...PADRAO_NOITE.freio, ...(n.freio ?? {}) } };
+}
+
+function linhaFreio(f) {
+  if (f.fator === 1 && !f.leve) return 'solto (ritmo normal)';
+  return 'PUXADO: ' + (f.fator > 1 ? `o site consulta ${f.fator}× mais espaçado` : 'ritmo normal') +
+    (f.leve ? ' + modo leve (mapa por município e "desde o 1º turno" parados, chat 2× mais lento)' : '') + ' · soltar: painel.sh freio 1';
+}
+
+function linhasChaves(s) {
+  const c = chavesDe(s);
+  const fora = (v, p) => (v !== p ? '   ← fora do padrão' : '');
+  const col = (t) => (t + ':').padEnd(38);
+  const out = [`${col('Freio de carga')}${linhaFreio(c.freio)}${c.freio.fator === 1 && !c.freio.leve ? '' : '   ← fora do padrão'}`];
+  for (const [comandoChave, [campo, rotulo]] of Object.entries(CHAVES)) {
+    out.push(`${col(rotulo)}${c[campo] ? 'ligado' : 'DESLIGADO'} — ${EXPLICA[campo](c[campo])}${fora(c[campo], PADRAO_NOITE[campo])}` +
+      `   [painel.sh ${comandoChave} ${c[campo] ? 'desligar' : 'ligar'}]`);
+  }
+  out.push(`${col('Aviso do arquivo nacional parado')}${c.avisoNacional === 'auto' ? 'automático' : 'DESLIGADO (nunca avisa)'}${fora(c.avisoNacional, PADRAO_NOITE.avisoNacional)}` +
+    `   [painel.sh aviso-nacional ${c.avisoNacional === 'auto' ? 'off' : 'auto'}]`);
+  return out;
+}
+
 async function estado() {
   const { j: s } = await req('/api/admin/state');
   const st = s.status, sv = s.servidor ?? {};
@@ -169,11 +251,16 @@ async function estado() {
   console.log('Aviso no site:    ' + (st.aviso ? `"${st.aviso.texto}" (${st.aviso.nivel})` : 'nenhum'));
   console.log('Simulação:        ' + (sv.simulacao?.permitida ? 'PERMITIDA (ALLOW_SIMULACAO=1) — tire essa linha do .env no site público' : 'bloqueada (correto no site público)'));
   const t = s.state.tse;
-  console.log(`Códigos do TSE:   pleito ${t.pleito} · Presidente ${t.eleicaoPres} · Governador ${t.eleicaoGov} · a cada ${t.intervaloSeg} s`);
+  console.log(`Códigos do TSE:   pleito ${t.pleito} · Presidente ${t.eleicaoPres} · Governador ${t.eleicaoGov} · a cada ${t.intervaloSeg} s` +
+    (typeof t.limitePorSeg === 'number' ? ` · teto ${t.limitePorSeg} pedidos/s` : ''));
   console.log(`Versão:           estado ${s.state.versao} · build ${sv.build?.commit ?? '?'}` + (typeof st.pessoasAgora === 'number' ? ` · pessoas agora ~${st.pessoasAgora} (estimativa: origem ou sinal das páginas, o maior)` : ''));
   const { j: c } = await req('/api/admin/chat');
   console.log('Chat ao vivo:     ' + linhaChat(c));
   console.log('Anúncios:         ' + linhaAnuncios(s));
+  const nt = chavesDe(s);
+  const fora = ['contadorPublico', 'htmlBorda', 'medirAnuncios', 'textoBots', 'contarLives', 'avisoNacional'].filter((k) => nt[k] !== PADRAO_NOITE[k]).length;
+  console.log('Freio de carga:   ' + linhaFreio(nt.freio));
+  console.log('Chaves da noite:  ' + (fora ? `${fora} fora do padrão (veja: painel.sh chaves)` : 'todas no padrão (painel.sh chaves)'));
   if (s.state.fonte === 'tse') {
     const { j: h } = await req('/api/admin/tse/health');
     console.log('TSE:');
@@ -348,6 +435,44 @@ function horarioDe(txt) {
       case 'anuncios-voltar': {
         const r = await comando({ tipo: 'anuncios-suspensao', suspender: false });
         ok('Anúncios de volta: ' + linhaAnuncios(r));
+        break;
+      }
+      case 'chaves': {
+        const { j: s } = await req('/api/admin/state');
+        for (const l of linhasChaves(s)) console.log(l);
+        break;
+      }
+      case 'freio': {
+        const r = await comando({ tipo: 'freio', fator: Number(arg), leve: arg2 === 'leve' });
+        ok('Freio de carga: ' + linhaFreio(chavesDe(r).freio) + '. Os visitantes seguem em segundos (na próxima consulta do status).');
+        break;
+      }
+      case 'contador-publico':
+      case 'html-borda':
+      case 'medir-anuncios':
+      case 'texto-bots':
+      case 'contar-lives': {
+        const [campo, rotulo] = CHAVES[cmd];
+        const r = await comando({ tipo: cmd, ligado: arg === 'ligar' });
+        const v = chavesDe(r)[campo];
+        ok(`${rotulo}: ${v ? 'ligado' : 'desligado'} — ${EXPLICA[campo](v)}`);
+        break;
+      }
+      case 'aviso-nacional': {
+        const r = await comando({ tipo: 'aviso-nacional', modo: arg });
+        ok('Aviso do arquivo nacional parado: ' + (chavesDe(r).avisoNacional === 'auto' ? 'automático' : 'desligado (nunca avisa)'));
+        break;
+      }
+      case 'tse-retomar': {
+        await comando({ tipo: 'tse-retomar' });
+        ok('Leituras do TSE retomadas agora (se o TSE bloquear de novo, a pausa volta sozinha).');
+        const { j: h } = await req('/api/admin/tse/health');
+        for (const l of resumoTse(h)) console.log(l);
+        break;
+      }
+      case 'alerta-teste': {
+        await comando({ tipo: 'alerta-teste' });
+        ok('Alerta de teste entregue ao Telegram.');
         break;
       }
       case 'sem-aviso': {

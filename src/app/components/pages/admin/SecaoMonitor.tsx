@@ -1,15 +1,18 @@
 /**
  * Seção "Monitor": métricas operacionais (AdminSnapshot.metrics) em cartões, mini-séries coletadas no navegador,
- * log operacional rolável e o estado bruto (JSON) para conferência.
+ * "Freio de carga" (sinais de aperto do último minuto e atalho para puxar/soltar o freio, I37), log operacional rolável
+ * e o estado bruto (JSON) para conferência.
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import type { ServidorInfo } from '@/shared/api';
+import type { MetricasServidor, ServidorInfo } from '@/shared/api';
+import { chavesNoite } from '@/shared/chaves-noite';
 import { fmtDataHora, fmtDecimal, fmtHora, fmtHoraSeg, fmtInt, fmtPct, normalize } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { copiarTexto } from '@/app/lib/share';
 import { Badge, Button, Icon, SearchBox, toast, type IconName } from '@/app/ui';
 import { amostrasMonitor, useAdmin } from './dados';
 import { CabecalhoSecao, MiniSerie, Painel, Rotulo } from './kit';
+import { sinaisDeAperto } from './freio';
 import { fmtDuracao, fmtMs, FONTE_ROTULO } from './rotulos';
 
 function Metrica({
@@ -107,6 +110,7 @@ export function SecaoMonitor() {
       </div>
 
       {snap.servidor ? <PainelServidor s={snap.servidor} /> : null}
+      {snap.servidor ? <PainelFreio m={snap.servidor.metricas} /> : null}
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
         <Painel
@@ -223,6 +227,85 @@ function PainelServidor({ s }: { s: ServidorInfo }) {
           </div>
         ))}
       </dl>
+    </Painel>
+  );
+}
+
+/**
+ * Freio de carga visto do Monitor (I37): os sinais de aperto do último minuto fechado, com os mesmos limites dos
+ * alertas, e um atalho para puxar 2× ou soltar. O controle completo (3×, 5×, modo leve) fica em Controle → Chaves da noite.
+ */
+function PainelFreio({ m }: { m: MetricasServidor }) {
+  const { snap, run, pendente, irPara } = useAdmin();
+  const freio = chavesNoite(snap.state).freio;
+  const puxado = freio.fator > 1 || freio.leve;
+  const sinais = sinaisDeAperto(m);
+  const aperto = sinais.filter((x) => x.apertado);
+  const fmtValor = (v: number, u: 'ms' | 'fracao') => (u === 'ms' ? msCurto(v) : fmtPct(v * 100, v > 0 && v < 0.1 ? 1 : 0));
+  const textoFreio = puxado ? (freio.fator > 1 ? `Puxado em ${freio.fator}×${freio.leve ? ', modo leve' : ''}` : 'Modo leve') : 'Solto (ritmo normal)';
+  return (
+    <Painel
+      className="mt-4 lg:mt-5"
+      titulo="Freio de carga"
+      icone="relogio"
+      subtitulo="Sinais do último minuto fechado, com os limites dos alertas. O freio é sempre puxado à mão."
+      acoes={
+        <Badge tone={puxado ? 'alert' : 'ok'} size="sm" data-freio-monitor={puxado ? freio.fator : undefined}>
+          <span className="num">{textoFreio}</span>
+        </Badge>
+      }
+    >
+      <dl className="grid grid-cols-1 gap-x-4 gap-y-3 min-[420px]:grid-cols-3">
+        {sinais.map((x) => (
+          <div key={x.id} className="min-w-0">
+            <dt>
+              <Rotulo>{x.rotulo}</Rotulo>
+            </dt>
+            <dd className={cn('num mt-1.5 truncate font-display text-[19px] font-semibold leading-none tracking-[-0.01em]', x.apertado ? 'text-alert-fg' : 'text-fg')}>
+              {fmtValor(x.valor, x.unidade)}
+            </dd>
+            <dd className="num mt-1 truncate text-[12px] text-fg-muted">limite {fmtValor(x.limite, x.unidade)}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
+        <p className="min-w-0 flex-[1_1_16rem] text-pretty text-[13px] leading-snug text-fg-muted">
+          {aperto.length ? (
+            <>
+              <span className="font-semibold text-alert-fg">Sinal de aperto</span> ({aperto.map((x) => x.rotulo.toLowerCase()).join(', ')}).{' '}
+              {puxado ? 'Com o freio puxado, confira em 1–2 min se os números caíram.' : 'O freio 2× corta pela metade as consultas de todos os visitantes.'}
+            </>
+          ) : puxado ? (
+            'Sem sinal de aperto. Solte o freio quando o tráfego normalizar.'
+          ) : (
+            'Sem sinal de aperto.'
+          )}
+        </p>
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <Button size="sm" variant="ghost" onClick={() => irPara('controle')}>
+            Chaves da noite
+          </Button>
+          {puxado ? (
+            <Button
+              size="sm"
+              variant="outline"
+              loading={pendente('noite-freio')}
+              onClick={() => void run({ tipo: 'freio', fator: 1, leve: false }, { chave: 'noite-freio', sucesso: 'Freio solto: ritmo normal' })}
+            >
+              Soltar o freio
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant={aperto.length ? 'primary' : 'outline'}
+              loading={pendente('noite-freio')}
+              onClick={() => void run({ tipo: 'freio', fator: 2, leve: false }, { chave: 'noite-freio', sucesso: 'Freio 2×' })}
+            >
+              Puxar 2×
+            </Button>
+          )}
+        </div>
+      </div>
     </Painel>
   );
 }

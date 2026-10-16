@@ -1,7 +1,8 @@
 /**
  * AdminState: padrão por modo, relógio, (de)serialização e validação de estados persistidos/recebidos.
  */
-import { INICIO_APURACAO } from '../shared/constants';
+import { CHAVES_NOITE_PADRAO, parseChavesNoite } from '../shared/chaves-noite';
+import { INICIO_APURACAO, TSE_LIMITE_POR_SEG } from '../shared/constants';
 import {
   ANUNCIO_LIMITES,
   imagemAnimada,
@@ -37,6 +38,7 @@ export function tsePadrao(st: Structure): TseConfig {
     pleito: pres?.pleito ?? '3221',
     intervaloSeg: 15,
     intervaloPrioritarioSeg: 5,
+    limitePorSeg: TSE_LIMITE_POR_SEG.padrao,
   };
 }
 
@@ -67,6 +69,7 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     anuncie: null,
     contatos: null,
     trocaAuto: trocaAutoPadrao(),
+    noite: parseChavesNoite(CHAVES_NOITE_PADRAO),
   };
 }
 
@@ -214,6 +217,10 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     pleito: str(t.pleito, fallback.tse.pleito),
     intervaloSeg: Math.min(600, Math.max(5, finito(t.intervaloSeg, fallback.tse.intervaloSeg))),
     intervaloPrioritarioSeg: Math.min(600, Math.max(3, finito(t.intervaloPrioritarioSeg, fallback.tse.intervaloPrioritarioSeg ?? 5))),
+    // leva 3: ausente (estado salvo antes) → o do fallback ou o padrão; fora da faixa → limitado a ela
+    limitePorSeg: Math.round(
+      Math.min(TSE_LIMITE_POR_SEG.max, Math.max(TSE_LIMITE_POR_SEG.min, finito(t.limitePorSeg, fallback.tse.limitePorSeg ?? TSE_LIMITE_POR_SEG.padrao))),
+    ),
   };
   const congelado = typeof v.congelado === 'boolean' ? v.congelado : fallback.congelado;
   return {
@@ -233,6 +240,8 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     anuncie: parseContatoSalvo(v.anuncie, fallback.anuncie ?? null),
     contatos: parseContatosSalvos(v.contatos, fallback.contatos ?? null),
     trocaAuto: parseTrocaAuto(v.trocaAuto, fallback.trocaAuto ?? trocaAutoPadrao()),
+    // leva 3: estado salvo antes (sem o campo) → as chaves do fallback (padrões na subida; as atuais no setState)
+    noite: parseChavesNoite(v.noite, fallback.noite ?? CHAVES_NOITE_PADRAO),
   };
 }
 

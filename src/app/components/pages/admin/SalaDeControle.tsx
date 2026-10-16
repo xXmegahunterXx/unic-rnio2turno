@@ -3,14 +3,15 @@
  *  - desktop (≥ lg): sidebar fixa (marca, seções, utilidades) + barra superior fixa com relógio, fase, fonte,
  *    % de seções, transporte e velocidade;
  *  - celular/tablet: cabeçalho compacto + abas roláveis e a barra de controle compacta fixa embaixo.
- * Atalhos: espaço (pausar/retomar), ←/→ (±1 min; Shift = 10 min), 1–6 (seções), ? (ajuda).
+ * Atalhos: espaço (pausar/retomar), ←/→ (±1 min; Shift = 10 min), 1–9 (seções), ? (ajuda).
+ * Faixas sob o cabeçalho, em todas as larguras: sem conexão, anúncios suspensos e freio de carga puxado (Chaves da noite).
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { MotionConfig } from 'framer-motion';
 import { cn } from '@/app/lib/cn';
 import { instalarBarrasMoveis } from '@/app/lib/barrasMoveis';
 import { LogoMark } from '@/app/components/layout/Logo';
-import { Badge, buttonClasses, Dialog, Icon, IconButton, LiveDot, ThemeToggle, Toaster } from '@/app/ui';
+import { Badge, buttonClasses, Dialog, Icon, IconButton, LiveDot, Skeleton, ThemeToggle, Toaster } from '@/app/ui';
 import { useAdmin } from './dados';
 import { Fundo } from './Login';
 import { DialogoConfirmacao, Kbd, SepV } from './kit';
@@ -28,6 +29,26 @@ import { SecaoAudiencia } from './SecaoAudiencia';
 import { SecaoInteressados, useInteressadosNovos } from './SecaoInteressados';
 import { situacaoDe } from './anunciosAdmin';
 import { fmtHora } from '@/shared/format';
+import { chavesNoite } from '@/shared/chaves-noite';
+
+// ---- seções de outras frentes (leva 3), carregadas sob demanda -----------------------------------------------------
+// `import.meta.glob` tolera arquivo ausente: enquanto SecaoPostar.tsx (frente F) e SecaoLives.tsx (frente G) não existem
+// no build, a entrada de menu não aparece e `?s=postar` cai no Controle. Aceita export nomeado ou default.
+const MODULOS_EXTRAS = import.meta.glob<Record<string, unknown>>(['./SecaoPostar.tsx', './SecaoLives.tsx']);
+const EXTRAS: Partial<Record<SecaoId, { arquivo: string; exportacao: string }>> = {
+  postar: { arquivo: './SecaoPostar.tsx', exportacao: 'SecaoPostar' },
+  lives: { arquivo: './SecaoLives.tsx', exportacao: 'SecaoLives' },
+};
+const SECOES_EXTRAS: Partial<Record<SecaoId, ComponentType>> = {};
+for (const [id, e] of Object.entries(EXTRAS) as [SecaoId, { arquivo: string; exportacao: string }][]) {
+  const carregar = MODULOS_EXTRAS[e.arquivo];
+  if (!carregar) continue;
+  SECOES_EXTRAS[id] = lazy(() =>
+    carregar().then((m) => ({ default: (m[e.exportacao] ?? m.default) as ComponentType })),
+  );
+}
+/** Seções do menu: as fixas e as de outras frentes que existem neste build. */
+const SECOES_MENU = SECOES.filter((s) => !EXTRAS[s.id] || !!SECOES_EXTRAS[s.id]);
 
 export function SalaDeControle({ offline }: { offline: boolean }) {
   const { secao } = useAdmin();
@@ -46,8 +67,12 @@ export function SalaDeControle({ offline }: { offline: boolean }) {
         <div className="relative lg:pl-[72px] xl:pl-[248px]">
           <BarraSuperior />
           <CabecalhoMovel />
-          <FaixaSuspensaoMovel />
-          {offline ? <FaixaOffline /> : null}
+          {/* faixas presas sob o cabeçalho, empilhadas: sem conexão, anúncios suspensos e freio puxado */}
+          <div className="sticky top-[101px] z-20 lg:top-[72px]">
+            {offline ? <FaixaOffline /> : null}
+            <FaixaSuspensao />
+            <FaixaFreio />
+          </div>
           <main
             ref={mainRef}
             id="conteudo"
@@ -83,6 +108,16 @@ function ConteudoSecao({ secao }: { secao: SecaoId }) {
       return <SecaoAudiencia />;
     case 'monitor':
       return <SecaoMonitor />;
+    case 'postar':
+    case 'lives': {
+      const Extra = SECOES_EXTRAS[secao];
+      if (!Extra) return <SecaoControle />;
+      return (
+        <Suspense fallback={<Skeleton className="h-[320px] w-full" rounded="lg" />}>
+          <Extra />
+        </Suspense>
+      );
+    }
     default:
       return <SecaoControle />;
   }
@@ -125,9 +160,14 @@ function useDicas(): Record<SecaoId, ReactNode> {
   const noAr = useAnunciosNoAr();
   const novos = useInteressadosNovos();
   const ajustes = new Set([...Object.keys(st.cenario.ufVies), ...Object.keys(st.cenario.ufAtraso)]).size;
+  const freio = chavesNoite(st).freio;
   return {
     controle:
-      st.fonte === 'simulacao' ? (
+      freio.fator > 1 || freio.leve ? (
+        <Badge size="xs" tone="alert" caps>
+          freio
+        </Badge>
+      ) : st.fonte === 'simulacao' ? (
         <LiveDot tone={st.congelado ? 'live' : st.relogio.rodando ? 'brand' : 'muted'} pulse={st.relogio.rodando && !st.congelado} size={7} />
       ) : null,
     cenario: st.cenario.preset === 'padrao' ? null : <span className="h-1.5 w-1.5 rounded-full bg-brand-2" aria-label="cenário alterado" />,
@@ -163,6 +203,8 @@ function useDicas(): Record<SecaoId, ReactNode> {
       </Badge>
     ) : null,
     audiencia: null,
+    postar: null,
+    lives: null,
   };
 }
 
@@ -173,8 +215,9 @@ function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
   const noAr = useAnunciosNoAr();
   const novos = useInteressadosNovos();
   const ajustes = Object.keys(st.cenario.ufVies).length + Object.keys(st.cenario.ufAtraso).length;
+  const freio = chavesNoite(st).freio;
   return {
-    controle: st.congelado ? 'alert' : null,
+    controle: st.congelado || freio.fator > 1 || freio.leve ? 'alert' : null,
     cenario: st.cenario.preset === 'padrao' ? null : 'brand',
     estados: ajustes ? 'brand' : null,
     comunicacao: st.congelado || st.aviso?.nivel === 'alerta' ? 'alert' : st.aviso ? 'brand' : null,
@@ -184,6 +227,8 @@ function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
     monitor: null,
     interessados: novos ? 'brand' : null,
     audiencia: null,
+    postar: null,
+    lives: null,
   };
 }
 
@@ -210,7 +255,7 @@ function Sidebar() {
       </div>
       <nav aria-label="Seções do painel" className="flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1 xl:space-y-0.5">
-          {SECOES.map((s, i) => {
+          {SECOES_MENU.map((s, i) => {
             const ativo = s.id === secao;
             const at = atencao[s.id];
             return (
@@ -220,7 +265,7 @@ function Sidebar() {
                   onClick={() => irPara(s.id)}
                   aria-current={ativo ? 'page' : undefined}
                   aria-label={s.rotulo}
-                  title={`${s.rotulo}: ${s.descricao} (atalho: ${i + 1})`}
+                  title={i < 9 ? `${s.rotulo}: ${s.descricao} (atalho: ${i + 1})` : `${s.rotulo}: ${s.descricao}`}
                   className={cn(
                     'group relative flex h-11 w-full items-center justify-center gap-3 rounded-xl text-left text-[14px] font-medium transition-colors xl:justify-start xl:px-3',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
@@ -274,36 +319,12 @@ function Sidebar() {
 // ---- barra superior (desktop) --------------------------------------------------------------------------
 
 /**
- * Chip do interruptor geral dos anúncios ("Tirar todos do ar", seção Anunciantes): aparece no cabeçalho em todas as
- * seções enquanto a suspensão está ligada; leva à seção.
+ * Interruptor geral dos anúncios ligado ("Tirar todos do ar", seção Anunciantes): faixa fina logo abaixo do cabeçalho,
+ * em todas as larguras e em todas as seções menos Anunciantes (que tem a faixa própria, com "Voltar com os anúncios");
+ * leva à seção. Até a leva 2 era um chip na barra superior do desktop — que, com o transporte e a velocidade ao lado,
+ * passava da largura da tela em 1024 e 1280 px (rolagem lateral).
  */
-function ChipSuspensao({ className }: { className?: string }) {
-  const { snap, irPara } = useAdmin();
-  const s = snap.state.anunciosSuspensos;
-  if (!s) return null;
-  return (
-    <button
-      type="button"
-      onClick={() => irPara('anuncios')}
-      title={`Anúncios suspensos desde ${fmtHora(s.desde)}${s.motivo ? ` · ${s.motivo}` : ''}`}
-      data-chip-suspensao
-      className={cn(
-        'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-alert/45 bg-alert/15 px-2.5 text-[12px] font-semibold text-alert-fg',
-        'transition-colors hover:bg-alert/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert',
-        className,
-      )}
-    >
-      <Icon name="pause" size={13} />
-      Anúncios suspensos
-    </button>
-  );
-}
-
-/**
- * Celular: a mesma informação numa faixa fina logo abaixo do cabeçalho (no cabeçalho não há espaço), em todas as
- * seções menos Anunciantes (que tem a faixa própria, com "Voltar com os anúncios").
- */
-function FaixaSuspensaoMovel() {
+function FaixaSuspensao() {
   const { snap, secao, irPara } = useAdmin();
   const s = snap.state.anunciosSuspensos;
   if (!s || secao === 'anuncios') return null;
@@ -312,13 +333,50 @@ function FaixaSuspensaoMovel() {
       type="button"
       onClick={() => irPara('anuncios')}
       data-chip-suspensao
-      className="sticky top-[101px] z-20 flex w-full items-center gap-2 border-b border-alert/35 bg-alert/[0.14] px-4 py-2 text-left text-[12.5px] text-fg backdrop-blur lg:hidden"
+      title={s.motivo ? `Motivo: ${s.motivo}` : undefined}
+      className={FAIXA_ALERTA}
     >
-      <Icon name="pause" size={14} className="shrink-0 text-alert-fg" />
-      <span className="min-w-0 flex-1 truncate">
-        <span className="font-semibold">Anúncios suspensos</span> desde <span className="num">{fmtHora(s.desde)}</span>
+      <span className="mx-auto flex max-w-[1280px] items-center gap-2 sm:px-2 lg:px-4">
+        <Icon name="pause" size={14} className="shrink-0 text-alert-fg" />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-semibold">Anúncios suspensos</span> desde <span className="num">{fmtHora(s.desde)}</span>
+        </span>
+        <span className="shrink-0 font-semibold text-alert-fg">Ver</span>
       </span>
-      <span className="shrink-0 font-semibold text-alert-fg">Ver</span>
+    </button>
+  );
+}
+
+/** Faixa de alerta sob o cabeçalho (suspensão dos anúncios, freio puxado): botão que leva à seção. */
+const FAIXA_ALERTA =
+  'block w-full border-b border-alert/35 bg-alert/[0.14] px-4 py-2 text-left text-[12.5px] text-fg backdrop-blur transition-colors hover:bg-alert/[0.2] ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-alert';
+
+/** Texto do freio puxado ("Freio 3× · leve"); null = ritmo normal. */
+function useFreioPuxado(): string | null {
+  const { snap } = useAdmin();
+  const f = chavesNoite(snap.state).freio;
+  if (f.fator === 1 && !f.leve) return null;
+  return f.fator > 1 ? `Freio ${f.fator}×${f.leve ? ' · leve' : ''}` : 'Modo leve';
+}
+
+/**
+ * Freio de carga puxado (Controle → Chaves da noite): faixa fina sob o cabeçalho, em todas as larguras e seções menos o
+ * Controle (onde está o bloco das chaves) — esquecer o freio deixa o site lento para todo mundo. Leva ao Controle.
+ */
+function FaixaFreio() {
+  const { secao, irPara } = useAdmin();
+  const freio = useFreioPuxado();
+  if (!freio || secao === 'controle') return null;
+  return (
+    <button type="button" onClick={() => irPara('controle')} data-chip-freio className={FAIXA_ALERTA}>
+      <span className="mx-auto flex max-w-[1280px] items-center gap-2 sm:px-2 lg:px-4">
+        <Icon name="relogio" size={14} className="shrink-0 text-alert-fg" />
+        <span className="min-w-0 flex-1 truncate">
+          <span className="num font-semibold">{freio}</span> · o site consulta mais espaçado
+        </span>
+        <span className="shrink-0 font-semibold text-alert-fg">Ver</span>
+      </span>
     </button>
   );
 }
@@ -358,7 +416,6 @@ function BarraSuperior() {
         <SepV />
         <ProgressoPres />
         <div className="ml-auto flex items-center gap-3">
-          <ChipSuspensao />
           <Transporte />
           <SeletorVelocidade variante="select" />
         </div>
@@ -408,7 +465,7 @@ function CabecalhoMovel() {
         aria-label="Seções do painel"
         className="flex gap-1 overflow-x-auto px-3 pb-2 scrollbar-none sm:px-5 [mask-image:linear-gradient(90deg,transparent,black_12px,black_calc(100%-20px),transparent)]"
       >
-        {SECOES.map((s) => {
+        {SECOES_MENU.map((s) => {
           const ativo = s.id === secao;
           return (
             <button
@@ -461,7 +518,7 @@ function BarraInferior() {
 
 function FaixaOffline() {
   return (
-    <div role="alert" className="sticky top-[101px] z-20 border-b border-alert/30 bg-alert/10 px-4 py-2.5 text-[13px] text-fg backdrop-blur lg:top-[72px]">
+    <div role="alert" className="border-b border-alert/30 bg-alert/10 px-4 py-2.5 text-[13px] text-fg backdrop-blur">
       <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 sm:px-2 lg:px-4">
         <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-alert" />
         <span className="font-semibold">Sem conexão com o servidor.</span>
@@ -510,8 +567,8 @@ function useAtalhos() {
         return;
       }
       const n = Number(e.key);
-      if (Number.isInteger(n) && n >= 1 && n <= SECOES.length) {
-        irPara(SECOES[n - 1].id);
+      if (Number.isInteger(n) && n >= 1 && n <= Math.min(9, SECOES_MENU.length)) {
+        irPara(SECOES_MENU[n - 1].id);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -546,10 +603,10 @@ export function DialogoAtalhos({ aberto, onFechar }: { aberto: boolean; onFechar
         <>
           <Kbd>1</Kbd>
           <span className="text-fg-subtle">…</span>
-          <Kbd>7</Kbd>
+          <Kbd>9</Kbd>
         </>
       ),
-      acao: 'Ir para a seção (Controle … Monitor)',
+      acao: 'Ir para a seção (na ordem do menu)',
     },
     { teclas: <Kbd>?</Kbd>, acao: 'Mostrar esta ajuda' },
     { teclas: <Kbd>Esc</Kbd>, acao: 'Fechar diálogos' },

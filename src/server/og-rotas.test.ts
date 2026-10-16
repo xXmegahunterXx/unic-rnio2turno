@@ -14,7 +14,8 @@ import { UFS_GOV_2T } from '../shared/constants';
 import type { UF } from '../shared/types';
 import { CC } from './app';
 import { C } from './og';
-import { comPrimeiroTurnoLocal } from './og-rotas';
+import { CC_OG, CC_OG_BORDA, comPrimeiroTurnoLocal } from './og-rotas';
+import { CABECALHO_BORDA } from './http-cache';
 import { layoutCalculadora, layoutCenario, layoutComposicao, layoutCuriosidade, layoutGovernadores, layoutSecao } from './og-cartoes';
 import { corPartido, svgHemiciclo } from './og-hemiciclo';
 import { RAIZ, comando, login, montar, type Montado } from './test-helpers';
@@ -134,6 +135,47 @@ describe('imagens da apuração (seguem a página: 1º turno antes das 17h, 2º 
     await comando(m, cookie, { tipo: 'nomes-reais', ativo: true });
     expect((await png('/api/og/municipio.png?race=pres&uf=sp&cod=71072')).r.headers.get('x-og-fotos')).toBe('0');
     await comando(m, cookie, { tipo: 'nomes-reais', ativo: false });
+  }, 60_000);
+});
+
+describe('leva 3: borda da Cloudflare (I04) e freio leve (I37)', () => {
+  it('imagens com Cloudflare-CDN-Cache-Control (mesmo TTL da borda + stale-if-error); o navegador como antes', async () => {
+    const vivo = await png('/api/og/apuracao.png?race=pres');
+    expect(vivo.r.headers.get('cache-control')).toBe(CC_OG.vivo);
+    expect(vivo.r.headers.get(CABECALHO_BORDA)).toBe(CC_OG_BORDA.vivo);
+    const est = await png('/api/og/senado.png');
+    expect(est.r.headers.get('cache-control')).toBe(CC_OG.estatica);
+    expect(est.r.headers.get(CABECALHO_BORDA)).toBe(CC_OG_BORDA.estatica);
+    const teste = await m.app.request('/api/og/teste.png');
+    expect(teste.headers.get(CABECALHO_BORDA)).toBe(CC_OG_BORDA.teste);
+    for (const v of Object.values(CC_OG_BORDA)) expect(v).toMatch(/stale-if-error=/);
+  }, 30_000);
+
+  it('freio no modo leve: imagem ao vivo vale 120 s na memória e na borda; solto, volta a 30 s', async () => {
+    const mm = await montar();
+    const cookie = await login(mm);
+    const url = '/api/og/apuracao.png?race=pres&uf=sp';
+    const geradas = () => mm.log.recentes(200).filter((l) => /^OG pres\/SP gerada/.test(l.msg)).length;
+    const esperar = async (n: number) => {
+      for (let i = 0; i < 100 && geradas() < n; i++) await new Promise((r) => setTimeout(r, 50));
+      return geradas();
+    };
+    expect((await comando(mm, cookie, { tipo: 'freio', fator: 2, leve: true })).status).toBe(200);
+    const a = await mm.app.request(url);
+    expect(a.headers.get('cache-control')).toBe(CC_OG.vivoLeve);
+    expect(a.headers.get(CABECALHO_BORDA)).toBe(CC_OG_BORDA.vivoLeve);
+    expect(await esperar(1)).toBe(1);
+    mm.relogio.t += 60_000; // passou dos 30 s normais, dentro dos 120 s do modo leve
+    const b = await mm.app.request(url);
+    expect(b.headers.get('etag')).toBe(a.headers.get('etag'));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(geradas()).toBe(1); // fresca: nada refeito
+    // freio solto: a mesma imagem (60 s) já venceu → sai na hora e é refeita em segundo plano
+    await comando(mm, cookie, { tipo: 'freio', fator: 1 });
+    const c = await mm.app.request(url);
+    expect(c.headers.get('cache-control')).toBe(CC_OG.vivo);
+    expect(c.headers.get(CABECALHO_BORDA)).toBe(CC_OG_BORDA.vivo);
+    expect(await esperar(2)).toBe(2);
   }, 60_000);
 });
 

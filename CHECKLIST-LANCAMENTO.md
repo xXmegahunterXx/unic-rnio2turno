@@ -51,19 +51,29 @@ curl -s https://seu-dominio/robots.txt; curl -s https://seu-dominio/sitemap.xml 
 deploy/painel.sh estado
 ```
 
-### A3. Cloudflare (recomendado para a noite; DEPLOY §5)
+### A3. Cloudflare (obrigatório para a noite; DEPLOY §5)
+
+Duas formas de configurar, com o mesmo resultado: **(a)** chave temporária da API só desta zona, válida por 2 dias, usada
+fora da VPS por `deploy/cloudflare.mjs --aplicar` e revogada logo depois (DEPLOY §5.1, recomendado); **(b)** passo a passo
+pelo celular, sem chave (DEPLOY §5.2, ~40 min). Nos dois casos, `node deploy/cloudflare.mjs --conferir
+--dominio=seu-dominio` confere tudo pela borda, sem chave, de qualquer computador. Prazo: até **18/10**, sobre a leva 2.
 
 | # | Item | Como conferir | Quem decide | Bloqueia? |
 |---|---|---|---|---|
 | A3.1 | Domínio na Cloudflare (nameservers trocados no registrador). **Precisa ser feito com dias de antecedência**: a troca de nameservers pode levar horas | painel da Cloudflare: zona "Ativa" | Dono | sim (para a noite) |
 | A3.2 | Registro A com **nuvem laranja** (depois do 1º certificado sair com a nuvem cinza) | `curl -sI https://seu-dominio \| grep -i '^server: cloudflare'` | Técnico | sim (para a noite) |
-| A3.3 | SSL/TLS **Full (strict)**; **"Sempre usar HTTPS" desligado**; Rocket Loader desligado; "Estou sob ataque" desligado | painel da Cloudflare | Técnico | sim |
-| A3.4 | **Regras de cache** 1 (API pública e dados) e 2 (nunca guardar `/api/admin`, `/admin`, `/healthz`, cliques e eventos de anúncio, POSTs do chat, audiência e formulário), com as expressões **exatamente** como no DEPLOY §5 (as de out/2026 incluem `/api/chat`, `/api/divulgacao`, `/api/anuncio/img`, `/api/anuncio/ir/`, `/api/anuncio/evento`, `/api/chat/`, `/api/audiencia`, `/api/anuncie/`) | os três `curl` do DEPLOY §5 item 7: `/api/status` e `/api/chat` → `HIT`/`EXPIRED`/`REVALIDATED`; `/api/anuncio/ir/x` e `/api/admin/state` → `BYPASS`/`DYNAMIC` | Técnico | sim (para a noite) |
+| A3.3 | SSL/TLS **Full (strict)**; **"Sempre usar HTTPS" desligado**; Rocket Loader desligado; **Always Online desligado**; *Browser Cache TTL* = **Respect Existing Headers**; **Smart Tiered Cache ligado**; "Estou sob ataque" desligado | `--conferir` com a chave (zona) ou o painel da Cloudflare | Técnico | sim |
+| A3.4 | **As 4 regras de cache do Sintonia**, nesta ordem e com as expressões **exatamente** como no DEPLOY §5.3 (sem `http.host`; nenhuma com TTL fixo — "usar Cache-Control se presente, senão não guardar"): 1 API pública e dados (inclui `/api/texto/` e `/api/live/agora`); 2 nunca guardar (painel, `/healthz`, `/api/saude-noite`, cliques e impressões de anúncio, POSTs do chat, audiência, `/api/live/batimento`, formulário); 3 sem query (status, meta, chat, divulgação); 4 páginas (só guardam com a chave "HTML na borda"). Regras "Sintonia…" antigas, feitas à mão, **apagadas** (o `--aplicar` substitui sozinho) | `node deploy/cloudflare.mjs --conferir --dominio=seu-dominio` → "Tudo certo" (saída 0); na VPS, `deploy/status.sh` → **"Borda: guardando"** | Técnico | sim (para a noite) |
 | A3.5 | Se ligar "Bot Fight Mode" ou regras de WAF: conferir que o monitor de uptime (A6) e os cartões do X (A7) continuam funcionando | A6 e A7 de novo | Técnico | não |
-| A3.6 | Depois de toda atualização que mude `public/data` ou `public/geo`: **limpar o cache** do prefixo `/data/` (e `/geo/`) | DEPLOY §5, último parágrafo | Técnico | não |
-| A3.7 | Regra 3 (sem query: `/api/status`, `/api/meta`, `/api/chat` e `/api/divulgacao` com a query ignorada na chave de cache) e, opcional, a regra de *Rate limiting* (DEPLOY §5) | `curl -s -o /dev/null https://seu-dominio/api/chat; curl -sI 'https://seu-dominio/api/chat?x=1' \| grep -iE '^HTTP\|cf-cache-status'` → `HIT` e 200 logo depois de um GET normal (um 400 isolado, com a borda expirada, é esperado e inofensivo) | Técnico | não |
-| A3.9 | **Cloudflare Web Analytics desligado** (a Cloudflare injeta um script de medição em toda página; a política de segurança do site o bloqueia — erro no console de todo visitante — e a /privacidade promete o site sem analytics). Em 16/10 estava LIGADO em produção | `curl -s -H 'Accept: text/html' https://seu-dominio/sobre \| grep -c cloudflareinsights` → `0` (DEPLOY §5, passo 5) | Técnico | sim |
+| A3.6 | Depois de toda atualização que mude `public/data` ou `public/geo`: **limpar o cache** do prefixo `/data/` (e `/geo/`) | DEPLOY §5.5 | Técnico | não |
+| A3.7 | Regra 3 conferida (já entra no A3.4) e, opcional, a regra de *Rate limiting* (DEPLOY §5.3, fim) | o `--conferir` pede `/api/status?x=…` e exige a mesma cópia; à mão: `curl -s -o /dev/null https://seu-dominio/api/chat; curl -sI 'https://seu-dominio/api/chat?x=1' \| grep -iE '^HTTP\|cf-cache-status'` → `HIT` e 200 (um 400 isolado, com a borda expirada, é esperado e inofensivo) | Técnico | não |
+| A3.9 | **Cloudflare Web Analytics desligado** (a Cloudflare injeta um script de medição em toda página; a política de segurança do site o bloqueia — erro no console de todo visitante — e a /privacidade promete o site sem analytics). Em 16/10 estava LIGADO em produção | `curl -s -H 'Accept: text/html' https://seu-dominio/sobre \| grep -c cloudflareinsights` → `0` (DEPLOY §5, pré-requisitos; o `--conferir` também reprova) | Técnico | sim |
 | A3.8 | **Antes de vender anúncio:** *Painel → Audiência → Zerar medição* depois do deploy final (tira os testes) e conferir a concentração por rede no pico | painel | Técnico + Dono | não |
+| A3.10 | **www**: registro `www` AAAA `100::` **com proxy** e a regra de redirecionamento 301 para o domínio, mantendo caminho e query (nada do www chega à VPS) | `curl -sI 'https://www.seu-dominio/apuracao?x=1' \| grep -iE '^HTTP\|^location'` → 301 e `https://seu-dominio/apuracao?x=1` (o `--conferir` também) | Técnico | não |
+| A3.11 | Transformação gerenciada **"Add visitor location headers" ligada** (a medição da noite soma UF e país; sem ela, tudo fica "não informado") | `--conferir` com a chave, ou *Rules → Settings → Managed Transforms* | Técnico | não |
+| A3.12 | **Chave da API revogada** logo depois do `--aplicar` (se a forma (a) foi usada). Nunca guardada na VPS, em arquivo ou em conversa que fica | *My Profile → API Tokens*: a chave do Sintonia não aparece mais | Dono | sim |
+| A3.13 | Depois do deploy da leva 3: **`/robots.txt` limpo da borda** (ela guarda 1 dia; o novo libera as páginas de apuração para o Google) | `node deploy/cloudflare.mjs --purgar /robots.txt` (com a chave) ou *Purge Cache → Custom Purge*; depois `curl -s https://seu-dominio/robots.txt \| grep 'Allow: /api/status'` | Técnico | não |
+| A3.14 | **Chave "HTML na borda" DESLIGADA** até o congelamento; ligada só em 24/10, 12h, e só se o ensaio (A11.3) passou. Antes de qualquer deploy com ela ligada: desligar e esperar 30 s | `deploy/painel.sh chaves`; `deploy/status.sh` → "páginas (HTML): não guardadas" | Técnico + Dono | sim |
 
 ### A4. Senhas e acessos
 
@@ -91,6 +101,7 @@ Um serviço de fora (UptimeRobot, Better Stack, Uptime Kuma noutra máquina…) 
 | # | Item | Como configurar | Quem decide | Bloqueia? |
 |---|---|---|---|---|
 | A6.1 | Monitor do **app** | `https://seu-dominio/healthz` a cada 1 min, palavra-chave `"ok":true` (com a Cloudflare, a regra 2 garante que ele chega à VPS) | Técnico | sim |
+| A6.1b | Monitor da **noite** (leva 3) | `https://seu-dominio/api/saude-noite` a cada 1 min, palavra-chave `"noite":"ok"` (também na regra 2) | Técnico | sim (para a noite) |
 | A6.2 | Monitor da **página** | `https://seu-dominio/` a cada 1–5 min, palavra-chave `Sintonia` | Técnico | não |
 | A6.3 | Alerta de **certificado** perto de vencer (o Caddy renova sozinho; isto é só um alarme) | opção do serviço de monitor | Técnico | não |
 | A6.4 | Teste do alerta: pare o app por 2 min numa hora tranquila (`docker compose stop app` → `docker compose start app`) e confirme que o aviso chegou | — | Técnico | não |
@@ -145,6 +156,18 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | A10.8 | **Contagem por pessoa** no ar sem pesar: no pico, o resumo por minuto do log sem p95 alto nas rotas de anúncio | `docker compose logs --since 5m app \| grep '"reqPorSeg"' \| tail -n 3`; se pesar: `ANUNCIO_PESSOA=0` (RUNBOOK §3.9) | Técnico | não |
 | A10.9 | **Rollback dos anunciantes v2 entendido**: o `:anterior` do `--rollback` rápido passa a ser a leva 2, que ignora a suspensão geral, a meta e a Reserva, e apaga os campos do v2 (e os totais por dia e o alcance das métricas) na 1ª gravação | Ler o aviso "voltar dos anunciantes v2 para a leva 2" no RUNBOOK §3.5; com a suspensão ligada, pausar cada anúncio ANTES de qualquer rollback | Técnico + Dono | sim |
 
+### A11. Leva 3: a noite (DEPLOY §5 e §16)
+
+| # | O quê | Como conferir | Quem | Bloqueia? |
+|---|---|---|---|---|
+| A11.1 | **Limites de CPU e de processos** do app em vigor na VPS compartilhada (CPU = núcleos − 1, peso 512, 512 processos; entram sozinhos na atualização da leva 3) | `deploy/limites.sh` → "em vigor" igual ao "configurado"; depois de mudar o tamanho da VPS: `deploy/limites.sh aplicar` | Técnico | sim |
+| A11.2 | **Alertas no celular**: bot do Telegram e vigia externo (healthchecks.io) no `.env` (`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `HC_PING_URL`), sem nunca colar os códigos em conversa | `deploy/painel.sh alerta-teste` → a mensagem chega; o healthchecks.io mostra "up" | Dono | sim (para a noite) |
+| A11.3 | **Ensaio pela borda** (21–22/10, madrugada; nunca em 24 nem em 25/10): 100, depois 1.000 e, se passar, 3.000 visitantes com `scripts/ensaio-borda.ts` (DEPLOY §5.5), mais o dia de jogo do plano (TSE bloqueando, arquivo nacional parado, app parado 60 s com "HTML na borda" ligado) | relatório "APROVADO": origem < 300 req/s, ≥ 95% HIT/UPDATING na API, p95 < 300 ms, zero 5xx; resultados anotados no RUNBOOK | Coordenador + Dono (autoriza a madrugada) | sim |
+| A11.4 | **Medição zerada depois do ensaio** (o tráfego de teste infla o pico) | *Painel → Audiência → Zerar medição* (A3.8) | Técnico | sim |
+| A11.5 | **Freio** testado no ensaio: `freio 2` e `freio 5` derrubam o req/s na origem; **solto** (`freio 1`) antes do congelamento | `deploy/painel.sh chaves` → "Freio de carga: solto" | Técnico | sim |
+| A11.6 | **Chaves da noite no padrão** no congelamento (contador público, medir anúncios, texto para bots, contar lives ligados; aviso nacional automático; HTML na borda conforme A3.14) | `deploy/painel.sh chaves` → "todas no padrão" | Técnico | sim |
+| A11.7 | Padrão do **aviso do arquivo nacional parado**: automático (como está) ou só depois de passar no ensaio | `deploy/painel.sh aviso-nacional auto\|off` | Dono | não |
+
 ---
 
 ## B. Humana
@@ -162,7 +185,7 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | B1.7 | **Registros de acesso (Marco Civil, art. 15)** | Por desenho, o app e o Caddy **não registram IP**; a Cloudflare registra do lado dela. A política de privacidade foi ajustada (out/2026) para dizer exatamente isso ("o Sintonia não grava o IP de quem acessa"; Cloudflare e provedor tratam conforme as políticas deles). Se o responsável for pessoa jurídica com fins econômicos, a guarda de 6 meses pode ser obrigação: ligar log de acesso com retenção segura (e mudar o texto) | Jurídico + Dono | sim |
 | B1.8 | **Patrocínio** | Só anunciante não político, com contrato que diga isso. Desligado por padrão | Jurídico + Dono | não |
 | B1.8.1 | **Barra do rodapé (celular) na noite** | Pela regra do §1.5 (nunca por cima de resultado), a barra fixa some diante de placar, mapas, tabelas, acontecimentos e mosaico de seções: na /apuracao, durante a apuração, ela **quase não aparece** (0 de 46 posições de rolagem na conferência); na UF, em cerca de metade; na Home e nas outras páginas, normalmente. Avisar quem comprar o formato "rodapé" (impressões vêm das outras páginas) ou vender o rodapé sem a /apuracao | Dono | não |
-| B1.9 | **Chat ao vivo** (`/apuracao`, `/ao-vivo`) | Conteúdo de terceiros num site com anúncio: filtros, moderação e denúncia bastam (Marco Civil art. 19; Lei 9.504/97 art. 57-D, anonimato)? Ligar o **registro cifrado dos envios** (`CHAT_REGISTRO_CHAVE`, DEPLOY §5.1, desligado), quem guarda a chave privada? A sala fica fechada de 0h às 17h de 25/10 (art. 39 §5º) | Jurídico + Dono | sim |
+| B1.9 | **Chat ao vivo** (`/apuracao`, `/ao-vivo`) | Conteúdo de terceiros num site com anúncio: filtros, moderação e denúncia bastam (Marco Civil art. 19; Lei 9.504/97 art. 57-D, anonimato)? Ligar o **registro cifrado dos envios** (`CHAT_REGISTRO_CHAVE`, DEPLOY §5.6, desligado), quem guarda a chave privada? A sala fica fechada de 0h às 17h de 25/10 (art. 39 §5º) | Jurídico + Dono | sim |
 | B1.10 | **Anúncio em imagem com candidato** | Hoje DESLIGADO (`OFERECIMENTO_COM_CANDIDATOS = false`): placar e palpite com nomes saem sem "Oferecimento". Ligar só com parecer (a imagem circula sem o site em volta, com foto e número). **Também decidir:** o "Oferecido por" da **/live** (fonte do OBS que vai para lives, VODs e cortes de terceiros) e o "Oferecimento" do **Modo TV** ficam no mesmo quadro de foto, nome, número de urna e percentuais (na barra do Sintonia, separados do placar por ela; a aba da /live nunca passa da largura da marca do Sintonia). Mesmo motivo da chave acima: manter, ou desligar nessas duas telas | Jurídico + Dono | não |
 | B1.11 | **Palpite do 2º turno** | Prazo até 23h59 de 24/10, palpite travado e sem compartilhar no dia da votação, sem número agregado. Basta para não ser lido como pesquisa/prognóstico? | Jurídico | sim |
 | B1.12 | **Números de audiência na /anuncie** (interruptor desligado) | Só o pico do sinal das páginas, maior dia em únicos e páginas vistas, "desde <data>". A forma de medir (conservadora) está descrita; ligar depois de zerar a medição (A3.8) | Dono | não |

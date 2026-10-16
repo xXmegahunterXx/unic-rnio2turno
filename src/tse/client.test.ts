@@ -1,6 +1,6 @@
 /** TseClient: retry/backoff, 404 como "ausente", 304 com validadores, timeout e limite de concorrência. */
 import { describe, expect, it } from 'vitest';
-import { MAX_CONCORRENCIA, TseClient, TseHttpError, type FetchLike } from './client';
+import { MAX_CONCORRENCIA, TseBloqueioError, TseClient, TseHttpError, type FetchLike } from './client';
 import { BASE, criarFakeFetch } from './__fixtures__/fake-fetch';
 
 const semEspera = { sleep: async () => undefined, random: () => 0.5 };
@@ -53,14 +53,25 @@ describe('TseClient', () => {
     expect(c2.stats().ultimoErro?.msg).toMatch(/falha de rede/);
   });
 
-  it('429 respeita Retry-After', async () => {
+  it('429 é bloqueio (sem retentativa): pausa tudo pelo Retry-After e depois volta', async () => {
     let n = 0;
+    let agora = 1_000_000;
     const esperas: number[] = [];
     const f: FetchLike = async () =>
-      ++n === 1 ? new Response('', { status: 429, headers: { 'retry-after': '2' } }) : new Response('{}', { status: 200 });
-    const c = new TseClient({ baseUrl: BASE, fetch: f, sleep: async (ms) => void esperas.push(ms) });
+      ++n === 1 ? new Response('', { status: 429, headers: { 'retry-after': '20' } }) : new Response('{}', { status: 200 });
+    const c = new TseClient({ baseUrl: BASE, fetch: f, now: () => agora, sleep: async (ms) => void esperas.push(ms) });
+    const e = await c.getJson('a.json').catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(TseBloqueioError);
+    expect(e).toMatchObject({ status: 429, motivo: 'http-429', semPedido: false, ate: 1_020_000 });
+    expect(esperas).toEqual([]);
+    expect(c.bloqueio()).toMatchObject({ motivo: 'http-429', ate: 1_020_000, porRetryAfter: true, arquivo: 'a.json' });
+    // durante a pausa nada sai
+    await expect(c.getJson('b.json')).rejects.toMatchObject({ semPedido: true });
+    expect(n).toBe(1);
+    agora += 20_000;
+    expect(c.bloqueio()).toBeNull();
     expect((await c.getJson('a.json')).status).toBe('ok');
-    expect(esperas).toEqual([2000]);
+    expect(n).toBe(2);
   });
 
   it('JSON truncado é transitório (retry)', async () => {
@@ -90,7 +101,7 @@ describe('TseClient', () => {
       ativos--;
       return new Response('{}', { status: 200 });
     };
-    const c = new TseClient({ baseUrl: BASE, fetch: f, concorrencia: 50, ...semEspera });
+    const c = new TseClient({ baseUrl: BASE, fetch: f, concorrencia: 50, semTeto: true, ...semEspera });
     const ps = Array.from({ length: 30 }, (_, i) => c.getJson(`b${i}.json`, { prioridade: 'baixa' }));
     ps.push(c.getJson('urgente.json', { prioridade: 'alta' }));
     await Promise.all(ps);

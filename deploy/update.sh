@@ -44,7 +44,17 @@ travar
 cd "$RAIZ"
 T0=$SECONDS
 CANARIO="sintonia-ensaio-$$"
-trap 'docker rm -f "$CANARIO" >/dev/null 2>&1 || true' EXIT
+VPS_YML="$RAIZ/docker-compose.vps.yml"
+VPS_YML_ANTES='' # cópia do docker-compose.vps.yml de antes desta atualização (VPS compartilhada)
+trap 'docker rm -f "$CANARIO" >/dev/null 2>&1 || true; [[ -z $VPS_YML_ANTES ]] || rm -f "$VPS_YML_ANTES"' EXIT
+
+# VPS compartilhada: o docker-compose.vps.yml volta ao de antes desta atualização (ela não chegou ao fim)
+restaurar_vps_yml() {
+  if [[ -n $VPS_YML_ANTES && -s $VPS_YML_ANTES ]] && ! cmp -s "$VPS_YML_ANTES" "$VPS_YML"; then
+    cp -p "$VPS_YML_ANTES" "$VPS_YML"
+    aviso "docker-compose.vps.yml voltou ao anterior (sem as mudanças desta atualização)."
+  fi
+}
 
 trocar() { # sobe a imagem sintonia-app:latest e espera ficar saudável
   dc up -d --no-build --remove-orphans
@@ -53,6 +63,7 @@ trocar() { # sobe a imagem sintonia-app:latest e espera ficar saudável
 
 voltar_para_anterior() {
   docker image inspect "$IMAGEM:anterior" >/dev/null 2>&1 || morrer "Não há imagem anterior ($IMAGEM:anterior) para voltar."
+  restaurar_vps_yml
   docker tag "$IMAGEM:anterior" "$IMAGEM:latest"
   if trocar 180; then
     ok "De volta à imagem anterior (commit $(revisao_imagem)). Site no ar."
@@ -159,6 +170,21 @@ if ! dc build app; then
   morrer "O build falhou (mensagens acima). Nada foi trocado: o site segue no ar na versão anterior."
 fi
 
+# ---- 2b. VPS compartilhada: docker-compose.vps.yml regerado do .env ----------------------------------------
+# Traz o que mudou nos scripts (ex.: os limites de CPU e de processos da leva 3, I19). O ensaio já roda com ele; se a
+# atualização não chegar ao fim, o arquivo volta ao de antes.
+if compartilhado; then
+  VPS_YML_ANTES="$(mktemp "${TMPDIR:-/tmp}/sintonia-vps-yml.XXXXXX")"
+  cp -p "$VPS_YML" "$VPS_YML_ANTES" 2>/dev/null || : >"$VPS_YML_ANTES"
+  gerar_compose_vps
+  if ! dc config -q >/dev/null 2>&1; then
+    aviso "O docker-compose.vps.yml regerado não passou na conferência do Docker Compose; sigo com o anterior."
+    cp -p "$VPS_YML_ANTES" "$VPS_YML"
+  elif ! cmp -s "$VPS_YML_ANTES" "$VPS_YML"; then
+    ok "docker-compose.vps.yml atualizado (limites: $(resumo_limites))"
+  fi
+fi
+
 # ---- 3. ensaio --------------------------------------------------------------------------------------
 info "Ensaio: subindo a imagem nova ao lado da atual, sem visitantes"
 if ensaio 120; then
@@ -166,6 +192,7 @@ if ensaio 120; then
   if [[ -n $TEM_NO_AR ]]; then docker tag "$NO_AR" "$IMAGEM:anterior"; fi
 else
   desfazer_tag
+  restaurar_vps_yml
   morrer "Nada foi trocado: o site segue no ar na versão anterior (commit ${REV_RODANDO:-?}). O código baixado (commit $COMMIT) tem um problema: quando houver correção no repositório, rode o update.sh de novo."
 fi
 

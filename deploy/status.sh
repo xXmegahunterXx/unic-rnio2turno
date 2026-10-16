@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =====================================================================================================
-# Sintonia — situação do servidor num relance: contêineres, saúde, fonte de dados, versão, CPU/memória,
-# certificado, último backup e últimos logs.
+# Sintonia — situação do servidor num relance: contêineres, saúde, fonte de dados, versão, borda (Cloudflare),
+# CPU/memória e limites, certificado, último backup e últimos logs.
 #
 #   sudo /opt/sintonia/deploy/status.sh            (LINHAS=50 para ver mais log)
 # =====================================================================================================
@@ -82,10 +82,26 @@ if docker image inspect "$IMAGEM:anterior" >/dev/null 2>&1; then
   echo "   para voltar:    deploy/update.sh --rollback  (imagem anterior: commit $(revisao_imagem "$IMAGEM:anterior"))"
 fi
 
+# Borda (Cloudflare, I02): o /api/status pedido 2× pelo domínio público tem de vir da cópia da borda
+dom="$(cfg DOMINIO)"
+if [[ -n $dom ]] && command -v curl >/dev/null 2>&1; then
+  info "Borda (Cloudflare)"
+  borda_estado "$dom" || true
+fi
+
 info "Recursos"
 mapfile -t cts < <(dc ps -q 2>/dev/null || true)
 if ((${#cts[@]})); then
   docker stats --no-stream --format 'table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}' "${cts[@]}" || true
+fi
+if compartilhado; then
+  lim="$(resumo_limites)"
+  vig="$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$(ids_app | head -n 1)" 2>/dev/null || echo 0)"
+  if limites_ligados && [[ $vig =~ ^[0-9]+$ ]] && ((vig > 0)) && [[ "$(awk -v n="$vig" 'BEGIN { printf "%g", n / 1e9 }')" != "$(awk -v n="$(limite_cpus)" 'BEGIN { printf "%g", n }')" ]]; then
+    aviso "   limites do app: $lim — mas o contêiner está com CPU $(awk -v n="$vig" 'BEGIN { printf "%g", n / 1e9 }') (a VPS mudou de tamanho?): sudo $DIR_DEPLOY/limites.sh aplicar"
+  else
+    echo "   limites do app: $lim ($DIR_DEPLOY/limites.sh)"
+  fi
 fi
 echo "   máquina: $(nproc) vCPU · carga $(cut -d' ' -f1-3 /proc/loadavg) · memória $(free -h | awk '/^Mem:/ {print $3 " usados de " $2}') · disco $(df -h "$RAIZ" | awk 'NR == 2 {print $4 " livres (" $5 " usado)"}')"
 

@@ -8,7 +8,9 @@ import { join } from 'node:path';
 import { brotliDecompressSync, gunzipSync } from 'node:zlib';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { escapeHtml } from './meta-tags';
-import { montar, type Montado } from './test-helpers';
+import { CC_BORDA } from './app';
+import { CABECALHO_BORDA } from './http-cache';
+import { comando, login, montar, type Montado } from './test-helpers';
 
 const TEMPLATE = `<!doctype html>
 <html lang="pt-BR" data-theme="dark">
@@ -232,13 +234,48 @@ describe('SPA com meta tags por rota', () => {
     expect(escapeHtml('<script>"x"&\'y\'</script>')).toBe('&lt;script&gt;&quot;x&quot;&amp;&#39;y&#39;&lt;/script&gt;');
   });
 
-  it('robots.txt padrão: imagens OG liberadas (o robô do X respeita o robots.txt), API e admin fora', async () => {
+  it('robots.txt padrão: imagens OG e os dados das páginas de apuração liberados (I06), resto da API e admin fora', async () => {
     const r = await get('/robots.txt');
     expect(r.status).toBe(200);
+    // 1 h também na borda: mudança de regra chega no mesmo dia
+    expect(r.headers.get('cache-control')).toBe('public, max-age=3600, s-maxage=3600');
     const t = await r.text();
     expect(t).toContain('Allow: /api/og/');
+    for (const a of ['Allow: /api/status', 'Allow: /api/meta', 'Allow: /api/apuracao/']) {
+      expect(t).toContain(a);
+      // antes do Disallow: robôs que usam a PRIMEIRA regra que casa também liberam
+      expect(t.indexOf(a)).toBeLessThan(t.indexOf('Disallow: /api/'));
+    }
     expect(t).toContain('Disallow: /api/');
+    expect(t).toContain('Disallow: /admin');
     expect(t).not.toContain('/duelo'); // o robô precisa ler a página do Duelo para montar o cartão
+  });
+
+  it('HTML na borda (I05): só com a chave "html-borda"; nunca admin, widgets, Duelo, relatório, 404', async () => {
+    const paginas = ['/', '/apuracao', '/apuracao/sp', '/teste', '/live'];
+    const fora = ['/admin', '/embed/placar', '/duelo/abc123', '/relatorio', '/rota-que-nao-existe'];
+    // padrão: desligada — só o no-cache do navegador
+    for (const p of [...paginas, ...fora]) expect((await get(p)).headers.get(CABECALHO_BORDA), p).toBeNull();
+    const cookie = await login(m);
+    expect((await comando(m, cookie, { tipo: 'html-borda', ligado: true })).status).toBe(200);
+    try {
+      for (const p of paginas) {
+        const r = await get(p, { 'accept-encoding': 'br' });
+        expect(r.status, p).toBe(200);
+        expect(r.headers.get('cache-control'), p).toBe('no-cache');
+        expect(r.headers.get(CABECALHO_BORDA), p).toBe(CC_BORDA.html);
+        expect(r.headers.get('vary'), p).toBe('Accept-Encoding');
+      }
+      expect(CC_BORDA.html).toBe('max-age=15, stale-while-revalidate=15, stale-if-error=86400');
+      for (const p of fora) expect((await get(p)).headers.get(CABECALHO_BORDA), p).toBeNull();
+      expect((await get('/rota-que-nao-existe')).status).toBe(404);
+      // arquivos do build e a API seguem com o próprio cache
+      expect((await get('/assets/index-abc123.js')).headers.get(CABECALHO_BORDA)).toBeNull();
+    } finally {
+      expect((await comando(m, cookie, { tipo: 'html-borda', ligado: false })).status).toBe(200);
+    }
+    // desligada: a próxima resposta já sai sem o cabeçalho (a borda revalida em até 15 s e para de guardar)
+    expect((await get('/')).headers.get(CABECALHO_BORDA)).toBeNull();
   });
 
   it('a API continua respondendo JSON (não cai na SPA)', async () => {

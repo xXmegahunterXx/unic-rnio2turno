@@ -33,10 +33,21 @@
  *    município, zona e seção sempre respondem o agora (não guardamos zonas nem BUs por instante).
  *  - Erros do TSE nunca derrubam: o último dado bom é mantido e `health()` expõe o problema. Métodos não
  *    lançam por falha de rede; lançam `NotFoundError` só para corrida/UF/município/zona inexistentes.
+ *  - I03 (leva 3): o cliente respeita um teto de pedidos por segundo (`limitePorSeg`, balde de fichas com fatia
+ *    reservada para os arquivos Brasil/UF das disputas) e reconhece quando o TSE bloqueia (429, 403 da borda dele ou
+ *    403 num arquivo já lido): TUDO pausa até o Retry-After ou 11 min (laço prioritário, laço normal, fila de
+ *    municípios e consultas de visitantes), com log, `health().bloqueio`/`ok: false`, `frescor().tseBloqueadoAte` e
+ *    `retomar()` ("Retomar agora" no painel). `conferidoEm` só avança com 200/304 do arquivo principal (um 404/403 de
+ *    "ainda não publicado" não conta como leitura boa). Arquivo de município/zona ainda não publicado: cache negativo de
+ *    60 s que dobra até 10 min (zerado quando o acompanhamento da UF mostra o município andando).
+ *  - I18 (leva 3): o arquivo NACIONAL de Presidente parado (mesma geração `dg/hg` há mais de 90 s) enquanto a soma das
+ *    seções totalizadas das UFs e do exterior passa a dele → `frescor().nacionalParadoDesde` (aviso factual no app; nunca
+ *    somamos os estados no lugar do arquivo oficial). Some quando o arquivo nacional volta a mudar.
  *
  * Isomórfico (fetch + timers), mas pensado para o servidor (um poller para todos os clientes).
  */
 import type {
+  FrescorCorrida,
   MunicipioResumo,
   MunicipioSnapshot,
   MunicipiosNacionalSnapshot,
@@ -55,7 +66,16 @@ import type {
   ZonaSnapshot,
 } from '../shared/types';
 import { NotFoundError } from '../engine/api';
-import { TseClient, type FetchLike, type Prioridade, type TseClientStats, type Validadores } from './client';
+import {
+  MOTIVO_BLOQUEIO_TEXTO,
+  TseBloqueioError,
+  TseClient,
+  type BloqueioTse,
+  type FetchLike,
+  type Prioridade,
+  type TseClientStats,
+  type Validadores,
+} from './client';
 import {
   tsePaths,
   type TseAcompanhamentoArquivo,
@@ -68,6 +88,7 @@ import {
 } from './feed';
 import * as map from './map';
 import { aplicarCores } from '../shared/cores';
+import { fmtHoraSeg } from '../shared/format';
 import { type Abr, HistoricoCorrida, type HistoricoSerializado } from './eventos';
 import { lerBoletimUrna } from './bu';
 
@@ -121,6 +142,10 @@ export interface TseCorridaHealth {
   erro: string | null;
   /** abrangências cujo arquivo ainda não existe no TSE (404) */
   ausentes: Abr[];
+  /** última leitura com 200/304 do arquivo principal (o `conferidoEm` do frescor; um 404 não conta) */
+  conferidoEm: number | null;
+  /** I18: arquivo nacional parado com os estados andando, desde este instante (ver `TseSource.frescor`) */
+  nacionalParadoDesde: number | null;
 }
 
 /** Laço do arquivo prioritário (resumo Brasil de Presidente). */
@@ -146,8 +171,15 @@ export interface TsePrioritarioHealth {
 }
 
 export interface TseHealth {
-  /** true quando o arquivo principal de todas as corridas de 2º turno foi lido nos últimos 3 intervalos */
+  /**
+   * true quando o arquivo principal de todas as corridas de 2º turno foi lido nos últimos 3 intervalos e o TSE não está
+   * limitando as leituras
+   */
   ok: boolean;
+  /** I03: pausa por bloqueio do TSE em curso (null = lendo normalmente) */
+  bloqueio: (BloqueioTse & { motivoTexto: string }) | null;
+  /** I03: fim da pausa em curso (epoch ms) — o mesmo que `bloqueio.ate`; null sem pausa */
+  bloqueadoAte: number | null;
   rodando: boolean;
   intervaloSeg: number;
   /** espera atual do laço normal (s), com o backoff quando todas as corridas falham */
@@ -191,6 +223,10 @@ class Corrida {
   ultimoPollMs: number | null = null;
   falhas = 0;
   erro: string | null = null;
+  /** última leitura com 200/304 do arquivo principal (frescor; o `ultimoPollOk` também conta o "ausente") */
+  conferidoEm: number | null = null;
+  /** I18: geração (`dg/hg`) do arquivo principal e quando a vimos pela 1ª vez (relógio do servidor) */
+  geracao: { geradoEm: number | null; vistaEm: number } | null = null;
   emVoo: Promise<void> | null = null;
   /** hash do conteúdo (ver `TseSource.marca`); recalculado sob demanda quando `sujo` */
   marca: string | null = null;
@@ -221,8 +257,11 @@ interface MunUf {
   abTentativa: number;
   mun: Map<string, Entrada>;
   zonas: Map<string, Entrada>;
-  /** arquivos (município ou `cod|zona`) que o TSE ainda não publicou (404) → instante da verificação */
-  ausentes: Map<string, number>;
+  /**
+   * arquivos (município ou `cod|zona`) que o TSE ainda não publicou (404) → instante da verificação e validade do cache
+   * negativo (60 s, dobrando a cada novo 404 até 10 min; zerado quando o `ab` mostra o município andando)
+   */
+  ausentes: Map<string, { em: number; ttl: number }>;
 }
 
 interface CacheCm {
@@ -329,6 +368,12 @@ const PRIORITARIO_TIMEOUT_MS = 8_000;
 const ATRASO_AMOSTRAS = 30;
 const CM_TTL_MS = 60 * 60_000;
 const PT_TTL_MS = 6 * 60 * 60_000;
+/** Cache negativo de município/zona ainda não publicado: `municipioTtlMs` (60 s), dobrando até 10 min. */
+const AUSENTE_TTL_MAX_MS = 10 * 60_000;
+/** I18: o arquivo nacional conta como parado depois de tanto tempo na mesma geração, com os estados à frente. */
+export const NACIONAL_PARADO_MS = 90_000;
+/** Depois de uma pausa por bloqueio, o laço normal volta um pouco depois do prioritário (1 pedido de prova antes). */
+const RETOMADA_NORMAL_ATRASO_MS = 2_000;
 
 // ---------------------------------------------------------------------------------------------
 // TseSource
@@ -393,6 +438,7 @@ export class TseSource {
         baseUrl: this.config.baseUrl,
         fetch: opts.fetch,
         concorrencia: opts.concorrencia ?? 6,
+        limitePorSeg: this.config.limitePorSeg,
         now: this.now,
         // User-Agent identificável só no servidor (no navegador o cabeçalho é proibido/gera preflight)
         headers: ehNode() ? { 'User-Agent': 'Sintonia/1.0 (apuracao 2o turno 2026)' } : {},
@@ -405,6 +451,8 @@ export class TseSource {
     this.nomeMunicipio = opts.nomeMunicipio;
     this.fila = new FilaMunicipios(Math.max(1, Math.min(opts.workersMunicipios ?? 3, opts.concorrencia ?? 6)));
     for (const h of opts.historico ?? []) this.historicoPendente.set(h.race, h);
+    if (opts.client && this.config.limitePorSeg !== undefined) this.client.setLimitePorSeg(this.config.limitePorSeg);
+    this.client.aoMudarBloqueio((b) => this.mudouBloqueio(b));
   }
 
   // -------------------------------------------------------------------------------------------
@@ -432,7 +480,7 @@ export class TseSource {
    * próximo ciclo bom. Consultas de quem abre uma página continuam (sob demanda, 1 por município por minuto).
    */
   private get tseFalhando() {
-    return this.prio.falhas > 0 || this.falhasCiclo > 0;
+    return this.prio.falhas > 0 || this.falhasCiclo > 0 || this.client.bloqueio() !== null;
   }
 
   /** O laço prioritário só existe se for mais frequente que o normal. */
@@ -485,6 +533,9 @@ export class TseSource {
       this.prio.falhas = 0;
       this.agendarPrioritario(1_000);
     }
+    if (this.config.limitePorSeg !== antes.limitePorSeg && this.config.limitePorSeg !== undefined) {
+      this.client.setLimitePorSeg(this.config.limitePorSeg);
+    }
     if (this.config.baseUrl !== antes.baseUrl) {
       this.client.setBaseUrl(this.config.baseUrl);
       this.corridas.clear();
@@ -518,9 +569,48 @@ export class TseSource {
       ? Math.min(CICLO_BACKOFF_MAX_MS, this.intervaloMs * 2 ** Math.min(this.falhasCiclo, 4)) * (0.9 + 0.2 * Math.random())
       : this.intervaloMs;
     this.esperaCicloMs = Math.round(base);
-    const espera = Math.max(1_000, this.esperaCicloMs - (this.now() - t0));
-    this.timer = setTimeout(() => void this.ciclo(), espera);
+    let espera = Math.max(1_000, this.esperaCicloMs - (this.now() - t0));
+    // TSE limitando: nada até o fim da pausa (o prioritário prova primeiro, com 1 pedido)
+    const b = this.client.bloqueio();
+    if (b) espera = Math.max(espera, b.ate - this.now() + RETOMADA_NORMAL_ATRASO_MS);
+    this.agendarCiclo(espera);
+  }
+
+  private agendarCiclo(ms: number) {
+    if (!this.rodando) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => void this.ciclo(), Math.max(0, ms));
     (this.timer as { unref?: () => void }).unref?.();
+  }
+
+  /**
+   * Início (b) ou fim antecipado (null, "Retomar agora") de uma pausa por bloqueio do TSE: log, fila de municípios vazia e
+   * os laços reagendados para o fim da pausa (ou já, na retomada).
+   */
+  private mudouBloqueio(b: BloqueioTse | null) {
+    if (b) {
+      this.log(
+        `TSE: leituras PAUSADAS até ${fmtHoraSeg(b.ate)} — o TSE está limitando (${MOTIVO_BLOQUEIO_TEXTO[b.motivo]} em ${b.arquivo}` +
+          `${b.porRetryAfter ? ', prazo do Retry-After' : ', pausa padrão de 11 min'}). Nenhum pedido sai até lá; "Retomar agora" no painel encerra a pausa.`,
+      );
+      this.fila.limpar();
+      if (!this.rodando) return;
+      this.agendarPrioritario(Math.max(0, b.ate - this.now()));
+      this.agendarCiclo(Math.max(0, b.ate - this.now()) + RETOMADA_NORMAL_ATRASO_MS);
+      return;
+    }
+    if (!this.rodando) return;
+    this.prio.falhas = 0;
+    this.prio.retryAfterMs = 0;
+    this.agendarPrioritario(200);
+    this.agendarCiclo(RETOMADA_NORMAL_ATRASO_MS);
+  }
+
+  /** "Retomar agora" (comando `tse-retomar`): encerra a pausa por bloqueio antes da hora. Devolve a pausa encerrada. */
+  retomar(): BloqueioTse | null {
+    const b = this.client.retomar();
+    if (b) this.log(`TSE: leituras retomadas pelo painel antes do fim da pausa (prevista até ${fmtHoraSeg(b.ate)})`);
+    return b;
   }
 
   /** Um ciclo de polling (público para testes e para o botão "testar" do admin). */
@@ -568,6 +658,8 @@ export class TseSource {
 
   /** Espera até a próxima leitura prioritária: o intervalo, ou o backoff (×2 por falha, até 30 s, ±20%) / Retry-After. */
   private esperaPrioritarioMs(): number {
+    const b = this.client.bloqueio();
+    if (b) return Math.max(500, b.ate - this.now());
     const base = this.intervaloPrioritarioMs;
     if (!this.prio.falhas) return base;
     const exp = Math.min(PRIORITARIO_BACKOFF_MAX_MS, base * 2 ** this.prio.falhas) * (0.8 + 0.4 * Math.random());
@@ -592,8 +684,12 @@ export class TseSource {
       );
       const agora = this.now();
       this.prio.ultimaLeituraMs = agora - t0;
-      this.prio.ultimaLeituraOk = agora;
+      // o TSE respondeu; mas só 200/304 do arquivo é leitura boa (o "ausente" não confirma número nenhum)
       c.ultimoPollOk = agora;
+      if (r.status !== 'ausente') {
+        this.prio.ultimaLeituraOk = agora;
+        c.conferidoEm = agora;
+      }
       if (this.prio.falhas > 0) {
         this.log(`TSE ${c.race.id}/BR: leitura prioritária normalizada após ${this.prio.falhas} falha(s)`);
         // o TSE voltou: se o laço normal está em backoff, antecipa o próximo ciclo
@@ -620,6 +716,12 @@ export class TseSource {
       return 'nao-modificado';
     } catch (err) {
       this.prio.ultimaLeituraMs = this.now() - t0;
+      if (err instanceof TseBloqueioError) {
+        // pausa por bloqueio: o cliente já parou tudo e avisou (log); o laço volta no fim da pausa
+        this.prio.erro = msgDe(err);
+        if (!err.semPedido) this.prio.contagem.erros++;
+        return 'erro';
+      }
       if (this.prio.falhas === 0) this.log(`TSE ${c.race.id}/BR: falha na leitura prioritária — ${msgDe(err)} (backoff)`);
       this.prio.falhas++;
       if (this.prio.falhas === 1) this.fila.limpar(); // TSE fora: esvazia a fila de municípios (ver `tseFalhando`)
@@ -689,15 +791,21 @@ export class TseSource {
       const mudaram: Abr[] = [];
       const erros: string[] = [];
       let principalOk = false;
+      let principalLido = false;
+      let soPausa = true;
       await Promise.all(
         c.abrs.map(async (abr) => {
           try {
-            // o prioritário marca a leitura boa (ultimoPollOk) por conta própria
+            // o prioritário marca a leitura boa (ultimoPollOk/conferidoEm) por conta própria
             if (this.cobertoPeloPrioritario(c, abr)) return;
             const r = await this.umaVez(this.chaveResultado(c, abr), () => this.buscarResultado(c, abr, prioridade));
             if (r.mudou) mudaram.push(abr);
-            if (abr === c.principal) principalOk = true;
+            if (abr === c.principal) {
+              principalOk = true;
+              principalLido = r.status !== 'ausente';
+            }
           } catch (err) {
+            if (!(err instanceof TseBloqueioError && err.semPedido)) soPausa = false;
             erros.push(`${abr}: ${msgDe(err)}`);
           }
         }),
@@ -706,7 +814,10 @@ export class TseSource {
       c.ultimoPoll = agora;
       c.ultimoPollMs = agora - t0;
       if (principalOk) c.ultimoPollOk = agora;
-      if (erros.length) {
+      if (principalLido) c.conferidoEm = agora;
+      if (erros.length && soPausa) {
+        // pausa por bloqueio: nada foi pedido ao TSE; não conta como falha da disputa (a pausa aparece no health)
+      } else if (erros.length) {
         if (c.falhas === 0) this.log(`TSE ${c.race.id}: falha ao ler ${erros.length} arquivo(s) — ${erros[0]}`);
         c.falhas++;
         c.erro = erros[0];
@@ -734,7 +845,8 @@ export class TseSource {
   ): Promise<{ mudou: boolean; status: 'ok' | 'nao-modificado' | 'ausente' | 'antigo' }> {
     const prev = c.resultados.get(abr);
     const path = tsePaths.resultado(c.cod.ciclo, c.cod.eleicao, c.cod.cargo, abr === 'BR' ? 'br' : abr);
-    const resp = await this.client.getJson<TseResultadoArquivo>(path, { validadores: prev?.validadores, prioridade, ...extra });
+    // arquivo das disputas (Brasil/UF): fatia reservada do teto de pedidos por segundo
+    const resp = await this.client.getJson<TseResultadoArquivo>(path, { validadores: prev?.validadores, prioridade, reservado: true, ...extra });
     if (resp.status === 'nao-modificado') {
       if (prev) prev.em = this.now();
       return { mudou: false, status: 'nao-modificado' };
@@ -752,6 +864,10 @@ export class TseSource {
       return { mudou: false, status: 'antigo' };
     }
     this.limitarAoRelogio(r.resumo);
+    if (abr === c.principal && (!c.geracao || c.geracao.geradoEm !== r.geradoEm || r.geradoEm === null)) {
+      // I18: geração nova do arquivo principal (sem `dg/hg`, cada download conta como nova: nunca acusa parado)
+      c.geracao = { geradoEm: r.geradoEm, vistaEm: this.now() };
+    }
     const a = prev?.r.resumo;
     const b = r.resumo;
     const mudou =
@@ -798,15 +914,52 @@ export class TseSource {
     return c.marca;
   }
 
-  /** Frescor de cada corrida do 2º turno (marca + última leitura boa do arquivo principal), para o `/api/status`. */
-  frescor(): Partial<Record<RaceId, { marca: string; conferidoEm: number | null }>> {
-    const out: Partial<Record<RaceId, { marca: string; conferidoEm: number | null }>> = {};
+  /**
+   * Frescor de cada corrida do 2º turno, para o `/api/status`: marca, última leitura BOA do arquivo principal (200/304),
+   * a pausa por bloqueio do TSE em curso (`tseBloqueadoAte`, igual em todas: a pausa é global) e o arquivo nacional
+   * parado com os estados andando (`nacionalParadoDesde`, I18 — quem decide se o público vê é o servidor, pela chave
+   * 'aviso-nacional').
+   */
+  frescor(): Partial<Record<RaceId, FrescorCorrida>> {
+    const out: Partial<Record<RaceId, FrescorCorrida>> = {};
+    const b = this.client.bloqueio();
     for (const r of this.races) {
       if (r.turno !== 2) continue;
       const c = this.corrida(r.id);
-      out[r.id] = { marca: this.marca(r.id), conferidoEm: c.ultimoPollOk };
+      const f: FrescorCorrida = { marca: this.marca(r.id), conferidoEm: c.conferidoEm };
+      const parado = this.nacionalParadoDesde(c);
+      if (parado !== null) f.nacionalParadoDesde = parado;
+      if (b) f.tseBloqueadoAte = b.ate;
+      out[r.id] = f;
     }
     return out;
+  }
+
+  /**
+   * I18: o arquivo nacional (Brasil) de uma disputa de abrangência Brasil está na MESMA geração (`dg/hg`) há mais de
+   * 90 s — pelo relógio do TSE e pelo nosso — enquanto a soma das seções totalizadas das UFs e do exterior já passa a
+   * dele. Devolve desde quando o arquivo nacional não muda (a geração dele, relógio do TSE; sem ela, quando a vimos), ou
+   * null. Nunca soma votos: só compara contagens de seções para saber se o arquivo nacional ficou para trás.
+   */
+  private nacionalParadoDesde(c: Corrida): number | null {
+    if (c.race.abrangencia !== 'BR' || c.principal !== 'BR' || !c.geracao) return null;
+    const br = c.resultados.get('BR');
+    if (!br || br.r.race.id !== c.mapeada.id) return null;
+    const agora = this.now();
+    const { geradoEm, vistaEm } = c.geracao;
+    if (agora - vistaEm <= NACIONAL_PARADO_MS) return null;
+    if (geradoEm !== null && agora - geradoEm <= NACIONAL_PARADO_MS) return null;
+    let soma = 0;
+    let ufs = 0;
+    for (const abr of c.abrs) {
+      if (abr === 'BR') continue;
+      const e = c.resultados.get(abr);
+      if (!e || e.r.race.id !== br.r.race.id) continue;
+      soma += e.r.resumo.secoesTotalizadas;
+      ufs++;
+    }
+    if (!ufs || soma <= br.r.resumo.secoesTotalizadas) return null;
+    return geradoEm !== null ? Math.min(geradoEm, vistaEm) : vistaEm;
   }
 
   /** Histórico da corrida mapeada (criado sob demanda; restaura o salvo na 1ª vez). */
@@ -840,6 +993,8 @@ export class TseSource {
 
   /** Garante dados da corrida: espera o 1º download; depois só renova em segundo plano. */
   private async garantir(c: Corrida) {
+    // TSE limitando: ninguém pede nada até o fim da pausa (as consultas respondem com o último dado bom)
+    if (this.client.bloqueio()) return;
     // corrida do 2º turno: respeita o intervalo em vigor (com o backoff, se o TSE estiver falhando)
     const ttl = c.race.turno === 1 ? this.t1Ttl : Math.max(this.intervaloMs, this.esperaCicloMs);
     if (c.resultados.size === 0 && (c.ultimoPoll === null || this.now() - c.ultimoPoll > Math.min(ttl, 5_000))) {
@@ -1045,7 +1200,7 @@ export class TseSource {
       });
       return this.guardarSecao(chave, det ?? pendente(), det ? 15 * 60_000 : 30_000);
     } catch (err) {
-      this.log(`TSE seção ${uf}/${info.cod}/${z}/${s}: ${msgDe(err)}`);
+      this.logErro(`TSE seção ${uf}/${info.cod}/${z}/${s}`, err);
       return cache?.det ?? pendente();
     }
   }
@@ -1184,7 +1339,7 @@ export class TseSource {
         } else if (r.status === 'nao-modificado' && ent) ent.em = this.now();
         else if (r.status === 'ausente') this.cms.set(k, { porUf: ent?.porUf ?? null, validadores: {}, em: this.now() });
       } catch (err) {
-        this.log(`TSE: municípios (${ele}) indisponíveis: ${msgDe(err)}`);
+        this.logErro(`TSE: municípios (${ele}) indisponíveis`, err);
       }
     });
     if (ent?.porUf) {
@@ -1206,11 +1361,16 @@ export class TseSource {
         });
         if (r.status === 'ok') {
           const porMun = new Map<string, TseAcompanhamentoItem>();
-          for (const [cod, it] of map.acompanhamentoPorMunicipio(r.data.abr ?? [])) porMun.set(cod, compactarAb(it));
+          for (const [cod, it] of map.acompanhamentoPorMunicipio(r.data.abr ?? [])) {
+            const novo = compactarAb(it);
+            const antes = mu.ab?.porMun.get(cod);
+            if (antes && map.versaoAcompanhamento(antes) !== map.versaoAcompanhamento(novo)) this.esquecerAusentes(mu, cod);
+            porMun.set(cod, novo);
+          }
           mu.ab = { porMun, validadores: r.validadores, em: this.now() };
         } else if (r.status === 'nao-modificado' && mu.ab) mu.ab.em = this.now();
       } catch (err) {
-        this.log(`TSE ${c.race.id}/${uf}: acompanhamento indisponível: ${msgDe(err)}`);
+        this.logErro(`TSE ${c.race.id}/${uf}: acompanhamento indisponível`, err);
       }
     });
   }
@@ -1302,17 +1462,38 @@ export class TseSource {
           mu.ausentes.delete(cod);
           // histórico do município ("reveja a noite"): instante oficial da última totalização do arquivo
           if (res.race.id === c.mapeada.id) this.histDe(c).registrarMunicipio(uf, cod, res.resumo, res.resumo.ultimaAtualizacao ?? this.now());
-        } else if (r.status === 'ausente') mu.ausentes.set(cod, this.now());
+        } else if (r.status === 'ausente') this.marcarAusente(mu, cod);
         else if (prev) prev.em = this.now();
       } catch (err) {
-        this.log(`TSE ${c.race.id}/${uf}/${cod}: ${msgDe(err)}`);
+        this.logErro(`TSE ${c.race.id}/${uf}/${cod}`, err);
       }
     });
   }
 
+  /** Cache negativo do arquivo ainda não publicado: 60 s na 1ª vez, dobrando a cada novo 404 até 10 min. */
+  private marcarAusente(mu: MunUf, chave: string) {
+    const prev = mu.ausentes.get(chave);
+    const ttl = prev ? Math.min(AUSENTE_TTL_MAX_MS, prev.ttl * 2) : Math.min(this.munTtl, AUSENTE_TTL_MAX_MS);
+    mu.ausentes.set(chave, { em: this.now(), ttl });
+  }
+
   private ausenteRecente(mu: MunUf, chave: string) {
-    const t = mu.ausentes.get(chave);
-    return t !== undefined && this.now() - t < this.munTtl;
+    const a = mu.ausentes.get(chave);
+    return a !== undefined && this.now() - a.em < a.ttl;
+  }
+
+  /** O acompanhamento mostrou o município andando: o arquivo dele (e os das zonas) pode ter saído — zera o cache negativo. */
+  private esquecerAusentes(mu: MunUf, cod: string) {
+    if (!mu.ausentes.size) return;
+    mu.ausentes.delete(cod);
+    const pref = `${cod}|`;
+    for (const k of mu.ausentes.keys()) if (k.startsWith(pref)) mu.ausentes.delete(k);
+  }
+
+  /** Erro de consulta no log — menos os da pausa por bloqueio (o início da pausa já foi registrado uma vez). */
+  private logErro(contexto: string, err: unknown) {
+    if (err instanceof TseBloqueioError) return;
+    this.log(`${contexto}: ${msgDe(err)}`);
   }
 
   private async resumoMunicipio(c: Corrida, uf: UF, info: map.MunicipioInfo): Promise<{ resumo: Summary; race: Race }> {
@@ -1346,10 +1527,10 @@ export class TseSource {
               this.limitarAoRelogio(res.resumo);
               mu.zonas.set(k, { r: res, validadores: r.validadores, em: this.now() });
               mu.ausentes.delete(k);
-            } else if (r.status === 'ausente') mu.ausentes.set(k, this.now());
+            } else if (r.status === 'ausente') this.marcarAusente(mu, k);
             else if (e) e.em = this.now();
           } catch (err) {
-            this.log(`TSE ${c.race.id}/${uf}/${info.cod}/z${zona}: ${msgDe(err)}`);
+            this.logErro(`TSE ${c.race.id}/${uf}/${info.cod}/z${zona}`, err);
           }
         }),
       );
@@ -1379,7 +1560,7 @@ export class TseSource {
         else if (r.status === 'nao-modificado' && ent) ent.em = this.now();
         else if (r.status === 'ausente') this.css.set(k, { secoes: null, validadores: {}, em: this.now() });
       } catch (err) {
-        this.log(`TSE: seções de ${uf} indisponíveis: ${msgDe(err)}`);
+        this.logErro(`TSE: seções de ${uf} indisponíveis`, err);
       }
     });
     if (ent) {
@@ -1411,7 +1592,7 @@ export class TseSource {
         });
         this.ptCache.set(k, { v: r.status === 'ok' ? map.primeiroTurnoDoResultado(r.data, t1) : null, em: this.now() });
       } catch (err) {
-        this.log(`TSE 1º turno ${uf}/${cod}: ${msgDe(err)}`);
+        this.logErro(`TSE 1º turno ${uf}/${cod}`, err);
       }
     });
     if (ent) {
@@ -1487,8 +1668,12 @@ export class TseSource {
         falhasConsecutivas: c.falhas,
         erro: c.erro,
         ausentes: [...c.ausentes],
+        conferidoEm: c.conferidoEm,
+        nacionalParadoDesde: this.nacionalParadoDesde(c),
       });
     }
+    const bloqueio = this.client.bloqueio();
+    if (bloqueio) ok = false;
     let munCache = 0;
     for (const m of this.munUf.values()) munCache += m.mun.size + m.zonas.size;
     const rp = this.racePrioritaria;
@@ -1515,6 +1700,8 @@ export class TseSource {
       : null;
     return {
       ok,
+      bloqueio: bloqueio ? { ...bloqueio, motivoTexto: MOTIVO_BLOQUEIO_TEXTO[bloqueio.motivo] } : null,
+      bloqueadoAte: bloqueio?.ate ?? null,
       rodando: this.rodando,
       intervaloSeg: this.intervaloMs / 1000,
       esperaSeg: Math.round((this.esperaCicloMs || this.intervaloMs) / 100) / 10,
@@ -1648,6 +1835,7 @@ function ehNode() {
 function msgDe(err: unknown) {
   return err instanceof Error ? err.message : String(err);
 }
+
 
 /** O arquivo novo foi gerado ANTES do que já temos (`dg/hg`)? Sem data em algum dos dois: não dá para dizer (false). */
 function maisAntigo(novo: number | null, atual: number | null): boolean {

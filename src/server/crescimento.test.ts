@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AudienciaAdmin, DivulgacaoPublica } from '../shared/audiencia';
+import { AUDIENCIA, type AudienciaAdmin, type DivulgacaoPublica } from '../shared/audiencia';
 import type { LeadsAdmin } from '../shared/leads';
 import { CC_DIVULGACAO } from './crescimento';
 import { login, montar, type Montado } from './test-helpers';
@@ -106,7 +106,7 @@ describe('GET /api/divulgacao e painel', () => {
     await sinal(m, { g: 'inicio' });
     const a = (await (await m.app.request('/api/admin/audiencia', { headers: { cookie } })).json()) as AudienciaAdmin;
     expect(a.dias).toHaveLength(1);
-    expect(a.horas).toHaveLength(48);
+    expect(a.horas).toHaveLength(AUDIENCIA.horas); // 336 (14 dias) desde a leva 3
     const z = await m.app.request('/api/admin/audiencia', { method: 'POST', headers: { 'content-type': 'application/json', cookie }, body: JSON.stringify({ acao: 'zerar' }) });
     expect(((await z.json()) as AudienciaAdmin).dias).toEqual([]);
     // CSRF: POST de outro site é recusado pelo painel
@@ -182,12 +182,13 @@ describe('formulário "Quero anunciar" em produção: abre só com e-mail de pri
 });
 
 describe('"pessoas agora" público (conferência final)', () => {
-  it('usa a presença pelo sinal das páginas (atravessa a CDN): 30 redes com a página aberta → ~30 no /api/status', async () => {
+  it('usa a presença pelo sinal das páginas (atravessa a CDN): 520 redes com a página aberta → ~520 no /api/status', async () => {
     const m = await montar({ env: { TRUST_PROXY: '1' } });
-    for (let i = 0; i < 30; i++) await sinal(m, { p: 1, g: 'apuracao' }, { 'x-real-ip': `200.10.${i}.7` });
+    // leva 3 (I09): o número só aparece no site a partir de PISO_PESSOAS_PUBLICO (500)
+    for (let i = 0; i < 520; i++) await sinal(m, { p: 1, g: 'apuracao' }, { 'x-real-ip': `200.${10 + (i >> 8)}.${i & 255}.7` });
     m.crescimento.audiencia.amostrar();
     m.relogio.t += 1500; // o corpo do status é montado no máximo 1×/s
     const s = (await (await m.app.request('/api/status')).json()) as { pessoasAgora: number };
-    expect(s.pessoasAgora).toBeGreaterThanOrEqual(30);
+    expect(s.pessoasAgora).toBeGreaterThanOrEqual(500);
   });
 });

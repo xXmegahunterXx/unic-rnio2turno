@@ -1,11 +1,20 @@
 /**
  * Seção "Fonte de dados": Pré-eleição · Simulação · TSE ao vivo (comando `fonte`, sempre com confirmação),
  * configuração do feed oficial (comando `tse`) e teste de conexão (`admin.testarTse()`).
+ *
+ * Leva 3 (frente B):
+ *  - teto de pedidos por segundo ao TSE (`tse.limitePorSeg`, I03; padrão 40, 5–90);
+ *  - "Leituras do TSE agora" (GET /api/admin/tse/health a cada 5 s): pausa por bloqueio do TSE com "Retomar agora"
+ *    (comando `tse-retomar`, para falso positivo), ritmo de pedidos e o arquivo nacional parado (I18);
+ *  - "Alertas no celular" (I16): o que é vigiado e "Enviar alerta de teste" (comando `alerta-teste`). Desligados sem
+ *    TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID no servidor — o teste responde dizendo isso.
  */
 import { useState, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { FonteDados, TseConfig } from '@/shared/types';
-import { INICIO_APURACAO } from '@/shared/constants';
-import { fmtDataHora } from '@/shared/format';
+import { INICIO_APURACAO, TSE_LIMITE_POR_SEG } from '@/shared/constants';
+import { chavesNoite } from '@/shared/chaves-noite';
+import { fmtDataHora, fmtHora, fmtHoraSeg, fmtInt } from '@/shared/format';
 import { getClient } from '@/app/data/client';
 import { anonimizarRace } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
@@ -38,7 +47,7 @@ function impacto(f: FonteDados, intervalo: number, prioritario: number): ReactNo
   );
 }
 
-type CampoTse = Exclude<keyof TseConfig, 'intervaloSeg' | 'intervaloPrioritarioSeg'>;
+type CampoTse = Exclude<keyof TseConfig, 'intervaloSeg' | 'intervaloPrioritarioSeg' | 'limitePorSeg'>;
 const CAMPOS: { k: CampoTse; rotulo: string; dica?: string }[] = [
   { k: 'ciclo', rotulo: 'Ciclo', dica: 'ele2026' },
   { k: 'pleito', rotulo: 'Pleito (2º turno)', dica: '3221' },
@@ -79,6 +88,9 @@ export function SecaoFonte() {
   // resumo nacional de Presidente (arquivo prioritário): padrão 5 s; ausente em estados antigos
   const prioritario = valor('intervaloPrioritarioSeg') ?? 5;
   const prioritarioInvalido = !(prioritario >= 3 && prioritario <= 600);
+  // teto de pedidos por segundo ao TSE (I03): ausente em estados antigos = padrão
+  const limite = valor('limitePorSeg') ?? TSE_LIMITE_POR_SEG.padrao;
+  const limiteInvalido = !(Number.isInteger(limite) && limite >= TSE_LIMITE_POR_SEG.min && limite <= TSE_LIMITE_POR_SEG.max);
   const vazio = (['baseUrl', ...CAMPOS.map((c) => c.k)] as CampoTse[]).some((k) => !String(valor(k)).trim());
 
   async function salvar() {
@@ -232,6 +244,15 @@ export function SecaoFonte() {
                 dica="Estados e governadores. Entre 5 e 600 s; com o TSE falhando, o servidor espera mais (backoff)."
               />
             </div>
+            <Campo
+              rotulo="Teto de pedidos ao TSE"
+              inputMode="numeric"
+              sufixo="por s"
+              value={String(limite)}
+              onChange={(e) => setEd((x) => ({ ...x, limitePorSeg: Number(e.target.value.replace(/\D/g, '').slice(0, 2)) || 0 }))}
+              erro={limiteInvalido ? `Entre ${TSE_LIMITE_POR_SEG.min} e ${TSE_LIMITE_POR_SEG.max} pedidos por segundo.` : undefined}
+              dica={`Soma de tudo o que o servidor pede ao TSE, com uma fatia reservada para o placar nacional e os estados. Entre ${TSE_LIMITE_POR_SEG.min} e ${TSE_LIMITE_POR_SEG.max}; padrão ${TSE_LIMITE_POR_SEG.padrao}. Vale na hora.`}
+            />
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
               {alterados.length ? (
                 <Button variant="ghost" onClick={() => setEd({})} className="mr-auto">
@@ -241,7 +262,13 @@ export function SecaoFonte() {
               <Button variant="outline" icon="ao-vivo" onClick={testar} loading={testando}>
                 Testar conexão
               </Button>
-              <Button variant="primary" icon="check" onClick={salvar} disabled={!alterados.length || intervaloInvalido || prioritarioInvalido || vazio} loading={pendente('tse')}>
+              <Button
+                variant="primary"
+                icon="check"
+                onClick={salvar}
+                disabled={!alterados.length || intervaloInvalido || prioritarioInvalido || limiteInvalido || vazio}
+                loading={pendente('tse')}
+              >
                 Salvar
               </Button>
             </div>
@@ -286,10 +313,204 @@ export function SecaoFonte() {
           ) : null}
         </Painel>
       </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <LeiturasTse />
+        <AlertasCelular />
+      </div>
     </div>
   );
 }
 
+/** O que o painel lê de GET /api/admin/tse/health (TseHealth do servidor; só os campos usados aqui). */
+interface SaudeTsePainel {
+  ok: boolean;
+  rodando: boolean;
+  bloqueio?: { desde: number; ate: number; motivoTexto: string; arquivo: string; porRetryAfter: boolean } | null;
+  prioritario: { falhasConsecutivas: number; ultimaLeituraOk: number | null; erro: string | null } | null;
+  corridas: { race: string; falhasConsecutivas: number; erro: string | null; nacionalParadoDesde?: number | null }[];
+  http: { requisicoes: number; limitePorSeg?: number; ritmo?: { ultimos10s: number; picoSeg: number }; bloqueios?: number };
+}
+
+/** Saúde do adaptador do TSE (servidor). null = a fonte TSE ainda não foi criada neste processo. */
+function useSaudeTse() {
+  return useQuery<SaudeTsePainel | null>({
+    queryKey: ['admin', 'tse-saude'],
+    enabled: !__DEMO__,
+    queryFn: async () => {
+      const r = await fetch('/api/admin/tse/health', { credentials: 'same-origin', headers: { accept: 'application/json' } });
+      if (!r.ok) throw new Error(`Erro ${r.status}`);
+      return (await r.json()) as SaudeTsePainel | null;
+    },
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: false,
+    staleTime: 2_000,
+  });
+}
+
+function Numero({ rotulo, valor, sub }: { rotulo: string; valor: string; sub?: string }) {
+  return (
+    <div className="min-w-0 rounded-xl border border-line bg-surface-2/60 px-3 py-2.5">
+      <span className="block text-[11.5px] font-medium leading-tight text-fg-muted">{rotulo}</span>
+      <span className="num mt-1 block truncate font-display text-[19px] font-semibold leading-tight tracking-[-0.01em] text-fg">{valor}</span>
+      {sub ? <span className="mt-0.5 block text-[11.5px] leading-tight text-fg-subtle">{sub}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * "Leituras do TSE agora" (I03 e I18): pausa por bloqueio do TSE com "Retomar agora", ritmo dos pedidos contra o teto e
+ * o arquivo nacional parado. Só no servidor (no demo não há TSE).
+ */
+function LeiturasTse() {
+  const { snap, run, pendente, confirmar } = useAdmin();
+  const qc = useQueryClient();
+  const q = useSaudeTse();
+  const h = q.data ?? null;
+  const b = h?.bloqueio ?? null;
+  const pres = h?.corridas.find((c) => c.race === 'pres') ?? null;
+  const parado = pres?.nacionalParadoDesde ?? null;
+  const avisoNacional = chavesNoite(snap.state).avisoNacional;
+  const ritmo = h?.http.ritmo;
+  const teto = h?.http.limitePorSeg ?? snap.state.tse.limitePorSeg ?? TSE_LIMITE_POR_SEG.padrao;
+
+  async function retomar() {
+    const ok = await confirmar({
+      titulo: 'Retomar as leituras do TSE agora?',
+      descricao: b ? `Pausa prevista até ${fmtHoraSeg(b.ate)} (${b.motivoTexto}).` : undefined,
+      corpo: (
+        <>
+          Use só se tiver certeza de que foi engano (falso positivo). Se o TSE ainda estiver limitando, a pausa recomeça na
+          primeira leitura — e insistir pode prolongar o bloqueio do lado deles.
+        </>
+      ),
+      confirmar: 'Retomar agora',
+      perigo: true,
+    });
+    if (!ok) return;
+    const s = await run({ tipo: 'tse-retomar' }, { chave: 'tse-retomar', sucesso: 'Leituras do TSE retomadas' });
+    if (s) void qc.invalidateQueries({ queryKey: ['admin', 'tse-saude'] });
+  }
+
+  return (
+    <Painel
+      titulo="Leituras do TSE agora"
+      icone="ao-vivo"
+      subtitulo="O servidor respeita o teto de pedidos e para tudo se o TSE limitar as leituras (429 ou bloqueio da borda deles)."
+      acoes={
+        __DEMO__ ? null : b ? (
+          <Badge tone="alert" size="sm" dot caps>
+            Pausadas
+          </Badge>
+        ) : h?.rodando ? (
+          <Badge tone="ok" size="sm" dot caps>
+            Lendo
+          </Badge>
+        ) : h ? (
+          <Badge tone="neutral" size="sm" caps>
+            Parado
+          </Badge>
+        ) : null
+      }
+    >
+      {__DEMO__ ? (
+        <p className="text-[13px] leading-snug text-fg-muted">Na demonstração (site estático) não há servidor lendo o TSE.</p>
+      ) : q.isError ? (
+        <Callout tom="neutro">Não consegui ler a situação do TSE agora ({mensagemErro(q.error)}). Tento de novo em 5 s.</Callout>
+      ) : !h ? (
+        <p className="text-[13px] leading-snug text-fg-muted">
+          {q.isLoading
+            ? 'Carregando…'
+            : 'A fonte TSE ainda não foi usada desde que o servidor subiu. A situação aparece aqui quando ela estiver ligada (ou depois de “Testar conexão”).'}
+        </p>
+      ) : (
+        <div className="space-y-3.5">
+          {b ? (
+            <Callout tom="alerta" titulo="O TSE está limitando as leituras">
+              {b.motivoTexto} em <span className="break-all font-mono text-[11.5px] text-fg">{b.arquivo}</span>, às{' '}
+              <span className="num">{fmtHoraSeg(b.desde)}</span>. Nenhum pedido sai até{' '}
+              <span className="num font-semibold text-fg">{fmtHoraSeg(b.ate)}</span>
+              {b.porRetryAfter ? ' (prazo dado pelo TSE)' : ' (pausa padrão de 11 min)'}; depois o servidor tenta de novo sozinho. O site
+              mostra o último dado bom e avisa “O TSE está limitando leituras”.
+              <div className="mt-3">
+                <Button variant="outline" size="sm" icon="play" onClick={() => void retomar()} loading={pendente('tse-retomar')}>
+                  Retomar agora
+                </Button>
+              </div>
+            </Callout>
+          ) : (
+            <Callout tom={h.rodando ? 'ok' : 'neutro'} titulo={h.rodando ? 'Lendo normalmente' : 'Leitura parada'}>
+              {h.rodando
+                ? `Sem bloqueio do TSE.${h.prioritario?.ultimaLeituraOk ? ` Última leitura boa do placar nacional às ${fmtHoraSeg(h.prioritario.ultimaLeituraOk)}.` : ''}`
+                : 'A fonte em uso não é o TSE: o servidor não está pedindo nada a ele.'}
+            </Callout>
+          )}
+
+          <div className="grid grid-cols-3 gap-2">
+            <Numero rotulo="Pedidos em 10 s" valor={ritmo ? fmtInt(ritmo.ultimos10s) : '—'} sub={`teto ${fmtInt(teto * 10)}`} />
+            <Numero rotulo="Maior por segundo" valor={ritmo ? fmtInt(ritmo.picoSeg) : '—'} sub="no último minuto" />
+            <Numero rotulo="Bloqueios" valor={fmtInt(h.http.bloqueios ?? 0)} sub="desde a subida" />
+          </div>
+
+          <Callout tom={parado ? 'info' : 'neutro'} titulo="Arquivo nacional de Presidente">
+            {parado ? (
+              <>
+                Não muda desde <span className="num font-semibold text-fg">{fmtHora(parado)}</span> enquanto os estados andam.
+              </>
+            ) : (
+              'Em dia com os estados.'
+            )}{' '}
+            Aviso no site: <span className="font-medium text-fg">{avisoNacional === 'auto' ? 'automático' : 'desligado'}</span> (Controle →
+            Chaves da noite).
+          </Callout>
+        </div>
+      )}
+    </Painel>
+  );
+}
+
+/** "Alertas no celular" (I16): o que é vigiado e a mensagem de teste. */
+function AlertasCelular() {
+  const { run, pendente } = useAdmin();
+  return (
+    <Painel
+      titulo="Alertas no celular"
+      icone="alerta"
+      subtitulo="Mensagem no Telegram em menos de 1 minuto quando algo sai do normal, e “resolvido” quando volta."
+    >
+      <ul className="space-y-1.5 text-[13px] leading-snug text-fg-muted">
+        {[
+          'placar nacional sem dado novo há 3 min (ou sem leitura boa do TSE)',
+          'TSE limitando as leituras ou com erros seguidos',
+          'erros 5xx acima de 1% ou lentidão (p99 acima de 1 s) por 2 min',
+          'servidor reiniciado, arquivo nacional parado, troca automática atrasada e memória alta',
+        ].map((t) => (
+          <li key={t} className="flex items-start gap-2">
+            <Icon name="check" size={14} className="mt-0.5 shrink-0 text-fg-subtle" />
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-3 text-[12.5px] leading-snug text-fg-subtle">
+        Cada tipo sai no máximo uma vez a cada 10 min. Ficam desligados até o servidor ter{' '}
+        <span className="break-words font-mono text-[11.5px] text-fg-muted">TELEGRAM_BOT_TOKEN</span> e{' '}
+        <span className="break-words font-mono text-[11.5px] text-fg-muted">TELEGRAM_CHAT_ID</span> no .env; o vigia externo usa{' '}
+        <span className="break-words font-mono text-[11.5px] text-fg-muted">HC_PING_URL</span>.
+      </p>
+      <div className="mt-4 flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+        <Button
+          variant="outline"
+          icon="ao-vivo"
+          onClick={() => void run({ tipo: 'alerta-teste' }, { chave: 'alerta-teste', sucesso: 'Alerta de teste entregue ao Telegram' })}
+          loading={pendente('alerta-teste')}
+          disabled={__DEMO__}
+        >
+          Enviar alerta de teste
+        </Button>
+      </div>
+    </Painel>
+  );
+}
 /**
  * Interruptor "Mostrar nomes reais na simulação" (comando `nomes-reais`). Desligado por padrão: na fonte Simulação
  * os candidatos aparecem como "Candidato A/B" para que prints com números fictícios nunca circulem associados a

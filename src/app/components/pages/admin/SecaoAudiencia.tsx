@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AUDIENCIA,
   EXEMPLO_REDE,
   REDES,
   ROTULO_GRUPO,
@@ -157,7 +158,8 @@ function SecaoAudienciaServidor() {
       <Concentracao agora={d.agora.concentracao} pico={d.pico?.concentracao} />
 
       <Painel titulo="Últimas 48 horas" icone="relogio" subtitulo="Páginas vistas por hora e o pico de pessoas ao mesmo tempo em cada hora (Brasília)." className="mb-4 lg:mb-5">
-        <Barras horas={d.horas} />
+        {/* o servidor manda 14 dias (CSV "Por hora"); o gráfico continua nas últimas 48 h */}
+        <Barras horas={d.horas.slice(-AUDIENCIA.horasGrafico)} />
       </Painel>
 
       <div className="mb-4 grid grid-cols-1 gap-4 lg:mb-5 lg:gap-5 xl:grid-cols-2">

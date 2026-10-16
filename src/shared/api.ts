@@ -60,7 +60,9 @@ import type {
   AdminState,
   Aviso,
   ClockState,
+  FatorCarga,
   FonteDados,
+  ModoAvisoNacional,
   MunicipiosNacionalSnapshot,
   Patrocinio,
   LiveStatus,
@@ -123,7 +125,40 @@ export type AdminCommand =
    *    aceitos pela rota HTTP do admin.
    */
   | { tipo: 'troca-auto'; acao: 'ligar' | 'desligar' | 'agora' | 'executar' | 'concluir' }
-  | { tipo: 'troca-auto'; acao: 'adiar'; para: number | null };
+  | { tipo: 'troca-auto'; acao: 'adiar'; para: number | null }
+  // ---- Leva 3: "Chaves da noite" (gravadas em AdminState.noite; no servidor NÃO incrementam `versao`) ----------------
+  /** I37: freio de carga — o app consulta `fator`× mais espaçado; `leve` (ausente = false) para o mapa municipal e o
+   *  "desde o 1º turno" e espaça o chat. `{ fator: 1 }` solta o freio. Vai ao site como `LiveStatus.carga`. */
+  | { tipo: 'freio'; fator: FatorCarga; leve?: boolean }
+  /** I09: "N pessoas agora" no site (só a partir de PISO_PESSOAS_PUBLICO). */
+  | { tipo: 'contador-publico'; ligado: boolean }
+  /** I05: HTML guardado na borda (padrão desligado; liga só depois do ensaio). */
+  | { tipo: 'html-borda'; ligado: boolean }
+  /** I11: contar as impressões visíveis dos anúncios (desligado = 204 sem contar). */
+  | { tipo: 'medir-anuncios'; ligado: boolean }
+  /** I18: aviso do arquivo nacional do TSE parado. */
+  | { tipo: 'aviso-nacional'; modo: ModoAvisoNacional }
+  /** I22: texto do placar para bots de chat (desligado = só o endereço do site). */
+  | { tipo: 'texto-bots'; ligado: boolean }
+  /** I23: contagem anônima de lives (desligado = 204 sem contar). */
+  | { tipo: 'contar-lives'; ligado: boolean }
+  // ---- Leva 3: ações executadas pelo SERVIDOR (interceptadas em app.ts; o motor recusa: "indisponível nesta versão") ---
+  /** I03: retoma já as leituras do TSE pausadas por bloqueio (falso positivo). */
+  | { tipo: 'tse-retomar' }
+  /** I16: manda uma mensagem de teste aos alertas (Telegram), se configurados. */
+  | { tipo: 'alerta-teste' }
+  /** I13: pacotes "a partir de" da página /anuncie (até PRECOS_ANUNCIE_LIMITES.itens; [] = some, volta "sob consulta"). */
+  | { tipo: 'precos-anuncie'; itens: PrecoAnuncie[] };
+
+/** I13: um pacote de preço "a partir de" da página /anuncie (valor em centavos; exibido com o formatador de real). */
+export interface PrecoAnuncie {
+  nome: string;
+  aPartirDeCentavos: number;
+  detalhe?: string;
+}
+
+/** Limites de 'precos-anuncie' (validação no servidor). */
+export const PRECOS_ANUNCIE_LIMITES = { itens: 6, nome: 60, detalhe: 140, centavosMin: 100, centavosMax: 100_000_000 } as const;
 
 export interface AdminSnapshot {
   state: AdminState;

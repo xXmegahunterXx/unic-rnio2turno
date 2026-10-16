@@ -358,8 +358,8 @@ export type ModoAvisoNacional = 'auto' | 'off';
 
 /**
  * "Chaves da noite" (painel → Controle e `deploy/painel.sh`): interruptores operacionais da noite, gravados no
- * AdminState — valem para todas as instâncias (admin.json) e sobrevivem a reinícios. Mudar uma chave NÃO incrementa
- * `AdminState.versao` (não invalida o cache dos visitantes nem as ETags). Padrões em `CHAVES_NOITE_PADRAO`
+ * AdminState — valem para todas as instâncias (admin.json) e sobrevivem a reinícios. No servidor, mudar uma chave NÃO
+ * incrementa `AdminState.versao` (não invalida o cache dos visitantes nem as ETags; no demo incrementa). Padrões em `CHAVES_NOITE_PADRAO`
  * (src/shared/chaves-noite.ts); leia sempre por `chavesNoite(state)` (estado antigo sem o campo = padrões).
  */
 export interface ChavesNoite {

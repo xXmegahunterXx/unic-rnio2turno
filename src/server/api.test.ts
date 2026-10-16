@@ -7,6 +7,10 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { PublicMeta } from '../shared/api';
 import type { LiveStatus, MunicipioSnapshot, NationalSnapshot, SecaoDetalhe, UfSnapshot, ZonaSnapshot } from '../shared/types';
 import { pctTotalizadas } from '../shared/calc';
+import { PISO_PESSOAS_PUBLICO } from '../shared/constants';
+import type { AdminSnapshot } from '../shared/api';
+import { CC, CC_BORDA } from './app';
+import { CABECALHO_BORDA } from './http-cache';
 import { comando, login, montar, type Montado } from './test-helpers';
 
 let m: Montado;
@@ -246,5 +250,124 @@ describe('simulação comandada pelo admin', () => {
     expect(s.metrics.clientesAtivosEstimados).toBeGreaterThanOrEqual(1);
     expect(s.metrics.log.some((l) => /Admin: comando "relogio"/.test(l.msg))).toBe(true);
     expect(s.metrics.log.some((l) => /motor: Modelo construído/.test(l.msg))).toBe(true);
+  });
+});
+
+describe('leva 3: cabeçalho da borda da Cloudflare (I04)', () => {
+  it('status, meta e snapshots: Cache-Control do navegador igual ao de antes + Cloudflare-CDN-Cache-Control com stale-if-error', async () => {
+    const st = await get('/api/status');
+    expect(st.headers.get('cache-control')).toBe(CC.status);
+    expect(st.headers.get(CABECALHO_BORDA)).toBe('max-age=1, stale-while-revalidate=2, stale-if-error=600');
+    const meta = await get('/api/meta');
+    expect(meta.headers.get(CABECALHO_BORDA)).toBe(CC_BORDA.meta);
+    // 1º turno (resultado final) e 2º turno no motor
+    const t1 = await get('/api/apuracao/pres-t1/uf/sp');
+    expect(t1.headers.get('cache-control')).toBe(CC.t1);
+    expect(t1.headers.get(CABECALHO_BORDA)).toBe(CC_BORDA.t1);
+    const br = await get('/api/apuracao/pres/br');
+    expect(br.headers.get('cache-control')).toBe(CC.snapshot);
+    expect(br.headers.get(CABECALHO_BORDA)).toBe(CC_BORDA.snapshot);
+    // o 304 leva os mesmos cabeçalhos de cache (a borda renova a cópia com eles)
+    const r304 = await get('/api/apuracao/pres/br', { 'if-none-match': br.headers.get('etag')! });
+    expect(r304.status).toBe(304);
+    expect(r304.headers.get(CABECALHO_BORDA)).toBe(CC_BORDA.snapshot);
+    // toda resposta pública ao vivo tem stale-if-error na borda; nada privado ganha o cabeçalho
+    for (const v of Object.values(CC_BORDA)) expect(v).toMatch(/stale-if-error=\d+/);
+    const cookie = await login(m);
+    const adm = await m.app.request('/api/admin/state', { headers: { cookie } });
+    expect(adm.headers.get('cache-control')).toBe('no-store');
+    expect(adm.headers.get(CABECALHO_BORDA)).toBeNull();
+    expect((await get('/api/qualquer')).headers.get(CABECALHO_BORDA)).toBeNull();
+  });
+
+  it('CDN_CC=0: sem o cabeçalho da borda (formato anterior), o resto igual', async () => {
+    const antes = process.env.CDN_CC;
+    process.env.CDN_CC = '0';
+    try {
+      const m0 = await montar();
+      for (const p of ['/api/status', '/api/meta', '/api/apuracao/pres/br', '/api/apuracao/pres-t1/br', '/api/og/teste.png']) {
+        const r = await m0.app.request(p);
+        expect(r.status, p).toBe(200);
+        expect(r.headers.get(CABECALHO_BORDA), p).toBeNull();
+      }
+      expect((await m0.app.request('/api/status')).headers.get('cache-control')).toBe(CC.status);
+      expect(m0.log.recentes(50).some((l) => /CDN_CC=0/.test(l.msg))).toBe(true);
+    } finally {
+      if (antes === undefined) delete process.env.CDN_CC;
+      else process.env.CDN_CC = antes;
+    }
+  });
+
+  it('API fora dos resultados de busca (X-Robots-Tag: noindex), salvo as imagens de prévia (I06)', async () => {
+    for (const p of ['/api/status', '/api/meta', '/api/apuracao/pres-t1/br', '/api/qualquer', '/api/saude-noite'])
+      expect((await get(p)).headers.get('x-robots-tag'), p).toBe('noindex');
+    expect((await get('/api/og/teste.png')).headers.get('x-robots-tag')).toBeNull();
+  });
+});
+
+describe('leva 3: chaves da noite no status público', () => {
+  const status = async (mm: Montado) => (await (await mm.app.request('/api/status')).json()) as LiveStatus;
+
+  it('freio (I37): "carga" no status no mesmo segundo, sem mudar a versão; fator 1 tira', async () => {
+    const mm = await montar();
+    const cookie = await login(mm);
+    const v0 = (await status(mm)).versao;
+    expect((await status(mm)).carga).toBeUndefined();
+    expect((await comando(mm, cookie, { tipo: 'freio', fator: 3, leve: true })).status).toBe(200);
+    const s = await status(mm); // mesmo segundo do relógio: a chave entra na chave do cache do status
+    expect(s.carga).toEqual({ fator: 3, leve: true });
+    expect(s.versao).toBe(v0);
+    await comando(mm, cookie, { tipo: 'freio', fator: 2 });
+    expect((await status(mm)).carga).toEqual({ fator: 2 });
+    await comando(mm, cookie, { tipo: 'freio', fator: 1 });
+    expect((await status(mm)).carga).toBeUndefined();
+  });
+
+  it('"pessoas agora" (I09): só a partir do piso e com a chave ligada; o painel vê sempre', async () => {
+    const mm = await montar();
+    const cookie = await login(mm);
+    expect((await status(mm)).pessoasAgora).toBeUndefined(); // 1 pessoa < piso
+    for (let i = 0; i < PISO_PESSOAS_PUBLICO + 300; i++) mm.metricas.clientes.registrar(`198.51.${i >> 8}.${i & 255}`);
+    mm.relogio.t += 6_000; // a estimativa é recalculada a cada 5 s
+    const s = await status(mm);
+    expect(s.pessoasAgora).toBeGreaterThanOrEqual(PISO_PESSOAS_PUBLICO);
+    expect((await comando(mm, cookie, { tipo: 'contador-publico', ligado: false })).status).toBe(200);
+    expect('pessoasAgora' in (await status(mm))).toBe(false);
+    const adm = (await (await mm.app.request('/api/admin/state', { headers: { cookie } })).json()) as AdminSnapshot;
+    expect(adm.status.pessoasAgora).toBeGreaterThanOrEqual(PISO_PESSOAS_PUBLICO);
+    await comando(mm, cookie, { tipo: 'contador-publico', ligado: true });
+    expect((await status(mm)).pessoasAgora).toBeGreaterThanOrEqual(PISO_PESSOAS_PUBLICO);
+  });
+
+  it('aviso do arquivo nacional (I18): com a chave em "off", o status público não leva nacionalParadoDesde', async () => {
+    const mm = await montar();
+    const cookie = await login(mm);
+    const fr = { pres: { marca: 'abc', conferidoEm: mm.relogio.t, nacionalParadoDesde: mm.relogio.t - 120_000 }, 'gov-df': { marca: 'x', conferidoEm: null } };
+    mm.dados.frescor = () => structuredClone(fr);
+    expect((await status(mm)).frescor?.pres?.nacionalParadoDesde).toBe(fr.pres.nacionalParadoDesde);
+    expect((await comando(mm, cookie, { tipo: 'aviso-nacional', modo: 'off' })).status).toBe(200);
+    const s = await status(mm);
+    expect(s.frescor?.pres).toEqual({ marca: 'abc', conferidoEm: mm.relogio.t });
+    expect(s.frescor?.['gov-df']).toEqual(fr['gov-df']);
+    await comando(mm, cookie, { tipo: 'aviso-nacional', modo: 'auto' });
+    expect((await status(mm)).frescor?.pres?.nacionalParadoDesde).toBe(fr.pres.nacionalParadoDesde);
+  });
+
+  it('medir anúncios (I11) desligado: o evento de impressão responde 204 sem ler nem contar', async () => {
+    const mm = await montar();
+    const cookie = await login(mm);
+    const ev = () =>
+      mm.app.request('/api/anuncio/evento', {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain;charset=UTF-8', origin: 'http://localhost', 'sec-fetch-site': 'same-origin' },
+        body: 'isto não é JSON',
+      });
+    expect((await ev()).status).toBe(400); // ligado (padrão): lê e valida
+    expect((await comando(mm, cookie, { tipo: 'medir-anuncios', ligado: false })).status).toBe(200);
+    const r = await ev();
+    expect(r.status).toBe(204);
+    expect(r.headers.get('cache-control')).toBe('no-store');
+    await comando(mm, cookie, { tipo: 'medir-anuncios', ligado: true });
+    expect((await ev()).status).toBe(400);
   });
 });

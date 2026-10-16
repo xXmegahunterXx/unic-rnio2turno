@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { router } from './router';
 import { preCarregarDadosDaRota } from './data/hooks';
+import { atrasoNovaTentativa } from './data/carga';
 import { recarregarUmaVez } from './lib/recarga';
 import './styles.css';
 
@@ -15,7 +16,13 @@ const definitivo = (e: unknown) => {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: (n, e) => n < 2 && !definitivo(e), refetchOnWindowFocus: true, staleTime: 1000 },
+    queries: {
+      retry: (n, e) => n < 2 && !definitivo(e),
+      // I05: nova tentativa com variação aleatória (1 s, 2 s… ±25%): aparelhos que falharam juntos não voltam juntos
+      retryDelay: (n) => atrasoNovaTentativa(n, Math.random()),
+      refetchOnWindowFocus: true,
+      staleTime: 1000,
+    },
   },
 });
 

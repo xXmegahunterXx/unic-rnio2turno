@@ -289,8 +289,10 @@ export const AUDIENCIA = {
   folgaS: 60,
   /** dias guardados no arquivo */
   maxDias: 400,
-  /** horas no detalhe */
-  horas: 48,
+  /** horas no detalhe (guardadas e entregues ao painel): 14 dias desde a leva 3 (eram 48) — a noite fica até 08/11 */
+  horas: 336,
+  /** horas no gráfico do painel (o CSV leva as `horas` inteiras) */
+  horasGrafico: 48,
   /** origens distintas guardadas por dia (o resto vai para "outros") */
   maxOrigensDia: 300,
 } as const;
@@ -360,10 +362,46 @@ export interface AudienciaAdmin {
   pico: PicoAudiencia | null;
   /** mais recente por último */
   dias: DiaAudiencia[];
-  /** últimas 48 h, da mais antiga para a mais recente (horas sem nada = zeros) */
+  /** últimas `AUDIENCIA.horas` horas (336 = 14 dias), da mais antiga para a mais recente (horas sem nada = zeros) */
   horas: HoraAudiencia[];
   /** o que /anuncie mostraria agora (null = sem dados) */
   publico: AudienciaPublica | null;
+  // ---- I14 (leva 3), só no painel; opcionais (servidor anterior não manda). Só contagens, nunca dado de pessoa. ----
+  /** curva minuto a minuto: últimas 24 h (≤ 1.440 minutos), do mais antigo ao mais recente; só minutos medidos */
+  curvaMinuto?: MinutoAudiencia[];
+  /** páginas vistas por pessoas por UF (`cf-region-code` com `cf-ipcountry` = BR), por dia; chave = sigla ou 'ND' */
+  porUf?: ContagemDiaAudiencia[];
+  /** páginas vistas por pessoas por país (`cf-ipcountry`, ISO 3166-1 alfa-2), por dia; chave = 'BR', 'PT'… ou 'ND' */
+  porPais?: ContagemDiaAudiencia[];
+  /** páginas vistas por pessoas por aparelho, por dia; chave = `Aparelho` */
+  porAparelho?: ContagemDiaAudiencia[];
+  /** horas de tela: pessoas presentes × 10 s por amostra, somadas por hora (mesma janela de `horas`) e por dia */
+  horasTela?: TelaAudiencia;
+}
+
+/** Aparelho (I14): `Sec-CH-UA-Mobile`; sem ele, o User-Agent; sem os dois, 'nd' (não informado). Nunca o modelo. */
+export const APARELHOS = ['celular', 'computador', 'nd'] as const;
+export type Aparelho = (typeof APARELHOS)[number];
+
+/** Um minuto da curva da noite (I14). */
+export interface MinutoAudiencia {
+  /** epoch ms do início do minuto */
+  minuto: number;
+  /** máximo de pessoas ao mesmo tempo (sinal) no minuto */
+  pessoas: number;
+}
+
+/** Contagens agregadas de um dia (I14): chave → páginas vistas por pessoas (sem widgets e /live). */
+export interface ContagemDiaAudiencia {
+  /** "2026-10-25" (Brasília) */
+  dia: string;
+  n: Record<string, number>;
+}
+
+/** Horas de tela (I14). */
+export interface TelaAudiencia {
+  porHora: { hora: number; horas: number }[];
+  porDia: { dia: string; horas: number }[];
 }
 
 /** "2026-10-25" em Brasília (UTC−3, sem horário de verão). */

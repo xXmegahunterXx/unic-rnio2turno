@@ -13,7 +13,7 @@ import type { FetchLike } from '../client';
 export const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'oficial');
 export const BASE = 'https://resultados.tse.jus.br/oficial';
 
-export type Rota = unknown | ((path: string) => unknown) | { status: number; body?: string };
+export type Rota = unknown | ((path: string) => unknown) | { status: number; body?: string; headers?: Record<string, string> };
 
 export interface FakeFetch extends FetchLike {
   chamadas: string[];
@@ -55,8 +55,8 @@ export function criarFakeFetch(): FakeFetch {
       let r = rotas.get(rel);
       if (typeof r === 'function') r = (r as (p: string) => unknown)(rel);
       if (r && typeof r === 'object' && 'status' in (r as object) && typeof (r as { status: unknown }).status === 'number' && !('carg' in (r as object))) {
-        const { status, body } = r as { status: number; body?: string };
-        return new Response(body ?? '', { status });
+        const { status, body, headers } = r as { status: number; body?: string; headers?: Record<string, string> };
+        return new Response(body ?? '', { status, headers });
       }
       if (r instanceof Uint8Array) {
         corpo = r;

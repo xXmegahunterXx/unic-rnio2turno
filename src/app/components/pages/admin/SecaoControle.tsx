@@ -1,6 +1,7 @@
 /**
- * Seção "Controle": linha do tempo, placar nacional compacto, mini mapa, últimos eventos e a pré-visualização
- * da visão do eleitor (iframe). No celular, também o transporte completo (a barra inferior é compacta).
+ * Seção "Controle": linha do tempo, "Chaves da noite" (freio de carga e os interruptores da leva 3, ChavesDaNoite.tsx),
+ * placar nacional compacto, mini mapa, últimos eventos e a pré-visualização da visão do eleitor (iframe). No celular,
+ * também o transporte completo (a barra inferior é compacta).
  */
 import { useState } from 'react';
 import type { UF } from '@/shared/types';
@@ -14,6 +15,7 @@ import { Skeleton } from '@/app/ui';
 import { useAdmin, useNacionalAdmin } from './dados';
 import { CabecalhoSecao, Callout, NotaNomesOcultos, Painel, Rotulo } from './kit';
 import { LinhaDoTempo } from './LinhaDoTempo';
+import { ChavesDaNoite } from './ChavesDaNoite';
 import { PreviaCelular, rotuloPagina } from './Previa';
 import { EstadoAoVivo, GradeVelocidade, ProgressoPres, RelogioApuracao, SeletorVelocidade, Transporte } from './relogio';
 import { FONTE_ROTULO } from './rotulos';
@@ -71,6 +73,8 @@ export function SecaoControle() {
           </div>
         }
       />
+
+      <ChavesDaNoite className="mt-4 lg:mt-5" />
 
       <div className="mt-4 grid grid-cols-1 gap-4 lg:mt-5 lg:gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4 lg:space-y-5">

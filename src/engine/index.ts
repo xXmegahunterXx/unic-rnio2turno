@@ -24,6 +24,12 @@
  *     `status().anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`), com o link já com UTM;
  *     o comando legado 'patrocinio' vira o anúncio master 'patrocinio' e `status().patrocinio` é derivado dele.
  *
+ * Leva 3 ("Chaves da noite", src/shared/chaves-noite.ts): 'freio' | 'contador-publico' | 'html-borda' |
+ *   'medir-anuncios' | 'aviso-nacional' | 'texto-bots' | 'contar-lives' só gravam a escolha em `state.noite` (no servidor
+ *   sem incrementar a versão: não invalidam o cache dos visitantes); `status().carga` = o freio, só quando puxado. Quem age
+ *   é o servidor/app. 'tse-retomar' | 'alerta-teste' | 'precos-anuncie' são do servidor (ele os intercepta): aqui são
+ *   recusados com CommandError ("indisponível nesta versão"), sem mudar nada. `tse.limitePorSeg` (5–90, padrão 40).
+ *
  * Fonte 'tse': o controller só guarda a escolha e `state.tse`; o servidor intercepta as rotas de apuração.
  * Nas fontes 'pre'/'tse' o controller responde o 2º turno em 0% ("aguardando") e o 1º turno (-t1) normal.
  * Mudança de cenário/preset reconstrói o modelo de forma síncrona (~0,5 s) mantendo o simNow.

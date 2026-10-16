@@ -5,9 +5,12 @@
  *  - a TseConfig acompanha o AdminState (comando 'tse'), inclusive o intervalo do arquivo prioritário (resumo
  *    nacional de Presidente, `intervaloPrioritarioSeg`);
  *  - `marca`/`frescor` expõem a marca dos números de cada corrida (ETag e `/api/status`);
- *  - a série/eventos do feed são persistidos em STATE_DIR/tse-historico.json (sobrevivem a reinícios).
+ *  - a série/eventos do feed são persistidos em STATE_DIR/tse-historico.json (sobrevivem a reinícios);
+ *  - leva 3: o teto de pedidos por segundo ao TSE vem da TseConfig (`limitePorSeg`, I03); `retomar()` encerra a pausa
+ *    por bloqueio do TSE (comando `tse-retomar`); o `frescor` só leva `nacionalParadoDesde` (I18) com a chave
+ *    'aviso-nacional' em 'auto' (lida a cada chamada por `avisoNacional`, sem reiniciar nada).
  */
-import type { Race, TseConfig, UF } from '../shared/types';
+import type { FrescorCorrida, ModoAvisoNacional, Race, TseConfig, UF } from '../shared/types';
 import { TseSource, type FetchLike, type TseHealth } from '../tse';
 import type { HistoricoSerializado } from '../tse';
 import type { JsonStore } from './state-store';
@@ -23,6 +26,18 @@ export interface TseManagerOptions {
   now?: () => number;
   /** Fábrica alternativa (testes). */
   criar?: (config: TseConfig, historico: HistoricoSerializado[] | undefined) => TseSource;
+  /**
+   * Chave 'aviso-nacional' do painel (I18), lida a cada `frescor()`: 'off' tira `nacionalParadoDesde` do status público
+   * (o detector segue rodando para o painel e os alertas). Ausente = 'auto'.
+   */
+  avisoNacional?: () => ModoAvisoNacional;
+}
+
+/** Resultado do "Retomar agora" (comando `tse-retomar`). */
+export interface RetomadaTse {
+  /** havia uma pausa e ela foi encerrada */
+  retomou: boolean;
+  detalhe: string;
 }
 
 export class TseManager {
@@ -96,8 +111,23 @@ export class TseManager {
   }
 
   /** Frescor das corridas do 2º turno (`LiveStatus.frescor`); null sem a fonte criada. */
-  frescor(): Partial<Record<string, { marca: string; conferidoEm: number | null }>> | null {
-    return this.src ? this.src.frescor() : null;
+  frescor(): Partial<Record<string, FrescorCorrida>> | null {
+    if (!this.src) return null;
+    const fr = this.src.frescor();
+    if ((this.opts.avisoNacional?.() ?? 'auto') === 'off') {
+      for (const f of Object.values(fr)) if (f) delete f.nacionalParadoDesde;
+    }
+    return fr;
+  }
+
+  /**
+   * "Retomar agora" (comando `tse-retomar` do painel): encerra a pausa por bloqueio do TSE antes da hora — para um falso
+   * positivo. Sem pausa em curso, não faz nada. Nunca lança.
+   */
+  retomar(): RetomadaTse {
+    const b = this.src?.retomar() ?? null;
+    if (!b) return { retomou: false, detalhe: 'As leituras do TSE não estavam pausadas.' };
+    return { retomou: true, detalhe: 'Leituras do TSE retomadas. Se o TSE voltar a limitar, a pausa recomeça sozinha.' };
   }
 
   private agendarHistorico() {

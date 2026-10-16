@@ -335,8 +335,62 @@ redes_do_proxy() {
   printf '%s' "${out% }"
 }
 
+# ---- limites de recursos do app na VPS compartilhada (I19, leva 3) ------------------------------------------------
+# O Sintonia nunca toma a máquina inteira do outro projeto (a Lynx):
+#   cpus        núcleos − 1 (mínimo 1): sempre sobra 1 núcleo para o resto da máquina;
+#   cpu_shares  512 (metade do peso padrão, 1024): com a CPU disputada, os outros contêineres têm prioridade;
+#   pids_limit  512: um vazamento de processos/threads não derruba a máquina (o app usa ~15).
+# No .env: LIMITE_RECURSOS=0 desliga; APP_CPUS, APP_CPU_SHARES e APP_PIDS trocam os valores. Vão para o
+# docker-compose.vps.yml (regerado pelo install.sh, dominio.sh e update.sh); deploy/limites.sh aplica na hora, sem reiniciar.
+limites_ligados() { [[ "$(cfg LIMITE_RECURSOS 1)" != 0 ]]; }
+nucleos() { nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1; }
+limite_cpus() {
+  local n v
+  n="$(nucleos)"
+  v="$(cfg APP_CPUS)"
+  if [[ $v =~ ^[0-9]+(\.[0-9]+)?$ ]] && awk -v v="$v" -v n="$n" 'BEGIN { exit !(v >= 0.5 && v <= n) }'; then
+    printf '%s' "$v"
+  else
+    ((n > 1)) && n=$((n - 1))
+    printf '%s' "$n"
+  fi
+}
+limite_shares() {
+  local v
+  v="$(cfg APP_CPU_SHARES 512)"
+  [[ $v =~ ^[0-9]+$ ]] && ((v >= 2 && v <= 262144)) || v=512
+  printf '%s' "$v"
+}
+limite_pids() {
+  local v
+  v="$(cfg APP_PIDS 512)"
+  [[ $v =~ ^[0-9]+$ ]] && ((v >= 128)) || v=512
+  printf '%s' "$v"
+}
+# o Docker desta máquina aplica este limite? (kernel sem CFS quota ou sem o controlador de pids: com o limite no
+# compose, o contêiner nem subiria). Sem acesso ao Docker, supõe que sim.
+suporta_limite() { # cpu | peso | pids
+  local campo
+  case $1 in
+    cpu) campo=CPUCfsQuota ;;
+    peso) campo=CPUShares ;;
+    *) campo=PidsLimit ;;
+  esac
+  local v
+  v="$(docker info --format "{{.$campo}}" 2>/dev/null)" || return 0
+  [[ $v != false ]]
+}
+# frase curta para os scripts ("CPU 3 de 4 núcleos · peso 512 · até 512 processos")
+resumo_limites() {
+  if limites_ligados; then
+    printf 'CPU %s de %s núcleos · peso %s · até %s processos' "$(limite_cpus)" "$(nucleos)" "$(limite_shares)" "$(limite_pids)"
+  else
+    printf 'sem limites (LIMITE_RECURSOS=0)'
+  fi
+}
+
 # Gera docker-compose.vps.yml (modo compartilhado; o .env aponta para ele em COMPOSE_FILE). Fonte: o .env
-# (PORTA_LOCAL, PORT, IP_PONTE, CADDY_PROPRIO, REDES_PROXY, PROXY_DOCKER, HOSTS_PROXY).
+# (PORTA_LOCAL, PORT, IP_PONTE, CADDY_PROPRIO, REDES_PROXY, PROXY_DOCKER, HOSTS_PROXY, LIMITE_RECURSOS, APP_CPUS…).
 gerar_compose_vps() {
   local arq="$RAIZ/docker-compose.vps.yml" tmp porta interna redes r i=0 tipo hosts ponte
   porta="$(cfg PORTA_LOCAL 8787)"
@@ -353,10 +407,22 @@ gerar_compose_vps() {
   [[ $hosts =~ ^[a-z0-9.,-]+$ ]] || hosts=''
   tmp="$(mktemp "$arq.XXXXXX")"
   {
-    echo "# GERADO por deploy/install.sh e deploy/dominio.sh (VPS compartilhada). Não edite à mão: mude o .env e"
-    echo "# rode sudo $RAIZ/deploy/dominio.sh (ou o install.sh) de novo."
+    echo "# GERADO por deploy/install.sh, dominio.sh, update.sh e limites.sh (VPS compartilhada). Não edite à mão:"
+    echo "# mude o .env e rode sudo $RAIZ/deploy/limites.sh aplicar (ou o dominio.sh/install.sh) de novo."
     echo "services:"
     echo "  app:"
+    if limites_ligados; then
+      echo "    # limites (I19): nunca a máquina inteira do outro projeto — $(resumo_limites). LIMITE_RECURSOS=0 no .env desliga"
+      if suporta_limite peso; then echo "    cpu_shares: $(limite_shares)"; fi
+      if suporta_limite cpu || suporta_limite pids; then
+        # em deploy.resources (o docker-compose.yml já põe a memória ali; "cpus:" solto no serviço conflitaria)
+        echo "    deploy:"
+        echo "      resources:"
+        echo "        limits:"
+        if suporta_limite cpu; then echo "          cpus: \"$(limite_cpus)\""; fi
+        if suporta_limite pids; then echo "          pids: $(limite_pids)"; fi
+      fi
+    fi
     echo "    # só nesta máquina (127.0.0.1): o servidor web que já existe encaminha o domínio para cá"
     echo "    ports:"
     echo "      - \"127.0.0.1:$porta:$interna\""
@@ -403,6 +469,43 @@ gerar_compose_vps() {
   } >"$tmp"
   chmod 644 "$tmp"
   mv "$tmp" "$arq"
+}
+
+# ---- borda (Cloudflare, I02) ------------------------------------------------------------------------------------
+# borda_estado <domínio> → linhas "Borda: guardando (HIT…)" ou "Borda: NÃO guardando" e o estado do HTML na borda.
+# Pede o /api/status 2× pelo endereço PÚBLICO (passa pela Cloudflare). Volta 1 quando a borda não guarda.
+# SINTONIA_BORDA_TESTE=http://127.0.0.1:PORTA (só teste): conecta ali mandando o Host do domínio.
+borda_estado() {
+  local dom=$1 h hh cst csth base=https://$1 extra=()
+  if [[ -n ${SINTONIA_BORDA_TESTE:-} ]]; then
+    base=$SINTONIA_BORDA_TESTE
+    extra=(-H "Host: $dom")
+  fi
+  _cab() { curl -sS -o /dev/null -D - --max-time 6 -H 'Accept-Encoding: gzip' ${extra[@]+"${extra[@]}"} "$@" 2>/dev/null | tr -d '\r' || true; }
+  _cab "$base/api/status" >/dev/null
+  sleep 0.4
+  h="$(_cab "$base/api/status")"
+  cst="$(sed -n 's/^cf-cache-status: *//Ip' <<<"$h" | head -n 1 | tr '[:lower:]' '[:upper:]')"
+  if [[ -z $h ]]; then
+    aviso "   Borda: SEM RESPOSTA de https://$dom/api/status (DNS ou rede desta máquina?)"
+    return 1
+  elif ! grep -qi '^cf-ray:' <<<"$h"; then
+    echo "   Borda: sem Cloudflare (o domínio não passa pelo proxy: nuvem cinza, ou outro CDN)"
+    return 1
+  elif [[ $cst =~ ^(HIT|UPDATING|EXPIRED|REVALIDATED|STALE)$ ]]; then
+    echo "   Borda: guardando ($cst; age $(sed -n 's/^age: *//Ip' <<<"$h" | head -n 1 | grep . || echo 0)) — o /api/status sai da cópia da Cloudflare"
+  else
+    aviso "   Borda: NÃO guardando (cf-cache-status ${cst:-ausente}) — todo pedido chega à VPS. Regras de cache desligadas? Confira: node deploy/cloudflare.mjs --conferir (DEPLOY §5)"
+    return 1
+  fi
+  hh="$(_cab -H 'Accept: text/html' "$base/")"
+  csth="$(sed -n 's/^cf-cache-status: *//Ip' <<<"$hh" | head -n 1 | tr '[:lower:]' '[:upper:]')"
+  if [[ $csth =~ ^(HIT|MISS|UPDATING|EXPIRED|REVALIDATED|STALE)$ ]]; then
+    echo "   páginas (HTML): guardadas na borda ($csth) — chave \"html-borda\" LIGADA (só do congelamento de 24/10 em diante)"
+  elif [[ -n $csth ]]; then
+    echo "   páginas (HTML): não guardadas ($csth) — chave \"html-borda\" desligada"
+  fi
+  return 0
 }
 
 # /healthz direto na porta local (modo compartilhado)

@@ -2,10 +2,12 @@
  * Validação de entrada: parâmetros de rota e comandos do admin (zod). Erros viram 400 `{ erro }`.
  */
 import { z } from 'zod';
-import type { AdminCommand } from '../shared/api';
+import { PRECOS_ANUNCIE_LIMITES, type AdminCommand } from '../shared/api';
 import { validaAjusteImagem, validaAnuncio, validaContatoAnuncie, validaLogoAnuncio } from '../shared/anuncios';
+import { ehFatorCarga, MODOS_AVISO_NACIONAL } from '../shared/chaves-noite';
+import { TSE_LIMITE_POR_SEG } from '../shared/constants';
 import { validaContatosPublicos } from '../shared/contatos';
-import { UFS, type UF } from '../shared/types';
+import { UFS, type FatorCarga, type ModoAvisoNacional, type UF } from '../shared/types';
 import { TROCA_AUTO_MAX, TROCA_AUTO_MIN } from '../engine/state';
 
 export class ErroValidacao extends Error {
@@ -114,6 +116,8 @@ const tse = z
     pleito: z.string().trim().regex(/^\d{1,6}$/, 'código de pleito inválido'),
     intervaloSeg: finito.min(5).max(600),
     intervaloPrioritarioSeg: finito.min(3).max(600),
+    // I03 (leva 3): teto de pedidos por segundo ao TSE
+    limitePorSeg: finito.int('limitePorSeg: use um número inteiro').min(TSE_LIMITE_POR_SEG.min).max(TSE_LIMITE_POR_SEG.max),
   })
   .partial()
   .strict();
@@ -224,6 +228,19 @@ const ajusteLogo = z
   })
   .transform((v) => (v === null || v === undefined ? (v as null | undefined) : validaAjusteImagem(v)));
 
+/** I13: um pacote "a partir de" da /anuncie (nome e detalhe aparados; valor em centavos, inteiro). */
+const L_PRECO = PRECOS_ANUNCIE_LIMITES;
+const precoAnuncie = z
+  .object({
+    nome: z.string().trim().min(1, 'nome vazio').max(L_PRECO.nome, `nome: máximo de ${L_PRECO.nome} caracteres`),
+    aPartirDeCentavos: z.number().int('valor em centavos (inteiro)').min(L_PRECO.centavosMin).max(L_PRECO.centavosMax),
+    detalhe: z.string().trim().max(L_PRECO.detalhe, `detalhe: máximo de ${L_PRECO.detalhe} caracteres`).optional(),
+  })
+  .strict();
+
+/** Chave liga/desliga das "Chaves da noite" (leva 3). */
+const chave = <T extends string>(tipo: T) => z.object({ tipo: z.literal(tipo), ligado: z.boolean() }).strict();
+
 export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('relogio'), acao: z.enum(['iniciar', 'pausar', 'retomar', 'reiniciar']) }).strict(),
   z.object({ tipo: z.literal('velocidade'), velocidade: finito.gt(0).max(10_000) }).strict(),
@@ -265,6 +282,34 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
       tipo: z.literal('troca-auto'),
       acao: z.enum(['ligar', 'desligar', 'agora', 'adiar']),
       para: z.number().int().min(TROCA_AUTO_MIN).max(TROCA_AUTO_MAX).nullable().optional(),
+    })
+    .strict(),
+  // ---- leva 3: "Chaves da noite" (gravadas pelo motor em AdminState.noite) ------------------------------------------
+  z
+    .object({
+      tipo: z.literal('freio'),
+      fator: z.custom<FatorCarga>((v) => ehFatorCarga(v), 'use 1, 2, 3 ou 5'),
+      leve: z.boolean().optional(),
+    })
+    .strict(),
+  chave('contador-publico'),
+  chave('html-borda'),
+  chave('medir-anuncios'),
+  chave('texto-bots'),
+  chave('contar-lives'),
+  z
+    .object({
+      tipo: z.literal('aviso-nacional'),
+      modo: z.custom<ModoAvisoNacional>((v) => (MODOS_AVISO_NACIONAL as readonly unknown[]).includes(v), 'use "auto" ou "off"'),
+    })
+    .strict(),
+  // ---- leva 3: ações do servidor (até a frente dona ligar em app.ts, o motor responde "indisponível nesta versão") ----
+  z.object({ tipo: z.literal('tse-retomar') }).strict(),
+  z.object({ tipo: z.literal('alerta-teste') }).strict(),
+  z
+    .object({
+      tipo: z.literal('precos-anuncie'),
+      itens: z.array(precoAnuncie).max(L_PRECO.itens, `até ${L_PRECO.itens} pacotes`),
     })
     .strict(),
 ]);

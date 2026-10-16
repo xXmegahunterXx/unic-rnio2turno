@@ -11,6 +11,7 @@ import { useEffect, useId, useSyncExternalStore } from 'react';
 import type { ChatPublico, MensagemChat, ReacaoId, RespostaEnvio } from '@/shared/chat';
 import { REACOES } from '@/shared/chat';
 import { contarNovas, gerarToken, intervaloConsulta, juntarMensagens, type Interesse } from './nucleo';
+import { fatorChatVigente } from '@/app/data/carga';
 
 export interface EstadoSala {
   /** última resposta do servidor (null antes da 1ª) */
@@ -120,7 +121,7 @@ function agendar(imediato = false) {
   if (estado.indisponivel) return;
   const i = interesseAtual();
   if (!i || document.visibilityState === 'hidden') return;
-  const ms = imediato ? 0 : intervaloConsulta(estado.pub, i, falhas);
+  const ms = imediato ? 0 : intervaloConsulta(estado.pub, i, falhas) * fatorChatVigente(); // freio leve (I37): 2× mais espaçado
   timer = window.setTimeout(() => void consultar(), ms);
 }
 

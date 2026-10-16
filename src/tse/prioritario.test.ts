@@ -39,7 +39,8 @@ const contar = (f: FakeFetch, path: string, desde = 0) => f.chamadas.slice(desde
 
 function criar(f: FakeFetch, config: Partial<TseConfig> = {}) {
   const logs: string[] = [];
-  const client = new TseClient({ baseUrl: BASE, fetch: f, sleep: async () => undefined, concorrencia: 8 });
+  // semTeto: estes testes medem o ritmo dos laços, não o teto de pedidos por segundo (que tem testes próprios)
+  const client = new TseClient({ baseUrl: BASE, fetch: f, sleep: async () => undefined, concorrencia: 8, semTeto: true });
   const src = new TseSource({ config: { ...CONFIG, ...config }, races, client, log: (m) => logs.push(m), aquecerMunicipios: false });
   return { src, logs, client };
 }
@@ -166,7 +167,7 @@ describe('laço prioritário (resumo Brasil de Presidente)', () => {
       if (/\/sp8\d{4}-c0001/.test(u)) await new Promise((r) => setTimeout(r, 200));
       return f(u, init);
     }) as typeof f;
-    const client = new TseClient({ baseUrl: BASE, fetch: lento, sleep: async () => undefined, concorrencia: 8 });
+    const client = new TseClient({ baseUrl: BASE, fetch: lento, sleep: async () => undefined, concorrencia: 8, semTeto: true });
     const src = new TseSource({ config: CONFIG, races, client, log: () => undefined, workersMunicipios: 2, concorrencia: 8 });
     const mun = (desde: number) => f.chamadas.slice(desde).filter((u) => /\/sp8\d{4}-c0001/.test(u)).length;
     src.start();

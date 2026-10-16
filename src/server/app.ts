@@ -16,7 +16,9 @@ import type { AdminCommand, AdminSnapshot, MetricasServidor, ServidorInfo } from
 import { FORMATOS_COM_CLIQUE, FORMATOS_COM_IMPRESSAO, urlComUtm, type FormatoAnuncio, type MetricasAnunciosResposta } from '../shared/anuncios';
 import { NOITE_ELEICAO, type RelatorioAnunciante, type SituacaoRelatorio } from '../shared/relatorio';
 import { contatosEfetivos } from '../shared/contatos';
-import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
+import { chavesNoite } from '../shared/chaves-noite';
+import { PISO_PESSOAS_PUBLICO } from '../shared/constants';
+import type { AdminMetrics, ChavesNoite, FrescorCorrida, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
 import type { LoadedDataset, Controller } from '../engine/api';
@@ -45,8 +47,10 @@ import { motivoSemSimulacao, type ServerConfig } from './config';
 import { Dados, type InstanteNormalizado, type NivelApuracao } from './dados';
 import { PacotesFotos } from './fotos';
 import {
+  CABECALHO_BORDA,
   CacheRespostas,
   type CorpoPronto,
+  cabecalhosCache,
   casaEtag,
   corpoCodificado,
   etagFraco,
@@ -64,6 +68,7 @@ import { ServicoOg } from './og-servico';
 import { DadosEstaticos } from './dados-estaticos';
 import { anonimizarRace } from '../shared/anon';
 import { Estaticos, pareceArquivo } from './static';
+import { VigiaNoite, avaliarSaude, unirSaude, type SaudeNoite } from './saude-noite';
 import type { TseManager } from './tse';
 import type { TseHealth } from '../tse';
 import {
@@ -108,18 +113,44 @@ export interface AppDeps {
   relatorios?: boolean;
   /** STATE_DIR/relatorios.json (só os hashes dos tokens). Ausente = criado em `config.stateDir`. */
   relatoriosStore?: JsonStore;
+  /**
+   * Cabeçalho da borda da Cloudflare (`Cloudflare-CDN-Cache-Control`, I04). Ausente = `CDN_CC` do ambiente (`0` desliga:
+   * só o `Cache-Control`, como antes da leva 3 — e a chave 'html-borda' passa a não ter efeito). Exige reinício.
+   */
+  cdnCc?: boolean;
+  /** Alertas da noite (I16, frente B). Também ligáveis depois da criação por `ligarAlertas` (ver AlertasApp). */
+  alertas?: AlertasApp;
+}
+
+/**
+ * Alertas da noite (I16, frente B: src/server/alertas.ts, iniciados em main.ts). Opcionais: sem eles, `/api/saude-noite`
+ * usa só a avaliação do servidor HTTP (saude-noite.ts) e o comando 'alerta-teste' responde 400.
+ */
+export interface AlertasApp {
+  /** Avaliação própria dos alertas, somada à do servidor HTTP no `/api/saude-noite` ('atencao' de qualquer um vence). */
+  saude?: () => SaudeNoite | null | undefined;
+  /** Manda a mensagem de teste (Telegram). `detalhe` vai ao log do painel (sem dado de visitante). */
+  teste?: () => Promise<{ ok: boolean; detalhe: string }> | { ok: boolean; detalhe: string };
 }
 
 /** Permissions-Policy das páginas: nada de câmera, microfone, localização, pagamentos, USB nem "tópicos" de anúncio. */
 export const PERMISSOES = 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()';
 
-/** Cache-Control por tipo de rota (ARCHITECTURE.md §6). */
+/**
+ * Cache-Control por tipo de rota (ARCHITECTURE.md §6) — o que o NAVEGADOR lê (o `s-maxage` vale para a borda só se o
+ * cabeçalho da borda faltar; ver CC_BORDA).
+ */
 export const CC = {
   status: 'public, max-age=0, s-maxage=1',
   meta: 'public, max-age=60, s-maxage=300',
   snapshot: 'public, max-age=0, s-maxage=2, stale-while-revalidate=10',
   /** fonte TSE ao vivo: a CDN guarda 1 s e serve cópia vencida por no máximo mais 1 s (ou 60 s se a origem falhar) */
   tseVivo: 'public, max-age=0, s-maxage=1, stale-while-revalidate=1, stale-if-error=60',
+  /**
+   * fonte TSE abaixo da UF (município, zona, seção) e o mapa nacional por município: esses números chegam pela fila de
+   * municípios (cache de 60 s na origem); a borda guarda 10 s. Com `CDN_CC=0`, volta a `tseVivo` (como antes).
+   */
+  tseDetalhe: 'public, max-age=0, s-maxage=10, stale-while-revalidate=10, stale-if-error=60',
   /** placar nacional com `?d=<marca atual>`: o conteúdo daquela marca não muda (dado novo = marca nova = outra URL) */
   tseMarca: 'public, max-age=0, s-maxage=60, stale-while-revalidate=60',
   /** 1º turno: resultado final, não muda */
@@ -143,9 +174,54 @@ export const CC = {
   privado: 'no-store',
 } as const;
 
+/** Tipos de rota com cabeçalho próprio da borda (CC_BORDA). */
+export type TipoCacheBorda = 'status' | 'meta' | 'snapshot' | 'tseVivo' | 'tseDetalhe' | 'tseMarca' | 't1' | 'historico' | 'historicoSemVersao' | 'html';
+
+/**
+ * `Cloudflare-CDN-Cache-Control` por tipo de rota (I04, leva 3; ver http-cache.ts › CABECALHO_BORDA): o que a BORDA da
+ * Cloudflare guarda, com `stale-if-error` — se a origem cair por alguns minutos, a borda continua entregando o último
+ * placar (o app mostra a faixa "Conexão instável" quando o relógio do status para). O navegador continua com `CC`.
+ * `CDN_CC=0` tira este cabeçalho (exige reinício, ~10 s).
+ */
+export const CC_BORDA: Record<TipoCacheBorda, string> = {
+  status: 'max-age=1, stale-while-revalidate=2, stale-if-error=600',
+  meta: 'max-age=300, stale-if-error=86400',
+  snapshot: 'max-age=2, stale-while-revalidate=10, stale-if-error=600',
+  /** Brasil e UF ao vivo na fonte TSE */
+  tseVivo: 'max-age=1, stale-while-revalidate=1, stale-if-error=600',
+  /** município, zona, seção e mapa nacional por município na fonte TSE */
+  tseDetalhe: 'max-age=10, stale-while-revalidate=10, stale-if-error=600',
+  /** placar nacional com `?d=<marca atual>`: o conteúdo daquela URL não muda mais */
+  tseMarca: 'max-age=300, stale-if-error=600',
+  t1: 'max-age=300, stale-while-revalidate=600, stale-if-error=86400',
+  historico: 'max-age=3600, stale-while-revalidate=600, stale-if-error=86400',
+  historicoSemVersao: 'max-age=30, stale-while-revalidate=60, stale-if-error=600',
+  /**
+   * I05: HTML das páginas SÓ com a chave 'html-borda' ligada (padrão desligada; liga no congelamento de 24/10, depois
+   * do ensaio). Nunca em /admin, /embed, /duelo, /relatorio, 404 ou erro. Desligar: em até 15 s a borda revalida.
+   */
+  html: 'max-age=15, stale-while-revalidate=15, stale-if-error=86400',
+};
+
 type Ctx = Context<{ Bindings: HttpBindings }>;
 
-export const ROBOTS_TXT = ['User-agent: *', 'Allow: /api/og/', 'Disallow: /api/', 'Disallow: /admin', 'Disallow: /relatorio', ''].join('\n');
+/**
+ * robots.txt (I06): as rotas de DADOS que as páginas de apuração pedem ao abrir (status, meta, apuração) ficam
+ * liberadas — o robô de busca precisa delas para renderizar a página —, mas a API em si não é indexada
+ * (`X-Robots-Tag: noindex` em toda /api/*, exceto as imagens /api/og/). `Allow` antes do `Disallow`: os robôs que
+ * leem a primeira regra que casa (e não a mais longa) também liberam.
+ */
+export const ROBOTS_TXT = [
+  'User-agent: *',
+  'Allow: /api/og/',
+  'Allow: /api/status',
+  'Allow: /api/meta',
+  'Allow: /api/apuracao/',
+  'Disallow: /api/',
+  'Disallow: /admin',
+  'Disallow: /relatorio',
+  '',
+].join('\n');
 
 /** robots.txt com o endereço do sitemap (absoluto, como o protocolo exige). */
 export const robotsTxt = (origem: string) => `${ROBOTS_TXT}\nSitemap: ${origem}/sitemap.xml\n`;
@@ -228,6 +304,10 @@ export function cspPagina(template: string, embed: boolean, origemPublica?: stri
     `frame-ancestors ${embed ? '*' : "'self'"}`,
   ].join('; ');
 }
+
+/** Páginas cujo HTML nunca vai para a borda (I05), além dos widgets /embed/* e das respostas que não são 200. */
+export const htmlForaDaBorda = (p: string): boolean =>
+  p === '/admin' || p.startsWith('/admin/') || p.startsWith('/duelo/') || p === '/relatorio' || p.startsWith('/relatorio/') || p.startsWith('/embed/');
 
 /** Rotas "quentes" (polling, estáticos e os eventos/cliques dos anúncios): log por amostragem. */
 const ehQuente = (p: string) =>
@@ -352,6 +432,29 @@ export function createApp(deps: AppDeps) {
   // (o código de um cenário não vai para o log: é a hipótese de quem compartilhou)
   const servicoOg = new ServicoOg({ now, aoFalhar: (chave, err) => log.erro(`Falha ao gerar a imagem OG ${chave.startsWith('cen|') ? 'cen|…' : chave}`, err) });
 
+  // ---- leva 3: borda da Cloudflare (I04) e "Chaves da noite" -------------------------------------------
+  /** `Cloudflare-CDN-Cache-Control` ligado (CDN_CC ≠ 0)? */
+  const cdnCc = deps.cdnCc ?? process.env.CDN_CC !== '0';
+  if (!cdnCc) log.aviso('Borda: cabeçalho Cloudflare-CDN-Cache-Control DESLIGADO (CDN_CC=0) — só o Cache-Control, como antes da leva 3; a chave "html-borda" não tem efeito');
+  /** Cabeçalhos de cache de um tipo de rota (com `CDN_CC=0`, o formato anterior: município etc. voltam a `tseVivo`). */
+  const cacheDe = (tipo: TipoCacheBorda): Record<string, string> =>
+    cdnCc ? cabecalhosCache(CC[tipo], CC_BORDA[tipo], true) : { 'cache-control': CC[tipo === 'tseDetalhe' ? 'tseVivo' : tipo] };
+  /**
+   * Chaves da noite (AdminState.noite; padrões em CHAVES_NOITE_PADRAO). `controller.state()` copia o estado inteiro: a
+   * leitura fica guardada por 1 s (relógio real) e é renovada na hora a cada comando do painel. Outra instância que
+   * adote o estado pelo admin.json vê a mudança em até 1 s.
+   */
+  let noiteMemo: { em: number; v: ChavesNoite } | null = null;
+  const noite = (): ChavesNoite => {
+    const t = performance.now();
+    if (!noiteMemo || t - noiteMemo.em >= 1000) noiteMemo = { em: t, v: chavesNoite(controller.state()) };
+    return noiteMemo.v;
+  };
+  /** Saúde da noite (/api/saude-noite): memória mínima + os alertas da frente B, se ligados. */
+  const vigia = new VigiaNoite();
+  let alertas: AlertasApp | null = deps.alertas ?? null;
+  let ultimaSaude: SaudeNoite['noite'] = 'ok';
+
   // ---- utilidades --------------------------------------------------------------------------------
   /**
    * IP do cliente (só para limites e contagem; nunca vai para o log). Com TRUST_PROXY: CF-Connecting-IP → Fly-Client-IP
@@ -448,11 +551,14 @@ export function createApp(deps: AppDeps) {
     const st = dados.status();
     const passado = inst.t !== undefined;
     const etag = etagFraco(`v${st.versao}`, passado ? dados.baldeHistorico(race, inst) : dados.balde(race, inst.nivel), hashCurto(rota));
-    let cc: string = r.turno === 1 ? CC.t1 : CC.snapshot;
-    if (passado && inst.consolidado) cc = parseVersaoUrl(c.req.query('v')) === st.versao ? CC.historico : CC.historicoSemVersao;
-    else if (r.turno === 2 && dados.fonteDe(race) === 'tse') cc = !passado && inst.nivel === 'br' && dados.marcaConfere(race, c.req.query('d')) ? CC.tseMarca : CC.tseVivo;
+    let tipo: TipoCacheBorda = r.turno === 1 ? 't1' : 'snapshot';
+    if (passado && inst.consolidado) tipo = parseVersaoUrl(c.req.query('v')) === st.versao ? 'historico' : 'historicoSemVersao';
+    else if (r.turno === 2 && dados.fonteDe(race) === 'tse') {
+      if (!passado && inst.nivel === 'br' && dados.marcaConfere(race, c.req.query('d'))) tipo = 'tseMarca';
+      else tipo = inst.nivel === 'br' || inst.nivel === 'uf' ? 'tseVivo' : 'tseDetalhe';
+    }
     const headers = {
-      'cache-control': cc,
+      ...cacheDe(tipo),
       etag,
       'access-control-allow-origin': '*',
     };
@@ -513,7 +619,8 @@ export function createApp(deps: AppDeps) {
   /** Fração registrada no log de acesso (ver LOG_AMOSTRA): 0 = nunca, 1 = sempre. */
   const amostraDe = (path: string, status: number, ms: number): number => {
     if (status >= 500 || status === 429 || ms >= 1000) return 1;
-    if (path === '/healthz' || path === '/readyz') return 0;
+    // monitores (a cada minuto): sem linha por pedido — a saúde da noite registra só as mudanças de estado
+    if (path === '/healthz' || path === '/readyz' || path === '/api/saude-noite') return 0;
     if (path.startsWith('/api/admin/')) return 1;
     if (ehQuente(path) || (pareceArquivo(path) && !path.startsWith('/api/'))) return config.logAmostra;
     if (!path.startsWith('/api/') || path.startsWith('/api/og/')) return config.logAmostraPaginas;
@@ -548,6 +655,9 @@ export function createApp(deps: AppDeps) {
     if (!h.has('referrer-policy')) h.set('referrer-policy', 'strict-origin-when-cross-origin');
     h.set('x-request-id', id);
     h.set('x-sintonia-versao', config.build.commit);
+    // I06: a API pode ser lida pelos robôs (as páginas precisam dela para renderizar), mas não entra nos resultados —
+    // salvo as imagens de prévia
+    if (api && !path.startsWith('/api/og/') && !h.has('x-robots-tag')) h.set('x-robots-tag', 'noindex');
     if (config.producao) h.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
     // SIGTERM: a resposta fecha a conexão keep-alive (o cliente reconecta em outra instância/no processo novo)
     if (encerrando) h.set('connection', 'close');
@@ -630,7 +740,8 @@ export function createApp(deps: AppDeps) {
       'cache-control': 'public, max-age=3600, s-maxage=86400',
     }),
   );
-  app.get('/robots.txt', (c) => c.text(robotsTxt(origemDe(c)), 200, { 'cache-control': 'public, max-age=3600, s-maxage=86400' }));
+  // 1 h também na borda (antes, 1 dia): uma mudança de regra chega aos robôs no mesmo dia sem depender de purga
+  app.get('/robots.txt', (c) => c.text(robotsTxt(origemDe(c)), 200, { 'cache-control': 'public, max-age=3600, s-maxage=3600' }));
 
   // ---- API pública -------------------------------------------------------------------------------
   // anúncios: imagens por hash e configs (links de destino) — atualizados quando a versão do admin muda
@@ -755,31 +866,101 @@ export function createApp(deps: AppDeps) {
   };
 
   /** LiveStatus público: + pessoas agora (estimativa arredondada), anúncios com imagens por URL e fase 'encerrada' no TSE. */
+  /**
+   * "N pessoas agora" PÚBLICO (I09): o maior entre o que chega à origem e a presença pelo sinal das páginas (com a
+   * Cloudflare na frente, só o sinal atravessa a CDN). Omitido (`undefined`) abaixo de PISO_PESSOAS_PUBLICO ou com a
+   * chave 'contador-publico' desligada — número pequeno não diz nada e chama atenção para si. O painel vê sempre.
+   */
+  const pessoasPublico = (n: ChavesNoite): number | undefined => {
+    if (!n.contadorPublico) return undefined;
+    const v = Math.max(metricas.pessoasAgora(), crescimento?.audiencia.presencaAgora ?? 0);
+    return v >= PISO_PESSOAS_PUBLICO ? v : undefined;
+  };
+
+  /** Frescor do status público: sem `nacionalParadoDesde` com a chave 'aviso-nacional' em 'off' (I18). */
+  const frescorPublico = (fr: LiveStatus['frescor'] | undefined, n: ChavesNoite): LiveStatus['frescor'] | undefined => {
+    if (!fr || n.avisoNacional !== 'off') return fr;
+    let mudou = false;
+    const out: Partial<Record<string, FrescorCorrida>> = {};
+    for (const [k, f] of Object.entries(fr)) {
+      if (f && f.nacionalParadoDesde !== undefined) {
+        const resto: FrescorCorrida = { ...f };
+        delete resto.nacionalParadoDesde;
+        out[k] = resto;
+        mudou = true;
+      } else out[k] = f;
+    }
+    return mudou ? out : fr;
+  };
+
+  /** LiveStatus público: + pessoas agora (piso e chave), anúncios com imagens por URL e fase 'encerrada' no TSE. */
   const statusPublico = (c: Ctx): LiveStatus => {
     const st = dados.status();
-    // "N pessoas agora": o maior entre o que chega à origem e a presença pelo sinal das páginas — com a Cloudflare na
-    // frente, só o sinal atravessa a CDN (o da origem ficava em ~1/3 do real e caía pela metade quando o intervalo subia)
-    const pessoasAgora = Math.max(metricas.pessoasAgora(), crescimento?.audiencia.presencaAgora ?? 0);
-    const out: LiveStatus = { ...st, pessoasAgora, ...anunciosParaSite(st, origemDe(c)) };
+    const n = noite();
+    const pessoasAgora = pessoasPublico(n);
+    const out: LiveStatus = { ...st, ...(pessoasAgora !== undefined ? { pessoasAgora } : {}), ...anunciosParaSite(st, origemDe(c)) };
     if (st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado()) out.fase = 'encerrada';
     // troca automática esperando o TSE responder: aviso discreto (só se o admin não publicou um aviso próprio)
     if (!st.aviso && agendador.avisoPublico()) out.aviso = { nivel: 'info', texto: AVISO_AGUARDANDO_TSE };
-    const frescor = dados.frescor(); // fonte 'tse': marca dos números + última leitura boa (o app reconsulta na hora)
+    const frescor = frescorPublico(dados.frescor(), n); // fonte 'tse': marca dos números + última leitura boa (o app reconsulta na hora)
     if (frescor) out.frescor = frescor;
     return out;
   };
 
   // Com anúncios o corpo passa de 1 KB e sai comprimido (brotli): montado e comprimido no máximo 1×/s por origem e por
-  // estado (versão, fase, aviso, marca dos números) — sem CDN (contingência), o status é ~40% do tráfego. O relógio
-  // (wallNow) e "pessoas agora" ficam até 1 s defasados, como já ficam na CDN (s-maxage=1).
+  // estado (versão, fase, aviso, frescor, chaves da noite) — sem CDN (contingência), o status é ~40% do tráfego. O
+  // relógio (wallNow) e "pessoas agora" ficam até 1 s defasados, como já ficam na CDN (s-maxage=1). As chaves da noite
+  // não mudam a versão (não invalidam o cache dos visitantes): entram na chave para valer já no mesmo segundo.
   app.get('/api/status', async (c) => {
     const st = dados.status();
     const fr = dados.frescor();
-    const chave = `status|${origemDe(c)}|${st.versao}|${st.fase}|${st.aviso?.texto ?? ''}|${agendador.avisoPublico() ? 1 : 0}|${tseEncerrado() ? 1 : 0}|${fr ? Object.values(fr).map((f) => f?.marca).join(',') : ''}|e${metricasAnuncios.geracaoEsgotados}`;
+    vigia.observarMarca(fr?.pres?.marca, now());
+    const n = noite();
+    const chaveNoite = `${n.contadorPublico ? 1 : 0}${n.avisoNacional}${st.carga ? `${st.carga.fator}${st.carga.leve ? 'l' : ''}` : ''}`;
+    const chave = `status|${origemDe(c)}|${st.versao}|${st.fase}|${st.aviso?.texto ?? ''}|${agendador.avisoPublico() ? 1 : 0}|${tseEncerrado() ? 1 : 0}|${fr ? hashCurto(JSON.stringify(fr)) : ''}|e${metricasAnuncios.geracaoEsgotados}|${chaveNoite}`;
     const { p, hit } = respostas.obter(chave, () => ({ bruto: Buffer.from(JSON.stringify(statusPublico(c))) }));
     metricas.cache(hit);
-    return enviar(c, await p, { 'cache-control': CC.status, 'access-control-allow-origin': '*' });
+    return enviar(c, await p, { ...cacheDe('status'), 'access-control-allow-origin': '*' });
   });
+
+  /**
+   * Saúde da noite (I16; saude-noite.ts): `{ noite: 'ok' | 'atencao', motivo? }` para o monitor externo (palavra-chave
+   * `"noite":"ok"`). Sempre 200, nunca guardado (no-store; na Cloudflare, regra de bypass). Mudança de estado vai ao log.
+   */
+  const saudeNoite = (): SaudeNoite => {
+    const st = dados.status();
+    const fr = dados.frescor();
+    const t = now();
+    vigia.observarMarca(fr?.pres?.marca, t);
+    const tse = deps.tse.health();
+    const fase = st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado() ? 'encerrada' : st.fase;
+    const proprio = avaliarSaude({
+      agora: t,
+      encerrando,
+      naoPronto: prontidao(),
+      fonte: st.fonte,
+      fase,
+      tse,
+      frescor: fr,
+      presParadoDesde: vigia.paradoDesde,
+      trocaAuto: agendador.info(),
+      minutosRuins: vigia.minutosRuins,
+    });
+    let deles: SaudeNoite | null | undefined = null;
+    try {
+      deles = alertas?.saude?.();
+    } catch (e) {
+      log.erro('Saúde da noite: falha na avaliação dos alertas', e);
+    }
+    const r = unirSaude(proprio, deles);
+    if (r.noite !== ultimaSaude) {
+      ultimaSaude = r.noite;
+      if (r.noite === 'atencao') log.aviso(`Saúde da noite: ATENÇÃO — ${r.motivo ?? 'sem motivo informado'}`);
+      else log.info('Saúde da noite: ok de novo');
+    }
+    return r;
+  };
+  app.get('/api/saude-noite', (c) => c.json(saudeNoite(), 200, { 'cache-control': CC.privado }));
 
   app.get('/api/patrocinio/logo', (c) => {
     const img = dados.status().patrocinio?.imagem;
@@ -884,6 +1065,9 @@ export function createApp(deps: AppDeps) {
     '/api/anuncio/evento',
     bodyLimit({ maxSize: 2048, onError: (c) => c.json({ erro: 'Corpo grande demais.' }, 413, { 'cache-control': CC.privado }) }),
     async (c) => {
+      // I11 (chave 'medir-anuncios' desligada no painel): 204 sem ler nem contar — alivia a origem no pico; os anúncios
+      // seguem no ar e os cliques continuam contados
+      if (!noite().medirAnuncios) return c.body(null, 204, { 'cache-control': CC.privado });
       if (!origemPermitida(c)) throw new ErroHttp(403, 'Origem não permitida.');
       const ct = c.req.header('content-type') ?? '';
       if (ct && !/^(application\/json|text\/plain)\b/i.test(ct)) throw new ErroHttp(415, 'Envie { id, formato } em JSON.');
@@ -959,7 +1143,7 @@ export function createApp(deps: AppDeps) {
 
   app.get('/api/meta', async (c) => {
     const etag = etagFraco('meta', deps.dataset.meta.versao, hashCurto(deps.dataset.meta.geradoEm));
-    const headers = { 'cache-control': CC.meta, etag, 'access-control-allow-origin': '*' };
+    const headers = { ...cacheDe('meta'), etag, 'access-control-allow-origin': '*' };
     if (casaEtag(c.req.header('if-none-match'), etag)) return c.body(null, 304, headers);
     const { p, hit } = respostas.obter('meta', () => ({ bruto: Buffer.from(JSON.stringify(dados.meta())) }));
     metricas.cache(hit);
@@ -1034,6 +1218,8 @@ export function createApp(deps: AppDeps) {
     servico: servicoOg,
     versaoDataset: `t1-${hashCurto(`${deps.dataset.meta.versao}|${deps.dataset.meta.geradoEm}`)}`,
     limitarRender: limiteOg ? (c) => limiteOg.tentar(clienteDe(c)) : undefined,
+    borda: cdnCc,
+    leve: () => noite().freio.leve,
   });
 
   // ---- Admin ---------------------------------------------------------------------------------------
@@ -1161,13 +1347,36 @@ export function createApp(deps: AppDeps) {
       log.aviso(`Admin: comando "${cmd.tipo}" recusado — simulação bloqueada em produção (ALLOW_SIMULACAO)`);
       throw new ErroHttp(403, motivoSim);
     }
+    // ---- leva 3: ações do próprio servidor (o motor não as executa; lá dariam "indisponível nesta versão") ----------
+    if (cmd.tipo === 'tse-retomar') {
+      // I03 (frente B): falso positivo de bloqueio → retoma as leituras do TSE já, sem esperar a pausa acabar
+      const tse = deps.tse as Omit<TseManager, 'retomar'> & { retomar?: () => unknown };
+      if (typeof tse.retomar !== 'function') throw new ErroHttp(400, 'Retomar as leituras do TSE: indisponível nesta versão.');
+      const r = (await tse.retomar()) as { detalhe?: unknown } | null | undefined;
+      log.info(`Admin: comando "tse-retomar" — ${typeof r?.detalhe === 'string' ? r.detalhe : 'leituras do TSE retomadas agora'}`);
+      return c.json(snapshotAdmin(c));
+    }
+    if (cmd.tipo === 'alerta-teste') {
+      // I16 (frente B): mensagem de teste aos alertas (Telegram), se configurados
+      if (!alertas?.teste) throw new ErroHttp(400, 'Alerta de teste: indisponível nesta versão (alertas não ligados).');
+      const r = await alertas.teste();
+      if (!r.ok) {
+        log.aviso(`Admin: alerta de teste não enviado — ${r.detalhe}`);
+        throw new ErroHttp(400, `Alerta de teste não enviado: ${r.detalhe}`);
+      }
+      log.info(`Admin: alerta de teste enviado — ${r.detalhe}`);
+      return c.json(snapshotAdmin(c));
+    }
     controller.command(cmd);
+    // chaves da noite: valem já (a leitura guardada por 1 s é renovada)
+    noiteMemo = null;
     // anúncio removido: os links de relatório dele morrem junto (um id recriado não reabre o link antigo)
     if (cmd.tipo === 'anuncio-remover') relatorios.revogarDoAnuncio(cmd.id);
     // meta aumentada/retirada ou anúncio novo com meta: o site reflete já, sem esperar os 15 s
     if (cmd.tipo.startsWith('anuncio')) verificarMetas();
     const s = controller.state();
-    if (cmd.tipo === 'fonte' || cmd.tipo === 'tse' || cmd.tipo === 'relogio' || cmd.tipo === 'troca-auto') deps.tse.sincronizar(s.fonte, s.tse);
+    if (cmd.tipo === 'fonte' || cmd.tipo === 'tse' || cmd.tipo === 'relogio' || cmd.tipo === 'troca-auto' || cmd.tipo === 'aviso-nacional')
+      deps.tse.sincronizar(s.fonte, s.tse);
     log.info(`Admin: comando "${cmd.tipo}"${'acao' in cmd ? ` (${cmd.acao})` : ''} aplicado (versão ${s.versao}, fonte ${s.fonte})`);
     // "tentar agora": não espera o próximo segundo do agendador
     if (cmd.tipo === 'troca-auto' && cmd.acao === 'agora') void agendador.tick();
@@ -1391,6 +1600,10 @@ export function createApp(deps: AppDeps) {
       if (!embed) headers['x-frame-options'] = 'SAMEORIGIN';
       if (body !== corpo.bruto && cod) headers['content-encoding'] = cod;
       if (corpo.noindex || path.startsWith('/admin') || path.startsWith('/duelo/')) headers['x-robots-tag'] = 'noindex';
+      // I05 (chave 'html-borda', padrão desligada): a borda guarda o HTML 15 s e o serve por até 1 dia se a origem cair.
+      // O navegador continua com no-cache. Nunca no admin, nos widgets, no Duelo (o código vai na URL), no relatório
+      // do anunciante, na página "não encontrada" nem em erro.
+      if (cdnCc && corpo.status === 200 && !embed && !htmlForaDaBorda(path) && noite().htmlBorda) headers[CABECALHO_BORDA] = CC_BORDA.html;
       return responder(c, head ? null : body, corpo.status, headers);
     });
   }
@@ -1398,6 +1611,7 @@ export function createApp(deps: AppDeps) {
   /** Resumo do último minuto (para o log operacional): texto + campos (no log JSON, um objeto por minuto). */
   const resumoMinuto = (): { msg: string; campos: Record<string, number> } | null => {
     const r = metricas.fecharMinuto();
+    vigia.minuto(r); // saúde da noite: minutos seguidos com 5xx > 1% ou p99 > 1 s
     if (r.requisicoes === 0) return null;
     const clientes = metricas.clientes.estimar();
     const mem = Math.round(process.memoryUsage().rss / 1048576);
@@ -1462,6 +1676,14 @@ export function createApp(deps: AppDeps) {
     verificarMetas,
     relatorios,
     crescimento,
+    /** Chaves da noite em vigor (leitura guardada por 1 s; ver `noite` acima): para os módulos das outras frentes. */
+    noite,
+    /** Saúde da noite (a mesma do GET /api/saude-noite). */
+    saudeNoite,
+    /** Liga os alertas da noite depois da criação (main.ts, frente B): saúde somada e 'alerta-teste'. */
+    ligarAlertas: (a: AlertasApp | null) => {
+      alertas = a;
+    },
   };
 }
 

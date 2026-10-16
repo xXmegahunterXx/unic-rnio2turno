@@ -13,12 +13,17 @@
  * conexões, espera as requisições em andamento (até ENCERRAMENTO_SEG, padrão 8 s, no total), fecha as que sobrarem,
  * para o polling do TSE e grava o estado pendente (e as métricas dos anúncios). Sai com código 0 (ou 1 se passar de
  * ENCERRAMENTO_SEG + 5 s).
+ *
+ * Leva 3: alertas da noite (alertas.ts; Telegram com TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID, batimento externo com
+ * HC_PING_URL, `ALERTAS=0` desliga; desligados sem as variáveis e sempre no ensaio do update.sh) e a chave 'aviso-nacional'
+ * do painel lida pelo TseManager a cada status.
  */
 import { unwatchFile, watchFile, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
 import type { AdminState, Patrocinio, UF } from '../shared/types';
+import { chavesNoite } from '../shared/chaves-noite';
 import { createController, loadDataset } from '../engine/controller';
 import { anuncioDoPatrocinio } from '../engine/state';
 import type { JsonLoader } from '../engine/api';
@@ -27,6 +32,7 @@ import { loadConfig } from './config';
 import { createLogger, msgErro } from './log';
 import { createJsonStore } from './state-store';
 import { TseManager } from './tse';
+import { AlertasNoite, configAlertas, limiteMemoriaMb } from './alertas';
 
 async function main() {
   const t0 = performance.now();
@@ -98,6 +104,29 @@ async function main() {
     nomeMunicipio: (uf: UF, cod: string) => nomes.get(`${uf}|${cod}`),
     log: (m) => log.info(m),
     historico: createJsonStore(config.stateDir, 'tse-historico.json', { debounceMs: 1000, onErro: (e) => log.erro('Falha ao salvar o histórico do TSE', e) }),
+    // I18: 'off' no painel ("Chaves da noite") tira o aviso do arquivo nacional parado do status público, na hora
+    avisoNacional: () => chavesNoite(controller.state()).avisoNacional,
+  });
+
+  // ensaio do update.sh (contêiner ao lado do que está no ar, mesmo volume): não grava audiência nem métricas — o app no
+  // ar é quem conta (senão cada update somaria um "reinício" e poderia regravar contagens velhas) — e não manda alertas
+  const ensaio = /^(1|true|sim)$/i.test(process.env.SINTONIA_ENSAIO?.trim() ?? '');
+
+  // ---- alertas da noite (I16) ------------------------------------------------------------------------
+  const cfgAlertas = configAlertas(process.env);
+  for (const a of cfgAlertas.avisos) log.aviso(a);
+  const limiteMem = limiteMemoriaMb();
+  const alertas = new AlertasNoite({
+    config: cfgAlertas,
+    log,
+    envio: !ensaio,
+    versao: config.build.commit,
+    fontes: {
+      status: () => controller.status(),
+      tse: () => tse.health(),
+      frescor: () => tse.frescor(),
+      memoria: () => ({ usadaMb: process.memoryUsage().rss / 1048576, limiteMb: limiteMem }),
+    },
   });
 
   // ---- HTTP ----------------------------------------------------------------------------------------
@@ -117,11 +146,28 @@ async function main() {
   };
   // configuração da sala do chat (aberta, modo lento, fixada): sobrevive a update/restart/vigia do healthcheck
   const chatStore = createJsonStore(config.stateDir, 'chat.json', { debounceMs: 0, onErro: (e) => log.erro('Falha ao salvar a configuração do chat', e) });
-  const sintonia = createApp({ config, dataset: ds, controller, tse, log, metricasAnunciosStore, crescimentoStores, chatStore });
+  const sintonia = createApp({
+    config,
+    dataset: ds,
+    controller,
+    tse,
+    log,
+    metricasAnunciosStore,
+    crescimentoStores,
+    chatStore,
+    // /api/saude-noite soma o que só os alertas conferem; 'alerta-teste' do painel manda a mensagem de teste
+    alertas: { saude: () => alertas.saude(), teste: () => alertas.teste() },
+  });
+  alertas.conectar({
+    minuto: () => sintonia.metricas.ultimoResumo,
+    trocaAuto: () => sintonia.agendador.info(),
+    loopMs: () => sintonia.metricas.eventLoopP99Ms(),
+  });
   sintonia.crescimento.iniciar();
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
   sintonia.agendador.iniciar();
+  alertas.iniciar();
 
   // Várias instâncias com o mesmo STATE_DIR (volume compartilhado, PM2/cluster) convergem para o admin.json
   // mais recente: quem não escreveu adota o estado (setState não regrava → sem laço). Atraso ≤ ~1 s.
@@ -198,9 +244,6 @@ async function main() {
     setInterval(bater, 1000).unref();
   }
 
-  // ensaio do update.sh (contêiner ao lado do que está no ar, mesmo volume): não grava audiência nem métricas — o app no
-  // ar é quem conta (senão cada update somaria um "reinício" e poderia regravar contagens velhas)
-  const ensaio = /^(1|true|sim)$/i.test(process.env.SINTONIA_ENSAIO?.trim() ?? '');
   if (ensaio) log.info('SINTONIA_ENSAIO: contêiner de ensaio — audiência e métricas dos anúncios não são gravadas');
   const resumo = setInterval(() => {
     const r = sintonia.resumoMinuto();
@@ -227,6 +270,7 @@ async function main() {
     }, config.encerramentoMs + 5_000);
     forcar.unref();
     sintonia.encerrar();
+    alertas.parar();
     clearInterval(resumo);
     unwatchFile(store.caminho);
     // 1ª fase (até 2 s): continua atendendo, mas cada resposta sai com `Connection: close` — os clientes keep-alive

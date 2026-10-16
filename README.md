@@ -74,9 +74,13 @@ ignorados com aviso no log da subida.
 | `LOG_FORMAT` | produção: `json` · dev: `texto` | formato do log (JSON = um objeto por linha) |
 | `LOG_AMOSTRA` | `0.01` | fração das requisições "quentes" registradas (`/api/status`, apuração, estáticos). 5xx, 429, lentas (≥ 1 s) e o painel: sempre |
 | `LOG_AMOSTRA_PAGINAS` | `0.1` | fração das páginas (HTML) e imagens OG registradas |
-| `CHAT_REGISTRO_CHAVE` | desligado | caminho de uma chave PÚBLICA RSA (PEM, ≥ 2048 bits): liga o registro cifrado dos envios do chat (id, hora, IP, porta, apelido e texto) em `STATE_DIR/chat-registro`, 6 meses, fora do backup. Chave ilegível: o site sobe, o registro fica desligado e a sala travada fechada. Só com decisão do dono e do advogado (DEPLOY.md, seção 5.1) |
+| `CHAT_REGISTRO_CHAVE` | desligado | caminho de uma chave PÚBLICA RSA (PEM, ≥ 2048 bits): liga o registro cifrado dos envios do chat (id, hora, IP, porta, apelido e texto) em `STATE_DIR/chat-registro`, 6 meses, fora do backup. Chave ilegível: o site sobe, o registro fica desligado e a sala travada fechada. Só com decisão do dono e do advogado (DEPLOY.md, seção 5.6) |
 | `CHAT_ENSAIO` | desligado | `1` só numa cópia de ensaio: em produção, deixa a sala do chat receber mensagens antes de 25/10 (sem ela, a sala só recebe a partir das 17h de 25/10; o bloqueio de 0h–17h de 25/10 vale sempre) |
 | `CHAT_REGISTRO_HEADER_PORTA` | — | cabeçalho com a porta de origem do visitante, quando o proxy a repassa (ex.: `x-porta-cliente`) |
+| `CDN_CC` | ligado | `0` tira o `Cloudflare-CDN-Cache-Control` (cabeçalho só da borda, "CDN" abaixo) e volta ao formato de antes da leva 3; a chave "HTML na borda" do painel deixa de ter efeito. Exige reinício (~10 s) |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | desligado | alertas da noite no Telegram (placar parado, TSE limitando, erros, reinício…; `src/server/alertas.ts`, DEPLOY.md §16.1). Os dois juntos; formato errado = desligado com aviso no log. Nunca vão ao log |
+| `HC_PING_URL` | desligado | batimento a cada 60 s para um vigia externo (healthchecks.io): se o processo morrer ou travar, o serviço avisa. Só `https` |
+| `ALERTAS` | ligado | `0` desliga o Telegram e o batimento sem apagar os códigos. O contêiner de ensaio do `update.sh` (`SINTONIA_ENSAIO=1`) nunca manda |
 | `SINTONIA_COMMIT` / `SINTONIA_BUILD_DATE` | `.git` local ou `dev` | versão do build mostrada em `x-sintonia-versao`, `/api/versao`, `/healthz` e no painel (a imagem Docker grava o commit a partir do build-arg `GIT_COMMIT`; `GIT_COMMIT`/`BUILD_DATE` também valem) |
 
 ---
@@ -88,8 +92,10 @@ HTTP/3) com poucos comandos: `deploy/install.sh` (Ubuntu 22.04/24.04: Docker, fi
 projetos, entra sozinho no modo compartilhado e o domínio é ligado depois com `deploy/dominio.sh`;
 build, subida e backup de hora em hora), `deploy/update.sh` (atualiza com o site no ar: ensaio da imagem nova,
 troca sem erro para o visitante e volta automática se falhar), `deploy/backup.sh`/`restore.sh`,
-`deploy/status.sh` e `deploy/painel.sh` (comandos do painel pelo terminal: estado, troca para o TSE, avisos), além
-da configuração da Cloudflare. Antes de divulgar o site: [`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md); na
+`deploy/status.sh` (com a linha "Borda": a Cloudflare está guardando?), `deploy/painel.sh` (comandos do painel pelo
+terminal: estado, troca para o TSE, avisos, chaves da noite), `deploy/limites.sh` (limites de CPU e de processos na VPS
+compartilhada) e `deploy/cloudflare.mjs` (regras de cache, zona e www da Cloudflare pela API, com chave temporária; ou o
+passo a passo pelo celular do DEPLOY §5.2); ensaio de carga pela borda: `scripts/ensaio-borda.ts`. Antes de divulgar o site: [`CHECKLIST-LANCAMENTO.md`](./CHECKLIST-LANCAMENTO.md); na
 semana da eleição: [`RUNBOOK-ELEICAO.md`](./RUNBOOK-ELEICAO.md). Imagem: `Dockerfile` (Node 22 Debian slim, usuário sem
 privilégios, `HEALTHCHECK` em `/healthz`); configuração: `.env.example`. As seções abaixo são a referência técnica
 (execução sem Docker, cache para CDN, capacidade, várias instâncias).
@@ -143,8 +149,9 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`, `?d=`).
 | `GET /api/status` | `public, max-age=0, s-maxage=1` | estado leve (fonte, fase, relógio, aviso, versão, `pessoasAgora` arredondado, anúncios no ar com imagens por URL, contato da página Anuncie, patrocínio legado; na fonte `tse`, `frescor`: marca dos números e última leitura boa de cada disputa) |
 | `GET /api/meta` | `public, max-age=60, s-maxage=300` | ETag pela versão do dataset |
 | `GET /api/apuracao/:race/…` (2º turno) | `public, max-age=0, s-maxage=2, stale-while-revalidate=10` | ETag fraco `W/"v{versão}-{balde}-{rota}"` → 304 (simulação) |
-| idem na fonte `tse` | `public, max-age=0, s-maxage=1, stale-while-revalidate=1, stale-if-error=60` | balde = marca dos números (hash do conteúdo: o ETag muda no instante em que o TSE publica e fica igual enquanto nada muda); abaixo do Brasil, marca + 5 s (os municípios chegam pela fila) |
-| `GET /api/apuracao/:race/br?d=<marca atual>` (fonte `tse`) | `public, max-age=0, s-maxage=60, stale-while-revalidate=60` | placar nacional pedido pelo app com a marca do `/api/status`: dado novo = endereço novo, então a cópia de cada marca pode ficar mais tempo na CDN; marca antiga ou desconhecida responde o atual com o cache de 1 s |
+| idem na fonte `tse` (Brasil e UF) | `public, max-age=0, s-maxage=1, stale-while-revalidate=1, stale-if-error=60` | balde = marca dos números (hash do conteúdo: o ETag muda no instante em que o TSE publica e fica igual enquanto nada muda) |
+| município, zona, seção e mapa nacional por município na fonte `tse` | `public, max-age=0, s-maxage=10, stale-while-revalidate=10, stale-if-error=60` | os números chegam pela fila de municípios (cache de 60 s na origem): a borda guarda 10 s (I04, leva 3; o app pede o município a cada 10 s). Balde = marca + 5 s. Com `CDN_CC=0`, volta ao de Brasil e UF |
+| `GET /api/apuracao/:race/br?d=<marca atual>` (fonte `tse`) | `public, max-age=0, s-maxage=60, stale-while-revalidate=60` (borda: 300 s) | placar nacional pedido pelo app com a marca do `/api/status`: dado novo = endereço novo, então a cópia de cada marca pode ficar mais tempo na CDN; marca antiga ou desconhecida responde o atual com o cache de 1 s |
 | `GET /api/apuracao/:race-t1/…` (1º turno) | `public, max-age=60, s-maxage=300, stale-while-revalidate=600` | resultado final (ignora `?t=`) |
 | `GET /api/apuracao/:race/…?t=<passado>&v=<versão>` | `public, max-age=600, s-maxage=3600, stale-while-revalidate=600` | "reveja a noite": instante ≥ 60 s (simulação) ou 3 min (TSE) no passado, com a versão atual do admin na URL; ETag `W/"v{versão}-h{t}-{rota}"` |
 | idem sem `&v=` (ou versão antiga) | `public, max-age=0, s-maxage=30, stale-while-revalidate=60` | passado recente ou `t` futuro = cache do agora (futuro nunca é atendido: vira o agora) |
@@ -165,11 +172,34 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`, `?d=`).
 | `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego (o código de um Duelo nunca é lido) |
 | `/assets/*` | `public, max-age=31536000, immutable` | nomes com hash do Vite |
 | demais arquivos (`/geo`, `/data`, favicon) | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400` | com ETag |
-| páginas (SPA) | `no-cache` | `index.html` com meta tags OG/Twitter da rota (`summary_large_image`, imagem da própria página) |
+| páginas (SPA) | `no-cache` | `index.html` com meta tags OG/Twitter da rota (`summary_large_image`, imagem da própria página). Com a chave "HTML na borda" ligada (padrão desligada), também o cabeçalho da borda abaixo |
 | `/embed/placar`, `/embed/mapa`, `/embed/uf` | `no-cache` | widgets: `frame-ancestors *` (podem ser incorporados em qualquer site), `noindex` |
 | `/sitemap.xml`, `/robots.txt` | `public, max-age=3600, s-maxage=86400` | gerados pelo servidor com `PUBLIC_URL` |
-| `/api/admin/*`, `/healthz`, `/readyz`, `/api/versao` | `no-store` | nunca cachear |
+| `/api/admin/*`, `/healthz`, `/readyz`, `/api/versao`, `/api/saude-noite` | `no-store` | nunca cachear (`/api/saude-noite`: `{ noite: 'ok' \| 'atencao', motivo }` para o monitor externo; DEPLOY §16.1) |
 | erros 4xx/5xx e 429 (fora da apuração) | `no-store` | a CDN não guarda erro nem limite |
+
+**Borda da Cloudflare (`Cloudflare-CDN-Cache-Control`, I04, leva 3).** Além do `Cache-Control` (que o navegador lê), as
+rotas abaixo mandam um cabeçalho que só a Cloudflare lê, consome e não repassa: ele vale no lugar do `s-maxage` para a
+borda e acrescenta `stale-if-error` — se a VPS cair, a borda continua entregando o último dado por até 10 min (placar)
+ou 1 dia (dados estáticos, HTML). As regras de cache da zona (DEPLOY §5.3, aplicadas por `deploy/cloudflare.mjs`) usam
+"Cache-Control se presente, senão não guarda": nunca TTL fixo. `CDN_CC=0` tira o cabeçalho (exige reinício).
+
+| Tipo de rota | `Cloudflare-CDN-Cache-Control` |
+|---|---|
+| `/api/status` | `max-age=1, stale-while-revalidate=2, stale-if-error=600` |
+| `/api/meta` | `max-age=300, stale-if-error=86400` |
+| apuração do 2º turno (simulação) | `max-age=2, stale-while-revalidate=10, stale-if-error=600` |
+| Brasil e UF ao vivo (fonte `tse`) | `max-age=1, stale-while-revalidate=1, stale-if-error=600` |
+| município, zona, seção e mapa por município (fonte `tse`) | `max-age=10, stale-while-revalidate=10, stale-if-error=600` |
+| placar nacional com `?d=<marca atual>` | `max-age=300, stale-if-error=600` |
+| 1º turno | `max-age=300, stale-while-revalidate=600, stale-if-error=86400` |
+| "reveja a noite" com `&v=` / sem `&v=` | `max-age=3600, stale-while-revalidate=600, stale-if-error=86400` / `max-age=30, stale-while-revalidate=60, stale-if-error=600` |
+| imagens OG ao vivo (com o freio no modo leve) | `max-age=30` (`120`), `stale-while-revalidate=60, stale-if-error=600` |
+| imagens OG de dado oficial / do Teste | `max-age=86400, stale-while-revalidate=604800, stale-if-error=604800` / `max-age=86400, stale-if-error=604800` |
+| páginas (HTML), só com a chave "HTML na borda" | `max-age=15, stale-while-revalidate=15, stale-if-error=86400` (nunca em `/admin`, `/embed`, `/duelo`, `/relatorio`, 404 ou erro) |
+
+As demais rotas guardáveis (chat, divulgação, imagens de anúncio, `/data`, `/geo`, `/assets`) seguem só o `Cache-Control`
+da tabela acima. Toda `/api/*` leva `X-Robots-Tag: noindex`, exceto as imagens `/api/og/` (I06).
 
 O "balde" do ETag só muda quando os números podem mudar: fixo com a fonte `pre`, no 1º turno, com o relógio
 pausado ou os dados congelados, antes das 17h e depois do encerramento; por segundo simulado com a simulação
@@ -299,8 +329,11 @@ intervalo as requisições esperam (a CDN continua servindo o conteúdo anterior
   minuto (429) — imagem pronta nunca conta, então uma CDN pedindo de novo não é barrada.
 - SEO: `GET /sitemap.xml` (início, apuração, as 27 UFs, governadores, Senado, Câmara, assembleias e `/assembleias/:uf`,
   curiosidades, cenários, Teste Cego, metodologia, sobre, privacidade, com `PUBLIC_URL`) e `GET /robots.txt` (libera
-  `/api/og/` — o robô do X respeita o robots.txt também para a imagem do cartão —, fecha a API e o painel, e aponta o
-  sitemap). Ambos gerados pelo servidor (valem mesmo se o build trouxer os seus).
+  `/api/og/` — o robô do X respeita o robots.txt também para a imagem do cartão — e, desde a leva 3 (I06), os dados que
+  as páginas de apuração pedem ao abrir (`/api/status`, `/api/meta`, `/api/apuracao/`), para o robô de busca conseguir
+  montar a página; fecha o resto da API, o painel e `/relatorio`, e aponta o sitemap; a API em si leva
+  `X-Robots-Tag: noindex`). Ambos gerados pelo servidor (valem mesmo se o build trouxer os seus). Depois de um deploy
+  que mude o robots.txt, limpe-o da Cloudflare (`node deploy/cloudflare.mjs --purgar /robots.txt`): a borda guarda 1 dia.
 
 ---
 

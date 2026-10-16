@@ -7,9 +7,24 @@
  *  - If-None-Match → 304 sem corpo.
  *  - Respostas montadas (JSON + gzip + brotli) ficam em memória por segundo de parede: sob carga, cada rota é
  *    calculada/serializada/comprimida no máximo 1×/s, e requisições simultâneas esperam a mesma promessa.
+ *  - Borda da Cloudflare (I04, leva 3): `Cloudflare-CDN-Cache-Control` ao lado do `Cache-Control` (ver `cabecalhosCache`).
  */
 import { brotliCompress, constants as zc, gzip } from 'node:zlib';
 import { promisify } from 'node:util';
+
+/**
+ * Cabeçalho de cache SÓ da borda da Cloudflare (I04): vale para o cache da Cloudflare, que o usa no lugar do
+ * `Cache-Control` e não o repassa ao navegador (o navegador segue lendo o `Cache-Control`). Dá à borda TTL e
+ * `stale-if-error` próprios (o último placar continua saindo se a origem cair por alguns minutos) sem mudar o que o
+ * navegador faz. O `s-maxage` do `Cache-Control` fica como rede de segurança: se este cabeçalho se perder no caminho,
+ * a borda guarda como antes. Desligado por `CDN_CC=0` (app.ts): só o `Cache-Control`, como antes da leva 3.
+ */
+export const CABECALHO_BORDA = 'cloudflare-cdn-cache-control';
+
+/** `Cache-Control` + (com a borda ligada e um valor para ela) o `Cloudflare-CDN-Cache-Control`. */
+export function cabecalhosCache(cc: string, borda: string | null | undefined, ligada: boolean): Record<string, string> {
+  return ligada && borda ? { 'cache-control': cc, [CABECALHO_BORDA]: borda } : { 'cache-control': cc };
+}
 
 const gzipP = promisify(gzip);
 const brotliP = promisify(brotliCompress);

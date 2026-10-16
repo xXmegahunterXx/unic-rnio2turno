@@ -1,6 +1,7 @@
 /**
  * Moldura pública do app: header de vidro fixo (logo, navegação + menu "Mais", status ao vivo, tema), faixa de
- * SIMULAÇÃO, banner de aviso do admin, rodapé institucional e tab bar inferior no celular (com a aba "Mais").
+ * SIMULAÇÃO, faixa "Conexão instável" (I05, FaixaConexao), banner de aviso do admin, rodapé institucional e tab bar
+ * inferior no celular (com a aba "Mais").
  * Funciona sem API: se useStatus() falhar ou estiver carregando, nada quebra (só some o que depende dele).
  * Os links pré-carregam a página ao apontar/tocar (prefetch.ts). "Compartilhar o Sintonia" e "Incorporar" ficam
  * montados aqui (acoesGlobais.tsx), carregados só na 1ª abertura.
@@ -23,6 +24,7 @@ import { Container } from './Container';
 import { Logo } from './Logo';
 import { NAV, NAV_TAB, ativoNoMais } from './nav';
 import { StatusPill } from './StatusPill';
+import { FaixaConexao } from './FaixaConexao';
 import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/BuscaRapida';
 import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompartilharSite, preCarregarIncorporar } from './acoesGlobais';
 import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
@@ -259,6 +261,8 @@ function Header() {
             }
           />
         ) : null}
+        {/* I05: "Conexão instável" (status falhando ou relógio do servidor parado), presa sob o cabeçalho em toda página */}
+        <FaixaConexao />
       </div>
       <FaixaTopo />
       <AvisoBanner aviso={status.data?.aviso ?? null} />

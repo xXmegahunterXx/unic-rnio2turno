@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { AUDIENCIA } from '../shared/audiencia';
 import { Audiencia, ConjuntoU32, PESSOAS_REDE_BALDE, PESSOAS_REDE_DIA, Presenca, ehRoboAudiencia } from './audiencia';
 import { createJsonStore } from './state-store';
 
@@ -189,16 +190,19 @@ describe('Audiencia: pico de pessoas ao mesmo tempo', () => {
     expect(p.pico?.valor).toBe(1);
   });
 
-  it('48 horas no detalhe, da mais antiga para a mais recente', () => {
+  it('336 horas (14 dias) no detalhe, da mais antiga para a mais recente', () => {
     const { a, relogio } = montar();
     a.sinal('r', UA(1), { g: 'inicio' });
     relogio.t += 3 * 3600_000;
     a.sinal('r', UA(1), { g: 'inicio' });
     const h = a.paraAdmin().horas;
-    expect(h).toHaveLength(48);
-    expect(h[47].paginas).toBe(1);
-    expect(h[44].paginas).toBe(1);
-    expect(h[0].hora).toBeLessThan(h[47].hora);
+    const n = AUDIENCIA.horas;
+    expect(n).toBe(336);
+    expect(h).toHaveLength(n);
+    expect(h[n - 1].paginas).toBe(1);
+    expect(h[n - 4].paginas).toBe(1);
+    expect(h[0].hora).toBeLessThan(h[n - 1].hora);
+    expect(h[n - 1].hora - h[0].hora).toBe((n - 1) * 3600_000);
   });
 });
 

@@ -17,7 +17,8 @@
  * dado real (o cenário leva a marca d'água "CENÁRIO HIPOTÉTICO").
  *
  * Cache (ServicoOg): chave = rota normalizada; "versão|modo" = versão do admin + fonte/anonimização (ao vivo, 30 s
- * frescas e até 5 min vencidas do mesmo modo) ou versão dos arquivos de dados (estáticas: valem até o dado mudar).
+ * frescas — 120 s com o freio no modo leve — e até 90 s vencidas do mesmo modo) ou versão dos arquivos de dados
+ * (estáticas: valem até o dado mudar). Na borda da Cloudflare: `Cloudflare-CDN-Cache-Control` (CC_OG_BORDA, I04).
  * Anúncio com o formato 'compartilhamento' no ar: faixa "Oferecimento: <marca>" no pé (og-oferecimento.ts) SÓ nos
  * cartões genéricos, sem candidato nem resultado (`CARTOES_COM_OFERECIMENTO`: Teste Cego, calculadora sem código e
  * capa das curiosidades); nesses, o conjunto de anunciantes entra no modo (`tagOferecimento`) e trocar o anunciante
@@ -39,7 +40,7 @@ import { NotFoundError } from '../engine/api';
 import type { Dados } from './dados';
 import { cargoExibicao, ehEleito, situacaoCurta, type DadosEstaticos } from './dados-estaticos';
 import type { PacotesFotos } from './fotos';
-import { casaEtag, etagFraco, hashCurto } from './http-cache';
+import { cabecalhosCache, casaEtag, etagFraco, hashCurto } from './http-cache';
 import type { Logger } from './log';
 import { layoutTeste, renderPng, type No } from './og';
 import { OFERECIMENTO_NO_PLACAR, comOferecimento, oferecimentoDe, tagOferecimento, type CartaoComOferecimento } from './og-oferecimento';
@@ -68,12 +69,27 @@ import { ErroValidacao, parseCodMunicipio, parseNumero, parseRace, parseUf } fro
 export const CC_OG = {
   /** placar ao vivo */
   vivo: 'public, max-age=30, s-maxage=30, stale-while-revalidate=60',
+  /** placar ao vivo com o freio no modo leve (I37): a imagem é refeita e buscada na origem 4× menos */
+  vivoLeve: 'public, max-age=120, s-maxage=120, stale-while-revalidate=60',
   /** dado oficial/real: muda só com o dataset (a URL das meta tags leva a versão em `v`) */
   estatica: 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
   teste: 'public, max-age=86400, s-maxage=86400',
 } as const;
 
+/**
+ * Cabeçalho da borda das imagens (I04, `Cloudflare-CDN-Cache-Control`; ver http-cache.ts › CABECALHO_BORDA): o mesmo
+ * TTL da borda de `CC_OG`, mais `stale-if-error` (a imagem pronta continua saindo se a origem cair). `CDN_CC=0` tira.
+ */
+export const CC_OG_BORDA: Record<keyof typeof CC_OG, string> = {
+  vivo: 'max-age=30, stale-while-revalidate=60, stale-if-error=600',
+  vivoLeve: 'max-age=120, stale-while-revalidate=60, stale-if-error=600',
+  estatica: 'max-age=86400, stale-while-revalidate=604800, stale-if-error=604800',
+  teste: 'max-age=86400, stale-if-error=604800',
+};
+
 const OG_TTL_MS = 30_000;
+/** Freio no modo leve (I37): a imagem ao vivo vale 120 s na memória (menos renderizações no pico). */
+const OG_TTL_LEVE_MS = 120_000;
 /**
  * Imagem vencida da mesma fonte ainda serve (enquanto a nova é gerada) por até 90 s. Na fonte TSE (e na simulação) a
  * versão do admin não muda com os números: quem pede uma imagem parada há mais tempo que isso espera a nova (~0,4 s).
@@ -117,6 +133,10 @@ export interface DepsOg {
    * pedido; devolve 0 (pode) ou os segundos de espera (→ 429). Imagem já em memória nunca passa por aqui.
    */
   limitarRender?: (c: Ctx) => number;
+  /** Cabeçalho da borda da Cloudflare (I04; `CDN_CC=0` → false). Ausente = ligado. */
+  borda?: boolean;
+  /** Freio no modo leve (I37, "Chaves da noite"): imagens ao vivo com TTL de 120 s. Ausente = nunca. */
+  leve?: () => boolean;
 }
 
 /**
@@ -189,12 +209,16 @@ export function registrarOg(app: App, d: DepsOg): void {
     return of ? comOferecimento(no, of.marca, of.logo) : no;
   };
 
+  const borda = d.borda !== false;
+  /** Cache-Control (+ cabeçalho da borda) de um tipo de imagem. */
+  const cacheOg = (tipo: keyof typeof CC_OG) => cabecalhosCache(CC_OG[tipo], CC_OG_BORDA[tipo], borda);
+
   /** PNG com ETag (rota + versão|modo + instante da geração), 304 e CORS (robôs de outras origens). */
-  const enviarPng = (c: Ctx, chave: string, s: OgServida, cc: string) => {
+  const enviarPng = (c: Ctx, chave: string, s: OgServida, tipo: keyof typeof CC_OG) => {
     const etag = etagFraco('og', hashCurto(chave), hashCurto(s.sub), s.em.toString(36));
     const headers: Record<string, string> = {
       'content-type': 'image/png',
-      'cache-control': cc,
+      ...cacheOg(tipo),
       etag,
       'access-control-allow-origin': '*',
       'cross-origin-resource-policy': 'cross-origin',
@@ -241,10 +265,11 @@ export function registrarOg(app: App, d: DepsOg): void {
   /** Imagem ao vivo (depende do estado da apuração). `placar`: o modo leva o anunciante (ver `subPlacar`). */
   const vivo = async (c: Ctx, chave: string, montar: (st: LiveStatus) => Promise<OgPronta>, placar = false) => {
     const st = dados.status();
+    const leve = d.leve?.() === true;
     const s = await obterLimitado(c, {
       chave,
       sub: placar ? subPlacar(st) : subVivo(st),
-      ttlMs: OG_TTL_MS,
+      ttlMs: leve ? OG_TTL_LEVE_MS : OG_TTL_MS,
       staleMs: OG_STALE_MS,
       montar: () => montar(dados.status()),
       modoAtual: () => {
@@ -252,7 +277,7 @@ export function registrarOg(app: App, d: DepsOg): void {
         return `${modoOg(agora)}${placar && OFERECIMENTO_NO_PLACAR ? tagOf(agora) : ''}`;
       },
     });
-    return enviarPng(c, chave, s, CC_OG.vivo);
+    return enviarPng(c, chave, s, leve ? 'vivoLeve' : 'vivo');
   };
 
   /**
@@ -278,7 +303,7 @@ export function registrarOg(app: App, d: DepsOg): void {
       montar: () => montar(sub),
       modoAtual: () => `${modoAtual ? modoAtual() : modo}${tag()}`,
     });
-    return enviarPng(c, chave, s, CC_OG.estatica);
+    return enviarPng(c, chave, s, 'estatica');
   };
 
   /**
@@ -692,7 +717,7 @@ export function registrarOg(app: App, d: DepsOg): void {
     const png = await ogTeste.png;
     return responder(c, c.req.method === 'HEAD' ? null : png, {
       'content-type': 'image/png',
-      'cache-control': CC_OG.teste,
+      ...cacheOg('teste'),
       'access-control-allow-origin': '*',
       'cross-origin-resource-policy': 'cross-origin',
     });

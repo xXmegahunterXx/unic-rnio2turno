@@ -174,16 +174,19 @@ describe('LiveStatus: pessoas agora e patrocínio', () => {
   });
 
   it('pessoasAgora vem da estimativa de clientes ativos (sem IP guardado), arredondada e com cache de 5 s', async () => {
+    // leva 3 (I09): abaixo de PISO_PESSOAS_PUBLICO (500) o status público omite o número
     const s0 = await status();
-    expect(s0.pessoasAgora).toBe(1); // só este "cliente" (sem socket nos testes)
+    expect(s0.pessoasAgora).toBeUndefined(); // só este "cliente" (sem socket nos testes): 1 < 500
+    expect(m.metricas.pessoasAgora()).toBe(1);
     for (let i = 0; i < 1234; i++) m.metricas.clientes.registrar(`198.51.${i >> 8}.${i & 255}`);
-    expect((await status()).pessoasAgora).toBe(1); // cache de 5 s
+    expect(m.metricas.pessoasAgora()).toBe(1); // cache de 5 s
     m.relogio.t += 5_000;
     const s1 = await status();
     expect(s1.pessoasAgora).toBe(1200);
     // a janela é de ~30 s: sem novos acessos, cai
     m.relogio.t += 40_000;
-    expect((await status()).pessoasAgora).toBe(1);
+    expect((await status()).pessoasAgora).toBeUndefined();
+    expect(m.metricas.pessoasAgora()).toBe(1);
   });
 
   it('patrocínio válido aparece no status; logo em data URI vira URL servida com cache longo', async () => {

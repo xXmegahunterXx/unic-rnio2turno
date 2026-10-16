@@ -23,7 +23,8 @@ const horaBrt = (h: string) => {
 
 function criar(f: FakeFetch, extra: Partial<ConstructorParameters<typeof TseSource>[0]> = {}) {
   const logs: string[] = [];
-  const client = new TseClient({ baseUrl: BASE, fetch: f, sleep: async () => undefined, now: () => AGORA });
+  // semTeto: o relógio destes testes é fixo (o balde de fichas não se reabasteceria); o teto tem testes próprios
+  const client = new TseClient({ baseUrl: BASE, fetch: f, sleep: async () => undefined, now: () => AGORA, semTeto: true });
   const src = new TseSource({ config: CONFIG, races, client, now: () => AGORA, log: (m) => logs.push(m), ...extra });
   return { src, logs };
 }

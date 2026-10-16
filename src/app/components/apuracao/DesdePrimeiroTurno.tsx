@@ -23,6 +23,7 @@ import { CandidateAvatar } from './CandidateAvatar';
 import { SimulationRibbon } from './SimulationRibbon';
 import { useFotosRace } from './fotos';
 import { desdePrimeiroTurno, type ContagemT1, type ContagemT2, type DesdeT1Agregado, type DesdeT1Candidato } from '@/shared/desde-t1';
+import { intervaloPesadoVigente } from '@/app/data/carga';
 
 export interface DesdePrimeiroTurnoProps {
   race: Race;
@@ -238,7 +239,7 @@ export function useDesdeT1Brasil(raceId: string, ativo: boolean) {
       return (await r.json()) as DesdeT1Agregado;
     },
     staleTime: 5_000,
-    refetchInterval: ativo ? 10_000 : false,
+    refetchInterval: ativo ? () => intervaloPesadoVigente(10_000) : false, // freio (I37): × fator; para no modo leve
     retry: 1,
   });
 }

@@ -545,5 +545,53 @@ describe('SEO', () => {
     expect(t).toContain('Sitemap: https://sintonia.exemplo.br/sitemap.xml');
     expect(t).toContain('Allow: /api/og/');
     expect(t).toContain('Disallow: /admin');
+    // I06: os dados que as páginas de apuração pedem ficam liberados para o robô renderizar (a API não é indexada)
+    expect(t).toMatch(/Allow: \/api\/status\nAllow: \/api\/meta\nAllow: \/api\/apuracao\/\nDisallow: \/api\//);
+  });
+});
+
+describe('leva 3: borda da Cloudflare em produção', () => {
+  const comDist = () => {
+    const dist = mkdtempSync(join(tmpdir(), 'sintonia-dist-borda-'));
+    mkdirSync(join(dist, 'assets'), { recursive: true });
+    writeFileSync(join(dist, 'index.html'), '<!doctype html><html><head><title>x</title><!--app-meta--></head><body></body></html>');
+    return dist;
+  };
+
+  it('html-borda ligada em produção: HTML com o cabeçalho da borda, no-cache no navegador; sessão/erros nunca', async () => {
+    const m = await montar({ env: { ...PROD, SERVE_STATIC: '1', DIST_DIR: comDist(), PUBLIC_URL: 'https://sintonia.exemplo.br' } });
+    const cookie = await login(m);
+    const origem = { origin: 'https://sintonia.exemplo.br' };
+    const r = await m.app.request('/api/admin/command', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', cookie, ...origem },
+      body: JSON.stringify({ tipo: 'html-borda', ligado: true }),
+    });
+    expect(r.status).toBe(200);
+    expect((await r.json()) as AdminSnapshot).toMatchObject({ state: { noite: { htmlBorda: true } } });
+    const home = await m.app.request('/');
+    expect(home.headers.get('cache-control')).toBe('no-cache');
+    expect(home.headers.get('cloudflare-cdn-cache-control')).toBe('max-age=15, stale-while-revalidate=15, stale-if-error=86400');
+    expect(home.headers.get('strict-transport-security')).toContain('max-age=31536000');
+    // erro do servidor nunca vai para a borda; admin sempre no-store
+    expect((await m.app.request('/admin')).headers.get('cloudflare-cdn-cache-control')).toBeNull();
+    expect((await m.app.request('/api/admin/state', { headers: { cookie } })).headers.get('cloudflare-cdn-cache-control')).toBeNull();
+  });
+
+  it('CDN_CC=0: nem a chave html-borda põe o cabeçalho (formato anterior a tudo)', async () => {
+    const antes = process.env.CDN_CC;
+    process.env.CDN_CC = '0';
+    try {
+      const m = await montar({ env: { SERVE_STATIC: '1', DIST_DIR: comDist() } });
+      const cookie = await login(m);
+      expect((await comando(m, cookie, { tipo: 'html-borda', ligado: true })).status).toBe(200);
+      const r = await m.app.request('/');
+      expect(r.status).toBe(200);
+      expect(r.headers.get('cloudflare-cdn-cache-control')).toBeNull();
+      expect(r.headers.get('cache-control')).toBe('no-cache');
+    } finally {
+      if (antes === undefined) delete process.env.CDN_CC;
+      else process.env.CDN_CC = antes;
+    }
   });
 });

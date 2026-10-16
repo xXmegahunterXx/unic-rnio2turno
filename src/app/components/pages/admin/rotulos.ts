@@ -41,7 +41,7 @@ export const ORDEM_ROTULO: Record<OrdemRegional, string> = {
   'sul-primeiro': 'Sul e Sudeste bem antes',
 };
 
-export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'chat' | 'fonte' | 'monitor' | 'interessados' | 'audiencia';
+export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'chat' | 'fonte' | 'monitor' | 'interessados' | 'audiencia' | 'postar' | 'lives';
 
 export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: string }[] = [
   { id: 'controle', rotulo: 'Controle', icone: 'ao-vivo', descricao: 'Relógio, linha do tempo e pré-visualização' },
@@ -55,6 +55,9 @@ export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: 
   // crescimento (src/server/crescimento.ts): no fim, para não mudar os atalhos 1–8 das seções da noite
   { id: 'interessados', rotulo: 'Interessados', icone: 'lista', descricao: 'Pedidos do formulário “Quero anunciar” da página Anuncie' },
   { id: 'audiencia', rotulo: 'Audiência', icone: 'grade', descricao: 'Pico, visitantes únicos, páginas e origens (agregado) e as redes do Sintonia' },
+  // leva 3 (SecaoPostar e SecaoLives, de outras frentes): o menu só mostra a entrada se o arquivo existir (SalaDeControle)
+  { id: 'postar', rotulo: 'Postar', icone: 'compartilhar', descricao: 'Textos e imagens prontos para cada momento da noite' },
+  { id: 'lives', rotulo: 'Lives', icone: 'play', descricao: 'Lives que exibem o Sintonia agora, minutos no ar e bots de chat (só contagens)' },
 ];
 
 export const ehSecao = (s: string | null): s is SecaoId => !!s && SECOES.some((x) => x.id === s);

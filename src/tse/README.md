@@ -7,7 +7,7 @@ em `src/shared/types.ts`) para a noite de 25/10/2026.
 | Arquivo | Papel |
 |---|---|
 | `feed.ts` | Tipos brutos do feed + `tsePaths` (montagem das URLs) |
-| `client.ts` | `TseClient`: `fetch` injetável, timeout, retry com backoff e jitter, `Retry-After`, ETag/If-Modified-Since (304), concorrência ≤ 8 com 3 prioridades, estatísticas |
+| `client.ts` | `TseClient`: `fetch` injetável, timeout, retry com backoff e jitter, ETag/If-Modified-Since (304), concorrência ≤ 8 com 3 prioridades, teto de pedidos por segundo (balde de fichas), pausa no bloqueio do TSE (§3.1), estatísticas |
 | `map.ts` | Funções **puras** feed → contratos (Summary, MunicipioResumo, mosaico, SecaoDetalhe…) |
 | `eventos.ts` | Série (1 ponto por mudança de seções) e eventos por diferença entre polls; serializável |
 | `bu.ts` | Decodificador BER (ASN.1) do boletim de urna `bu.dat` |
@@ -150,6 +150,27 @@ Horas gravadas no BU (abertura/encerramento) são locais da urna.
   TSE: não fazemos.
 - `x-ratelimit-limit: 2000` por segundo. Mesmo assim limitamos a ≤ 8 conexões simultâneas.
 - Arquivo ainda não publicado: **404 com XML `NoSuchKey`** (S3/Ceph) → tratado como "ausente", não erro.
+
+### 3.1 Respeito ao limite do TSE (leva 3, I03)
+
+- **Teto de pedidos por segundo** (`TseConfig.limitePorSeg`, painel → Fonte; padrão 40, 5–90): balde de fichas GLOBAL no
+  `TseClient` (toda tentativa gasta uma ficha), rajada de até 1 s de teto sem que rajada + 1 s passe de 100 (o limite
+  publicado pelo TSE, fonte ainda por confirmar). Fatia reservada (40% da rajada) para os arquivos Brasil/UF das disputas
+  (`reservado: true`, também passam na frente da fila). Medido com o TSE falso e 600 municípios pedidos por visitantes ao
+  mesmo tempo: 40/s sustentados, pico de 64 num segundo (antes: rajadas acima de 100 e bloqueio).
+- **Bloqueio** (`TseBloqueioError`): 429; 403 com `Server: AkamaiGHost` ou página HTML "Access Denied"; 403 num arquivo
+  que já deu 200/304. Um 404 ou o 403 em XML (`NoSuchKey`/`AccessDenied`) de arquivo nunca lido continua "ausente".
+- **Pausa total** até o `Retry-After` (5 s–60 min) ou 11 min: nenhum pedido sai (laço prioritário, laço normal, fila de
+  municípios e consultas de visitantes, que respondem com o último dado bom). Depois, o prioritário prova com 1 pedido e
+  o laço normal vem 2 s depois. Log uma vez, `health().bloqueio`/`bloqueadoAte` com `ok: false`,
+  `frescor().tseBloqueadoAte` (selo do app: "O TSE está limitando leituras; nova tentativa às HH:MM") e
+  `retomar()` (comando `tse-retomar`, botão "Retomar agora" no painel, para falso positivo).
+- `conferidoEm` (o "Atualizado às" do selo) só anda com 200/304 do arquivo principal; um "ausente" não confirma número
+  nenhum. Município/zona ainda não publicado: cache negativo de 60 s que dobra até 10 min, zerado quando o `-ab.json`
+  da UF mostra o município andando.
+- **Arquivo nacional parado (I18)**: o Brasil de Presidente na mesma geração `dg/hg` há mais de 90 s (relógio do TSE e o
+  nosso) enquanto a soma das seções totalizadas das UFs e do exterior passa a dele → `frescor().nacionalParadoDesde`. Só
+  o aviso; nunca somamos os estados no lugar do arquivo oficial. Chave 'aviso-nacional' do painel ('off' tira do público).
 
 ## 4. Códigos do 2º turno e estado do feed (conferidos em 12/10/2026)
 

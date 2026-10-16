@@ -31,8 +31,9 @@ import {
   type AnuncioConfig,
   type AnuncioPublico,
 } from '../shared/anuncios';
+import { cargaDoFreio, chavesNoite, COMANDO_CHAVE, ehFatorCarga, MODOS_AVISO_NACIONAL, ROTULO_CHAVE } from '../shared/chaves-noite';
 import { validaContatosPublicos } from '../shared/contatos';
-import { INICIO_APURACAO } from '../shared/constants';
+import { INICIO_APURACAO, TSE_LIMITE_POR_SEG } from '../shared/constants';
 import { fmtDataHora, fmtHoraSeg } from '../shared/format';
 import { UFS } from '../shared/types';
 import type {
@@ -382,6 +383,23 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     state = { ...state, versao: state.versao + 1 };
     opts.onStateChange?.(state);
   };
+  /**
+   * "Chaves da noite" no SERVIDOR: grava (e sincroniza as instâncias pelo admin.json, que adotam estado de mesma versão
+   * com conteúdo diferente) SEM incrementar a versão — uma versão nova invalida o cache de todos os visitantes e as
+   * ETags, e puxar o freio no pico não pode gerar uma rajada de consultas. No DEMO a versão sobe como nos outros
+   * comandos: as abas se sincronizam pela ordem versão → âncora → JSON (src/engine/sync.ts), que sem versão nova
+   * poderia preferir o estado anterior.
+   */
+  const mudouSemVersao = () => {
+    if (modo !== 'servidor') return mudou();
+    opts.onStateChange?.(state);
+  };
+  /** Ações que só o servidor executa (ele as intercepta antes do motor); aqui, recusadas sem mudar nada. */
+  const SO_SERVIDOR: Record<string, string> = {
+    'tse-retomar': 'Retomar as leituras do TSE',
+    'alerta-teste': 'Alerta de teste',
+    'precos-anuncie': 'Preços da página Anuncie',
+  };
 
   const relogioAgora = (wall: number) => ({ ...state.relogio, ancoraSim: simNowDe(state.relogio, wall), ancoraWall: wall });
 
@@ -389,6 +407,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     if (!cmd || typeof cmd !== 'object' || typeof (cmd as { tipo?: unknown }).tipo !== 'string')
       throw new CommandError('Comando inválido.');
     const wall = clock();
+    let semVersao = false;
     switch (cmd.tipo) {
       case 'relogio': {
         const r = state.relogio;
@@ -664,14 +683,53 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
           if (!Number.isFinite(n) || n < 3 || n > 600) throw new CommandError('tse.intervaloPrioritarioSeg deve estar entre 3 e 600.');
           next.intervaloPrioritarioSeg = n;
         }
+        if (t.limitePorSeg !== undefined) {
+          const n = Number(t.limitePorSeg);
+          const { min, max } = TSE_LIMITE_POR_SEG;
+          if (!Number.isInteger(n) || n < min || n > max) throw new CommandError(`tse.limitePorSeg deve ser um inteiro entre ${min} e ${max}.`);
+          next.limitePorSeg = n;
+        }
         state = { ...state, tse: next };
         log('Configuração do TSE atualizada');
         break;
       }
+      // ---- "Chaves da noite" (leva 3): só gravam a escolha; quem age é o servidor/app (ver ChavesNoite) -------------
+      case 'freio': {
+        if (!ehFatorCarga(cmd.fator)) throw new CommandError('freio: use o fator 1, 2, 3 ou 5.');
+        if (cmd.leve !== undefined && typeof cmd.leve !== 'boolean') throw new CommandError('freio: "leve" deve ser true ou false.');
+        const leve = cmd.leve === true;
+        state = { ...state, noite: { ...chavesNoite(state), freio: { fator: cmd.fator, leve } } };
+        log(cmd.fator === 1 && !leve ? 'Freio solto: consultas no ritmo normal' : `Freio: consultas ${cmd.fator}× mais espaçadas${leve ? ', modo leve' : ''}`);
+        semVersao = true;
+        break;
+      }
+      case 'contador-publico':
+      case 'html-borda':
+      case 'medir-anuncios':
+      case 'texto-bots':
+      case 'contar-lives': {
+        if (typeof cmd.ligado !== 'boolean') throw new CommandError(`${cmd.tipo}: informe "ligado" (true ou false).`);
+        state = { ...state, noite: { ...chavesNoite(state), [COMANDO_CHAVE[cmd.tipo]]: cmd.ligado } };
+        log(`${ROTULO_CHAVE[cmd.tipo]}: ${cmd.ligado ? 'ligado' : 'desligado'}`);
+        semVersao = true;
+        break;
+      }
+      case 'aviso-nacional': {
+        if (!MODOS_AVISO_NACIONAL.includes(cmd.modo)) throw new CommandError('aviso-nacional: use o modo "auto" ou "off".');
+        state = { ...state, noite: { ...chavesNoite(state), avisoNacional: cmd.modo } };
+        log(cmd.modo === 'auto' ? 'Aviso do arquivo nacional parado: automático' : 'Aviso do arquivo nacional parado: desligado');
+        semVersao = true;
+        break;
+      }
+      case 'tse-retomar':
+      case 'alerta-teste':
+      case 'precos-anuncie':
+        throw new CommandError(`${SO_SERVIDOR[cmd.tipo]}: comando indisponível nesta versão.`);
       default:
         throw new CommandError(`Comando desconhecido: "${String((cmd as { tipo?: unknown }).tipo)}".`);
     }
-    mudou();
+    if (semVersao) mudouSemVersao();
+    else mudou();
     return adminSnapshot();
   };
 
@@ -708,6 +766,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     const wall = clock();
     const sim = state.fonte === 'simulacao';
     const pub = anunciosPublicos(wall);
+    const carga = cargaDoFreio(state.noite?.freio);
     return {
       fonte: state.fonte,
       fase: fase(wall),
@@ -727,6 +786,8 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       ...(state.anunciosSuspensos ? { anunciosSuspensos: true as const } : {}),
       anuncie: state.anuncie ? { ...state.anuncie } : null,
       contatos: state.contatos ? { ...state.contatos } : null,
+      // freio do painel (I37): só quando puxado — ausente = ritmo normal
+      ...(carga ? { carga } : {}),
     };
   };
 
