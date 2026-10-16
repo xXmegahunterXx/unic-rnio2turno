@@ -54,6 +54,15 @@ export const UFS_GOV_2T: UF[] = ['AC', 'AM', 'DF', 'ES', 'RN', 'TO'];
 /** Quantas disputas de governador há no 2º turno (derivado de `UFS_GOV_2T`). */
 export const QTD_GOV_2T = UFS_GOV_2T.length;
 
+/**
+ * I09: "N pessoas agora" só aparece no SITE a partir deste número de pessoas ao mesmo tempo (abaixo dele, ou com a chave
+ * 'contador-publico' desligada, o servidor omite `LiveStatus.pessoasAgora` no status público). O painel vê sempre.
+ */
+export const PISO_PESSOAS_PUBLICO = 500;
+
+/** I03: teto de pedidos por segundo ao TSE (`TseConfig.limitePorSeg`): padrão e faixa aceita no painel. */
+export const TSE_LIMITE_POR_SEG = { padrao: 40, min: 5, max: 90 } as const;
+
 /** Buckets de margem (pontos percentuais) usados no mapa e no mosaico de seções. */
 export const MARGEM_BUCKETS = [5, 15, 30] as const;
 

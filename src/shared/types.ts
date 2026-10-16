@@ -311,6 +311,12 @@ export interface LiveStatus {
    * O app reconsulta o placar assim que a `marca` muda, sem esperar o próximo ciclo de consulta.
    */
   frescor?: Partial<Record<RaceId, FrescorCorrida>>;
+  /**
+   * Freio de carga do painel (I37, "Chaves da noite" → comando 'freio'): o app multiplica os intervalos de consulta
+   * (placar e status) por `fator`; com `leve`, para o mapa municipal e o "desde o 1º turno" e espaça o chat.
+   * AUSENTE = normal (fator 1, sem leve): o motor só manda quando o freio está puxado. Cliente antigo ignora.
+   */
+  carga?: CargaStatus;
 }
 
 /** Frescor dos números de uma disputa na fonte 'tse' (ver `LiveStatus.frescor`). */
@@ -319,6 +325,58 @@ export interface FrescorCorrida {
   marca: string;
   /** Última leitura bem-sucedida (200 ou 304) do arquivo principal da disputa no TSE (epoch ms, relógio do servidor). */
   conferidoEm: number | null;
+  /**
+   * I18: o arquivo NACIONAL desta disputa não muda desde este instante (epoch ms) enquanto os estados avançam — o app
+   * mostra o aviso factual "o arquivo nacional do TSE não atualiza desde HH:MM · veja os estados". Ausente = normal, ou
+   * chave 'aviso-nacional' em 'off'. Opcional (leva 3).
+   */
+  nacionalParadoDesde?: number;
+  /**
+   * I03: o TSE está limitando as leituras (429, 403 da borda dele, ou 403 num arquivo que já deu 200); o servidor pausou
+   * e tenta de novo neste instante (epoch ms). Ausente = sem bloqueio. Opcional (leva 3).
+   */
+  tseBloqueadoAte?: number;
+  /**
+   * I36 (reserva): instante (epoch ms) em que o TSE gerou os números atuais (data/hora de geração do arquivo), para o selo
+   * "chegou X s depois do TSE". Ausente = desconhecido. Opcional (leva 3).
+   */
+  geradoEm?: number;
+}
+
+/** Freio de carga (I37): por quanto o app multiplica os intervalos de consulta. 1 = normal. */
+export type FatorCarga = 1 | 2 | 3 | 5;
+
+/** Carga pedida pelo painel, como vai ao site (`LiveStatus.carga`). */
+export interface CargaStatus {
+  fator: FatorCarga;
+  /** modo leve: o mapa municipal e o "desde o 1º turno" param; o chat fica 2× mais espaçado */
+  leve?: boolean;
+}
+
+/** Aviso do arquivo nacional parado (I18): 'auto' = o servidor detecta e o app avisa; 'off' = nunca avisa. */
+export type ModoAvisoNacional = 'auto' | 'off';
+
+/**
+ * "Chaves da noite" (painel → Controle e `deploy/painel.sh`): interruptores operacionais da noite, gravados no
+ * AdminState — valem para todas as instâncias (admin.json) e sobrevivem a reinícios. Mudar uma chave NÃO incrementa
+ * `AdminState.versao` (não invalida o cache dos visitantes nem as ETags). Padrões em `CHAVES_NOITE_PADRAO`
+ * (src/shared/chaves-noite.ts); leia sempre por `chavesNoite(state)` (estado antigo sem o campo = padrões).
+ */
+export interface ChavesNoite {
+  /** I37 ('freio'): fator 1 e leve false = normal. Vai ao site como `LiveStatus.carga` (só quando puxado). */
+  freio: { fator: FatorCarga; leve: boolean };
+  /** I09 ('contador-publico'): "N pessoas agora" no site (só a partir de PISO_PESSOAS_PUBLICO). O painel vê sempre. */
+  contadorPublico: boolean;
+  /** I05 ('html-borda'): HTML guardado na borda (Cloudflare-CDN-Cache-Control). Liga só depois do ensaio. */
+  htmlBorda: boolean;
+  /** I11 ('medir-anuncios'): contar impressões visíveis (POST /api/anuncio/evento). false = 204 sem contar. */
+  medirAnuncios: boolean;
+  /** I18 ('aviso-nacional'): aviso do arquivo nacional parado (`FrescorCorrida.nacionalParadoDesde`). */
+  avisoNacional: ModoAvisoNacional;
+  /** I22 ('texto-bots'): texto do placar para bots de chat (/api/texto/placar). false = só o endereço do site. */
+  textoBots: boolean;
+  /** I23 ('contar-lives'): contagem anônima de lives (POST /api/live/batimento). false = 204 sem contar. */
+  contarLives: boolean;
 }
 
 /** Patrocínio/anúncio institucional (nunca político — ARCHITECTURE §1.5). */
@@ -384,6 +442,12 @@ export interface TseConfig {
    * Opcional por compatibilidade com estados salvos antes (ausente = padrão).
    */
   intervaloPrioritarioSeg?: number; // 5
+  /**
+   * I03: teto de pedidos por segundo ao TSE (balde de fichas global, com fatia reservada para BR e UF). Padrão e faixa em
+   * `TSE_LIMITE_POR_SEG` (constants.ts: 40; 5–90). Opcional por compatibilidade com estados salvos antes (ausente =
+   * padrão).
+   */
+  limitePorSeg?: number; // 40
 }
 
 export interface AdminState {
@@ -410,6 +474,8 @@ export interface AdminState {
   contatos?: ContatosPublicos | null;
   /** Troca automática 'pre' → 'tse' no início da apuração (ausente = padrão: ligada, horário do servidor). */
   trocaAuto?: TrocaAutoEstado;
+  /** "Chaves da noite" (leva 3). Ausente (estado salvo antes) = `CHAVES_NOITE_PADRAO`; leia por `chavesNoite(state)`. */
+  noite?: ChavesNoite;
 }
 
 /**

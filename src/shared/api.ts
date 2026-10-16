@@ -32,6 +32,16 @@
  *                                                             aparece aqui, uma vez)
  *                              { acao: 'revogar', lid }     → { link: LinkRelatorio }
  *
+ *   Leva 3 (rotas novas; quem implementa entre parênteses — a fiação em app.ts é da A2):
+ *   GET  /api/texto/placar?race=pres&uf=sp                  → text/plain (≤ 380 caracteres, sempre 200) para bots de chat
+ *                                                             (!apuracao); chave 'texto-bots' (G)
+ *   POST /api/live/batimento   BatimentoLive                → 204; contagem anônima de lives; chave 'contar-lives' (G)
+ *   GET  /api/live/agora                                    → LivesPublico (s-maxage=30; número só com N ≥ 5) (G)
+ *   GET  /api/admin/lives                                   → LivesResumo (src/shared/lives.ts) (G)
+ *   GET  /api/saude-noite                                   → { noite: 'ok' | 'atencao'; motivo? } (no-store) (B)
+ *   GET  /api/og/audiencia.png                              → imagem genérica "N pessoas acompanhando" (s-maxage=60) (F)
+ *   GET  /sitemap.xml                                       → índice de sitemaps (páginas, municípios, candidatos, cargos) (E)
+ *
  *   POST /api/admin/login            { senha }                → { ok: true } + cookie httpOnly
  *   POST /api/admin/logout
  *   GET  /api/admin/state                                     → AdminSnapshot
