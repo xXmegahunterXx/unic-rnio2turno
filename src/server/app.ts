@@ -67,6 +67,7 @@ import { Metricas } from './metrics';
 import { CC_OG, registrarOg } from './og-rotas';
 import { registrarOgAudiencia } from './og-audiencia';
 import { registrarDesdeT1 } from './desde-t1';
+import { registrarStreamers } from './lives'; // I22/I23 (frente G)
 import { ServicoOg } from './og-servico';
 import { DadosEstaticos } from './dados-estaticos';
 import { anonimizarRace } from '../shared/anon';
@@ -1464,6 +1465,7 @@ export function createApp(deps: AppDeps) {
     relatorio: relatorioDe,
   });
 
+  registrarStreamers(app, admin, { now, log, dados, noite, clienteDe, origemPermitida, stateDir: config.stateDir, borda: cdnCc, dominio: config.publicUrl ? new URL(config.publicUrl).host : null }); // I22/I23 (frente G): texto para bots, lives
   app.route('/api/admin', admin);
 
   app.all('/api/*', () => {

@@ -16,6 +16,7 @@ import { LogoMark } from '@/app/components/layout/Logo';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { segmentos } from '@/app/components/apuracao/VoteSplitBar';
 import { gerarQr, qrPath } from '@/app/components/apuracao/qr';
+import { textoPessoas } from '@/app/components/apuracao/PessoasAgora';
 
 /** Tudo o que um layout precisa para desenhar (montado por `useQuadroLive`; nos testes, à mão). */
 export interface QuadroLive {
@@ -24,6 +25,8 @@ export interface QuadroLive {
   resumo: Summary;
   /** resumo por UF (layout mapa) */
   ufs?: Partial<Record<UF, Summary>>;
+  /** estado fixo (I25, Presidente numa UF): `resumo` é o da UF, sem "eleito" */
+  uf?: UF | null;
   /** fase pública 'pre': mostra o 1º turno oficial e a contagem regressiva */
   pre: boolean;
   /** a corrida exibida é o 1º turno oficial */
@@ -42,14 +45,20 @@ export interface QuadroLive {
   dominio: string;
   /** endereço do QR Code */
   urlQr: string;
+  /** "N pessoas agora" do status (só vem do servidor, ≥ 500 e com a chave do painel ligada); null = não mostra */
+  pessoasAgora?: number | null;
 }
 
 export const finalistas = (race: Race) => race.candidatos.map((c, i) => ({ c, i })).filter(({ c }) => !c.agregado);
 
-/** Rótulo da disputa: "Presidente · 2º turno", "Governador · DF · 1º turno" (curto: "Gov. DF · 1º turno"). */
-export function rotuloDisputa(q: Pick<QuadroLive, 'race' | 't1'>, curto = false): string {
+/**
+ * Rótulo da disputa: "Presidente · 2º turno", "Governador · DF · 1º turno" (curto: "Gov. DF · 1º turno"); com estado
+ * fixo, "Presidente · PE · 2º turno" (curto: "Pres. · PE · 2º turno", do tamanho do rótulo sem estado).
+ */
+export function rotuloDisputa(q: Pick<QuadroLive, 'race' | 't1' | 'uf'>, curto = false): string {
   const uf = q.race.abrangencia === 'BR' ? '' : q.race.abrangencia;
-  const cargo = q.race.cargo === 'Presidente' ? 'Presidente' : curto ? `Gov. ${uf}` : `Governador · ${uf}`;
+  const pres = q.uf ? `${curto ? 'Pres.' : 'Presidente'} · ${q.uf}` : 'Presidente';
+  const cargo = q.race.cargo === 'Presidente' ? pres : curto ? `Gov. ${uf}` : `Governador · ${uf}`;
   return `${cargo.trim()} · ${q.t1 ? '1º turno' : '2º turno'}`;
 }
 
@@ -304,6 +313,24 @@ export function QrLive({ url, className }: { url: string; className?: string }) 
       <rect width={qr.tamanho + 4} height={qr.tamanho + 4} className="fill-surface dark:fill-fg" />
       <path d={qrPath(qr, 2)} className="fill-fg dark:fill-bg" />
     </svg>
+  );
+}
+
+/**
+ * "N pessoas no site agora · estimativa" (I09): discreto, só com o número que o servidor manda (≥ 500 e a chave
+ * 'contador-publico' ligada; nunca no demo) e `?pessoas=1` (padrão). É a audiência do SITE, não da live.
+ */
+export function PessoasLive({ n, className }: { n: number | null | undefined; className?: string }) {
+  if (typeof n !== 'number' || !Number.isFinite(n) || n <= 0) return null;
+  return (
+    <span
+      className={cn('num inline-flex items-center gap-[calc(var(--u)*0.6)] whitespace-nowrap text-[length:calc(var(--u)*1.35)] font-semibold leading-none text-fg-muted', className)}
+      title="Pessoas no Sintonia agora (estimativa)"
+    >
+      <span aria-hidden className="h-[calc(var(--u)*0.7)] w-[calc(var(--u)*0.7)] shrink-0 rounded-full bg-brand-2" />
+      {textoPessoas(Math.round(n))} no site agora
+      <span className="font-medium text-fg-subtle">· estimativa</span>
+    </span>
   );
 }
 

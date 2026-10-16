@@ -14,6 +14,7 @@ import type { Race, Summary } from '@/shared/types';
 import { anonimizarRace } from '@/shared/anon';
 import { UFS_GOV_2T } from '@/shared/constants';
 import { anuncioDaLive, ROTACAO_LIVE_MS } from '@/app/components/anuncios/OferecimentoLive';
+import { textoPessoas } from '@/app/components/apuracao/PessoasAgora';
 import { LayoutLive } from './Layouts';
 import { LAYOUTS_LIVE, lerOpcoesLive, type LayoutLive as TipoLayout } from './opcoes';
 import type { QuadroLive } from './pecas';
@@ -266,5 +267,44 @@ describe('barra: a aba "Oferecido por" nunca passa da largura da marca do Sinton
     const marca = /flex w-\[calc\(var\(--u\)\*(\d+)\)\] shrink-0 items-center border-r/.exec(src);
     expect(aba?.[1]).toBeDefined();
     expect(Number(aba![1])).toBeLessThanOrEqual(Number(marca![1]));
+  });
+});
+
+describe('estado fixo (?uf=) e "pessoas agora" (I25, I09)', () => {
+  it.each(LAYOUTS_LIVE)('%s: Presidente num estado — rótulo com a UF, mesmas cores e nenhum "eleito"', (l) => {
+    const h = html(l, quadro({ uf: 'PE', resumo: resumo([20_000, 19_000], 0.5, { eleito: null }) }), ANUNCIO, 'uf=pe');
+    expect(h).toMatch(l === 'barra' ? /Pres\. · PE · 2º turno/ : /Presidente · PE · 2º turno/);
+    expect(h).toContain('text-cand-vermelho');
+    expect(h).toContain('text-cand-azul');
+    expect(h).not.toMatch(/\bEleito\b|\beleito\b/);
+  });
+
+  it('mapa com estado fixo: título por município, não "por estado"', () => {
+    const h = html('mapa', quadro({ uf: 'PE' }), ANUNCIO, 'uf=pe');
+    expect(h).toContain('Presidente · Pernambuco');
+    expect(h).toContain('Quem está à frente em cada município');
+    expect(h).not.toContain('Brasil · por estado');
+    const df = html('mapa', quadro({ uf: 'DF' }), ANUNCIO, 'uf=df');
+    expect(df).toContain('Quem está à frente no Distrito Federal');
+  });
+
+  it.each(LAYOUTS_LIVE)('%s: "N pessoas no site agora · estimativa" só com o número do servidor; ?pessoas=0 esconde; longe dos candidatos', (l) => {
+    const com = html(l, quadro({ pessoasAgora: 12_345 }));
+    expect(com).toContain(`${textoPessoas(12_345)} no site agora`);
+    expect(com).toContain('· estimativa');
+    // junto do endereço do site, nunca entre os candidatos (no canto, na faixa da marca, depois do endereço)
+    if (l === 'canto') expect(com.indexOf('no site agora')).toBeGreaterThan(com.lastIndexOf('Flávio Bolsonaro'));
+    else expect(placarDe(com)).not.toContain('no site agora');
+    expect(html(l, quadro({ pessoasAgora: 12_345 }), ANUNCIO, 'pessoas=0')).not.toContain('no site agora');
+    expect(html(l, quadro({ pessoasAgora: null }))).not.toContain('no site agora');
+    expect(html(l, quadro())).not.toContain('no site agora');
+  });
+
+  it('placar em pé: pessoas no pé, fora do placar', () => {
+    const h = renderToStaticMarkup(
+      createElement(LayoutLive, { q: quadro({ pessoasAgora: 842 }), opcoes: lerOpcoesLive(new URLSearchParams('layout=placar')), anuncio: null, previa: true, vertical: true }),
+    );
+    expect(h).toContain(`${textoPessoas(842)} no site agora`);
+    expect(placarDe(h)).not.toContain('no site agora');
   });
 });

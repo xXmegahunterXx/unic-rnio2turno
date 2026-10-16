@@ -1,6 +1,8 @@
 /**
- * "N pessoas agora": pílula discreta com o número estimado de visitantes ativos (`LiveStatus.pessoasAgora`).
- * Só existe no servidor; no demo o campo não vem e a pílula NÃO aparece — nunca inventamos número.
+ * "N pessoas agora · estimativa": pílula discreta com o número estimado de visitantes ativos (`LiveStatus.pessoasAgora`).
+ * Só existe no servidor; no demo o campo não vem e a pílula NÃO aparece — nunca inventamos número. Desde a leva 3 (I09)
+ * o servidor só manda o número a partir de PISO_PESSOAS_PUBLICO (500) e com a chave 'contador-publico' ligada no painel;
+ * o rótulo "estimativa" fica sempre junto (é contagem de sinais, arredondada — não é medição exata).
  * Não é enquete nem preferência: é só audiência do site (ARCHITECTURE §1.2).
  */
 import type { LiveStatus } from '@/shared/types';
@@ -33,11 +35,13 @@ export function PessoasAgora({
   const n = pessoasAgora(status);
   if (n === null) return null;
   const texto = `${textoPessoas(n)} agora`;
+  const rotulo = <span className="font-medium text-fg-subtle">· estimativa</span>;
   if (variant === 'inline') {
     return (
       <span className={cn('num inline-flex items-center gap-1.5 text-fg-muted', className)} title="Pessoas acompanhando o Sintonia agora (estimativa)">
         <Icon name="usuarios" size={14} />
         {texto}
+        {rotulo}
       </span>
     );
   }
@@ -51,6 +55,7 @@ export function PessoasAgora({
         <span className="relative h-1.5 w-1.5 rounded-full bg-brand-2" />
       </span>
       {texto}
+      {rotulo}
     </span>
   );
 }

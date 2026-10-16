@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ContagemDiaAudiencia } from '@/shared/audiencia';
 import {
   csvCurva,
   csvHorasNoite,
@@ -26,7 +27,7 @@ describe('período e somas', () => {
   it('dias de calendário que terminam hoje (não os n registros)', () => {
     expect(diaAntes('2026-10-25', 6)).toBe('2026-10-19');
     expect(diaAntes('2026-11-01', 1)).toBe('2026-10-31');
-    const lista = [
+    const lista: ContagemDiaAudiencia[] = [
       { dia: '2026-10-10', n: { SP: 100 } },
       { dia: '2026-10-19', n: { SP: 1, RJ: 2 } },
       { dia: '2026-10-25', n: { SP: 3, ND: 1 } },

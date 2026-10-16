@@ -1,16 +1,25 @@
 /**
- * /streamers — "Use o Sintonia na sua live": os layouts do modo streamer (/live) com prévia, opções e "Copiar URL",
- * o passo a passo do OBS/Streamlabs (fonte de navegador), as regras de uso e o contato de parceria (`status.anuncie`,
- * o mesmo contato comercial do painel).
+ * /streamers — "Use o Sintonia na sua live": os layouts do modo streamer (/live) com prévia, opções (inclusive o
+ * estado fixo, I25) e "Copiar URL", o passo a passo do OBS/Streamlabs (fonte de navegador), o `!apuracao` dos bots de
+ * chat (I22: Nightbot, StreamElements, Fossabot — comando e timer prontos, com a prévia da resposta), o endereço do
+ * Modo TV com estado fixo, as regras de uso e o contato de parceria (`status.anuncie`, o mesmo contato comercial do
+ * painel). "O Sintonia está em N lives agora" (I23) só a partir de 5 lives, sem nunca dizer quais.
  *
  * Prévias: a própria /live num iframe (mesma origem, `?previa=1` → o anúncio aparece sem contar impressão), desenhada
  * em 1280×720 e reduzida para caber — é exatamente o que vai para a transmissão, com o tema e o fundo pedidos (o tema
  * do site não interfere). `loading="lazy"`: só carrega perto da tela.
  *
- * Nada de número de audiência aqui (nunca inventamos): só o que o produto entrega de fato.
+ * Nada de número de audiência aqui (nunca inventamos): só o que o produto entrega de fato — a contagem de lives é
+ * medida (src/server/lives.ts) e só aparece a partir de `LIVES.pisoPublico`.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import type { UF, UFBr } from '@/shared/types';
+import { UF_NOMES } from '@/shared/constants';
+import { fmtInt } from '@/shared/format';
+import { LIVES, type LivesPublico } from '@/shared/lives';
+import { comandoBot, mensagemTimer, urlTextoPlacar, type BotChat } from '@/shared/texto-placar';
 import { cn } from '@/app/lib/cn';
 import { copiarTexto, urlAbsoluta } from '@/app/lib/share';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
@@ -46,6 +55,7 @@ import {
   ROTULO_LAYOUT,
   ROTULO_POSICAO,
   rotuloRaceLive,
+  UFS_LIVE,
   type FundoLive,
   type LayoutLive,
   type OpcoesLive,
@@ -82,6 +92,8 @@ export default function StreamersPage() {
       <Container wide className="pb-6">
         <Layouts />
         <PassoAPasso />
+        <BotsDeChat />
+        <ModoTvRegional />
         <Regras />
         <Parceria whatsapp={contato?.whatsapp} email={(contato?.email && !emailProvisorio(contato.email) ? contato.email : null) ?? geral ?? undefined} />
       </Container>
@@ -116,6 +128,7 @@ function Hero() {
               transparente. Os números atualizam sozinhos, a cada poucos segundos.{' '}
               <span className="text-fg">É grátis e não precisa de cadastro.</span>
             </p>
+            <LivesAgora />
             <div className="mt-7 flex flex-col gap-2.5 sm:flex-row">
               <ButtonLink to={{ hash: 'layouts' }} variant="primary" size="lg" icon="grade">
                 Escolher o layout
@@ -128,6 +141,8 @@ function Hero() {
               <Selo icone="ao-vivo">Fonte de navegador</Selo>
               <Selo icone="olho-fechado">Fundo transparente</Selo>
               <Selo icone="expandir">1920 × 1080, 1280 × 720 e em pé 1080 × 1920</Selo>
+              <Selo icone="pin">Brasil ou um estado</Selo>
+              <Selo icone="lista">!apuracao no chat</Selo>
               <Selo icone="selo">Fonte: TSE</Selo>
             </ul>
           </div>
@@ -265,6 +280,8 @@ const OPCOES_TEMA: { value: TemaLive; label: string }[] = [
   { value: 'claro', label: 'Claro' },
 ];
 const OPCOES_RACE = RACES_LIVE.map((r) => ({ value: r, label: rotuloRaceLive(r) }));
+/** Estado fixo (I25): Brasil ou um dos 27 estados (Presidente). */
+const OPCOES_UF = [{ value: '', label: 'Brasil (todos os estados)' }, ...UFS_LIVE.map((u) => ({ value: u, label: UF_NOMES[u] }))];
 
 function CartaoLayout({ layout, n }: { layout: LayoutLive; n: number }) {
   const [o, setO] = useState<OpcoesLive>(() => opcoesPadrao(layout));
@@ -298,8 +315,13 @@ function CartaoLayout({ layout, n }: { layout: LayoutLive; n: number }) {
       <div className="flex flex-1 flex-col gap-4 p-5 sm:p-6">
         <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
           <Campo rotulo="Disputa">
-            <Select size="sm" aria-label="Disputa" options={OPCOES_RACE} value={o.race} onChange={(e) => mudar({ race: e.target.value })} />
+            <Select size="sm" aria-label="Disputa" options={OPCOES_RACE} value={o.race} onChange={(e) => mudar({ race: e.target.value, uf: null })} />
           </Campo>
+          {o.race === 'pres' ? (
+            <Campo rotulo="Estado">
+              <Select size="sm" aria-label="Estado" options={OPCOES_UF} value={o.uf ?? ''} onChange={(e) => mudar({ uf: (e.target.value || null) as UFBr | null })} />
+            </Campo>
+          ) : null}
           {layout === 'placar' ? (
             <Campo rotulo="Tela da live">
               <Segmented
@@ -346,7 +368,7 @@ function CartaoLayout({ layout, n }: { layout: LayoutLive; n: number }) {
               />
             </Campo>
           ) : null}
-          {layout === 'mapa' && o.race === 'pres' ? (
+          {layout === 'mapa' && o.race === 'pres' && !o.uf ? (
             <Campo rotulo="Mapa">
               <Segmented
                 size="sm"
@@ -491,6 +513,257 @@ function PassoAPasso() {
             </li>
           ))}
         </ul>
+      </div>
+    </Bloco>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// "O Sintonia está em N lives agora" (I23): só a partir de LIVES.pisoPublico; nunca quais
+
+function useLivesAgora(): number | null {
+  const q = useQuery({
+    queryKey: ['live-agora'],
+    queryFn: async () => {
+      const r = await fetch('/api/live/agora', { credentials: 'omit' });
+      if (!r.ok) return null;
+      const j = (await r.json()) as LivesPublico;
+      return typeof j.agora === 'number' && j.agora >= LIVES.pisoPublico ? j.agora : null;
+    },
+    enabled: !__DEMO__,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  return q.data ?? null;
+}
+
+function LivesAgora() {
+  const n = useLivesAgora();
+  if (n === null) return null;
+  return (
+    <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-line bg-surface/80 px-3.5 py-1.5 text-[13.5px] font-medium text-fg-muted backdrop-blur">
+      <span className="relative inline-flex h-2 w-2" aria-hidden>
+        <span className="absolute inset-0 animate-ping rounded-full bg-brand-2 opacity-60 motion-reduce:hidden" />
+        <span className="relative h-2 w-2 rounded-full bg-brand-2" />
+      </span>
+      <span>
+        O Sintonia está em <strong className="num font-semibold text-fg">{fmtInt(n)} lives</strong> agora
+      </span>
+    </p>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Bots de chat (I22): !apuracao
+
+const BOTS: { value: BotChat; label: string }[] = [
+  { value: 'nightbot', label: 'Nightbot' },
+  { value: 'streamelements', label: 'StreamElements' },
+  { value: 'fossabot', label: 'Fossabot' },
+];
+
+/** Alvo do comando: Brasil (''), um estado ('PE') ou uma disputa de governador ('gov-df'). */
+const OPCOES_ALVO = [
+  { value: '', label: 'Brasil · Presidente' },
+  ...UFS_LIVE.map((u) => ({ value: u, label: `${UF_NOMES[u]} · Presidente` })),
+  ...RACES_LIVE.filter((r) => r !== 'pres').map((r) => ({ value: r, label: rotuloRaceLive(r) })),
+];
+
+const alvoDe = (v: string): { uf: UF | null; race: string | null } => (v.startsWith('gov-') ? { uf: null, race: v } : { uf: (v || null) as UF | null, race: null });
+
+/** Texto que o bot vai responder agora (o próprio endereço do servidor; no demo não há servidor). */
+function usePreviaTexto(alvo: string, ativo: boolean): string | null {
+  const q = useQuery({
+    queryKey: ['texto-placar', alvo],
+    queryFn: async () => {
+      const r = await fetch(urlTextoPlacar('', alvoDe(alvo)), { credentials: 'omit' });
+      return r.ok ? await r.text() : null;
+    },
+    enabled: ativo && !__DEMO__,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  return q.data ?? null;
+}
+
+function Copiavel({ rotulo, valor, dica, extra }: { rotulo: string; valor: string; dica?: ReactNode; extra?: ReactNode }) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = async () => {
+    const ok = await copiarTexto(valor);
+    if (ok) {
+      setCopiado(true);
+      window.setTimeout(() => setCopiado(false), 2200);
+      toast('Copiado.', { tone: 'ok', icon: 'check' });
+    } else toast('Não deu para copiar: selecione o texto e copie à mão.', { tone: 'alert' });
+  };
+  return (
+    <div className="min-w-0">
+      <span className="mb-1.5 block text-[13px] font-medium text-fg-muted">{rotulo}</span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
+        <code className="min-w-0 flex-1 select-all break-all rounded-xl border border-line bg-surface-2 px-3 py-2.5 font-mono text-[12.5px] leading-relaxed text-fg">{valor}</code>
+        <div className="flex shrink-0 items-start gap-2 sm:items-stretch">
+          <button type="button" onClick={copiar} className={cn(buttonClasses({ variant: 'outline', size: 'md' }), 'h-11 shrink-0')}>
+            <Icon name={copiado ? 'check' : 'copiar'} size={18} />
+            {copiado ? 'Copiado' : 'Copiar'}
+          </button>
+          {extra}
+        </div>
+      </div>
+      {dica ? <p className="mt-1.5 text-[12.5px] leading-snug text-fg-subtle">{dica}</p> : null}
+    </div>
+  );
+}
+
+function BotsDeChat() {
+  const { site } = siteDaLive();
+  const [bot, setBot] = useState<BotChat>('nightbot');
+  const [alvo, setAlvo] = useState('');
+  const [refTela, naTela] = useNaTela<HTMLDivElement>('300px');
+  const a = alvoDe(alvo);
+  const cmd = comandoBot(bot, site, a);
+  const timer = mensagemTimer(bot, site, a);
+  const previa = usePreviaTexto(alvo, naTela);
+  const livre = !alvo && bot === 'nightbot';
+  const passos: Record<BotChat, ReactNode[]> = {
+    nightbot: [
+      <>Com o Nightbot no seu canal, escreva no chat da live (como dono ou moderador) a linha de cima.</>,
+      <>Pronto: quem digitar <strong className="font-semibold text-fg">!apuracao</strong> no chat recebe o placar e o endereço do site.</>,
+      <>
+        Para repetir sozinho: no painel do Nightbot, <strong className="font-semibold text-fg">Timers › Add</strong>, com a mensagem do timer e intervalo
+        de <span className="num">5</span> minutos ou mais.
+      </>,
+    ],
+    streamelements: [
+      <>Com o StreamElements no seu canal, escreva no chat da live (como dono ou moderador) a linha de cima.</>,
+      <>Pronto: quem digitar <strong className="font-semibold text-fg">!apuracao</strong> no chat recebe o placar e o endereço do site.</>,
+      <>
+        Para repetir sozinho: no painel do StreamElements, <strong className="font-semibold text-fg">Chatbot › Timers</strong>, com a mensagem do timer e
+        intervalo de <span className="num">5</span> minutos ou mais.
+      </>,
+    ],
+    fossabot: [
+      <>
+        No painel do Fossabot, <strong className="font-semibold text-fg">Commands › Add Command</strong>: nome{' '}
+        <strong className="font-semibold text-fg">!apuracao</strong> e, na resposta, a linha de cima.
+      </>,
+      <>Pronto: quem digitar !apuracao no chat recebe o placar e o endereço do site.</>,
+      <>
+        Para repetir sozinho: <strong className="font-semibold text-fg">Timers › Add Timer</strong>, com a mensagem do timer e intervalo de{' '}
+        <span className="num">5</span> minutos ou mais.
+      </>,
+    ],
+  };
+  return (
+    <Bloco
+      id="bots"
+      eyebrow="Bot de chat"
+      titulo="!apuracao no chat da sua live"
+      descricao="Um comando para o Nightbot, o StreamElements ou o Fossabot responder com o placar e o endereço do site — no Twitch, no YouTube e no Kick. Escolha o bot e copie."
+    >
+      <div ref={refTela} className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] lg:gap-5">
+        <div className="flex min-w-0 flex-col gap-5 rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-7">
+          <div className="grid grid-cols-1 gap-x-4 gap-y-3.5 sm:grid-cols-2">
+            <Campo rotulo="Bot">
+              <Segmented size="sm" block ariaLabel="Bot de chat" options={BOTS} value={bot} onChange={setBot} />
+            </Campo>
+            <Campo rotulo="Placar">
+              <Select size="sm" aria-label="Placar do comando" options={OPCOES_ALVO} value={alvo} onChange={(e) => setAlvo(e.target.value)} />
+            </Campo>
+          </div>
+          {cmd.chat ? (
+            <Copiavel
+              rotulo="Cole no chat da live"
+              valor={cmd.chat}
+              dica={livre ? <>Do jeito que está, o público também escolhe o estado: <span className="font-mono">!apuracao pe</span>, <span className="font-mono">!apuracao são paulo</span> ou <span className="font-mono">!apuracao governador df</span>.</> : null}
+            />
+          ) : (
+            <Copiavel rotulo="Resposta do comando !apuracao" valor={cmd.resposta} />
+          )}
+          <Copiavel rotulo="Mensagem do timer" valor={timer} dica="Com intervalo de 5 minutos ou mais, para não encher o chat." />
+          <ol className="border-t border-line pt-4">
+            {passos[bot].map((p, i) => (
+              <li key={i} className={cn('flex gap-3.5', i > 0 && 'mt-3')}>
+                <span className="num mt-px inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/15 text-[12px] font-bold text-brand-fg">{i + 1}</span>
+                <p className="min-w-0 text-pretty text-[14.5px] leading-relaxed text-fg-muted">{p}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="rounded-3xl border border-line bg-surface p-5 shadow-card">
+            <h3 className="flex items-center gap-2 text-[15.5px] font-semibold leading-snug text-fg">
+              <Icon name="lista" size={17} className="text-fg-muted" />
+              O que o bot responde agora
+            </h3>
+            {previa ? (
+              <p className="mt-3 rounded-2xl rounded-tl-md border border-line bg-surface-2 px-3.5 py-3 text-[14px] leading-relaxed text-fg">{previa}</p>
+            ) : (
+              <p className="mt-3 text-[14px] leading-relaxed text-fg-muted">A prévia da resposta aparece aqui, com os números do momento.</p>
+            )}
+          </div>
+          <ul className="grid grid-cols-1 gap-3">
+            {DICAS_BOT.map((d) => (
+              <li key={d.titulo} className="flex gap-3.5 rounded-3xl border border-line bg-surface p-5 shadow-card">
+                <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-fg-muted">
+                  <Icon name={d.icone} size={18} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-[15.5px] font-semibold leading-snug text-fg">{d.titulo}</h3>
+                  <p className="mt-1 text-pretty text-[14px] leading-relaxed text-fg-muted">{d.texto}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </Bloco>
+  );
+}
+
+const DICAS_BOT: { icone: IconName; titulo: string; texto: ReactNode }[] = [
+  {
+    icone: 'relogio',
+    titulo: 'Sem nomes antes das 17h de 25/10',
+    texto: 'Até a apuração começar, a resposta traz só a contagem regressiva e o endereço. No dia 25, das 0h às 17h, só “a apuração começa às 17h”.',
+  },
+  {
+    icone: 'selo',
+    titulo: 'Texto neutro, ordem da urna',
+    texto: 'Os dois finalistas pelo número na urna, com o mesmo formato, o total apurado e o horário do último dado. Cabe no chat do YouTube.',
+  },
+];
+
+// ---------------------------------------------------------------------------------------------------------------
+// Modo TV com estado fixo (I25): rádios, TVs e telões regionais
+
+function ModoTvRegional() {
+  const [uf, setUf] = useState('');
+  const url = urlAbsoluta(uf ? `/tv?uf=${uf.toLowerCase()}` : '/tv');
+  return (
+    <Bloco
+      id="tv"
+      eyebrow="Rádio, TV e telão"
+      titulo="O Modo TV, do Brasil ou de um estado"
+      descricao="Tela cheia com placar grande, mapa, letreiro dos acontecimentos e QR Code. Com um estado, o placar e o mapa ficam naquele estado a noite inteira."
+    >
+      <div className="grid grid-cols-1 gap-4 rounded-3xl border border-line bg-surface p-5 shadow-card sm:p-7 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] lg:items-end lg:gap-6">
+        <Campo rotulo="Estado">
+          <Select size="sm" aria-label="Estado do Modo TV" options={OPCOES_UF} value={uf} onChange={(e) => setUf(e.target.value)} />
+        </Campo>
+        <Copiavel
+          rotulo="Endereço do Modo TV"
+          valor={url}
+          extra={
+            <a href={url} target="_blank" rel="noopener noreferrer" className={cn(buttonClasses({ variant: 'ghost', size: 'md' }), 'h-11 shrink-0')}>
+              Abrir
+              <Icon name="externo" size={15} />
+            </a>
+          }
+        />
       </div>
     </Bloco>
   );

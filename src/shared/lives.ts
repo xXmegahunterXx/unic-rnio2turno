@@ -16,11 +16,42 @@ export const LIVES = {
   ativaS: 150,
   /** fontes distintas aceitas por rede (o resto é ignorado) */
   maxFontesPorRede: 30,
+  /** fontes ativas no total (memória limitada mesmo sob ataque; acima, as novas são ignoradas) */
+  maxFontes: 20_000,
   /** corpo máximo do POST /api/live/batimento (bytes) */
   corpoMax: 200,
   /** GET /api/live/agora só mostra o número a partir de tantas lives (abaixo: null) */
   pisoPublico: 5,
+  /** um batimento soma 1 minuto se vier pelo menos tantos segundos depois do último que somou (recarga não duplica) */
+  minutoMinS: 45,
+  /** anúncios aceitos por batimento */
+  maxAnuncios: 4,
+  /** batimentos aceitos por rede por minuto (acima: 204 sem contar) */
+  maxBatimentosRedeMin: 120,
+  /** horas guardadas no detalhe por hora (CSV do painel): 14 dias, como a audiência */
+  horas: 336,
+  /** o `GET /api/live/agora` fica tantos segundos na borda */
+  agoraBordaS: 30,
 } as const;
+
+/**
+ * Layouts contados (lista fechada; o servidor ignora o resto). Os quatro da /live (`LAYOUTS_LIVE` em
+ * src/app/components/live/opcoes.ts — o teste confere que são os mesmos) + 'vertical' (placar em pé: TikTok, Shorts).
+ */
+export const LAYOUTS_CONTADOS = ['placar', 'barra', 'canto', 'mapa', 'vertical'] as const;
+export type LayoutContado = (typeof LAYOUTS_CONTADOS)[number];
+
+/** Rótulo de cada layout no painel. */
+export const ROTULO_LAYOUT_CONTADO: Record<LayoutContado, string> = {
+  placar: 'Placar grande',
+  barra: 'Barra',
+  canto: 'Canto',
+  mapa: 'Mapa',
+  vertical: 'Em pé (9:16)',
+};
+
+/** Id aleatório da carga da página (12 caracteres [a-z0-9]): não identifica canal nem pessoa e não fica no aparelho. */
+export const ID_FONTE_LIVE = /^[a-z0-9]{8,24}$/;
 
 /** Corpo do `POST /api/live/batimento`. */
 export interface BatimentoLive {
@@ -47,4 +78,27 @@ export interface LivesResumo {
   minutos: { total: number; porLayout: Record<string, number>; porAnuncio: Record<string, number> };
   /** canais distintos que pediram o texto do placar (Nightbot-Channel e afins) — só a contagem */
   canaisBot: number;
+  /** (opcional, leva 3) maior número de lives ao mesmo tempo, com o instante (epoch ms) */
+  pico?: { n: number; em: number } | null;
+  /** (opcional) início da contagem (epoch ms): subida sem arquivo ou "Zerar contagem" do painel */
+  desde?: number;
+  /** (opcional) lives agora exibindo cada anúncio (id do anúncio) */
+  agoraPorAnuncio?: Record<string, number>;
+  /** (opcional) detalhe por hora (CSV): início da hora (epoch ms), maior número de lives ao mesmo tempo e minutos */
+  horas?: HoraLives[];
+  /** (opcional) a chave 'contar-lives' do painel está ligada */
+  ligado?: boolean;
 }
+
+/** Uma hora do detalhe (CSV do painel). */
+export interface HoraLives {
+  /** início da hora (epoch ms, hora cheia UTC — Brasília não tem horário de verão) */
+  h: number;
+  /** maior número de lives ao mesmo tempo nesta hora */
+  max: number;
+  /** minutos de /live no ar nesta hora */
+  minutos: number;
+}
+
+/** Comando do painel (`POST /api/admin/lives`). */
+export type ComandoLives = { acao: 'zerar' };

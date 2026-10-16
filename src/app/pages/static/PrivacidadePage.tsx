@@ -202,13 +202,28 @@ export default function PrivacidadePage() {
               cada 1 a 4 minutos.
             </>,
             <>
-              <strong>O que guardamos.</strong> Só totais: páginas vistas por dia, por tipo de página e por hora; entradas por origem; visitantes
-              únicos estimados por dia; e o maior número de pessoas no site ao mesmo tempo, com data e hora.
+              <strong>Estado, país e tipo de aparelho, só resumidos.</strong> Como em qualquer acesso, o pedido chega com o tipo de navegador e,
+              pela rede de distribuição do site (Cloudflare), a localização aproximada da conexão. Usamos só três informações resumidas: se o
+              aparelho é celular ou computador, a sigla do estado (por exemplo, “PE”) e a do país (por exemplo, “BR”). Cada página vista soma 1
+              nesses totais e o resto é descartado na hora: cidade, CEP e coordenadas não são lidos nem guardados.
+            </>,
+            <>
+              <strong>O que guardamos.</strong> Só totais: páginas vistas por dia, por tipo de página, por hora, por estado, por país e por tipo
+              de aparelho; entradas por origem; visitantes únicos estimados por dia; o maior número de pessoas no site ao mesmo tempo, com data e
+              hora, e minuto a minuto nas últimas 24 horas; e as “horas de tela”, a soma do tempo de todas as páginas abertas e visíveis (um
+              total geral, nunca o tempo de alguém). O detalhe por hora fica guardado por 14 dias e os totais por dia, por até 400 dias.
             </>,
             <>
               <strong>Visitantes únicos sem identificar ninguém.</strong> Para não contar a mesma pessoa duas vezes no dia, o servidor calcula, só em
               memória, um código a partir da conexão e do tipo de navegador, misturado a um valor aleatório que muda todo dia e nunca é gravado. À
               meia-noite o valor e a lista do dia são descartados e fica só o número. Não guardamos IP, cookie nem identificador.
+            </>,
+            <>
+              <strong>Modo streamer.</strong> A página usada como fonte de transmissão ao vivo (/live) avisa o servidor a cada minuto, com um código
+              aleatório criado cada vez que ela abre (não identifica canal nem pessoa), o layout em uso e os anúncios na tela. Contamos só quantas
+              transmissões estão no ar e os minutos por layout e por anúncio. Quando um bot de chat de transmissão pede o placar em texto, contamos
+              só quantos canais diferentes pediram: o nome do canal não aparece no painel nem é publicado. Quem assiste à transmissão não envia
+              nada ao Sintonia.
             </>,
             <>
               <strong>Nada sobre a sua opinião.</strong> O sinal não diz nada sobre as suas respostas do Teste Cego nem sobre candidatos.
@@ -219,8 +234,8 @@ export default function PrivacidadePage() {
           ]}
         />
         <p>
-          Esses totais podem aparecer na página <LinkInterno to="/anuncie">Anuncie no Sintonia</LinkInterno>, sempre com a data de início da
-          medição.
+          Esses totais podem aparecer na página <LinkInterno to="/anuncie">Anuncie no Sintonia</LinkInterno> e em material para anunciantes, sempre
+          como números gerais e com a data de início da medição.
         </p>
       </Secao>
 

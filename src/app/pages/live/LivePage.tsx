@@ -24,6 +24,7 @@ import { MapaLiveConteudo } from '@/app/components/live/MapaLive';
 import { lerOpcoesLive, type FundoLive, type TemaLive } from '@/app/components/live/opcoes';
 import { FundoSolidoLive } from '@/app/components/live/pecas';
 import { useQuadroLive } from '@/app/components/live/useQuadroLive';
+import { useBatimentoLive } from '@/app/components/live/batimento'; // I23 (frente G): contagem anônima de lives
 import { useAnuncioLive } from '@/app/components/anuncios/OferecimentoLive';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 
@@ -73,6 +74,7 @@ export default function LivePage() {
   const previa = params.get('previa') === '1';
   const quadro = useQuadroLive(opcoes.race);
   const anuncio = useAnuncioLive();
+  useBatimentoLive();
   // live vertical: janela mais alta que larga
   const emPe = useMediaQuery('(max-aspect-ratio: 1/1)', false);
   const vertical = emPe && (opcoes.layout === 'placar' || opcoes.layout === 'mapa');

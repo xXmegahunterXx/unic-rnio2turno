@@ -9,8 +9,13 @@
  *  - race     pres | gov-xx                   (só as UFs de UFS_GOV_2T; o resto cai em Presidente)
  *  - posicao  barra: baixo | topo · canto: topo-direita | topo-esquerda | baixo-direita | baixo-esquerda
  *  - mapa     estados | municipios            (layout mapa, Presidente)
+ *  - uf       ac | al | … | to                (I25: Presidente num estado FIXO — rádios, TVs e lives regionais; só com
+ *                                              race=pres; lista fechada das 27 UFs; o mapa vira o do estado)
+ *  - pessoas  0 | 1                           (I09: "N pessoas agora" discreto; padrão 1 — só aparece quando o servidor
+ *                                              manda o número: ≥ 500 e a chave do painel ligada)
  */
-import type { UF } from '@/shared/types';
+import type { UF, UFBr } from '@/shared/types';
+import { UFS } from '@/shared/types';
 import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
 
 export const LAYOUTS_LIVE = ['placar', 'barra', 'canto', 'mapa'] as const;
@@ -38,8 +43,12 @@ export interface OpcoesLive {
   race: string;
   /** Só barra e canto; nos layouts de tela cheia é ignorada. */
   posicao: PosicaoLive;
-  /** Só no layout mapa de Presidente. */
+  /** Só no layout mapa de Presidente (sem estado fixo). */
   mapa: MapaLive;
+  /** Estado fixo (I25): Presidente naquela UF. Só com race 'pres'; null = Brasil. */
+  uf: UFBr | null;
+  /** Mostra "N pessoas agora" (I09) quando o servidor manda o número. */
+  pessoas: boolean;
 }
 
 /** Domínio exibido nas lives quando o build não define VITE_SITE_URL (o endereço público do produto). */
@@ -82,6 +91,15 @@ export const ROTULO_POSICAO: Record<PosicaoLive, string> = {
 
 /** Disputas aceitas: Presidente + as de governador do 2º turno (fonte única: UFS_GOV_2T). */
 export const RACES_LIVE: readonly string[] = ['pres', ...UFS_GOV_2T.map((u) => `gov-${u.toLowerCase()}`)];
+
+/** Estados aceitos no estado fixo (as 27 UFs; o exterior não tem mapa nem "estado"). */
+export const UFS_LIVE: readonly UFBr[] = UFS;
+
+/** UF da URL (sigla, qualquer caixa) ou null. */
+export function lerUfLive(v: string | null): UFBr | null {
+  const x = (v ?? '').trim().toUpperCase();
+  return (UFS_LIVE as readonly string[]).includes(x) ? (x as UFBr) : null;
+}
 
 /** Rótulo curto da disputa para seletores ("Presidente", "Governador · DF"). */
 export function rotuloRaceLive(race: string): string {
@@ -138,8 +156,10 @@ export function lerOpcoesLive(params: URLSearchParams): OpcoesLive {
   let posicao: PosicaoLive = posicaoPadrao(layout);
   if (layout === 'barra' && (POSICOES_BARRA as readonly string[]).includes(p)) posicao = p as PosicaoBarra;
   if (layout === 'canto' && (POSICOES_CANTO as readonly string[]).includes(p)) posicao = p as PosicaoCanto;
-  const mapa: MapaLive = layout === 'mapa' && race === 'pres' && (params.get('mapa') ?? '').toLowerCase() === 'municipios' ? 'municipios' : 'estados';
-  return { layout, fundo, tema, race, posicao, mapa };
+  const uf = race === 'pres' ? lerUfLive(params.get('uf')) : null;
+  const mapa: MapaLive = layout === 'mapa' && race === 'pres' && !uf && (params.get('mapa') ?? '').toLowerCase() === 'municipios' ? 'municipios' : 'estados';
+  const pessoas = !/^(0|nao|não|false|off)$/i.test((params.get('pessoas') ?? '').trim());
+  return { layout, fundo, tema, race, posicao, mapa, uf, pessoas };
 }
 
 /**
@@ -153,14 +173,16 @@ export function caminhoLive(o: OpcoesLive): string {
   if (o.fundo === 'transparente' && o.tema !== 'escuro') p.set('tema', o.tema);
   if (o.race !== 'pres' && RACES_LIVE.includes(o.race)) p.set('race', o.race);
   if ((o.layout === 'barra' || o.layout === 'canto') && o.posicao !== posicaoPadrao(o.layout)) p.set('posicao', o.posicao);
-  if (o.layout === 'mapa' && o.race === 'pres' && o.mapa === 'municipios') p.set('mapa', 'municipios');
+  if (o.race === 'pres' && o.uf && (UFS_LIVE as readonly string[]).includes(o.uf)) p.set('uf', o.uf.toLowerCase());
+  if (o.layout === 'mapa' && o.race === 'pres' && !o.uf && o.mapa === 'municipios') p.set('mapa', 'municipios');
+  if (!o.pessoas) p.set('pessoas', '0');
   return `/live?${p.toString()}`;
 }
 
 /** Opções padrão de um layout (o que a /streamers mostra antes de a pessoa mexer). */
 export function opcoesPadrao(layout: LayoutLive): OpcoesLive {
   const fundo = fundoPadrao(layout);
-  return { layout, fundo, tema: temaEfetivo(fundo, null), race: 'pres', posicao: posicaoPadrao(layout), mapa: 'estados' };
+  return { layout, fundo, tema: temaEfetivo(fundo, null), race: 'pres', posicao: posicaoPadrao(layout), mapa: 'estados', uf: null, pessoas: true };
 }
 
 /** Normaliza uma combinação vinda dos controles da /streamers (ex.: trocou o fundo → o tema acompanha). */

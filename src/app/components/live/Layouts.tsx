@@ -15,11 +15,16 @@
  * Anúncio ('live', "Oferecido por"): nunca dentro do placar nem colado a foto, nome ou número de candidato — na barra do
  * topo (placar, mapa) ao lado da marca do Sintonia e separado por um filete; na barra e no canto, numa aba própria
  * presa à marca/endereço do Sintonia, do lado oposto aos candidatos.
+ *
+ * Estado fixo (I25, `?uf=pe`, Presidente): o mesmo desenho com o placar da UF ("Presidente · PE") e, no layout mapa, o
+ * estado por município. "N pessoas no site agora" (I09, `?pessoas=0` esconde): junto do endereço do site, nunca no
+ * placar — rodapé (placar), linha do selo (mapa), linha de cima da barra, faixa da marca (canto), pé do placar em pé.
  */
 import type { ReactNode } from 'react';
 import type { AnuncioPublico } from '@/shared/anuncios';
 import { pctTotalizadas } from '@/shared/calc';
 import { fmtHoraSeg, fmtPct } from '@/shared/format';
+import { UF_NOMES } from '@/shared/constants';
 import { cn } from '@/app/lib/cn';
 import { corSlot, fillMargem } from '@/app/lib/raceUi';
 import { hachuraStyle } from '@/app/components/apuracao/MapHatch';
@@ -36,6 +41,7 @@ import {
   MarcaLive,
   PAINEL,
   PctLive,
+  PessoasLive,
   QrLive,
   rotuloDisputa,
   SeloEleito,
@@ -80,7 +86,7 @@ export function LayoutLive(props: PropsLayoutLive) {
 // Barra do topo (placar e mapa)
 // =============================================================================================
 
-function CabecalhoLive({ q, anuncio, previa, vista }: Pick<PropsLayoutLive, 'q' | 'anuncio' | 'previa' | 'vista'>) {
+function CabecalhoLive({ q, anuncio, previa, vista, pessoas }: Pick<PropsLayoutLive, 'q' | 'anuncio' | 'previa' | 'vista'> & { pessoas?: number | null }) {
   return (
     <header className={cn(PAINEL, 'relative flex shrink-0 items-center gap-[calc(var(--u)*2)] px-[calc(var(--u)*2.2)] py-[calc(var(--u)*1.4)]')}>
       <MarcaLive dominio={q.dominio} subtitulo={`Apuração · ${rotuloDisputa(q)}`} tamanho="lg" className="shrink-0" />
@@ -93,7 +99,14 @@ function CabecalhoLive({ q, anuncio, previa, vista }: Pick<PropsLayoutLive, 'q' 
         ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-[calc(var(--u)*2)]">
-        <SeloLive q={q} />
+        {pessoas ? (
+          <div className="flex flex-col items-end gap-[calc(var(--u)*0.7)]">
+            <SeloLive q={q} />
+            <PessoasLive n={pessoas} />
+          </div>
+        ) : (
+          <SeloLive q={q} />
+        )}
         <TempoLive q={q} />
       </div>
     </header>
@@ -104,7 +117,10 @@ function CabecalhoLive({ q, anuncio, previa, vista }: Pick<PropsLayoutLive, 'q' 
 // Placar grande (tela cheia)
 // =============================================================================================
 
-function LayoutPlacar({ q, anuncio, previa, vista }: PropsLayoutLive) {
+/** "N pessoas agora" a mostrar (null = não mostra: `?pessoas=0` ou o servidor não mandou). */
+const pessoasDe = (q: QuadroLive, opcoes: OpcoesLive): number | null => (opcoes.pessoas !== false && q.pessoasAgora ? q.pessoasAgora : null);
+
+function LayoutPlacar({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
   const fin = finalistas(q.race);
   const eleito = eleitoDe(q);
   const tem = q.resumo.votos.some((v) => v > 0);
@@ -170,7 +186,7 @@ function LayoutPlacar({ q, anuncio, previa, vista }: PropsLayoutLive) {
         </div>
       </section>
 
-      <RodapeLive q={q} />
+      <RodapeLive q={q} pessoas={pessoasDe(q, opcoes)} />
     </div>
   );
 }
@@ -179,7 +195,8 @@ function LayoutPlacar({ q, anuncio, previa, vista }: PropsLayoutLive) {
 // Placar em pé (live vertical: 9:16) — `--u` ≈ 1,8% da largura (a página define)
 // =============================================================================================
 
-function LayoutPlacarVertical({ q, anuncio, previa, vista }: PropsLayoutLive) {
+function LayoutPlacarVertical({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
+  const pessoas = pessoasDe(q, opcoes);
   const fin = finalistas(q.race);
   const eleito = eleitoDe(q);
   const tem = q.resumo.votos.some((v) => v > 0);
@@ -187,7 +204,7 @@ function LayoutPlacarVertical({ q, anuncio, previa, vista }: PropsLayoutLive) {
     <div data-layout="placar-vertical" className="absolute inset-0 flex flex-col gap-[calc(var(--u)*1.4)] p-[calc(var(--u)*2.2)]">
       <header className={cn(PAINEL, 'shrink-0 px-[calc(var(--u)*2)] py-[calc(var(--u)*1.5)]')}>
         <div className="flex items-center justify-between gap-[calc(var(--u)*1.5)]">
-          <MarcaLive dominio={q.dominio} subtitulo={`Apuração · ${rotuloDisputa(q, true)}`} tamanho="md" className="min-w-0" />
+          <MarcaLive dominio={q.dominio} subtitulo={q.uf ? rotuloDisputa(q, true) : `Apuração · ${rotuloDisputa(q, true)}`} tamanho="md" className="min-w-0" />
           <SeloLive q={q} />
         </div>
         {/* anúncio fora do placar: no cabeçalho, embaixo da marca do Sintonia, separado por um filete */}
@@ -258,6 +275,7 @@ function LayoutPlacarVertical({ q, anuncio, previa, vista }: PropsLayoutLive) {
             {q.simulado ? <span className="font-semibold text-brand-fg">Simulação · dados fictícios</span> : <>Fonte: <span className="font-semibold text-fg">TSE</span></>}
             <span className="text-fg-subtle"> · Não é site oficial da Justiça Eleitoral</span>
           </div>
+          {pessoas ? <PessoasLive n={pessoas} className="mt-[calc(var(--u)*0.7)]" /> : null}
         </div>
       </footer>
     </div>
@@ -265,13 +283,16 @@ function LayoutPlacarVertical({ q, anuncio, previa, vista }: PropsLayoutLive) {
 }
 
 /** Pé dos layouts de tela cheia: QR + endereço (o que leva o público da live ao site) + fonte. */
-function RodapeLive({ q }: { q: QuadroLive }) {
+function RodapeLive({ q, pessoas }: { q: QuadroLive; pessoas?: number | null }) {
   return (
     <footer className={cn(PAINEL, 'flex shrink-0 items-center gap-[calc(var(--u)*1.8)] px-[calc(var(--u)*2)] py-[calc(var(--u)*1.2)]')}>
       <QrLive url={q.urlQr} className="h-[calc(var(--u)*7)] w-[calc(var(--u)*7)]" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Estado por estado, cidade por cidade, seção por seção</div>
-        <div className="mt-[calc(var(--u)*0.4)] whitespace-nowrap font-display text-[length:calc(var(--u)*3.2)] font-semibold leading-none tracking-[-0.02em] text-fg">{q.dominio}</div>
+        <div className="mt-[calc(var(--u)*0.4)] flex items-center gap-[calc(var(--u)*2)]">
+          <span className="whitespace-nowrap font-display text-[length:calc(var(--u)*3.2)] font-semibold leading-none tracking-[-0.02em] text-fg">{q.dominio}</span>
+          {pessoas ? <PessoasLive n={pessoas} className="min-w-0" /> : null}
+        </div>
       </div>
       <div className="shrink-0 text-right text-[length:calc(var(--u)*1.5)] leading-snug text-fg-muted">
         {/* número simulado nunca sai com "Fonte: TSE" */}
@@ -288,6 +309,7 @@ function RodapeLive({ q }: { q: QuadroLive }) {
 
 function LayoutBarra({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
   const topo = opcoes.posicao === 'topo';
+  const pessoas = pessoasDe(q, opcoes);
   const fin = finalistas(q.race);
   const eleito = eleitoDe(q);
   // a aba do anúncio fica presa ao bloco da marca do Sintonia (à esquerda), do lado de fora da barra, e NUNCA passa da
@@ -299,11 +321,18 @@ function LayoutBarra({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
       </div>
     </div>
   ) : null;
-  const simulacao = q.simulado ? (
-    <div className={cn('flex justify-end', topo ? 'mt-[calc(var(--u)*0.8)]' : 'mb-[calc(var(--u)*0.8)]')}>
-      <FaixaSimulacaoLive />
-    </div>
-  ) : null;
+  // do lado oposto ao anúncio: a simulação e o "N pessoas no site agora" (numa pílula própria, sobre a câmera)
+  const simulacao =
+    q.simulado || pessoas ? (
+      <div className={cn('flex items-center justify-end gap-[calc(var(--u)*1)]', topo ? 'mt-[calc(var(--u)*0.8)]' : 'mb-[calc(var(--u)*0.8)]')}>
+        {pessoas ? (
+          <div className={cn(PAINEL, 'flex items-center rounded-full px-[calc(var(--u)*1.4)] py-[calc(var(--u)*0.7)]')}>
+            <PessoasLive n={pessoas} />
+          </div>
+        ) : null}
+        {q.simulado ? <FaixaSimulacaoLive /> : null}
+      </div>
+    ) : null;
   return (
     <div data-layout="barra" className={cn('absolute inset-x-[calc(var(--u)*3)] flex flex-col', topo ? 'top-[calc(var(--u)*3)]' : 'bottom-[calc(var(--u)*3)]')}>
       {!topo ? (
@@ -398,6 +427,7 @@ const CANTO: Record<PosicaoCanto, string> = {
 
 function LayoutCanto({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
   const pos = (opcoes.posicao in CANTO ? opcoes.posicao : 'topo-direita') as PosicaoCanto;
+  const pessoas = pessoasDe(q, opcoes);
   const embaixo = pos.startsWith('baixo');
   const fin = finalistas(q.race);
   const eleito = eleitoDe(q);
@@ -411,8 +441,9 @@ function LayoutCanto({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
   // faixa da marca (o endereço do site, sempre visível): fica sempre do lado da aba do anúncio — embaixo do quadro nos
   // cantos de cima, em cima nos de baixo —, então a marca do Sintonia separa o anúncio das linhas dos candidatos
   const faixaMarca = (
-    <div className={cn('flex items-center justify-center bg-surface-2 px-[calc(var(--u)*1.8)] py-[calc(var(--u)*1)]', embaixo ? 'border-b border-line' : 'border-t border-line')}>
+    <div className={cn('flex flex-col items-center justify-center gap-[calc(var(--u)*0.7)] bg-surface-2 px-[calc(var(--u)*1.8)] py-[calc(var(--u)*1)]', embaixo ? 'border-b border-line' : 'border-t border-line')}>
       <MarcaLive dominio={q.dominio} tamanho="sm" />
+      {pessoas ? <PessoasLive n={pessoas} className="!text-[length:calc(var(--u)*1.2)]" /> : null}
     </div>
   );
   return (
@@ -485,9 +516,11 @@ function LayoutMapa({ q, opcoes, anuncio, previa, vista, mapa }: PropsLayoutLive
   const eleito = eleitoDe(q);
   const tem = q.resumo.votos.some((v) => v > 0);
   const gov = q.race.cargo === 'Governador';
+  // estado fixo (Presidente numa UF): o mapa é o do estado, por município, como no governador
+  const porUf = gov || !!q.uf;
   // o DF é um município só (Brasília): "em cada município" não faria sentido
-  const df = q.race.abrangencia === 'DF';
-  const titulo = gov
+  const df = q.race.abrangencia === 'DF' || q.uf === 'DF';
+  const titulo = porUf
     ? df
       ? q.t1
         ? 'Mais votado no Distrito Federal'
@@ -500,12 +533,18 @@ function LayoutMapa({ q, opcoes, anuncio, previa, vista, mapa }: PropsLayoutLive
       : `Quem está à frente em cada ${opcoes.mapa === 'municipios' ? 'município' : 'estado'}`;
   return (
     <div data-layout="mapa" className="absolute inset-0 flex flex-col gap-[calc(var(--u)*1.8)] p-[calc(var(--u)*3)]">
-      <CabecalhoLive q={q} anuncio={anuncio} previa={previa} vista={vista} />
+      <CabecalhoLive q={q} anuncio={anuncio} previa={previa} vista={vista} pessoas={pessoasDe(q, opcoes)} />
       {q.simulado ? <FaixaSimulacaoLive className="shrink-0" /> : null}
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] gap-[calc(var(--u)*1.8)]">
         <section aria-label="Mapa" className={cn(PAINEL, 'relative flex min-h-0 flex-col overflow-hidden p-[calc(var(--u)*2)]')}>
           <div className="text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">
-            {gov ? q.race.titulo.replace(/ · 1º turno$/, '') : opcoes.mapa === 'municipios' ? 'Brasil · por município' : 'Brasil · por estado'}
+            {gov
+              ? q.race.titulo.replace(/ · 1º turno$/, '')
+              : q.uf
+                ? `Presidente · ${UF_NOMES[q.uf]}`
+                : opcoes.mapa === 'municipios'
+                  ? 'Brasil · por município'
+                  : 'Brasil · por estado'}
           </div>
           <div className="mt-[calc(var(--u)*0.4)] truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em] text-fg">{titulo}</div>
           <div className="relative mt-[calc(var(--u)*1)] flex min-h-0 flex-1 items-center justify-center">{mapa}</div>

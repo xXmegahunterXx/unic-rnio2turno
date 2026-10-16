@@ -13,7 +13,10 @@
  *  - Legível a 3 m em 1920×1080 e 1280×720: todas as medidas derivam de `--u` (≈ 1% da altura útil); também
  *    funciona em tablet (retrato empilha placar e mapa).
  *  - Parâmetros: `?race=` (padrão pres; gov-xx mostra a UF — só as UFs de `UFS_GOV_2T`; uma UF fora do quadro,
- *    como um link antigo de gov-rj, cai em Presidente), `?mapa=municipios`, `?rodizio=0`.
+ *    como um link antigo de gov-rj, cai em Presidente), `?mapa=municipios`, `?rodizio=0`, `?uf=pe` (I25: Presidente num
+ *    estado FIXO — rádios, TVs e telões regionais: placar e mapa daquele estado, sem rodízio; as 27 UFs) e `?pessoas=0`
+ *    (esconde o "N pessoas no site agora", que só aparece quando o servidor manda o número: ≥ 500 e a chave do painel).
+ *  - O QR leva à apuração (ou à do estado fixo) com `utm_source=tv` (I08).
  *  - Na fase 'pre' mostra a contagem regressiva e o 1º turno oficial.
  */
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -28,7 +31,7 @@ import { cn } from '@/app/lib/cn';
 import { corSlot, fillMargem } from '@/app/lib/raceUi';
 import { estimarSimNow, useNow } from '@/app/lib/useNow';
 import { useInterval } from '@/app/lib/useInterval';
-import { hostExibicao, urlAbsoluta } from '@/app/lib/share';
+import { hostExibicao, urlAbsoluta, urlCompartilhada } from '@/app/lib/share';
 import { partesTempo } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
 import { NumberRoll } from '@/app/ui/NumberRoll';
@@ -43,6 +46,8 @@ import { ProvedorAnuncios } from '@/app/components/anuncios/contexto';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
 import { useElementSize } from '@/app/components/apuracao/MapHooks';
 import { gerarQr, qrPath } from '@/app/components/apuracao/qr';
+import { pessoasAgora, textoPessoas } from '@/app/components/apuracao/PessoasAgora';
+import { lerUfLive } from '@/app/components/live/opcoes';
 
 const BrazilMunicipiosMap = lazy(() => import('@/app/components/apuracao/BrazilMunicipiosMap').then((m) => ({ default: m.BrazilMunicipiosMap })));
 
@@ -65,13 +70,20 @@ export default function TvPage() {
   const gov = /^gov-[a-z]{2}$/.test(pedida) && UFS_GOV_2T.includes(pedida.slice(4).toUpperCase() as UF) ? pedida : null;
   const ufGov = gov ? (gov.slice(4).toUpperCase() as UF) : null;
   const raceId: RaceId = pre ? `${gov ?? 'pres'}-t1` : (gov ?? 'pres');
+  // estado fixo (I25): só Presidente; a disputa de governador já é de uma UF
+  const ufFixa = gov ? null : lerUfLive(params.get('uf'));
   const race = useRace(raceId);
   const q = useNacional(raceId);
   const dados = q.data && q.data.race === raceId ? q.data : undefined;
+  const ufQ = useUf(raceId, ufFixa ?? undefined);
+  const ufSnap = ufFixa && ufQ.data && ufQ.data.race === raceId && ufQ.data.uf === ufFixa ? ufQ.data : undefined;
+  // placar: o do Brasil (ou da disputa de governador) ou o do estado fixo — este sem "eleito" (um estado não elege)
+  const resumoPlacar = ufFixa ? (ufSnap ? { ...ufSnap.resumo, eleito: null } : undefined) : dados?.resumo;
   const t1 = raceId.endsWith('-t1');
+  const mostrarPessoas = params.get('pessoas') !== '0';
 
-  const mapaMun = params.get('mapa') === 'municipios';
-  const rodizio = params.get('rodizio') !== '0' && !gov;
+  const mapaMun = params.get('mapa') === 'municipios' && !ufFixa;
+  const rodizio = params.get('rodizio') !== '0' && !gov && !ufFixa;
   const setParam = (k: string, v: string | null) =>
     setParams(
       (p) => {
@@ -110,7 +122,7 @@ export default function TvPage() {
   useEffect(() => {
     if (ciclo.current.length <= 1) ciclo.current = ['BR', ...disputadas];
   }, [disputadas]);
-  const foco: Foco = gov ? (ufGov as UF) : rodizio ? (ciclo.current[passo] ?? 'BR') : 'BR';
+  const foco: Foco = gov ? (ufGov as UF) : ufFixa ? ufFixa : rodizio ? (ciclo.current[passo] ?? 'BR') : 'BR';
 
   // ---------------------------------------------------------------- tela cheia, tela acesa, controles
   const [cheia, setCheia] = useState(false);
@@ -144,6 +156,7 @@ export default function TvPage() {
         <FundoTv />
         <BarraTopo
           race={race}
+          uf={ufFixa}
           t1={t1}
           pre={pre}
           simNow={simNow}
@@ -155,11 +168,11 @@ export default function TvPage() {
           controles={
             <Controles
               visivel={!ocioso || !cheia}
-              podeMapa={!gov}
+              podeMapa={!gov && !ufFixa}
               mapaMun={mapaMun}
               setMapaMun={(v) => setParam('mapa', v ? 'municipios' : null)}
               rodizio={rodizio}
-              podeRodizio={!gov}
+              podeRodizio={!gov && !ufFixa}
               setRodizio={(v) => setParam('rodizio', v ? null : '0')}
               cheia={cheia}
               alternarCheia={alternarCheia}
@@ -170,13 +183,13 @@ export default function TvPage() {
 
         <main className="relative grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(0,1fr)] gap-[calc(var(--u)*2)] px-[calc(var(--u)*3)] pb-[calc(var(--u)*1.5)] pt-[calc(var(--u)*2)] landscape:grid-cols-[minmax(0,46fr)_minmax(0,54fr)] landscape:grid-rows-1">
           <section aria-label="Placar" className="flex min-h-0 flex-col">
-            {race && dados ? (
-              <PlacarTv race={race} resumo={dados.resumo} pre={pre} simulado={simulado} />
+            {race && resumoPlacar ? (
+              <PlacarTv race={race} resumo={resumoPlacar} pre={pre} simulado={simulado} />
             ) : (
               // retrato: reserva a altura do placar (~56u) para o mapa não pular para baixo quando os dados chegam (CLS)
               <div className="flex-1 animate-pulse rounded-[calc(var(--u)*2.5)] bg-surface portrait:min-h-[calc(var(--u)*56)]" />
             )}
-            <Rodape simulado={simulado} />
+            <Rodape simulado={simulado} rota={ufFixa ? `/apuracao/${ufFixa.toLowerCase()}` : gov ? `/apuracao/${gov.slice(4)}?race=${gov}` : '/apuracao'} pessoas={mostrarPessoas ? pessoasAgora(status) : null} />
           </section>
 
           <section aria-label="Mapa" className="relative min-h-0 min-w-0">
@@ -191,6 +204,7 @@ export default function TvPage() {
                 passo={passo}
                 total={ciclo.current.length}
                 gov={!!gov}
+                fixo={!!ufFixa}
               />
             ) : (
               <div className="h-full animate-pulse rounded-[calc(var(--u)*2.5)] bg-surface" />
@@ -204,7 +218,7 @@ export default function TvPage() {
           className="mx-[calc(var(--u)*3)] mb-[calc(var(--u)*1.5)] justify-center rounded-[calc(var(--u)*2.5)] border border-line bg-surface/80 px-[calc(var(--u)*2)] landscape:hidden"
         />
 
-        <Ticker eventos={dados?.eventos ?? []} race={race} vazio={pre ? 'A apuração começa às 17h (horário de Brasília).' : 'Os acontecimentos da apuração aparecem aqui.'} />
+        <Ticker eventos={(ufFixa ? ufSnap?.eventos : dados?.eventos) ?? []} race={race} vazio={pre ? 'A apuração começa às 17h (horário de Brasília).' : 'Os acontecimentos da apuração aparecem aqui.'} />
 
         {aviso ? (
           <div role="alert" className="absolute left-1/2 top-[calc(var(--u)*11)] z-50 max-w-[90vw] -translate-x-1/2 rounded-2xl border border-alert/40 bg-surface px-5 py-3 text-[16px] text-fg shadow-card">
@@ -243,6 +257,7 @@ function FundoTv() {
 
 function BarraTopo({
   race,
+  uf,
   t1,
   pre,
   simNow,
@@ -254,6 +269,8 @@ function BarraTopo({
   controles,
 }: {
   race: Race | undefined;
+  /** estado fixo (Presidente numa UF) */
+  uf?: UF | null;
   t1: boolean;
   pre: boolean;
   simNow: number;
@@ -274,7 +291,7 @@ function BarraTopo({
         <div className="min-w-0">
           <div className="font-display text-[length:calc(var(--u)*3.2)] font-semibold leading-none tracking-[-0.025em]">Sintonia</div>
           <div className="mt-[calc(var(--u)*0.5)] truncate text-[length:calc(var(--u)*1.7)] font-semibold uppercase tracking-[0.14em] text-fg-muted">
-            {race ? (race.cargo === 'Presidente' ? 'Presidente' : race.titulo) : 'Apuração'} · {t1 ? '1º turno · resultado oficial' : '2º turno'}
+            {race ? (race.cargo === 'Presidente' ? (uf ? `Presidente · ${UF_NOMES[uf]}` : 'Presidente') : race.titulo) : 'Apuração'} · {t1 ? '1º turno · resultado oficial' : '2º turno'}
           </div>
         </div>
       </div>
@@ -504,6 +521,7 @@ function PainelMapa({
   passo,
   total,
   gov,
+  fixo,
 }: {
   race: Race;
   raceId: RaceId;
@@ -515,6 +533,8 @@ function PainelMapa({
   total: number;
   /** Disputa de governador: o mapa é sempre o da UF (sem "em foco"). */
   gov?: boolean;
+  /** Estado fixo (Presidente numa UF): o mapa é sempre o do estado e o placar ao lado já é o dele. */
+  fixo?: boolean;
 }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   const ufQ = useUf(raceId, foco === 'BR' ? undefined : foco);
@@ -531,14 +551,14 @@ function PainelMapa({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-[length:calc(var(--u)*1.6)] font-semibold uppercase tracking-[0.14em] text-fg-muted">
-            {foco === 'BR' ? (mapaMun ? 'Brasil · por município' : 'Brasil · por estado') : gov ? 'Por município' : 'Em foco · disputa mais apertada'}
+            {foco === 'BR' ? (mapaMun ? 'Brasil · por município' : 'Brasil · por estado') : gov || fixo ? 'Por município' : 'Em foco · disputa mais apertada'}
           </div>
           <div className="mt-[calc(var(--u)*0.3)] truncate font-display text-[length:calc(var(--u)*3.4)] font-semibold leading-tight tracking-[-0.02em]">
             {/* 1º turno (fase 'pre') é resultado final: "mais votado", não "à frente". */}
             {foco === 'BR' ? (race.turno === 1 ? `Mais votado em cada ${mapaMun ? 'município' : 'estado'}` : 'Quem está à frente') : UF_NOMES[foco]}
           </div>
         </div>
-        {resumoUf && !gov ? <MiniPlacarUf race={race} resumo={resumoUf} /> : null}
+        {resumoUf && !gov && !fixo ? <MiniPlacarUf race={race} resumo={resumoUf} /> : null}
       </div>
       <div ref={ref} className="relative mt-[calc(var(--u)*1.2)] flex min-h-0 flex-1 items-center justify-center">
         {W > 0 && H > 0 ? (
@@ -620,8 +640,9 @@ function MiniPlacarUf({ race, resumo }: { race: Race; resumo: Summary }) {
   );
 }
 
-function Rodape({ simulado }: { simulado?: boolean }) {
-  const url = urlAbsoluta('/apuracao');
+function Rodape({ simulado, rota = '/apuracao', pessoas }: { simulado?: boolean; rota?: string; pessoas?: number | null }) {
+  // QR com a origem (I08): quem chega pela TV aparece como "utm:tv" na audiência
+  const url = urlCompartilhada(urlAbsoluta(rota), 'tv');
   const host = hostExibicao() || 'sintonia';
   const qr = useMemo(() => {
     try {
@@ -650,7 +671,15 @@ function Rodape({ simulado }: { simulado?: boolean }) {
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="text-[length:calc(var(--u)*1.6)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Acompanhe no celular</div>
-          <div className="mt-[calc(var(--u)*0.4)] truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em]">{host}</div>
+          <div className="mt-[calc(var(--u)*0.4)] flex min-w-0 items-baseline gap-x-[calc(var(--u)*1.6)]">
+            <span className="truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em]">{host}</span>
+            {pessoas ? (
+              // "N pessoas no site agora · estimativa" (I09): só com o número do servidor (≥ 500, chave do painel) e ?pessoas≠0
+              <span className="num shrink-0 whitespace-nowrap text-[length:calc(var(--u)*1.6)] font-semibold text-fg-muted" title="Pessoas no Sintonia agora (estimativa)">
+                {textoPessoas(pessoas)} no site agora <span className="font-medium text-fg-subtle">· estimativa</span>
+              </span>
+            ) : null}
+          </div>
           <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">
             {/* número simulado nunca sai com "fonte TSE" (ARCHITECTURE §11.10) */}
             Estado por estado, município por município, seção por seção · {simulado ? 'simulação, dados fictícios' : 'fonte TSE'}

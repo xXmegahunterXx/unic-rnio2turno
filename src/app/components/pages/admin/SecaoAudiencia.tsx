@@ -1,8 +1,10 @@
 /**
  * Seção "Audiência" do painel (pensada para o celular): números REAIS medidos pelo próprio site (src/server/audiencia.ts)
- * — pessoas agora, pico com data e hora, visitantes únicos e páginas por dia, últimas 48 h, seções do site e origens das
- * visitas — com CSV; o interruptor "Mostrar audiência na página /anuncie" (padrão desligado) e os links de "Siga o
- * Sintonia". Fala com `/api/admin/audiencia` e `/api/admin/divulgacao`; no build demo não há servidor e a seção explica.
+ * — pessoas agora, pico com data e hora, visitantes únicos e páginas por dia, horas de tela, a curva minuto a minuto das
+ * últimas 24 h, aparelho/UF/país (MedicaoNoite.tsx, I14), últimas 48 h em barras (o CSV "Por hora" leva 14 dias), seções
+ * do site e origens das visitas — com CSV; o interruptor "Mostrar audiência na página /anuncie" (padrão desligado) e os
+ * links de "Siga o Sintonia". Fala com `/api/admin/audiencia` e `/api/admin/divulgacao`; no build demo não há servidor e
+ * a seção explica.
  *
  * Tudo agregado: nenhum dado pessoal chega aqui (nem IP, nem navegador, nem caminho completo).
  */
@@ -23,7 +25,7 @@ import {
   type HoraAudiencia,
   type RedeSintonia,
 } from '@/shared/audiencia';
-import { fmtDataHora, fmtHora, fmtInt, fmtPct } from '@/shared/format';
+import { fmtDataHora, fmtDecimal, fmtHora, fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Button, Icon, Toggle, toast } from '@/app/ui';
 import { IconeRede } from '@/app/components/crescimento/IconeRede';
@@ -32,7 +34,9 @@ import { useAdmin } from './dados';
 import { CabecalhoSecao, Callout, Campo, Painel, Rotulo } from './kit';
 import { urlPublica } from './rotulos';
 import { baixarArquivo } from './anunciosAdmin';
-import { csvAudienciaDias, csvAudienciaHoras, csvOrigens, somaOrigens, somaPorGrupo } from './crescimentoAdmin';
+import { csvAudienciaDias, csvOrigens, somaOrigens, somaPorGrupo } from './crescimentoAdmin';
+import { csvHorasNoite, fracaoCelular, somaPeriodo, telaDoDia, telaUltimasHoras } from './audienciaNoite';
+import { CurvaNoite, OndeEAparelho } from './MedicaoNoite';
 
 const CHAVE_AUD = ['admin', 'audiencia'] as const;
 const CHAVE_DIV = ['admin', 'divulgacao'] as const;
@@ -123,7 +127,11 @@ function SecaoAudienciaServidor() {
 
   const carimbo = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-');
   const hoje = d.dias.at(-1);
-  const ehHoje = hoje && hoje.dia === diaBrasilia(Date.now());
+  const diaHoje = diaBrasilia(Date.now());
+  const ehHoje = hoje && hoje.dia === diaHoje;
+  // I14 (opcionais: servidor anterior à leva 3 não manda)
+  const telaHoje = d.horasTela ? telaDoDia(d.horasTela, diaHoje) : null;
+  const celular = d.porAparelho ? fracaoCelular(somaPeriodo(d.porAparelho, diaHoje, 1)) : null;
 
   return (
     <div>
@@ -133,7 +141,7 @@ function SecaoAudienciaServidor() {
             <Button size="sm" variant="outline" icon="download" onClick={() => baixarArquivo(`sintonia-audiencia-dias-${carimbo}.csv`, csvAudienciaDias(d.dias))} disabled={!d.dias.length}>
               CSV por dia
             </Button>
-            <Button size="sm" variant="ghost" icon="download" onClick={() => baixarArquivo(`sintonia-audiencia-horas-${carimbo}.csv`, csvAudienciaHoras(d.horas))}>
+            <Button size="sm" variant="ghost" icon="download" onClick={() => baixarArquivo(`sintonia-audiencia-horas-${carimbo}.csv`, csvHorasNoite(d.horas, d.horasTela))}>
               Por hora
             </Button>
             <Button size="sm" variant="ghost" icon="download" onClick={() => baixarArquivo(`sintonia-audiencia-origens-${carimbo}.csv`, csvOrigens(d.dias))} disabled={!d.dias.length}>
@@ -143,7 +151,7 @@ function SecaoAudienciaServidor() {
         }
       />
 
-      <ul className="mb-4 grid grid-cols-2 gap-3 lg:mb-5 lg:grid-cols-4 lg:gap-4">
+      <ul className="mb-4 grid grid-cols-2 gap-3 lg:mb-5 lg:grid-cols-3 lg:gap-4">
         <Cartao
           rotulo="Pessoas agora"
           valor={fmtInt(d.agora.pessoas)}
@@ -153,17 +161,31 @@ function SecaoAudienciaServidor() {
         <Cartao rotulo="Pico ao mesmo tempo" valor={d.pico ? fmtInt(d.pico.valor) : '—'} sub={d.pico ? `em ${fmtDataHora(d.pico.em)}` : 'sem medição ainda'} destaque />
         <Cartao rotulo="Únicos hoje" valor={ehHoje ? fmtInt(hoje.unicos) : '0'} sub={ehHoje && hoje.reinicios ? `pelo maior trecho (${fmtInt(hoje.reinicios)} reinício${hoje.reinicios > 1 ? 's' : ''})` : 'estimativa conservadora'} />
         <Cartao rotulo="Páginas hoje" valor={ehHoje ? fmtInt(hoje.paginas) : '0'} sub={ehHoje ? `${fmtInt(hoje.entradas)} entradas` : 'nenhuma ainda'} />
+        <Cartao
+          rotulo="Horas de tela hoje"
+          valor={telaHoje === null ? '—' : fmtHoras(telaHoje)}
+          sub={telaHoje === null ? 'servidor sem a medição da noite' : `últimas 24 h: ${fmtHoras(telaUltimasHoras(d.horasTela, 24))} h`}
+        />
+        <Cartao
+          rotulo="No celular hoje"
+          valor={celular === null ? '—' : fmtPct(celular * 100, 0)}
+          sub={celular === null ? (d.porAparelho ? 'nenhuma página ainda' : 'servidor sem a medição da noite') : `das páginas · ${fmtPct((1 - celular) * 100, 0)} computador ou tablet`}
+        />
       </ul>
 
       <Concentracao agora={d.agora.concentracao} pico={d.pico?.concentracao} />
+
+      <CurvaNoite d={d} />
 
       <Painel titulo="Últimas 48 horas" icone="relogio" subtitulo="Páginas vistas por hora e o pico de pessoas ao mesmo tempo em cada hora (Brasília)." className="mb-4 lg:mb-5">
         {/* o servidor manda 14 dias (CSV "Por hora"); o gráfico continua nas últimas 48 h */}
         <Barras horas={d.horas.slice(-AUDIENCIA.horasGrafico)} />
       </Painel>
 
+      <OndeEAparelho d={d} />
+
       <div className="mb-4 grid grid-cols-1 gap-4 lg:mb-5 lg:gap-5 xl:grid-cols-2">
-        <PorDia dias={d.dias} />
+        <PorDia dias={d.dias} tela={d.horasTela} />
         <div className="grid grid-cols-1 gap-4 lg:gap-5">
           <Ranking
             titulo="Seções do site · 7 dias"
@@ -203,6 +225,15 @@ function SecaoAudienciaServidor() {
             <strong className="text-fg">Antes de vender:</strong> zere a medição depois do deploy (tira os testes), confira a concentração no pico e só
             então ligue os números na página Anuncie.
           </li>
+          <li>
+            <strong className="text-fg">Horas de tela:</strong> a cada amostra de 10 s, as pessoas com a página aberta e visível × 10 s, somadas por hora
+            e por dia. É uma estimativa do tempo de atenção (aba escondida não conta).
+          </li>
+          <li>
+            <strong className="text-fg">Aparelho, estado e país:</strong> cada página vista soma 1 no aparelho (o que o navegador informa:
+            celular ou computador/tablet) e na UF e no país que a Cloudflare põe no pedido. Só a sigla vira número; cidade, CEP e coordenadas
+            nunca são lidos. Detalhe por hora guardado por 14 dias; a curva minuto a minuto, por 24 h.
+          </li>
           <li>Robôs, navegadores automatizados e quem liga “não rastrear” não contam. Nada de IP, cookie ou opinião é guardado.</li>
           <li>
             Se o servidor reinicia no meio do dia, os únicos do dia ficam pelo maior trecho. O sinal de presença fica mais espaçado com mais gente (agora:
@@ -223,6 +254,9 @@ function SecaoAudienciaServidor() {
 }
 
 // ---- peças -------------------------------------------------------------------------------------------------
+
+/** Horas de tela: inteiro a partir de 10 h; abaixo, 1 casa ("0,4"). */
+const fmtHoras = (h: number) => (h >= 10 ? fmtInt(h) : fmtDecimal(h, 1));
 
 function Cartao({ rotulo, valor, sub, destaque, vivo }: { rotulo: string; valor: string; sub?: string; destaque?: boolean; vivo?: boolean }) {
   return (
@@ -277,9 +311,10 @@ function Barras({ horas }: { horas: HoraAudiencia[] }) {
   );
 }
 
-function PorDia({ dias }: { dias: AudienciaAdmin['dias'] }) {
+function PorDia({ dias, tela }: { dias: AudienciaAdmin['dias']; tela?: AudienciaAdmin['horasTela'] }) {
   const ultimos = [...dias].reverse().slice(0, 14);
   const maxU = Math.max(1, ...ultimos.map((d) => d.unicos));
+  const comTela = !!tela;
   return (
     <Painel titulo="Por dia" icone="calendario" subtitulo="Últimos 14 dias (Brasília). O CSV traz todos, com as seções do site." semPadding className="xl:self-start">
       {ultimos.length ? (
@@ -295,9 +330,15 @@ function PorDia({ dias }: { dias: AudienciaAdmin['dias'] }) {
               <th scope="col" className="px-2 py-2 text-right font-semibold">
                 Páginas
               </th>
-              <th scope="col" className="py-2 pl-2 pr-4 text-right font-semibold sm:pr-5">
+              <th scope="col" className={cn('py-2 pl-2 pr-4 text-right font-semibold sm:pr-5', comTela && 'sm:pr-2')}>
                 Pico
               </th>
+              {/* horas de tela: coluna própria a partir de 640 px; no celular, embaixo das páginas */}
+              {comTela ? (
+                <th scope="col" className="hidden py-2 pl-2 pr-4 text-right font-semibold sm:table-cell sm:pr-5" title="Horas de tela">
+                  Tela (h)
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody className="divide-y divide-[rgb(var(--line)/var(--line-alpha))]">
@@ -310,11 +351,15 @@ function PorDia({ dias }: { dias: AudienciaAdmin['dias'] }) {
                   </span>
                 </td>
                 <td className="num px-2 py-2.5 text-right text-fg">{fmtInt(d.unicos)}</td>
-                <td className="num px-2 py-2.5 text-right text-fg-muted">{fmtInt(d.paginas)}</td>
-                <td className="num py-2.5 pl-2 pr-4 text-right text-fg-muted sm:pr-5" title={d.pico ? fmtDataHora(d.pico.em) : undefined}>
+                <td className="num px-2 py-2.5 text-right text-fg-muted">
+                  {fmtInt(d.paginas)}
+                  {comTela ? <span className="block text-[11px] text-fg-subtle sm:hidden">{fmtHoras(telaDoDia(tela, d.dia))} h tela</span> : null}
+                </td>
+                <td className={cn('num py-2.5 pl-2 pr-4 text-right text-fg-muted sm:pr-5', comTela && 'sm:pr-2')} title={d.pico ? fmtDataHora(d.pico.em) : undefined}>
                   {d.pico ? fmtInt(d.pico.valor) : '—'}
                   {d.pico ? <span className="block text-[11px] text-fg-subtle">{fmtHora(d.pico.em)}</span> : null}
                 </td>
+                {comTela ? <td className="num hidden py-2.5 pl-2 pr-4 text-right text-fg-muted sm:table-cell sm:pr-5">{fmtHoras(telaDoDia(tela, d.dia))}</td> : null}
               </tr>
             ))}
           </tbody>
