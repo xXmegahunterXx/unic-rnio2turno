@@ -297,6 +297,8 @@ export interface LiveStatus {
   patrocinio?: Patrocinio | null;
   /** Anúncios no ar (ativos e dentro da janela), com os formatos de cada um — src/shared/anuncios.ts. */
   anuncios?: AnuncioPublico[];
+  /** Interruptor geral do painel ligado: nenhum anúncio no ar (nem o "Anuncie no Sintonia"). */
+  anunciosSuspensos?: true;
   /** Contato da página /anuncie (configurado no admin). */
   anuncie?: ContatoAnuncie | null;
   /**
@@ -400,6 +402,8 @@ export interface AdminState {
   patrocinio?: Patrocinio | null;
   /** Anunciantes cadastrados (src/shared/anuncios.ts). */
   anuncios?: AnuncioConfig[];
+  /** Interruptor geral: desde quando e por quê. null/ausente = anúncios normais. */
+  anunciosSuspensos?: { desde: number; motivo?: string } | null;
   /** Contato da página /anuncie. */
   anuncie?: ContatoAnuncie | null;
   /** Contatos públicos e responsável pelo site (src/shared/contatos.ts). Ausente = nenhum. */

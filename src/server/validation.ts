@@ -3,7 +3,7 @@
  */
 import { z } from 'zod';
 import type { AdminCommand } from '../shared/api';
-import { validaAnuncio, validaContatoAnuncie } from '../shared/anuncios';
+import { validaAjusteImagem, validaAnuncio, validaContatoAnuncie, validaLogoAnuncio } from '../shared/anuncios';
 import { validaContatosPublicos } from '../shared/contatos';
 import { UFS, type UF } from '../shared/types';
 import { TROCA_AUTO_MAX, TROCA_AUTO_MIN } from '../engine/state';
@@ -157,8 +157,11 @@ const patrocinio = z
   })
   .strict();
 
-/** Campos aceitos num anúncio (o resto é recusado, como nos demais comandos). */
-const CAMPOS_ANUNCIO = new Set(['id', 'marca', 'titulo', 'texto', 'cta', 'url', 'logo', 'imagem', 'formatos', 'peso', 'cota', 'ativo', 'inicio', 'fim', 'naoPolitico']);
+/** Campos aceitos num anúncio (o resto é recusado, como nos demais comandos). v2: ajustes, versão escura, reserva e meta. */
+const CAMPOS_ANUNCIO = new Set([
+  'id', 'marca', 'titulo', 'texto', 'cta', 'url', 'logo', 'imagem', 'formatos', 'peso', 'cota', 'ativo', 'inicio', 'fim', 'naoPolitico',
+  'logoAjuste', 'logoEscuro', 'logoEscuroAjuste', 'imagemAjuste', 'reserva', 'limiteImpressoes',
+]);
 
 /**
  * Anúncio: a MESMA validação do motor (`validaAnuncio`, src/shared/anuncios.ts), com a barreira de conteúdo
@@ -199,6 +202,28 @@ const contatosPublicos = z.unknown().superRefine((v, ctx) => {
 
 const idAnuncio = z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/, 'id de anúncio inválido');
 
+/**
+ * 'anuncio-logo' ("Ajustar agora" e o desfazer): cada imagem presente passa pela regra única da logo
+ * (`validaLogoAnuncio`: data URI até 150 KB e parada, ou a URL do próprio servidor); null apaga; ausente mantém. O ajuste
+ * precisa ser válido (`validaAjusteImagem`) ou null. O motor confere de novo depois de juntar com o anúncio gravado.
+ */
+const imagemLogo = (campo: 'logo' | 'logoEscuro') =>
+  z
+    .unknown()
+    .superRefine((v, ctx) => {
+      if (v === null || v === undefined) return;
+      const r = typeof v === 'string' && v.trim() ? validaLogoAnuncio({ [campo]: v }) : { erro: `Anúncio: ${campo === 'logo' ? 'logo' : 'versão para fundo escuro'} inválida.` };
+      if ('erro' in r) ctx.addIssue({ code: z.ZodIssueCode.custom, message: r.erro, params: { limpo: true } });
+    })
+    .transform((v) => (typeof v === 'string' ? v.trim() : (v as null | undefined)));
+const ajusteLogo = z
+  .unknown()
+  .superRefine((v, ctx) => {
+    if (v === null || v === undefined) return;
+    if (!validaAjusteImagem(v)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Anúncio: ajuste da logo inválido (proporção de 0,2 a 12).', params: { limpo: true } });
+  })
+  .transform((v) => (v === null || v === undefined ? (v as null | undefined) : validaAjusteImagem(v)));
+
 export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('relogio'), acao: z.enum(['iniciar', 'pausar', 'retomar', 'reiniciar']) }).strict(),
   z.object({ tipo: z.literal('velocidade'), velocidade: finito.gt(0).max(10_000) }).strict(),
@@ -215,6 +240,23 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   z.object({ tipo: z.literal('anuncio-salvar'), anuncio }).strict(),
   z.object({ tipo: z.literal('anuncio-remover'), id: idAnuncio }).strict(),
   z.object({ tipo: z.literal('anuncio-ativo'), id: idAnuncio, ativo: z.boolean() }).strict(),
+  z
+    .object({
+      tipo: z.literal('anuncio-logo'),
+      id: idAnuncio,
+      logo: imagemLogo('logo').optional(),
+      logoAjuste: ajusteLogo.optional(),
+      logoEscuro: imagemLogo('logoEscuro').optional(),
+      logoEscuroAjuste: ajusteLogo.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      tipo: z.literal('anuncios-suspensao'),
+      suspender: z.boolean(),
+      motivo: z.string().trim().max(140, 'motivo: máximo de 140 caracteres').optional(),
+    })
+    .strict(),
   z.object({ tipo: z.literal('anuncie-contato'), contato: contatoAnuncie }).strict(),
   z.object({ tipo: z.literal('contatos'), contatos: contatosPublicos }).strict(),
   // 'executar' e 'concluir' são internos do servidor (troca-auto.ts): nunca entram pela rota HTTP

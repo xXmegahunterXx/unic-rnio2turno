@@ -21,6 +21,8 @@
  * sem cookie, sem IP e sem dado pessoal (LGPD).
  */
 
+import { FORMATOS_MASTER_PRIORITARIO } from './anuncios-escolha';
+import { categoriaDoAnuncio, mensagemCategoria, recusaAlcoolNaJanela } from './anuncios-categorias';
 import { motivoPolitico } from './anuncios-politica';
 import { emailProvisorio } from './contatos';
 
@@ -48,6 +50,29 @@ export const FORMATOS_COM_CLIQUE: readonly FormatoAnuncio[] = ['topo', 'rodape',
 
 /** Cota: 'master' (patrocinador principal: prioridade no topo, na TV e nas imagens) ou 'apoio'. */
 export type CotaAnuncio = 'master' | 'apoio';
+
+/** Fundo atrás de uma imagem do anunciante num tema. Tokens `bg-placa-clara` (255 255 255) e `bg-placa-escura`
+ *  (17 17 26), IGUAIS nos dois temas. */
+export type PlacaLogo = 'nenhuma' | 'clara' | 'escura';
+export const PLACAS_LOGO: readonly PlacaLogo[] = ['nenhuma', 'clara', 'escura'];
+
+/**
+ * Como desenhar uma imagem do anunciante (logo ou peça). Medido no PAINEL ao enviar (admin/analiseLogo.ts) ou escolhido
+ * pelo dono. Opcional: sem ele o site usa o desenho antigo. `proporcao` = largura ÷ altura da imagem GRAVADA (já sem
+ * margens vazias).
+ */
+export interface AjusteImagem {
+  /** 0,2–12 */
+  proporcao: number;
+  placaClaro: PlacaLogo;
+  placaEscuro: PlacaLogo;
+  origem: 'auto' | 'manual';
+  /** imagem opaca com fundo próprio (JPEG com fundo branco, ícone de app): cantos arredondados, sem placa extra */
+  comFundo?: true;
+}
+
+/** Interruptor do desenho novo: false = o site ignora os ajustes (logo na placa clara quadrada, como antes). */
+export const LOGO_NATURAL: boolean = true;
 
 /** Anúncio como o admin cadastra (fica no estado do servidor, `AdminState.anuncios`). */
 export interface AnuncioConfig {
@@ -77,6 +102,17 @@ export interface AnuncioConfig {
   fim?: number | null;
   /** declaração obrigatória do admin: anunciante e peça sem conteúdo político-eleitoral */
   naoPolitico: true;
+  /** como desenhar a `logo` (proporção e placa por tema); sem ele, o desenho antigo */
+  logoAjuste?: AjusteImagem;
+  /** versão da logo para FUNDO ESCURO: tema escuro, Modo TV/live no escuro e imagens de compartilhamento. Mesma regra da `logo`. */
+  logoEscuro?: string;
+  logoEscuroAjuste?: AjusteImagem;
+  /** como desenhar a peça (`imagem`) */
+  imagemAjuste?: AjusteImagem;
+  /** RESERVA (empresas do grupo do dono): só aparece onde nenhum anúncio pago está disponível. Sempre cota 'apoio'. */
+  reserva?: true;
+  /** meta de impressões visíveis contadas desde `inicio`; ao atingir, sai do ar sozinho. Exige `inicio`. Nunca vai ao site. */
+  limiteImpressoes?: number | null;
 }
 
 /** O que o site recebe (em `LiveStatus.anuncios`): só anúncios ATIVOS e dentro da janela, sem métricas. */
@@ -95,6 +131,12 @@ export interface AnuncioPublico {
   formatos: FormatoAnuncio[];
   peso: number;
   cota: CotaAnuncio;
+  /** campos v2 (opcionais; NUNCA `limiteImpressoes`) */
+  logoAjuste?: AjusteImagem;
+  logoEscuro?: string;
+  logoEscuroAjuste?: AjusteImagem;
+  imagemAjuste?: AjusteImagem;
+  reserva?: true;
 }
 
 /** Contato da página /anuncie (configurado no admin). */
@@ -116,6 +158,18 @@ export interface MetricaAnuncio {
   porHora: { hora: number; impressoes: number; cliques: number }[];
 }
 
+/** Resposta de GET /api/admin/anuncios/metricas (campos novos opcionais). */
+export interface MetricasAnunciosResposta {
+  metricas: MetricaAnuncio[];
+  desde: number;
+  /** impressões visíveis desde o `inicio` de cada anúncio COM meta */
+  entregue?: Record<string, number>;
+  /** quando a meta foi atingida (epoch ms) */
+  esgotadoEm?: Record<string, number>;
+  /** pessoas alcançadas (estimativa) na campanha e na noite da eleição */
+  alcance?: Record<string, { campanha: number | null; noite: number | null }>;
+}
+
 export const ANUNCIO_LIMITES = {
   id: 40,
   marca: 40,
@@ -131,6 +185,8 @@ export const ANUNCIO_LIMITES = {
   maxAnuncios: 24,
   chamada: 160,
   email: 120,
+  /** meta de impressões visíveis (E16) */
+  limiteImpressoes: { min: 1_000, max: 50_000_000 },
 } as const;
 
 const RE_ID = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
@@ -185,6 +241,140 @@ function epochOuNull(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : NaN;
 }
 
+// ---- contrato v2: ajuste das imagens, animação, logo e master sobreposto ---------------------------------
+
+/**
+ * Ajuste de imagem vindo do painel (ou do estado salvo), normalizado. Nunca lança: ajuste inválido (não é objeto ou
+ * `proporcao` fora de 0,2–12) → undefined, e o site usa o desenho antigo. Placa desconhecida vira 'nenhuma'; `origem`
+ * diferente de 'manual' vira 'auto'; `comFundo` só quando for exatamente `true`.
+ */
+export function validaAjusteImagem(v: unknown): AjusteImagem | undefined {
+  if (!isObj(v)) return undefined;
+  const p = v.proporcao;
+  if (typeof p !== 'number' || !Number.isFinite(p) || p < 0.2 || p > 12) return undefined;
+  const placa = (x: unknown): PlacaLogo => ((PLACAS_LOGO as readonly unknown[]).includes(x) ? (x as PlacaLogo) : 'nenhuma');
+  const out: AjusteImagem = {
+    proporcao: Math.round(p * 1000) / 1000,
+    placaClaro: placa(v.placaClaro),
+    placaEscuro: placa(v.placaEscuro),
+    origem: v.origem === 'manual' ? 'manual' : 'auto',
+  };
+  if (v.comFundo === true) out.comFundo = true;
+  return out;
+}
+
+/** Começo de um base64 decodificado como "string binária" (1 caractere = 1 byte), até `maxChars` caracteres do base64
+ *  (múltiplo de 4). Base64 malformado → null. */
+function binarioBase64(b64: string, maxChars: number): string | null {
+  const parte = b64.length > maxChars ? b64.slice(0, maxChars - (maxChars % 4)) : b64;
+  try {
+    return atob(parte);
+  } catch {
+    return null;
+  }
+}
+
+/** SVG com animação (SMIL ou CSS). */
+const RE_SVG_ANIMADO = /<animate|<animateTransform|<animateMotion|<set[\s>]|@keyframes|animation(-name)?\s*:/i;
+
+/**
+ * Imagem animada (data URI)? O Sintonia só exibe imagens paradas (sem pisca, sem animação). Lê no máximo os primeiros
+ * 64 KB do base64 (o SVG, inteiro), com `atob` (Node ≥ 16 e navegador). O tipo vem dos BYTES (o navegador também
+ * reconhece pelo conteúdo, não pelo rótulo do data URI):
+ *  - PNG: percorre os chunks a partir do byte 8 — animado (APNG) se houver `acTL` antes de `IDAT`;
+ *  - WebP: animado se o `VP8X` tiver o bit 0x02 no byte 20, ou se houver chunk `ANIM` ou `ANMF`;
+ *  - GIF (formato não aceito; aqui só se vier com o rótulo de outro tipo): tratado como animado (lado seguro);
+ *  - SVG (pelo rótulo `image/svg+xml`): `<animate…>`, `<set>`, `@keyframes` ou `animation:`;
+ *  - outro (JPEG, URL do servidor…): false.
+ */
+export function imagemAnimada(dataUri: string): boolean {
+  const m = /^data:([^;,]*)(;[^,]*)?,/.exec(dataUri);
+  if (!m || !/;base64$/i.test(m[2] ?? '')) return false;
+  const svg = /svg/i.test(m[1]);
+  const b = binarioBase64(dataUri.slice(m[0].length), svg ? Number.MAX_SAFE_INTEGER : 64 * 1024);
+  if (!b || b.length < 4) return false;
+  const byte = (i: number) => b.charCodeAt(i);
+  // PNG: assinatura 89 50 4E 47 0D 0A 1A 0A; cada chunk = tamanho (4, big-endian) + tipo (4) + dados + CRC (4)
+  if (b.startsWith('\x89PNG\r\n\x1a\n')) {
+    for (let i = 8; i + 8 <= b.length; ) {
+      const tam = byte(i) * 0x1000000 + (byte(i + 1) << 16) + (byte(i + 2) << 8) + byte(i + 3);
+      const tipo = b.slice(i + 4, i + 8);
+      if (tipo === 'acTL') return true;
+      if (tipo === 'IDAT' || tipo === 'IEND') return false;
+      i += 12 + tam;
+    }
+    return false;
+  }
+  // WebP: "RIFF" <tamanho> "WEBP" e chunks a partir do byte 12 (tipo (4) + tamanho (4, little-endian) + dados, par)
+  if (b.length >= 16 && b.startsWith('RIFF') && b.slice(8, 12) === 'WEBP') {
+    if (b.slice(12, 16) === 'VP8X' && b.length > 20 && (byte(20) & 0x02) !== 0) return true;
+    for (let i = 12; i + 8 <= b.length; ) {
+      const tipo = b.slice(i, i + 4);
+      if (tipo === 'ANIM' || tipo === 'ANMF') return true;
+      const tam = byte(i + 4) + (byte(i + 5) << 8) + (byte(i + 6) << 16) + byte(i + 7) * 0x1000000;
+      i += 8 + tam + (tam % 2);
+    }
+    return false;
+  }
+  if (b.startsWith('GIF8')) return true;
+  if (svg) return RE_SVG_ANIMADO.test(b);
+  return false;
+}
+
+/** Mensagem única para imagem animada (logo, versão escura ou peça). */
+export const ERRO_IMAGEM_ANIMADA = 'Anúncio: use uma imagem parada (sem animação).';
+
+/**
+ * Regra ÚNICA da logo (e da versão para fundo escuro): usada por `validaAnuncio` e pelo comando 'anuncio-logo'.
+ * `logo` e `logoEscuro`: data URI png/jpeg/webp/svg até 150 KB e parada, ou a URL que o próprio servidor serve. Cada
+ * ajuste só fica se a imagem correspondente existir (e for válido — `validaAjusteImagem`).
+ */
+export function validaLogoAnuncio(v: unknown): { ok: Pick<AnuncioConfig, 'logo' | 'logoAjuste' | 'logoEscuro' | 'logoEscuroAjuste'> } | { erro: string } {
+  const o = isObj(v) ? v : {};
+  const out: Pick<AnuncioConfig, 'logo' | 'logoAjuste' | 'logoEscuro' | 'logoEscuroAjuste'> = {};
+  const campos = [
+    ['logo', 'logoAjuste', 'logo'],
+    ['logoEscuro', 'logoEscuroAjuste', 'versão para fundo escuro'],
+  ] as const;
+  for (const [campo, campoAjuste, nome] of campos) {
+    const img = typeof o[campo] === 'string' ? (o[campo] as string).trim() : '';
+    if (!img) continue;
+    if (!RE_IMG_SERVIDOR.test(img)) {
+      if (img.length > ANUNCIO_LIMITES.logoDataUri || !RE_LOGO.test(img)) return { erro: `Anúncio: ${nome} em PNG, JPEG, WebP ou SVG de até 150 KB.` };
+      if (imagemAnimada(img)) return { erro: ERRO_IMAGEM_ANIMADA };
+    }
+    out[campo] = img;
+    const ajuste = validaAjusteImagem(o[campoAjuste]);
+    if (ajuste) out[campoAjuste] = ajuste;
+  }
+  return { ok: out };
+}
+
+/** Janela [inicio, fim) de um anúncio; null/ausente/0 = aberta. Janelas encostadas (fim = início) não se cruzam. */
+function janelasSeCruzam(a: { inicio?: number | null; fim?: number | null }, b: { inicio?: number | null; fim?: number | null }): boolean {
+  const ini = (x: number | null | undefined) => (x ? x : -Infinity);
+  const fim = (x: number | null | undefined) => (x ? x : Infinity);
+  return ini(a.inicio) < fim(b.fim) && ini(b.inicio) < fim(a.fim);
+}
+
+type AnuncioParaConflito = Pick<AnuncioConfig, 'id' | 'marca' | 'formatos' | 'cota' | 'ativo' | 'inicio' | 'fim' | 'reserva'>;
+
+/**
+ * Master sobreposto (venda): o `candidato` e outro anúncio da `lista` são master, sem reserva e ativos, têm ids
+ * diferentes, dividem um formato de `FORMATOS_MASTER_PRIORITARIO` e as janelas se cruzam. Devolve o 1º conflito (pela
+ * ordem da lista; o formato pela ordem de `FORMATOS_MASTER_PRIORITARIO`) ou null.
+ */
+export function conflitoMaster(lista: readonly AnuncioParaConflito[], candidato: AnuncioParaConflito): { id: string; marca: string; formato: FormatoAnuncio } | null {
+  const elegivel = (a: AnuncioParaConflito) => a.cota === 'master' && !a.reserva && a.ativo;
+  if (!elegivel(candidato)) return null;
+  for (const outro of lista) {
+    if (outro.id === candidato.id || !elegivel(outro)) continue;
+    const formato = FORMATOS_MASTER_PRIORITARIO.find((f) => candidato.formatos.includes(f) && outro.formatos.includes(f));
+    if (formato && janelasSeCruzam(candidato, outro)) return { id: outro.id, marca: outro.marca, formato };
+  }
+  return null;
+}
+
 /** Opções de `validaAnuncio`. */
 export interface OpcoesValidaAnuncio {
   /** nomes de candidatos (nome de urna e nome completo, do dataset): anúncio que os cite é recusado */
@@ -192,10 +382,13 @@ export interface OpcoesValidaAnuncio {
 }
 
 /**
- * Valida e normaliza um anúncio vindo do admin (ou do estado salvo). Devolve só os campos do contrato.
+ * Valida e normaliza um anúncio vindo do admin (ou do estado salvo). Devolve só os campos do contrato (o painel envia
+ * `validacao.ok`: campo que não sai daqui some no salvar).
  * Imagens: data URI (limites acima) ou a URL que o próprio servidor serve (ida e volta pelo admin — o servidor
- * reconhece e mantém a imagem que já tem). Conteúdo político-eleitoral é recusado (`motivoPolitico`), além da
- * declaração obrigatória.
+ * reconhece e mantém a imagem que já tem); imagem animada é recusada. Conteúdo político-eleitoral é recusado
+ * (`motivoPolitico`), além da declaração obrigatória; logo depois, as categorias sensíveis (`anuncios-categorias.ts`:
+ * apostas, cassino e mercados de previsão recusados; bebida alcoólica fora do ar em 25/10 até as 17h).
+ * v2: ajustes das imagens, versão escura da logo, `reserva` (força a cota 'apoio') e meta de impressões (exige início).
  */
 export function validaAnuncio(v: unknown, opcoes: OpcoesValidaAnuncio = {}): { ok: AnuncioConfig } | { erro: string } {
   if (!isObj(v)) return { erro: 'Anúncio inválido.' };
@@ -224,16 +417,40 @@ export function validaAnuncio(v: unknown, opcoes: OpcoesValidaAnuncio = {}): { o
     opcoes.nomesCandidatos,
   );
   if (politico) return { erro: politico };
+  const categoria = categoriaDoAnuncio(
+    [
+      { campo: 'marca', valor: marca },
+      { campo: 'título', valor: titulo },
+      { campo: 'texto', valor: t },
+      { campo: 'botão', valor: cta },
+    ],
+    url,
+  );
+  if (categoria && categoria.categoria !== 'alcool') return { erro: mensagemCategoria(categoria) };
 
   const formatos = Array.isArray(v.formatos) ? [...new Set(v.formatos)].filter((f): f is FormatoAnuncio => (FORMATOS_ANUNCIO as readonly unknown[]).includes(f)) : [];
   if (formatos.length === 0) return { erro: 'Anúncio: escolha pelo menos um formato.' };
   const peso = typeof v.peso === 'number' && Number.isFinite(v.peso) ? Math.round(v.peso) : 5;
   if (peso < L.peso.min || peso > L.peso.max) return { erro: `Anúncio: peso de ${L.peso.min} a ${L.peso.max}.` };
-  const cota: CotaAnuncio = v.cota === 'master' ? 'master' : 'apoio';
+  const reserva = v.reserva === true;
+  // RESERVA (empresas do grupo do dono) é sempre cota 'apoio': nunca disputa a prioridade do master
+  const cota: CotaAnuncio = !reserva && v.cota === 'master' ? 'master' : 'apoio';
   const inicio = epochOuNull(v.inicio);
   const fim = epochOuNull(v.fim);
   if (Number.isNaN(inicio) || Number.isNaN(fim)) return { erro: 'Anúncio: datas de início/fim inválidas.' };
   if (inicio !== null && fim !== null && fim <= inicio) return { erro: 'Anúncio: o fim precisa ser depois do início.' };
+  if (categoria?.categoria === 'alcool') {
+    const alcool = recusaAlcoolNaJanela(categoria, { inicio, fim });
+    if (alcool) return { erro: alcool };
+  }
+  let limiteImpressoes: number | null = null;
+  if (v.limiteImpressoes !== null && v.limiteImpressoes !== undefined) {
+    const n = v.limiteImpressoes;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < L.limiteImpressoes.min || n > L.limiteImpressoes.max)
+      return { erro: 'Anúncio: meta de impressões de 1.000 a 50.000.000.' };
+    if (inicio === null) return { erro: 'Anúncio: com meta de impressões, informe o início.' };
+    limiteImpressoes = n;
+  }
 
   const out: AnuncioConfig = {
     id,
@@ -250,18 +467,21 @@ export function validaAnuncio(v: unknown, opcoes: OpcoesValidaAnuncio = {}): { o
     fim,
     naoPolitico: true,
   };
-  const logo = typeof v.logo === 'string' ? v.logo.trim() : '';
-  if (logo) {
-    if (RE_IMG_SERVIDOR.test(logo)) out.logo = logo;
-    else if (logo.length > L.logoDataUri || !RE_LOGO.test(logo)) return { erro: 'Anúncio: logo em PNG, JPEG, WebP ou SVG de até 150 KB.' };
-    else out.logo = logo;
-  }
+  const logo = validaLogoAnuncio(v);
+  if ('erro' in logo) return logo;
+  Object.assign(out, logo.ok);
   const imagem = typeof v.imagem === 'string' ? v.imagem.trim() : '';
   if (imagem) {
-    if (RE_IMG_SERVIDOR.test(imagem)) out.imagem = imagem;
-    else if (imagem.length > L.imagemDataUri || !RE_IMAGEM.test(imagem)) return { erro: 'Anúncio: peça em PNG, JPEG ou WebP de até 400 KB.' };
-    else out.imagem = imagem;
+    if (!RE_IMG_SERVIDOR.test(imagem)) {
+      if (imagem.length > L.imagemDataUri || !RE_IMAGEM.test(imagem)) return { erro: 'Anúncio: peça em PNG, JPEG ou WebP de até 400 KB.' };
+      if (imagemAnimada(imagem)) return { erro: ERRO_IMAGEM_ANIMADA };
+    }
+    out.imagem = imagem;
+    const ajuste = validaAjusteImagem(v.imagemAjuste);
+    if (ajuste) out.imagemAjuste = ajuste;
   }
+  if (reserva) out.reserva = true;
+  if (limiteImpressoes !== null) out.limiteImpressoes = limiteImpressoes;
   return { ok: out };
 }
 
@@ -323,4 +543,4 @@ export function urlComUtm(url: string, id: string, formato: FormatoAnuncio | 'li
  * Escolha do anúncio de cada posição: mora em `anuncios-escolha.ts` (módulo pequeno, sem a validação, que é tudo o que
  * o site precisa no JS inicial) e é reexportada aqui — o contrato continua o mesmo.
  */
-export { escolherAnuncio } from './anuncios-escolha';
+export { escolherAnuncio, FORMATOS_MASTER_PRIORITARIO } from './anuncios-escolha';

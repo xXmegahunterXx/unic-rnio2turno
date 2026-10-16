@@ -21,7 +21,15 @@
  *                                                             destino com UTM (urlComUtm)
  *   POST /api/anuncio/evento   { id, formato }              → conta uma impressão VISÍVEL (agregada, sem dado pessoal;
  *                                                             204; limitada por visitante)
- *   GET  /api/admin/anuncios/metricas                       → { metricas: MetricaAnuncio[]; desde: number }
+ *   POST /api/anuncie/relatorio { k }                       → RelatorioAnunciante (src/shared/relatorio.ts): relatório de
+ *                                                             entrega pelo link privado (/relatorio#k=<token>); token
+ *                                                             errado/revogado → 404; no-store, noindex, no-referrer
+ *   GET  /api/admin/anuncios/metricas?horas=<1–336>         → MetricasAnunciosResposta (detalhe por hora das últimas
+ *                                                             `horas`, padrão 48; + entregue, esgotadoEm e alcance)
+ *   GET  /api/admin/relatorios                              → { links: LinkRelatorio[] }
+ *   POST /api/admin/relatorios { acao: 'criar', id, rotulo?, mostrarMeta? } → { link: LinkRelatorio; url } (o token só
+ *                                                             aparece aqui, uma vez)
+ *                              { acao: 'revogar', lid }     → { link: LinkRelatorio }
  *
  *   POST /api/admin/login            { senha }                → { ok: true } + cookie httpOnly
  *   POST /api/admin/logout
@@ -34,7 +42,7 @@
  *
  * `:race` = RaceId ('pres', 'gov-df', 'pres-t1', 'gov-df-t1', ...). UF e race em minúsculas na URL.
  */
-import type { AnuncioConfig, ContatoAnuncie } from './anuncios';
+import type { AjusteImagem, AnuncioConfig, ContatoAnuncie } from './anuncios';
 import type { ContatosPublicos } from './contatos';
 import type {
   AdminMetrics,
@@ -87,6 +95,10 @@ export type AdminCommand =
   | { tipo: 'anuncio-remover'; id: string }
   /** Liga/desliga um anúncio sem apagar. */
   | { tipo: 'anuncio-ativo'; id: string; ativo: boolean }
+  /** Troca SÓ a logo de um anúncio ("Ajustar agora" e o desfazer). Campo ausente = mantém; null = apaga. */
+  | { tipo: 'anuncio-logo'; id: string; logo?: string | null; logoAjuste?: AjusteImagem | null; logoEscuro?: string | null; logoEscuroAjuste?: AjusteImagem | null }
+  /** Interruptor geral: tira todos os anúncios do ar sem apagar nada (suspender=true) ou devolve exatamente o que estava. */
+  | { tipo: 'anuncios-suspensao'; suspender: boolean; motivo?: string } // motivo ≤ 140
   /** Contato da página /anuncie (null limpa). */
   | { tipo: 'anuncie-contato'; contato: ContatoAnuncie | null }
   /** Contatos públicos (geral, privacidade, imprensa, correções) e responsável pelo site (null limpa). */

@@ -16,12 +16,22 @@ function fnv(s: string): number {
 }
 
 /**
- * Escolhe o anúncio de um formato. Rotação ponderada pelo `peso`, determinística pela `semente` (ex.: id da visita
- * + posição na página: a mesma posição não troca a cada renderização, mas muda entre visitas). No 'topo', na 'tv', na
- * 'live' e em 'compartilhamento', a cota MASTER vence quando existe. `evitar` tira ids já mostrados em outra posição da mesma
- * página (se sobrar algum).
+ * Formatos em que a cota MASTER (sem reserva) tem prioridade: havendo master no ar com o formato, só os masters
+ * disputam. Também é a base do bloqueio de master sobreposto (`conflitoMaster`, src/shared/anuncios.ts).
  */
-export function escolherAnuncio<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota'>>(
+export const FORMATOS_MASTER_PRIORITARIO: readonly FormatoAnuncio[] = ['topo', 'tv', 'live', 'compartilhamento'];
+
+/**
+ * Escolhe o anúncio de um formato. Rotação ponderada pelo `peso`, determinística pela `semente` (ex.: id da visita
+ * + posição na página: a mesma posição não troca a cada renderização, mas muda entre visitas). Ordem:
+ *  1. só os anúncios com o formato;
+ *  2. nos formatos de `FORMATOS_MASTER_PRIORITARIO`, havendo master sem reserva, só os masters (sem reserva);
+ *  3. tira os ids de `evitar` (já mostrados em outra posição da mesma página), se sobrar algum;
+ *  4. sobrando algum pago (sem `reserva`), tira as reservas — a reserva só preenche o espaço que nenhum pago ocupa
+ *     (vem depois do `evitar`: num cartão em que todos os pagos já apareceram, a reserva preenche o lugar);
+ *  5. sorteio pelo peso (FNV da semente + formato).
+ */
+export function escolherAnuncio<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota' | 'reserva'>>(
   anuncios: readonly T[] | null | undefined,
   formato: FormatoAnuncio,
   semente: string,
@@ -29,12 +39,14 @@ export function escolherAnuncio<T extends Pick<AnuncioPublico, 'id' | 'formatos'
 ): T | null {
   let pool = (anuncios ?? []).filter((a) => a.formatos.includes(formato));
   if (pool.length === 0) return null;
-  if (formato === 'topo' || formato === 'tv' || formato === 'live' || formato === 'compartilhamento') {
-    const master = pool.filter((a) => a.cota === 'master');
+  if (FORMATOS_MASTER_PRIORITARIO.includes(formato)) {
+    const master = pool.filter((a) => a.cota === 'master' && !a.reserva);
     if (master.length) pool = master;
   }
   const sem = pool.filter((a) => !evitar.includes(a.id));
   if (sem.length) pool = sem;
+  const pagos = pool.filter((a) => !a.reserva);
+  if (pagos.length) pool = pagos;
   const total = pool.reduce((s, a) => s + Math.max(1, a.peso), 0);
   let r = fnv(`${semente}|${formato}`) % total;
   for (const a of pool) {
