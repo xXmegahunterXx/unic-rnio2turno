@@ -28,6 +28,10 @@ DIR_ESTADO=/var/lib/sintonia-auto-update
 acao=${1:-estado}
 
 registrar() { printf '%s %s\n' "$(date '+%d/%m %H:%M:%S')" "$*" >>"$LOG"; }
+# `rodar` à mão (com terminal): diz o que aconteceu; pelo cron (sem terminal) fica só o log
+TERMINAL=''
+[[ -t 1 ]] && TERMINAL=1
+contar() { [[ -z $TERMINAL ]] || echo "$*"; }
 # congelamento padrão = o do RUNBOOK (código congelado das 12h da véspera até a manhã seguinte à eleição)
 CONGELAR_DE_PADRAO='2026-10-24T12:00:00-03:00'
 CONGELAR_ATE_PADRAO='2026-10-26T06:00:00-03:00'
@@ -67,45 +71,70 @@ CRON
     [[ $EUID -eq 0 ]] || morrer "Rode como root."
     install -d -m 700 "$DIR_ESTADO"
     exec 8>"$DIR_ESTADO/trava"
-    flock -n 8 || exit 0 # uma conferência ainda rodando
+    if ! flock -n 8; then
+      contar "Outra conferência ainda está rodando (veja $LOG)."
+      exit 0
+    fi
     agora=$(date +%s)
     de=$(date -d "$(cfg AUTO_CONGELAR_DE "$CONGELAR_DE_PADRAO")" +%s 2>/dev/null || echo 0)
     ate=$(date -d "$(cfg AUTO_CONGELAR_ATE "$CONGELAR_ATE_PADRAO")" +%s 2>/dev/null || echo 0)
     if ((agora >= de && agora < ate)); then
-      exit 0 # congelado: noite da eleição
+      # congelado: noite da eleição
+      contar "Congelada até $(cfg AUTO_CONGELAR_ATE "$CONGELAR_ATE_PADRAO"): nada é publicado sozinho. Para publicar mesmo assim: $DIR_DEPLOY/update.sh"
+      exit 0
     fi
     if ! gitr fetch --quiet --prune 2>>"$LOG"; then
       registrar "sem acesso ao GitHub agora; tento de novo depois"
+      contar "Sem acesso ao GitHub agora (detalhes em $LOG); tente de novo em instantes."
       exit 0
     fi
     local_=$(gitr rev-parse HEAD)
     # só versões MARCADAS para produção: o commit mais novo com "[deploy]" na mensagem (os intermediários não vão ao ar)
     remoto=$(gitr log --format=%H --grep='\[deploy\]' -n 1 'HEAD..@{u}' 2>/dev/null || true)
-    [[ -n $remoto && $local_ != "$remoto" ]] || exit 0
+    if [[ -z $remoto || $local_ == "$remoto" ]]; then
+      if [[ -n $TERMINAL ]]; then
+        rev=$(revisao_rodando 2>/dev/null || true)
+        contar "Nada novo para publicar: nenhum commit marcado com [deploy] depois de $(gitr rev-parse --short HEAD) (imagem no ar: ${rev:-?})."
+      fi
+      exit 0
+    fi
     # só avança (fast-forward); histórico divergente fica para quem cuida à mão
     if ! gitr merge-base --is-ancestor "$local_" "$remoto"; then
       registrar "o código desta máquina divergiu do GitHub: atualize à mão (git status)"
+      contar "O código desta máquina divergiu do GitHub: atualize à mão (git -C $(dirname "$DIR_DEPLOY") status)."
       exit 0
     fi
     curto=$(gitr rev-parse --short "$remoto")
     if [[ -f $DIR_ESTADO/falhou && "$(cat "$DIR_ESTADO/falhou")" == "$curto" ]]; then
+      contar "O commit $curto está marcado como falho (o update dele já falhou uma vez): use $DIR_DEPLOY/update.sh para tentar à mão."
       exit 0
     fi
     registrar "versão nova $curto: atualizando"
+    contar "Versão nova $curto: atualizando (a saída também fica em $LOG)…"
     saida=0
-    SINTONIA_ALVO="$remoto" "$DIR_DEPLOY/update.sh" >>"$LOG" 2>&1 || saida=$?
+    if [[ -n $TERMINAL ]]; then
+      set +o pipefail
+      SINTONIA_ALVO="$remoto" "$DIR_DEPLOY/update.sh" 2>&1 | tee -a "$LOG"
+      saida=${PIPESTATUS[0]}
+      set -o pipefail
+    else
+      SINTONIA_ALVO="$remoto" "$DIR_DEPLOY/update.sh" >>"$LOG" 2>&1 || saida=$?
+    fi
     if ((saida == 0)); then
       rm -f "$DIR_ESTADO/falhou"
       registrar "no ar: $(commit_atual)"
+      contar "No ar: $(commit_atual)."
     elif ((saida == SAIDA_OCUPADO)); then
       registrar "outra operação de deploy (update/restore) em andamento: tento $curto de novo na próxima conferência"
+      contar "Outra operação de deploy (update/restore) está em andamento: tente de novo daqui a pouco."
     else
       echo "$curto" >"$DIR_ESTADO/falhou"
       registrar "FALHOU ao atualizar para $curto (o site seguiu na versão anterior); não tento este commit de novo"
+      contar "FALHOU ao atualizar para $curto (o site seguiu na versão anterior). Detalhes em $LOG."
     fi
     # log enxuto
     if [[ -f $LOG ]] && (($(wc -l <"$LOG") > 4000)); then tail -n 2000 "$LOG" >"$LOG.tmp" && mv "$LOG.tmp" "$LOG"; fi
     ;;
-  -h | --help) sed -n '2,17p' "$0" ;;
+  -h | --help) sed -n '2,21p' "$0" ;;
   *) morrer "Use: $0 ligar | desligar | estado | rodar" ;;
 esac

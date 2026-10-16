@@ -488,7 +488,8 @@ export function SecaoMosaic({
   const anel = Math.max(2, Math.min(3, Math.round(cell * 0.18)));
 
   return (
-    <div className={cn('w-full', className)}>
+    // mapa de seções pintado pelo resultado: a barra do rodapé e a pílula do chat não ficam por cima (faixaLivre)
+    <div data-sem-anuncio-fixo className={cn('w-full', className)}>
       {resumo ? (
         <p className="num mb-3 text-[12.5px] text-fg-muted">
           <span className="font-semibold text-fg">{fmtInt(totais.secoes)}</span> seções ·{' '}

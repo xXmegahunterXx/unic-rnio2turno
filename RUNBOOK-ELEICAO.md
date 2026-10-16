@@ -101,7 +101,7 @@ Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar c
 
 | Quando | O quê | Como conferir |
 |---|---|---|
-| **até 12h00** | **Última atualização de código.** Depois disso, código congelado até segunda. Só versão **marcada** (`[deploy]` na mensagem do commit): `deploy/auto-update.sh rodar` vai até a última marcada; o `update.sh` pergunta antes de publicar um commit sem a marca | `git -C /opt/sintonia log -1 --format='%h %s' '@{u}'` antes; no fim, `deploy/status.sh` mostra a imagem nova `healthy` |
+| **até 12h00** | **Última atualização de código.** Depois disso, código congelado até segunda. Só versão **marcada** (`[deploy]` na mensagem do commit): `deploy/auto-update.sh rodar` vai até a última marcada; o `update.sh` pergunta antes de publicar um commit sem a marca | `git -C /opt/sintonia fetch -q && git -C /opt/sintonia log -1 --format='%h %s' '@{u}'` antes (o `rodar` com terminal diz o que fez: publicou, nada novo, congelado ou commit marcado como falho); no fim, `deploy/status.sh` mostra a imagem nova `healthy` |
 | até 12h00 | Atualização automática: congelada a partir das 12h de 24/10 até 06h de 26/10 (padrão), ou desligada | `deploy/auto-update.sh estado` mostra o intervalo; se tiver dúvida, `deploy/auto-update.sh desligar` |
 | até 12h00 | Situação do TSE no Governador: o "Testar conexão" diz quais UFs ainda não têm arquivo do 2º turno (hoje, TO). Se o TSE tiver mudado o quadro (ex.: TO eleito no 1º turno), a decisão é do dono e o procedimento está no README, "Mudança no quadro do 2º turno"; **não** faça isso no domingo | `deploy/painel.sh testar-tse` |
 | 14h00 | **Aumentar a VPS** para 4 vCPU / 8 GB, se ainda não estiver (o provedor reinicia a máquina: ≈ 1–2 min fora do ar; tudo volta sozinho) | depois: `deploy/status.sh` (tudo `healthy`) e `deploy/painel.sh chat-estado` (a configuração da sala voltou) |
@@ -279,8 +279,9 @@ por minutos, ou números claramente errados:
 5. **Rajada que fura a borda:** Cloudflare → Analytics → Cache → *Top URLs*: endereço com `?x=` aleatório em
    `/api/status`/`/api/apuracao`, ou muita página (HTML) de poucos IPs? Crie as Regras 3/4 e a regra de *Rate limiting*
    do DEPLOY §5 (valem em segundos, sem reiniciar nada).
-6. **O vigia do healthcheck não reinicia por lentidão** (só se o processo travar de verdade: batimento parado). Se ainda
-   assim aparecerem reinícios em série no log (`/healthz falhou … SIGTERM`), ponha `AUTORREINICIO=0` no `.env` e rode
+6. **O vigia do healthcheck não reinicia por lentidão** (só se o processo travar de verdade — batimento parado — ou
+   ficar ~5 min sem responder a nenhuma verificação). Se ainda assim aparecerem reinícios em série no log
+   (`/healthz falhou … SIGKILL`/`SIGTERM`), ponha `AUTORREINICIO=0` no `.env` e rode
    `docker compose up -d app` (~3 s); um travamento real passa a depender de você (`docker compose restart app`).
    Depois de qualquer reinício: `deploy/painel.sh chat-estado`.
 
@@ -295,8 +296,10 @@ ar). **Na VPS compartilhada** o proxy é do outro projeto: memória e logs dele 
 
 ### 3.4 App fora do ar, travado ou com relógio errado
 
-- **Travado:** o vigia do healthcheck reinicia o processo sozinho depois de ~75 s sem resposta **com o batimento parado**
-  (lento por carga não conta). Se passar de 3 min: `docker compose restart app`. O estado do painel (fonte, troca,
+- **Travado:** o vigia do healthcheck reinicia o processo sozinho em **~2–3 min** num travamento de verdade (30 s até o
+  batimento contar como parado, mais 5 verificações de 15 s, mais a subida do processo novo; lento por carga não conta).
+  Processo vivo mas sem atender nenhuma conexão por ~5 min seguidos (ex.: "too many open files") também reinicia. Se
+  passar de 4 min sem voltar: `docker compose restart app`. O estado do painel (fonte, troca,
   aviso, anúncios, contatos), a configuração do chat e o histórico ficam no volume e voltam iguais; as mensagens do
   chat e os silenciamentos, não (`deploy/painel.sh chat-estado`).
 - **Não sobe:** `docker compose logs --tail 100 app`. Se começou depois de uma atualização: `deploy/update.sh --rollback`.
@@ -320,11 +323,31 @@ backup do estado atual antes (e preserva o registro cifrado do chat).
 **Atenção — voltar para uma versão de ANTES de out/2026** (a imagem `sintonia-app:pre-anuncios`, ou o `:anterior` logo
 depois da primeira atualização desta leva): ela não conhece os anúncios, o contato da /anuncie nem os contatos
 públicos — o site fica **sem anúncio** e **qualquer gravação** nessa versão (inclusive a troca automática das 17h)
-**apaga** essas listas do `admin.json`. Depois de voltar, não mexa no painel; ao subir de novo a versão nova, refaça os
-anúncios e os contatos ou restaure só o `admin.json` do último backup feito na versão nova (o app avisa no log:
-"sem a lista de anúncios"). Por isso, logo depois da primeira atualização desta leva: `docker tag
-sintonia-app:anterior sintonia-app:pre-anuncios` e `deploy/update.sh --forcar` — o rollback rápido passa a cair numa
-imagem que entende os anúncios.
+**apaga** essas listas do `admin.json`. Não há conserto no código para isso (a versão antiga não sabe que as listas
+existem). Por isso o passo do roteiro de publicação (CHECKLIST A9.6) deixa o `:anterior` numa versão que entende os
+anúncios e guarda a antiga à parte, como `:pre-anuncios`. Confira para onde o rollback rápido vai:
+
+```bash
+docker image inspect -f '{{index .Config.Labels "org.opencontainers.image.revision"}}' sintonia-app:anterior
+```
+
+**Voltar de propósito para a versão antiga** (só se a nova estiver inutilizável e o rollback rápido não resolver):
+
+```bash
+docker tag sintonia-app:latest sintonia-app:volta               # guarda a versão de agora para voltar depois
+docker tag sintonia-app:pre-anuncios sintonia-app:anterior
+deploy/update.sh --rollback                                     # sobe a antiga em ~5 s; NÃO mexa no painel nela
+```
+
+Para subir de novo a versão nova: `docker tag sintonia-app:volta sintonia-app:anterior && deploy/update.sh --rollback`.
+Se alguém gravou algo no painel enquanto a antiga estava no ar (o app avisa no log: "sem a lista de anúncios"), restaure
+**só o painel** do último backup feito na versão nova — anúncios, contatos e o resto do `admin.json`; audiência, pedidos
+de anunciantes e chat ficam como estão:
+
+```bash
+deploy/restore.sh --listar                                      # escolha um backup de ANTES da volta
+deploy/restore.sh /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz --so-admin
+```
 
 ### 3.6 HTTPS / Cloudflare com erro
 

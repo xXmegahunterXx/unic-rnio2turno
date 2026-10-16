@@ -131,7 +131,7 @@ function Hero({ finalistas, aberto, temPalpite }: { finalistas: FinalistasPalpit
           id="palpite-titulo"
           // tela baixa (360×740, 375×667): título menor e sem o parágrafo (repetido em "Como funciona"): o divisor e os
           // "+0,1" ficam na 1ª tela, acima da tab bar
-          className="mt-3 text-balance font-display text-[30px] font-semibold leading-[1] tracking-[-0.045em] text-fg min-[400px]:text-[34px] sm:mt-5 sm:text-[56px] lg:text-[64px] [@media(max-height:760px)_and_(max-width:639px)]:text-[26px]"
+          className="mt-3 text-balance font-display text-[30px] font-semibold leading-[1] tracking-[-0.045em] text-fg min-[400px]:text-[34px] sm:mt-5 sm:text-[56px] lg:text-[64px] [@media(max-height:760px)_and_(max-width:639px)]:text-[26px] [@media(max-height:700px)_and_(max-width:639px)]:mt-2.5 [@media(max-height:700px)_and_(max-width:639px)]:text-[24px]"
         >
           {aberto ? (
             <>
@@ -273,7 +273,10 @@ function Editor({
           <h2 id="meu-palpite-titulo" className="font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-fg sm:text-[25px]">
             Seu palpite
           </h2>
-          <p className="mt-0.5 text-[12.5px] text-fg-muted sm:text-[13px]">% dos votos válidos (sem brancos e nulos, como no TSE)</p>
+          {/* tela bem baixa (375×667): sem esta linha (o "Como funciona" repete), o divisor e os "+0,1" ficam acima da tab bar */}
+          <p className="mt-0.5 text-[12.5px] text-fg-muted sm:text-[13px] [@media(max-height:700px)_and_(max-width:639px)]:hidden">
+            % dos votos válidos (sem brancos e nulos, como no TSE)
+          </p>
         </div>
         {cravado ? (
           <Badge tone="ok" size="sm" icon="check">

@@ -45,7 +45,7 @@ while (($#)); do
       shift
       ;;
     -h | --help)
-      sed -n '2,27p' "$0"
+      sed -n '2,25p' "$0"
       exit 0
       ;;
     -*) morrer "Opção desconhecida: $1 (use --help)" ;;

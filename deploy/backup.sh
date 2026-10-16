@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # =====================================================================================================
-# Sintonia — backup do estado do painel (volume STATE_DIR: admin.json, tse-historico.json) e do .env.
+# Sintonia — backup do volume STATE_DIR (estado do painel, anúncios, contatos, chat, histórico do TSE, audiência
+# agregada e os PEDIDOS DE ANUNCIANTES — dados pessoais: nome, e-mail, WhatsApp) e do .env (senha do painel).
+# Fica fora: o registro cifrado do chat (chat-registro/, por desenho).
 #
 #   sudo /opt/sintonia/deploy/backup.sh            → /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz
 #   sudo /opt/sintonia/deploy/backup.sh --quieto   só mostra erros (é o que o cron de hora em hora usa)
 #
-#   BACKUP_DIR (padrão /var/backups/sintonia) e BACKUP_MANTER (padrão 72 arquivos) vêm do ambiente ou do .env.
-# O arquivo tem a senha do painel (.env): fica com permissão 600. Para guardar fora da VPS (recomendado):
-#   scp root@IP-DA-VPS:/var/backups/sintonia/sintonia-*.tar.gz .
+#   BACKUP_DIR (padrão /var/backups/sintonia) e BACKUP_MANTER (padrão 72 arquivos = 3 dias) vêm do ambiente ou do .env.
+# Permissão 600. Cópia fora da VPS (recomendado): SÓ a mais recente, CIFRADA, e apague as antigas em até 30 dias (é o
+# que a /privacidade promete; DEPLOY §7):
+#   ssh root@IP-DA-VPS 'ls -1t /var/backups/sintonia/sintonia-*.tar.gz | head -1'
+#   scp root@IP-DA-VPS:/var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz . && gpg -c sintonia-AAAAMMDD-HHMMSS.tar.gz && rm sintonia-AAAAMMDD-HHMMSS.tar.gz
 # Restaurar: deploy/restore.sh <arquivo>
 # =====================================================================================================
 # shellcheck source=deploy/lib.sh
@@ -18,7 +22,7 @@ for a in "$@"; do
   case $a in
     --quieto | -q) QUIETO=1 ;;
     -h | --help)
-      sed -n '2,13p' "$0"
+      sed -n '2,16p' "$0"
       exit 0
       ;;
     *) morrer "Opção desconhecida: $a (use --help)" ;;

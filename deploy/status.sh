@@ -58,7 +58,7 @@ if app_rodando; then
       console.log("   memória (RSS):  " + h.memoriaMb + " MB");
       if (h.tse) console.log("   feed do TSE:    " + (h.tse.ok ? "ok" : "COM FALHAS") + (h.tse.rodando ? " · consultando" : " · parado"));
       if (s && s.aviso && s.aviso.texto) console.log("   aviso no site:  " + s.aviso.texto);
-      if (s && typeof s.pessoasAgora === "number") console.log("   pessoas agora:  ~" + s.pessoasAgora + " (que chegaram a este servidor)");
+      if (s && typeof s.pessoasAgora === "number") console.log("   pessoas agora:  ~" + s.pessoasAgora + " (estimativa: origem ou sinal das páginas, o maior)");
     }).catch((e) => { console.log("   /healthz não respondeu: " + e.message); process.exit(1); });
   ' || erro "O app não respondeu ao /healthz."
   est="$(docker inspect -f '{{.State.Health.Status}}' "$(ids_app | head -n 1)" 2>/dev/null || echo '?')"

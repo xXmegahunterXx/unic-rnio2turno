@@ -194,7 +194,8 @@ function PlacarDuelo({
           </div>
         </div>
 
-        <div className={cn('grid grid-cols-2 gap-x-3 sm:gap-x-8', hero && 'lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]')}>
+        {/* data-placar-lados: no celular baixo, a folha do chat rola o placar até aqui (fotos, nomes e % à vista acima dela) */}
+        <div data-placar-lados className={cn('grid grid-cols-2 gap-x-3 sm:gap-x-8', hero && 'lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]')}>
           {a ? <LadoDuelo l={a} lado="esq" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} foto={fotos[a.i]} /> : <div />}
           {hero ? <Diferenca resumo={resumo} /> : null}
           {b ? <LadoDuelo l={b} lado="dir" hero={hero} pctCls={pctCls} semVotos={semVotos} vice={vice} resumo={resumo} foto={fotos[b.i]} /> : <div />}

@@ -60,7 +60,8 @@ function Moldura({
       <header className="flex items-center justify-between gap-3 px-4 pt-3.5">
         <div className="flex min-w-0 items-center gap-2">
           <LogoMark size={22} />
-          <div className="min-w-0 truncate text-[14px] font-semibold leading-tight">
+          {/* título inteiro em até 2 linhas (o contexto "quem está à frente em cada estado" era cortado no celular) */}
+          <div className="line-clamp-2 min-w-0 text-[14px] font-semibold leading-tight">
             {titulo}
             {contexto ? <span className="font-medium text-fg-muted"> · {contexto}</span> : null}
           </div>

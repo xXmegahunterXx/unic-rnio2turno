@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MensagemChat } from '@/shared/chat';
-import { contarNovas, gerarToken, intervaloConsulta, juntarMensagens, modoPainelDesktop, paginaDaSala, textoPessoasSala } from './nucleo';
+import { alturaFolhaCelular, contarNovas, gerarToken, intervaloConsulta, juntarMensagens, modoPainelDesktop, paginaDaSala, textoPessoasSala } from './nucleo';
 
 const msg = (id: string, em: number, texto = id): MensagemChat => ({ id, apelido: 'Ana', texto, em });
 const vazio = { mensagens: [], removidas: [], limpaEm: 0 };
@@ -106,5 +106,21 @@ describe('utilidades', () => {
     expect(modoPainelDesktop(1100, 'uf')).toBe('doca');
     expect(modoPainelDesktop(1440, 'uf')).toBe('doca');
     expect(modoPainelDesktop(1024, 'uf')).toBe('folha');
+  });
+});
+
+describe('alturaFolhaCelular', () => {
+  it('começa logo abaixo da linha dos % do placar (conferência: 360×740 e 375×667 com a lista sem mensagem inteira)', () => {
+    expect(alturaFolhaCelular(740, 342)).toBe(398);
+    expect(alturaFolhaCelular(667, 280)).toBe(387);
+  });
+  it('nunca passa de 58% da tela nem de 560 px', () => {
+    expect(alturaFolhaCelular(844, 200)).toBe(490);
+    expect(alturaFolhaCelular(1100, 100)).toBe(560);
+  });
+  it('nunca fica abaixo de 300 px (a lista some) e, sem placar na tela, usa a altura de sempre', () => {
+    expect(alturaFolhaCelular(740, 600)).toBe(300);
+    expect(alturaFolhaCelular(740, null)).toBe(429);
+    expect(alturaFolhaCelular(500, 450)).toBe(290);
   });
 });

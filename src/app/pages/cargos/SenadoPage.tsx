@@ -315,7 +315,8 @@ function CartaoUf({
   return (
     <article className="group relative flex h-full flex-col rounded-2xl border border-line bg-surface p-4 shadow-card transition-colors hover:border-line/[2.5]">
       <header className="mb-3 flex items-center justify-between gap-2">
-        <h3 className="min-w-0 truncate font-display text-[16px] font-semibold tracking-[-0.01em] text-fg">
+        {/* nome do estado inteiro (quebra a linha): "Rio Grande do N…" deixava RN igual a RS */}
+        <h3 className="min-w-0 font-display text-[16px] font-semibold leading-tight tracking-[-0.01em] text-fg">
           {UF_NOMES[uf]} <span className="font-mono text-[12px] font-semibold text-fg-subtle">{uf}</span>
         </h3>
         <button

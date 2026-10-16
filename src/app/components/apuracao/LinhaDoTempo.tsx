@@ -397,6 +397,8 @@ export const LinhaDoTempo = memo(function LinhaDoTempo({ status, recebidoEm, ser
 
   return (
     <section
+      // linha do tempo com os % da noite: a pílula do chat e a barra do rodapé não ficam por cima (faixaLivre)
+      data-sem-anuncio-fixo
       aria-label="Reveja a noite: linha do tempo da apuração"
       className={cn(
         'relative z-30 rounded-2xl border px-3 pb-2 pt-2.5 transition-[border-color,background-color,box-shadow] duration-300 sm:px-4',

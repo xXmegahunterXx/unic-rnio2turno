@@ -62,6 +62,7 @@ deploy/painel.sh estado
 | A3.5 | Se ligar "Bot Fight Mode" ou regras de WAF: conferir que o monitor de uptime (A6) e os cartões do X (A7) continuam funcionando | A6 e A7 de novo | Técnico | não |
 | A3.6 | Depois de toda atualização que mude `public/data` ou `public/geo`: **limpar o cache** do prefixo `/data/` (e `/geo/`) | DEPLOY §5, último parágrafo | Técnico | não |
 | A3.7 | Regra 3 (sem query: `/api/status`, `/api/meta`, `/api/chat` e `/api/divulgacao` com a query ignorada na chave de cache) e, opcional, a regra de *Rate limiting* (DEPLOY §5) | `curl -s -o /dev/null https://seu-dominio/api/chat; curl -sI 'https://seu-dominio/api/chat?x=1' \| grep -iE '^HTTP\|cf-cache-status'` → `HIT` e 200 logo depois de um GET normal (um 400 isolado, com a borda expirada, é esperado e inofensivo) | Técnico | não |
+| A3.9 | **Cloudflare Web Analytics desligado** (a Cloudflare injeta um script de medição em toda página; a política de segurança do site o bloqueia — erro no console de todo visitante — e a /privacidade promete o site sem analytics). Em 16/10 estava LIGADO em produção | `curl -s -H 'Accept: text/html' https://seu-dominio/sobre \| grep -c cloudflareinsights` → `0` (DEPLOY §5, passo 5) | Técnico | sim |
 | A3.8 | **Antes de vender anúncio:** *Painel → Audiência → Zerar medição* depois do deploy final (tira os testes) e conferir a concentração por rede no pico | painel | Técnico + Dono | não |
 
 ### A4. Senhas e acessos
@@ -79,7 +80,7 @@ deploy/painel.sh estado
 | # | Item | Como conferir | Quem decide | Bloqueia? |
 |---|---|---|---|---|
 | A5.1 | Backup de hora em hora ativo | `cat /etc/cron.d/sintonia`; `ls -lt /var/backups/sintonia \| head -3` | Técnico | sim |
-| A5.2 | Cópia **fora da VPS** (diária e na véspera) | `scp root@IP:/var/backups/sintonia/sintonia-*.tar.gz ./` | Técnico | sim |
+| A5.2 | Cópia **fora da VPS** (diária e na véspera): só a mais recente, **cifrada** (`gpg -c`), apagando as antigas em até 30 dias — leva pedidos de anunciantes e o `.env` | DEPLOY §7 (`scp` do mais recente + `gpg -c`) | Técnico | sim |
 | A5.3 | Restauração ensaiada uma vez (lista e um restore numa hora tranquila) | `deploy/restore.sh --listar` | Técnico | não |
 | A5.4 | (Opcional) snapshot automático do provedor | painel do provedor | Dono | não |
 
@@ -128,6 +129,7 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | A9.3 | `src/app/pages/static/PrivacidadePage.tsx` | controlador e encarregado vêm do painel (A9.1); operadores (Cloudflare e provedor do servidor) já citados; conferir com o jurídico a retenção (B1.7) e a data "atualizado em" | B3 e B1.7 |
 | A9.4 | `src/app/content/afirmacoes.ts` (+ `afirmacoes.test.ts` e a validação no fim do arquivo) | depois da revisão: `revisado: true` em cada afirmação aprovada (o tipo hoje é o literal `false`, de propósito) e as correções de texto | B2.1 |
 | A9.5 | depois de A9.1–A9.4 | `deploy/update.sh` na VPS e repetir A7 | — |
+| A9.6 | **logo depois da 1ª atualização desta leva** (a que saiu da 58efd31; a b88dfe1 já está no ar desde 16/10) e **antes** da próxima | guarde a versão antiga à parte: `docker tag sintonia-app:anterior sintonia-app:pre-anuncios`; depois `deploy/update.sh --forcar` (ou a próxima atualização normal) para o `:anterior` passar a ser uma versão com anúncios. Confira com o comando do RUNBOOK §3.5: o `:anterior` não pode ser `58efd31`. Sem isso, o `--rollback` rápido volta para a versão sem anúncios (RUNBOOK §3.5) | — |
 
 ---
 
@@ -145,6 +147,7 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | B1.6 | **Divulgação e impulsionamento** | Impulsionamento pago de conteúdo eleitoral é exclusivo de candidatos e partidos (Lei 9.504/97, art. 57-C): **não** pagar anúncio de post com nome ou número de candidato. Regras para posts do perfil do Sintonia no dia 25 | Jurídico + Dono | sim |
 | B1.7 | **Registros de acesso (Marco Civil, art. 15)** | Por desenho, o app e o Caddy **não registram IP**; a Cloudflare registra do lado dela. A política de privacidade foi ajustada (out/2026) para dizer exatamente isso ("o Sintonia não grava o IP de quem acessa"; Cloudflare e provedor tratam conforme as políticas deles). Se o responsável for pessoa jurídica com fins econômicos, a guarda de 6 meses pode ser obrigação: ligar log de acesso com retenção segura (e mudar o texto) | Jurídico + Dono | sim |
 | B1.8 | **Patrocínio** | Só anunciante não político, com contrato que diga isso. Desligado por padrão | Jurídico + Dono | não |
+| B1.8.1 | **Barra do rodapé (celular) na noite** | Pela regra do §1.5 (nunca por cima de resultado), a barra fixa some diante de placar, mapas, tabelas, acontecimentos e mosaico de seções: na /apuracao, durante a apuração, ela **quase não aparece** (0 de 46 posições de rolagem na conferência); na UF, em cerca de metade; na Home e nas outras páginas, normalmente. Avisar quem comprar o formato "rodapé" (impressões vêm das outras páginas) ou vender o rodapé sem a /apuracao | Dono | não |
 | B1.9 | **Chat ao vivo** (`/apuracao`, `/ao-vivo`) | Conteúdo de terceiros num site com anúncio: filtros, moderação e denúncia bastam (Marco Civil art. 19; Lei 9.504/97 art. 57-D, anonimato)? Ligar o **registro cifrado dos envios** (`CHAT_REGISTRO_CHAVE`, DEPLOY §5.1, desligado), quem guarda a chave privada? A sala fica fechada de 0h às 17h de 25/10 (art. 39 §5º) | Jurídico + Dono | sim |
 | B1.10 | **Anúncio em imagem com candidato** | Hoje DESLIGADO (`OFERECIMENTO_COM_CANDIDATOS = false`): placar e palpite com nomes saem sem "Oferecimento". Ligar só com parecer (a imagem circula sem o site em volta, com foto e número). **Também decidir:** o "Oferecido por" da **/live** (fonte do OBS que vai para lives, VODs e cortes de terceiros) e o "Oferecimento" do **Modo TV** ficam no mesmo quadro de foto, nome, número de urna e percentuais (na barra do Sintonia, separados do placar por ela; a aba da /live nunca passa da largura da marca do Sintonia). Mesmo motivo da chave acima: manter, ou desligar nessas duas telas | Jurídico + Dono | não |
 | B1.11 | **Palpite do 2º turno** | Prazo até 23h59 de 24/10, palpite travado e sem compartilhar no dia da votação, sem número agregado. Basta para não ser lido como pesquisa/prognóstico? | Jurídico | sim |

@@ -163,7 +163,7 @@ async function estado() {
   console.log('Simulação:        ' + (sv.simulacao?.permitida ? 'PERMITIDA (ALLOW_SIMULACAO=1) — tire essa linha do .env no site público' : 'bloqueada (correto no site público)'));
   const t = s.state.tse;
   console.log(`Códigos do TSE:   pleito ${t.pleito} · Presidente ${t.eleicaoPres} · Governador ${t.eleicaoGov} · a cada ${t.intervaloSeg} s`);
-  console.log(`Versão:           estado ${s.state.versao} · build ${sv.build?.commit ?? '?'}` + (typeof st.pessoasAgora === 'number' ? ` · pessoas agora ~${st.pessoasAgora} (que chegaram a este servidor)` : ''));
+  console.log(`Versão:           estado ${s.state.versao} · build ${sv.build?.commit ?? '?'}` + (typeof st.pessoasAgora === 'number' ? ` · pessoas agora ~${st.pessoasAgora} (estimativa: origem ou sinal das páginas, o maior)` : ''));
   const { j: c } = await req('/api/admin/chat');
   console.log('Chat ao vivo:     ' + linhaChat(c));
   if (s.state.fonte === 'tse') {
@@ -175,7 +175,14 @@ async function estado() {
 
 function linhaChat(c) {
   if (!c) return '(indisponível)';
-  const sala = c.aberta ? (c.bloqueio ? `ABERTA no painel, mas ainda sem receber mensagens: ${c.bloqueio}` : 'ABERTA (recebendo mensagens)') : 'fechada';
+  // travada pelo servidor (ex.: registro de envios configurado mas inválido): abrir é recusado até corrigir
+  const sala = c.travada
+    ? `TRAVADA fechada pelo servidor: ${c.travada}`
+    : c.aberta
+      ? c.bloqueio
+        ? `ABERTA no painel, mas ainda sem receber mensagens: ${c.bloqueio}`
+        : 'ABERTA (recebendo mensagens)'
+      : 'fechada';
   return `${sala} · modo lento ${c.lentoS} s` + (c.fixada ? ` · fixada: "${c.fixada.texto}"` : ' · sem mensagem fixada') +
     (typeof c.pessoas === 'number' ? ` · ~${c.pessoas} pessoa(s) na sala` : '');
 }

@@ -753,9 +753,13 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   o layout continua o mesmo (`modoPainelDesktop` → `doca`: nacional em 1200–1359 e ≥ 1760 px; UF ≥ 1100), gaveta NÃO
   modal abaixo do cabeçalho (nacional 1360–1759; Esc fecha) ou, em tela estreita (nacional < 1200, UF < 1100), `folha`
   centralizada embaixo (até 440 px de altura: os dois percentuais do placar continuam à vista);
-  celular = botão flutuante acima da tab bar e da barra de anúncio (recolhe para uma alça na margem quando há bloco
-  `data-sem-anuncio-fixo` na faixa de baixo) e folha inferior NÃO modal de ~58% (rola o placar para ficar à vista acima;
-  a folha leva `data-sem-anuncio-fixo`, então a barra de anúncio some; o anúncio da sala fica no PÉ da folha). Regras
+  celular = botão flutuante acima da tab bar e da barra de anúncio (recolhe para uma alça na margem, com o rótulo
+  vertical "Chat", quando há bloco `data-sem-anuncio-fixo` na faixa de baixo — quase sempre na /apuracao) e folha
+  inferior NÃO modal que começa logo abaixo da linha dos % do placar (rola o placar para ficar à vista acima; altura
+  medida na abertura, entre 300 px e 58% da tela — `alturaFolhaCelular`; a folha leva `data-sem-anuncio-fixo`, então a
+  barra de anúncio some; o anúncio da sala fica no PÉ da folha). Portas visíveis para a sala: a chamada "Chat ao vivo"
+  na 1ª dobra da /apuracao e da UF (ao lado de "N pessoas agora"; só com a sala aberta — `chat/chamada.ts` liga a página
+  à sala sem puxar o chat para o JS inicial) e o item "Chat ao vivo" do menu Mais (/ao-vivo). Regras
   compactas no pé (popover com as regras inteiras e "Trocar apelido"); quem digita antes de ter apelido escreve a mensagem
   e o apelido é pedido no envio. Mensagem enviada que o servidor não devolveu some depois da janela de consulta (não fica
   "fantasma" na tela). Demo: sala desligada com aviso.

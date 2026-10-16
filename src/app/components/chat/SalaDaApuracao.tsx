@@ -244,7 +244,15 @@ function mostrarPlacarAcima(): number | null {
   const r = el.getBoundingClientRect();
   if (r.bottom <= 0 || r.top >= window.innerHeight) return null; // fora da tela: não mexe na leitura
   const cab = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 56;
+  const votos = el.querySelector<HTMLElement>('[data-placar-votos]');
   let delta = r.top - cab - 8;
+  // celular baixo (375×667): com o placar inteiro à vista, sobrariam ~320 px para a folha (1 mensagem). Aí o topo do
+  // placar (título da disputa) passa por baixo do cabeçalho e ficam à vista as fotos, os nomes e os % — a folha ganha
+  // ~60 px de lista
+  const lados = el.querySelector<HTMLElement>('[data-placar-lados]');
+  if (votos && lados && window.innerHeight - (votos.getBoundingClientRect().top - delta) < 360) {
+    delta = lados.getBoundingClientRect().top - cab - 8;
+  }
   if (Math.abs(delta) < 24) delta = 0;
   else {
     const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
@@ -253,7 +261,6 @@ function mostrarPlacarAcima(): number | null {
     window.scrollTo({ top: alvo, behavior: 'smooth' });
   }
   // a linha "N votos" vem 8 px abaixo dos percentuais: a folha começa 2 px acima dela (os % ficam inteiros)
-  const votos = el.querySelector<HTMLElement>('[data-placar-votos]');
   if (!votos) return null;
   return votos.getBoundingClientRect().top - delta - 2;
 }

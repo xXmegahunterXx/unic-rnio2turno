@@ -228,6 +228,11 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
    bloqueada. HSTS: não precisa ligar na Cloudflare (o app já envia).
 5. **Velocidade / Otimização:** **Rocket Loader desligado** (ele reescreve o JavaScript do site). Não use o modo
    "Estou sob ataque" a não ser em emergência: ele bloqueia as atualizações automáticas da apuração.
+   **Web Analytics / Real User Measurements desligado** (Analytics e logs → Web Analytics → o site → "Desativar" a
+   configuração automática): a Cloudflare injeta `static.cloudflareinsights.com/beacon.min.js` em toda página, a
+   política de segurança do site o bloqueia (erro no console de todo visitante) e a /privacidade promete o site sem
+   ferramenta de analytics. Confira: `curl -s -H 'Accept: text/html' https://seu-dominio/sobre | grep -c cloudflareinsights`
+   tem de dar `0`.
 6. **Caching → Cache Rules** — crie duas regras, nesta ordem:
 
    **Regra 1 — "Sintonia: API pública e dados"**
@@ -351,6 +356,12 @@ O que acontece:
 | `deploy/update.sh --rollback` | voltar para a versão anterior (≈ 5 s) |
 | `deploy/update.sh --qualquer-commit` | publicar a ponta do branch mesmo sem `[deploy]` na mensagem |
 
+**Primeira atualização desta leva (saindo da 58efd31, de antes dos anúncios):** logo depois dela, e antes da próxima,
+`docker tag sintonia-app:anterior sintonia-app:pre-anuncios` e `deploy/update.sh --forcar` (ou a próxima atualização
+normal). Assim o `--rollback` rápido cai numa versão que entende os anúncios, e a antiga fica guardada à parte — voltar
+para ela apaga os anúncios e os contatos do painel na primeira gravação (RUNBOOK §3.5, que também mostra como voltar de
+propósito e como restaurar só o painel com `deploy/restore.sh <arquivo> --so-admin`).
+
 **Só commits marcados vão ao ar sem perguntar:** se o commit mais novo do GitHub não tiver `[deploy]` na mensagem (ex.:
 "WIP … (não publicar)"), o `update.sh` mostra o assunto e pergunta (ou para, sem terminal). Para ir só até o último
 commit marcado: `deploy/auto-update.sh rodar`.
@@ -397,7 +408,8 @@ usuário `root` e a senha; depois cole o comando.
   gpg -c sintonia-AAAAMMDD-HHMMSS.tar.gz && rm sintonia-AAAAMMDD-HHMMSS.tar.gz     # fica só o .gpg (senha forte)
   ```
 - **Restaurar:** `/opt/sintonia/deploy/restore.sh --listar` e depois
-  `/opt/sintonia/deploy/restore.sh /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz`
+  `/opt/sintonia/deploy/restore.sh /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz` (com `--so-admin`, só o
+  `admin.json` — painel, anúncios e contatos —, sem tocar na audiência, nos pedidos nem no chat)
   (faz um backup do estado atual antes; o app fica parado ~5 s). A versão do estado restaurado é ajustada para
   continuar crescendo, para nenhum cache antigo ser confundido com o estado restaurado. O restore **preserva** o
   registro cifrado do chat (`chat-registro/`, guarda de 6 meses) e a chave pública do registro (`*.pem`).
@@ -423,11 +435,14 @@ erros, clientes estimados). Nunca registra IP, senha, cookie nem código de Duel
 pelo mesmo motivo. Os logs do Docker giram sozinhos (5 arquivos de 20 MB por serviço).
 
 **Vigia de travamento:** o Docker verifica o `/healthz` a cada 15 s. Se o app já esteve no ar e para de
-responder por ~75 s seguidos **e o batimento do processo parou** (o app grava um batimento por segundo em
-`/tmp/sintonia-batimento`; num travamento de verdade o laço de eventos para), o próprio healthcheck reinicia o
-processo. **Lentidão não reinicia:** com a CPU saturada (pico, rajada que fura a CDN), o `/healthz` numa conexão nova
-pode passar de 5 s enquanto o processo segue atendendo — o log mostra "processo vivo … SEM reinício" e o contêiner
-fica `unhealthy` até a carga baixar. Desligue o vigia com `AUTORREINICIO=0` no `.env`.
+responder **com o batimento do processo parado** (o app grava um batimento por segundo em `/tmp/sintonia-batimento`;
+num travamento de verdade o laço de eventos para), o próprio healthcheck mata o processo (SIGKILL: um laço travado não
+atende SIGTERM) e o Docker sobe outro — **~2–3 min** do travamento até o site voltar (30 s até o batimento contar como
+parado + 5 verificações + a subida). **Lentidão não reinicia:** com a CPU saturada (pico, rajada que fura a CDN), o
+`/healthz` numa conexão nova pode passar de 5 s enquanto o processo segue atendendo — o log mostra "processo vivo …
+SEM reinício" e o contêiner fica `unhealthy` até a carga baixar. Só se o processo vivo passar **~5 min sem responder a
+nenhuma verificação** (servidor HTTP parado, ex.: "too many open files") ele é reiniciado com SIGTERM
+(`AUTORREINICIO_VIVO_FALHAS=20`; `0` desliga só isso). Desligue o vigia inteiro com `AUTORREINICIO=0` no `.env`.
 
 Depois de um reinício da VPS tudo volta sozinho (Docker habilitado no boot + `restart: unless-stopped`).
 

@@ -78,8 +78,9 @@ export function OferecimentoChatPeca({
         <LogoMarca anuncio={a} tamanho="xs" />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-subtle">Sala oferecida por</span>
-          {/* a mensagem comprada pelo anunciante: inteira, em até 2 linhas (cortada no meio do preço da oferta, não) */}
-          <span className="mt-0.5 line-clamp-2 text-[13.5px] font-semibold leading-snug text-fg">
+          {/* a mensagem comprada pelo anunciante: inteira, em até 2 linhas (3 no celular, ao lado do botão) — cortada no
+              meio do preço da oferta, não */}
+          <span className={cn('mt-0.5 text-[13.5px] font-semibold leading-snug text-fg', compacta ? 'line-clamp-2' : 'line-clamp-3 sm:line-clamp-2')}>
             {a.marca}
             {a.titulo ? <span className="font-normal text-fg-muted"> · {a.titulo}</span> : null}
           </span>
@@ -87,10 +88,14 @@ export function OferecimentoChatPeca({
         {compacta ? (
           <Icon name="externo" size={15} className="text-fg-subtle" />
         ) : (
-          <span className="inline-flex h-8 shrink-0 items-center gap-1 rounded-full border border-line bg-surface px-3 text-[12px] font-semibold text-fg transition-colors group-hover:bg-surface-3">
-            <span className="max-w-[9rem] truncate">{a.cta}</span>
-            <Icon name="externo" size={13} className="text-fg-subtle" />
-          </span>
+          <>
+            {/* abaixo de 640 px o botão roubava a largura da mensagem (título cortado, rótulo em 2 linhas): só o ícone */}
+            <Icon name="externo" size={15} className="text-fg-subtle sm:hidden" />
+            <span className="hidden h-8 shrink-0 items-center gap-1 rounded-full border border-line bg-surface px-3 text-[12px] font-semibold text-fg transition-colors group-hover:bg-surface-3 sm:inline-flex">
+              <span className="max-w-[9rem] truncate">{a.cta}</span>
+              <Icon name="externo" size={13} className="text-fg-subtle" />
+            </span>
+          </>
         )}
       </LinkAnuncio>
     </aside>

@@ -39,7 +39,7 @@ export function DestaquesCuriosidades({ ids = DESTAQUES_PADRAO, variante = 'comp
           ))
         : [0, 1, 2].map((i) => (
             <li key={i}>
-              <Skeleton className={cn('w-full rounded-2xl', hero ? 'h-[112px]' : 'h-[124px]')} />
+              <Skeleton className={cn('w-full rounded-2xl', hero ? 'h-[140px]' : 'h-[124px]')} />
             </li>
           ))}
     </ul>

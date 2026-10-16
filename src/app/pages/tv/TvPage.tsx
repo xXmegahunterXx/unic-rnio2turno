@@ -173,7 +173,8 @@ export default function TvPage() {
             {race && dados ? (
               <PlacarTv race={race} resumo={dados.resumo} pre={pre} simulado={simulado} />
             ) : (
-              <div className="flex-1 animate-pulse rounded-[calc(var(--u)*2.5)] bg-surface" />
+              // retrato: reserva a altura do placar (~56u) para o mapa não pular para baixo quando os dados chegam (CLS)
+              <div className="flex-1 animate-pulse rounded-[calc(var(--u)*2.5)] bg-surface portrait:min-h-[calc(var(--u)*56)]" />
             )}
             <Rodape simulado={simulado} />
           </section>

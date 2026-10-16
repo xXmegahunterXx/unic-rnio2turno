@@ -75,7 +75,8 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
     >
       {eleito ? <div aria-hidden className={cn('pointer-events-none absolute inset-0 bg-gradient-to-br', corSlot(eleito.cor).glow)} /> : null}
 
-      <div className="relative grid h-full grid-cols-[30%_minmax(0,1fr)] gap-x-4 gap-y-4 xl:grid-cols-[minmax(0,38%)_minmax(0,1fr)] xl:grid-rows-[auto_1fr_auto] xl:gap-x-6 xl:gap-y-3">
+      {/* 768–1279 (2 cartões por linha, com foto): mapa a 24% para a sigla inteira (REPUBLICANOS) caber ao lado do % */}
+      <div className="relative grid h-full grid-cols-[30%_minmax(0,1fr)] gap-x-4 gap-y-4 md:grid-cols-[24%_minmax(0,1fr)] xl:grid-cols-[minmax(0,38%)_minmax(0,1fr)] xl:grid-rows-[auto_1fr_auto] xl:gap-x-6 xl:gap-y-3">
         {/* cabeçalho */}
         <div className="col-span-2 flex items-start justify-between gap-3 xl:col-span-1 xl:col-start-2 xl:row-start-1">
           <div className="min-w-0">

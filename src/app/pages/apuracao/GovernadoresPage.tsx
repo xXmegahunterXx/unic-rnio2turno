@@ -282,8 +282,8 @@ function Resumo({ rotulo, valor, sub, className }: { rotulo: string; valor: stri
     <div className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface px-3.5 py-3 shadow-card sm:px-4 sm:py-3.5', className)}>
       <dt className="truncate text-[11px] font-semibold uppercase leading-tight tracking-[0.1em] text-fg-muted sm:text-[11.5px]">{rotulo}</dt>
       {/* valor e legenda inteiros em até 2 linhas: "Rio Grande do …" deixava RN e RS iguais */}
-      <dd className="num mt-auto line-clamp-2 break-words pt-2 font-display text-[22px] font-semibold leading-[1.05] tracking-[-0.02em] text-fg sm:text-[26px]">
-        {valor}
+      <dd className="num mt-auto pt-2 font-display text-[22px] font-semibold leading-[1.1] tracking-[-0.02em] text-fg sm:text-[26px]">
+        <span className="line-clamp-2 break-words">{valor}</span>
       </dd>
       <dd className="mt-1.5 line-clamp-2 text-[12px] leading-snug text-fg-muted sm:text-[12.5px]">{sub}</dd>
     </div>

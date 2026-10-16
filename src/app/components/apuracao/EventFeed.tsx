@@ -96,7 +96,8 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
 
   if (variant === 'ticker') {
     return (
-      <div className={cn('relative', className)}>
+      // acontecimentos citam candidato e %: a pílula do chat e a barra do rodapé não ficam por cima (faixaLivre)
+      <div data-sem-anuncio-fixo className={cn('relative', className)}>
         <ol
           aria-label="Últimos acontecimentos"
           className={cn('flex snap-x snap-mandatory gap-2 overflow-x-auto pb-1 scrollbar-none', bleed ? '-mx-4 scroll-px-4 px-4 sm:mx-0 sm:scroll-px-0 sm:px-0' : '')}
@@ -127,7 +128,8 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
                     {fmtHora(e.t)}
                     {showUf && e.abrangencia !== 'BR' ? ` · ${e.abrangencia}` : ''}
                   </div>
-                  <div className="mt-0.5 line-clamp-2 text-[13.5px] font-medium leading-snug text-fg">{e.titulo}</div>
+                  {/* até 3 linhas: "Com 1,1% das seções totalizadas, Flávio Bolsonaro sai na frente" cortava no nome */}
+                  <div className="mt-0.5 line-clamp-3 text-[13.5px] font-medium leading-snug text-fg">{e.titulo}</div>
                 </div>
                 {acao ? <div className="-mr-1.5 -mt-1.5 shrink-0">{acao(e)}</div> : null}
               </motion.li>
@@ -139,7 +141,8 @@ export function EventFeed({ eventos, race, variant = 'list', max, showUf = true,
   }
 
   return (
-    <ol aria-label="Acontecimentos da apuração" className={cn('relative', className)}>
+    // acontecimentos citam candidato e %: a pílula do chat e a barra do rodapé não ficam por cima (faixaLivre)
+    <ol data-sem-anuncio-fixo aria-label="Acontecimentos da apuração" className={cn('relative', className)}>
       <AnimatePresence initial={false}>
         {lista.map((e, i) => (
           <motion.li
