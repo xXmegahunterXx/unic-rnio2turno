@@ -168,7 +168,12 @@ export class Presenca {
     const pos = (chave >>> 0) & (BITS - 1);
     const byte = pos >>> 3;
     const bit = 1 << (pos & 7);
-    if (b.bits[byte] & bit) return;
+    if (b.bits[byte] & bit) {
+      // mesma pessoa de novo (ou colisão no mapa de bits): não soma pessoa, mas a rede conta como presente na
+      // concentração — senão uma colisão some com a rede do "quantas redes" (o pico de 300 redes virava 299)
+      if (!b.porRede.has(rede)) b.porRede.set(rede, 0);
+      return;
+    }
     const n = b.porRede.get(rede) ?? 0;
     if (n >= PESSOAS_REDE_BALDE) return;
     b.porRede.set(rede, n + 1);
