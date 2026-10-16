@@ -16,9 +16,14 @@
  *
  * Regras que valem em todo lugar: sempre rotulado ("Publicidade"/"Patrocinado"/"Oferecido por"); link com
  * rel="sponsored noopener"; nunca colado a número, foto ou nome de candidato (separação visual clara); nada
- * político-eleitoral (declaração + `motivoPolitico`, src/shared/anuncios-politica.ts); sem pop-up,
- * sem som, sem animação piscante. Métricas só agregadas (impressões visíveis e cliques por anúncio/formato/hora),
- * sem cookie, sem IP e sem dado pessoal (LGPD).
+ * político-eleitoral (declaração + `motivoPolitico`, src/shared/anuncios-politica.ts); nada de apostas, cassino ou
+ * mercados de previsão, e bebida alcoólica fora do ar em 25/10 até as 17h (src/shared/anuncios-categorias.ts); sem
+ * pop-up, sem som, sem animação (imagem animada é recusada: `imagemAnimada`). Métricas só agregadas (impressões
+ * visíveis e cliques por anúncio/formato/hora), sem cookie, sem IP e sem dado pessoal (LGPD).
+ *
+ * Contrato v2 (anunciantes v2): ajuste de desenho das imagens (`AjusteImagem`: proporção e placa por tema, medido no
+ * painel), versão da logo para fundo escuro, cota Reserva (empresas do grupo: só no espaço que nenhum pago ocupa) e
+ * meta de impressões. Tudo opcional: estados e clientes antigos continuam valendo.
  */
 
 import { FORMATOS_MASTER_PRIORITARIO } from './anuncios-escolha';
@@ -71,8 +76,11 @@ export interface AjusteImagem {
   comFundo?: true;
 }
 
-/** Interruptor do desenho novo: false = o site ignora os ajustes (logo na placa clara quadrada, como antes). */
-export const LOGO_NATURAL: boolean = true;
+/**
+ * Interruptor do desenho novo: false = o site ignora os ajustes (logo na placa clara quadrada, como antes). Mora em
+ * anuncios-flags.ts (módulo folha: o site importa de lá sem puxar a validação para o JS das peças); reexportado aqui.
+ */
+export { LOGO_NATURAL } from './anuncios-flags';
 
 /** Anúncio como o admin cadastra (fica no estado do servidor, `AdminState.anuncios`). */
 export interface AnuncioConfig {
@@ -279,31 +287,48 @@ const RE_SVG_ANIMADO = /<animate|<animateTransform|<animateMotion|<set[\s>]|@key
 
 /**
  * Imagem animada (data URI)? O Sintonia só exibe imagens paradas (sem pisca, sem animação). Lê no máximo os primeiros
- * 64 KB do base64 (o SVG, inteiro), com `atob` (Node ≥ 16 e navegador). O tipo vem dos BYTES (o navegador também
- * reconhece pelo conteúdo, não pelo rótulo do data URI):
+ * 64 KB do base64 (o SVG, inteiro; o PNG, inteiro só se os chunks antes do `IDAT` passarem da janela), com `atob`
+ * (Node ≥ 16 e navegador). O tipo vem dos BYTES (o navegador também reconhece pelo conteúdo, não pelo rótulo do data URI):
  *  - PNG: percorre os chunks a partir do byte 8 — animado (APNG) se houver `acTL` antes de `IDAT`;
  *  - WebP: animado se o `VP8X` tiver o bit 0x02 no byte 20, ou se houver chunk `ANIM` ou `ANMF`;
  *  - GIF (formato não aceito; aqui só se vier com o rótulo de outro tipo): tratado como animado (lado seguro);
  *  - SVG (pelo rótulo `image/svg+xml`): `<animate…>`, `<set>`, `@keyframes` ou `animation:`;
  *  - outro (JPEG, URL do servidor…): false.
  */
+/**
+ * PNG animado (APNG)? Percorre os chunks a partir do byte 8 (tamanho (4, big-endian) + tipo (4) + dados + CRC (4)):
+ * true com `acTL` antes de `IDAT`; false com `IDAT`/`IEND` antes; null se os bytes acabarem antes de decidir.
+ */
+function pngAnimado(b: string): boolean | null {
+  const byte = (i: number) => b.charCodeAt(i);
+  for (let i = 8; i + 8 <= b.length; ) {
+    const tam = byte(i) * 0x1000000 + (byte(i + 1) << 16) + (byte(i + 2) << 8) + byte(i + 3);
+    const tipo = b.slice(i + 4, i + 8);
+    if (tipo === 'acTL') return true;
+    if (tipo === 'IDAT' || tipo === 'IEND') return false;
+    i += 12 + tam;
+  }
+  return null;
+}
+
 export function imagemAnimada(dataUri: string): boolean {
   const m = /^data:([^;,]*)(;[^,]*)?,/.exec(dataUri);
   if (!m || !/;base64$/i.test(m[2] ?? '')) return false;
   const svg = /svg/i.test(m[1]);
-  const b = binarioBase64(dataUri.slice(m[0].length), svg ? Number.MAX_SAFE_INTEGER : 64 * 1024);
+  const corpo = dataUri.slice(m[0].length);
+  const janela = 64 * 1024;
+  const b = binarioBase64(corpo, svg ? Number.MAX_SAFE_INTEGER : janela);
   if (!b || b.length < 4) return false;
   const byte = (i: number) => b.charCodeAt(i);
-  // PNG: assinatura 89 50 4E 47 0D 0A 1A 0A; cada chunk = tamanho (4, big-endian) + tipo (4) + dados + CRC (4)
+  // PNG: assinatura 89 50 4E 47 0D 0A 1A 0A
   if (b.startsWith('\x89PNG\r\n\x1a\n')) {
-    for (let i = 8; i + 8 <= b.length; ) {
-      const tam = byte(i) * 0x1000000 + (byte(i + 1) << 16) + (byte(i + 2) << 8) + byte(i + 3);
-      const tipo = b.slice(i + 4, i + 8);
-      if (tipo === 'acTL') return true;
-      if (tipo === 'IDAT' || tipo === 'IEND') return false;
-      i += 12 + tam;
-    }
-    return false;
+    const r = pngAnimado(b);
+    if (r !== null) return r;
+    // o percurso saiu da janela antes de decidir (metadado grande antes do acTL: iTXt/XMP, iCCP de ferramentas de
+    // exportação): lê o arquivo inteiro (≤ 400 KB pelas regras de tamanho). Arquivo truncado: não é animado
+    if (corpo.length <= janela) return false;
+    const tudo = binarioBase64(corpo, Number.MAX_SAFE_INTEGER);
+    return tudo ? (pngAnimado(tudo) ?? false) : true;
   }
   // WebP: "RIFF" <tamanho> "WEBP" e chunks a partir do byte 12 (tipo (4) + tamanho (4, little-endian) + dados, par)
   if (b.length >= 16 && b.startsWith('RIFF') && b.slice(8, 12) === 'WEBP') {
@@ -373,6 +398,23 @@ export function conflitoMaster(lista: readonly AnuncioParaConflito[], candidato:
     if (formato && janelasSeCruzam(candidato, outro)) return { id: outro.id, marca: outro.marca, formato };
   }
   return null;
+}
+
+/** Nome curto de cada formato (mensagens do motor e do painel, como no bloco "Espaços agora"). */
+export const NOME_CURTO_FORMATO: Record<FormatoAnuncio, string> = {
+  topo: 'Topo',
+  rodape: 'Rodapé',
+  nativo: 'Cartões',
+  teste: 'Teste Cego',
+  tv: 'Modo TV',
+  compartilhamento: 'Imagens',
+  chat: 'Chat',
+  live: 'Lives',
+};
+
+/** Mensagem do master sobreposto (`conflitoMaster`): a mesma no motor (recusa ao salvar) e no formulário do painel. */
+export function mensagemConflitoMaster(c: { marca: string; formato: FormatoAnuncio }): string {
+  return `Já há um master em ${NOME_CURTO_FORMATO[c.formato]} nesse horário (${c.marca}). Mude o horário, use Apoio ou ponha ${c.marca} como Reserva.`;
 }
 
 /** Opções de `validaAnuncio`. */

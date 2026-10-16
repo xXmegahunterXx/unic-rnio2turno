@@ -30,6 +30,11 @@
 #   sudo /opt/sintonia/deploy/painel.sh chat-lento 20     modo lento: segundos entre mensagens da mesma pessoa (3–300)
 #   sudo /opt/sintonia/deploy/painel.sh chat-fixar "texto"  fixa uma mensagem no topo da sala · chat-sem-fixada tira
 #
+#   sudo /opt/sintonia/deploy/painel.sh anuncios-estado   anúncios no ar, cadastrados (situação de cada um) e a suspensão
+#   sudo /opt/sintonia/deploy/painel.sh anuncios-suspender "motivo"   TIRA TODOS os anúncios do ar em ~5 s (site, lives e
+#                                                         imagens), sem apagar nada; o motivo (opcional, ≤ 140) vai ao registro
+#   sudo /opt/sintonia/deploy/painel.sh anuncios-voltar   devolve exatamente o que estava no ar
+#
 # A SIMULAÇÃO nunca é ligada por aqui (no site público ela não pode ir ao ar). Roteiro da noite: RUNBOOK-ELEICAO.md.
 # Usa o mesmo login do painel: sujeito ao mesmo limite de tentativas (HTTP 429 → espere 1 min).
 # =====================================================================================================
@@ -38,11 +43,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 case ${1:-} in
   '' | -h | --help | ajuda)
-    sed -n '2,35p' "$0"
+    sed -n '2,40p' "$0"
     exit 0
     ;;
   estado | tse | testar-tse | trocar-agora | horario-padrao | desligar-troca | ligar-troca | sem-aviso) ;;
   chat-estado | chat-abrir | chat-fechar | chat-limpar | chat-sem-fixada) ;;
+  anuncios-estado | anuncios-voltar) ;;
+  anuncios-suspender) ;; # o motivo é opcional (≤ 140 caracteres; o servidor confere)
   chat-lento)
     [[ ${2:-} =~ ^[0-9]{1,3}$ && $2 -ge 3 && $2 -le 300 ]] || morrer "Use: painel.sh chat-lento <segundos>   (3 a 300; ex.: painel.sh chat-lento 20)"
     ;;
@@ -166,6 +173,7 @@ async function estado() {
   console.log(`Versão:           estado ${s.state.versao} · build ${sv.build?.commit ?? '?'}` + (typeof st.pessoasAgora === 'number' ? ` · pessoas agora ~${st.pessoasAgora} (estimativa: origem ou sinal das páginas, o maior)` : ''));
   const { j: c } = await req('/api/admin/chat');
   console.log('Chat ao vivo:     ' + linhaChat(c));
+  console.log('Anúncios:         ' + linhaAnuncios(s));
   if (s.state.fonte === 'tse') {
     const { j: h } = await req('/api/admin/tse/health');
     console.log('TSE:');
@@ -185,6 +193,36 @@ function linhaChat(c) {
       : 'fechada';
   return `${sala} · modo lento ${c.lentoS} s` + (c.fixada ? ` · fixada: "${c.fixada.texto}"` : ' · sem mensagem fixada') +
     (typeof c.pessoas === 'number' ? ` · ~${c.pessoas} pessoa(s) na sala` : '');
+}
+
+/** Anúncios no site (o mesmo do /api/status) e o interruptor geral. */
+function linhaAnuncios(s) {
+  const sus = s.state.anunciosSuspensos;
+  if (sus) return `SUSPENSOS — todos fora do ar desde ${hora(sus.desde)}` + (sus.motivo ? ` (motivo: ${sus.motivo})` : '') + ' · para voltar: painel.sh anuncios-voltar';
+  const noAr = s.status.anuncios ?? [];
+  return `${noAr.length} no ar` + (noAr.length ? `: ${noAr.map((a) => a.marca).join(', ')}` : '');
+}
+
+async function anunciosEstado() {
+  const { j: s } = await req('/api/admin/state');
+  console.log('Anúncios: ' + linhaAnuncios(s));
+  const noAr = new Set((s.status.anuncios ?? []).map((a) => a.id));
+  const agora = Date.now();
+  for (const a of s.state.anuncios ?? []) {
+    const sit = noAr.has(a.id)
+      ? 'NO AR'
+      : !a.ativo
+        ? 'pausado'
+        : a.fim && agora >= a.fim
+          ? `encerrado (${hora(a.fim)})`
+          : a.inicio && agora < a.inicio
+            ? `agendado (${hora(a.inicio)})`
+            : s.state.anunciosSuspensos
+              ? 'suspenso (geral)'
+              : 'fora do site (meta de impressões atingida)';
+    console.log(`   ${a.id.padEnd(22)} ${a.marca.slice(0, 24).padEnd(24)} ${a.reserva ? 'reserva' : a.cota.padEnd(7)} · ${sit} · ${a.formatos.join(', ')}`);
+  }
+  if (!(s.state.anuncios ?? []).length) console.log('   (nenhum anúncio cadastrado)');
 }
 
 async function chat(corpo) {
@@ -301,6 +339,17 @@ function horarioDe(txt) {
       case 'chat-lento': ok('Chat: ' + linhaChat(await chat({ acao: 'lento', segundos: Number(arg) }))); break;
       case 'chat-fixar': ok('Chat: ' + linhaChat(await chat({ acao: 'fixar', texto: arg }))); break;
       case 'chat-sem-fixada': ok('Chat: ' + linhaChat(await chat({ acao: 'fixar', texto: null }))); break;
+      case 'anuncios-estado': await anunciosEstado(); break;
+      case 'anuncios-suspender': {
+        const r = await comando({ tipo: 'anuncios-suspensao', suspender: true, ...(arg ? { motivo: arg } : {}) });
+        ok('Anúncios: ' + linhaAnuncios(r) + '. Nada foi apagado; o site atualiza em até ~5 s.');
+        break;
+      }
+      case 'anuncios-voltar': {
+        const r = await comando({ tipo: 'anuncios-suspensao', suspender: false });
+        ok('Anúncios de volta: ' + linhaAnuncios(r));
+        break;
+      }
       case 'sem-aviso': {
         const r = await comando({ tipo: 'aviso', aviso: null });
         ok('Aviso retirado.' + (r.status.aviso ? ` (continua o aviso automático: "${r.status.aviso.texto}")` : ''));

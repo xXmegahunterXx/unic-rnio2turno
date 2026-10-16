@@ -133,16 +133,18 @@ function Calculadora({ ds }: { ds: PresidenteT1Dataset }) {
           <PlacarCenario ds={ds} cenario={cenario} resultado={resultado} compartilhar={compartilhar} />
         </div>
 
-        {/* Mapa: logo abaixo do placar no celular; coluna fixa à direita no desktop, com o mini-placar ao vivo */}
-        <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        {/* Mapa: logo abaixo do placar no celular; coluna fixa à direita no desktop, com o mini-placar ao vivo. Mapa,
+            controles e estados mostram nome, cor e percentual dos finalistas: a barra fixa do rodapé não passa por cima
+            (ARCHITECTURE §1.5) */}
+        <div data-sem-anuncio-fixo className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <div className="space-y-3 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)] lg:max-h-[calc(100dvh-var(--app-header-h,64px)-24px)] lg:overflow-y-auto lg:overscroll-contain lg:pb-2 lg:[scrollbar-width:thin]">
             <MiniPlacar ds={ds} resultado={resultado} className="hidden lg:flex" />
             <PainelMapa geo={geo} resultado={resultado} nomes={nomes} selecionada={selecionada} onSelect={setSelecionada} />
           </div>
         </div>
 
-        {/* Controles */}
-        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2">
+        {/* Controles (presets e os cartões do divisor, com o nome de cada finalista nas pontas) */}
+        <div data-sem-anuncio-fixo className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2">
           <Presets ds={ds} cenario={cenario} nomes={nomes} onEscolher={set} />
           <section aria-labelledby="eliminados-titulo" className="space-y-3">
             <div>
@@ -174,7 +176,7 @@ function Calculadora({ ds }: { ds: PresidenteT1Dataset }) {
 
       <AnuncioNativo posicao={1} className="mt-10 sm:mt-14" />
 
-      <div className="mt-10 sm:mt-14">
+      <div data-sem-anuncio-fixo className="mt-10 sm:mt-14">
         <ListaUfs resultado={resultado} nomes={nomes} selecionada={selecionada} onSelect={setSelecionada} />
       </div>
       <ComoFunciona ds={ds} />
@@ -196,7 +198,13 @@ function ComoFunciona({ ds }: { ds: PresidenteT1Dataset }) {
     'Os pontos de partida são neutros e iguais para os dois finalistas; nenhum se baseia em pesquisa.',
   ];
   return (
-    <section id="como-funciona" aria-labelledby="como-funciona-titulo" className="mt-10 scroll-mt-[calc(var(--app-header-h,56px)+16px)] sm:mt-14">
+    // `data-sem-anuncio-fixo`: o texto da conta cita os finalistas pelo nome — a barra do rodapé não passa por cima
+    <section
+      id="como-funciona"
+      data-sem-anuncio-fixo
+      aria-labelledby="como-funciona-titulo"
+      className="mt-10 scroll-mt-[calc(var(--app-header-h,56px)+16px)] sm:mt-14"
+    >
       <div className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-7">
         <h2 id="como-funciona-titulo" className="flex items-center gap-2 font-display text-[20px] font-semibold tracking-[-0.02em] text-fg sm:text-[24px]">
           <Icon name="info" size={20} className="text-brand-fg" />

@@ -20,13 +20,14 @@
  *   GET  /api/anuncio/ir/:id?f=<formato>                    → conta o clique (agregado) e redireciona (302) para o
  *                                                             destino com UTM (urlComUtm)
  *   POST /api/anuncio/evento   { id, formato }              → conta uma impressão VISÍVEL (agregada, sem dado pessoal;
- *                                                             204; limitada por visitante)
+ *                                                             204; repetição por pessoa = rede + navegador; limite por rede)
  *   POST /api/anuncie/relatorio { k }                       → RelatorioAnunciante (src/shared/relatorio.ts): relatório de
  *                                                             entrega pelo link privado (/relatorio#k=<token>); token
  *                                                             errado/revogado → 404; no-store, noindex, no-referrer
  *   GET  /api/admin/anuncios/metricas?horas=<1–336>         → MetricasAnunciosResposta (detalhe por hora das últimas
  *                                                             `horas`, padrão 48; + entregue, esgotadoEm e alcance)
- *   GET  /api/admin/relatorios                              → { links: LinkRelatorio[] }
+ *   GET  /api/admin/relatorios                              → { links: LinkRelatorio[]; ligado: boolean } (ligado false =
+ *                                                             RELATORIOS=0 no servidor: o painel esconde os links)
  *   POST /api/admin/relatorios { acao: 'criar', id, rotulo?, mostrarMeta? } → { link: LinkRelatorio; url } (o token só
  *                                                             aparece aqui, uma vez)
  *                              { acao: 'revogar', lid }     → { link: LinkRelatorio }

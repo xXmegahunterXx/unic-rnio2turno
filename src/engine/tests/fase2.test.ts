@@ -307,15 +307,26 @@ describe('patrocínio (LEGADO: vira o anúncio master "patrocinio")', () => {
     expect(parseAdminState(c.toJSON(), fb, st).anuncios).toEqual([]);
   });
 
-  it('textos longos do formato antigo cabem no anúncio (marca 40, título 60)', () => {
+  it('textos longos do formato antigo cabem no anúncio (marca 40, título 60), cortados na última palavra, sem "…"', () => {
     const { c } = novo(ds, 'servidor');
     c.command({ tipo: 'patrocinio', patrocinio: { marca: 'M'.repeat(60), texto: 'palavra '.repeat(17).trim(), url: 'https://a.com.br' } });
     const a = c.state().anuncios![0];
-    expect(a.marca.length).toBe(40);
-    expect(a.marca.endsWith('…')).toBe(true);
-    expect(a.titulo.length).toBeLessThanOrEqual(60);
-    expect(a.titulo.endsWith('…')).toBe(true);
+    // uma palavra só, maior que o limite: corte no limite
+    expect(a.marca).toBe('M'.repeat(40));
+    // 7 × "palavra" + 6 espaços = 55 caracteres; a 8ª não cabe em 60
+    expect(a.titulo).toBe('palavra '.repeat(7).trim());
+    expect(a.titulo).not.toMatch(/…|\.\.\.$/);
     expect(a.texto).toBe('palavra '.repeat(17).trim());
+  });
+
+  it('o título do legado tira a pontuação que sobra no corte (caso real da Lynx)', () => {
+    const { c } = novo(ds, 'servidor');
+    const texto = 'Oferece a apuração ao vivo. Carteira digital com Pix em tempo real, cartão virtual e sem mensalidade.';
+    c.command({ tipo: 'patrocinio', patrocinio: { marca: 'Lynx', texto, url: 'https://lynxpix.cc' } });
+    const a = c.state().anuncios![0];
+    expect(a.titulo).toBe('Oferece a apuração ao vivo. Carteira digital com Pix em');
+    expect(a.titulo.length).toBeLessThanOrEqual(60);
+    expect(a.texto).toBe(texto);
   });
 
   it.each([

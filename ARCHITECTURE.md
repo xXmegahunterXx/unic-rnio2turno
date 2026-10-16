@@ -49,7 +49,11 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
    (presa ao cabeçalho ou ao rodapé) passando por cima ou colada a resultado ao rolar: a faixa do topo rola com a página
    em todas as larguras, e a barra do rodapé (celular) e a pílula do chat se recolhem diante de qualquer bloco
    `[data-sem-anuncio-fixo]` (placar, gráfico da corrida, participação, 1º × 2º turno, mapas, tabela de estados, ficha
-   do candidato inteira, que nem tem a barra).
+   do candidato inteira, que nem tem a barra) — e, como rede de segurança, diante de qualquer elemento com cor de
+   candidato (`cand-*`, `--cand-*` ou `[data-candidato]`) na faixa de baixo da tela. Imagem animada (APNG, WebP animado,
+   SVG com animação) é recusada. Categorias recusadas além do político-eleitoral: apostas/bets, cassino e mercados de
+   previsão; bebida alcoólica fica fora do ar em 25/10 até as 17h (`anuncios-categorias.ts`). Interruptor geral "Tirar
+   todos do ar" (painel e `deploy/painel.sh anuncios-suspender`): nenhum anúncio em ~5 s, nada apagado.
 6. **Fonte.** Dados reais vêm do TSE (resultados.tse.jus.br) e do IBGE (malhas). Cite as fontes na
    página `/metodologia`.
 
@@ -443,7 +447,9 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
       e — `OFERECIMENTO_NO_PLACAR`, §11.14 — os cartões do PLACAR (Brasil/UF/município, servidor e app), abaixo da marca do
       Sintonia; nunca seção, ficha, eleitos, bancadas, governadores, fato isolado ou cenário). `escolherAnuncio` (módulo próprio `anuncios-escolha.ts`, o único que entra no
       JS inicial do site; reexportado pelo contrato) faz a rotação ponderada pelo `peso`, fixa por semente, com o master
-      vencendo em `topo`, `tv` e `compartilhamento`.
+      vencendo em `FORMATOS_MASTER_PRIORITARIO` (`topo`, `tv`, `live`, `compartilhamento`) e a cota **Reserva** (empresas
+      do grupo do dono, sempre cota apoio) só entrando onde nenhum pago está disponível — depois do `evitar`, então num
+      cartão em que todos os pagos já apareceram a reserva preenche o lugar.
     - **Posição (regra dura)**: nada dentro de placar/resultado nem encostado em foto, nome ou número de candidato. A barra
       fixa do rodapé só entra depois da 1ª rolagem e fica escondida enquanto um bloco marcado com `data-sem-anuncio-fixo`
       (placares, cartão do confronto, PreHero, retratos/avatares, barras de votos, BU, governadores, `FotoOficial`, placar
@@ -452,42 +458,107 @@ Os formatos ficam em `src/shared/dataset.ts`, seção "FASE 2":
     - **Nada político-eleitoral**: além da declaração, `validaAnuncio` recusa (`anuncios-politica.ts`) nomes de candidatos
       (os do dataset, passados pelo motor, + "Lula"/"Bolsonaro"), termos eleitorais, número de urna pedido como voto,
       siglas de partido em maiúsculas e destinos de governo/Legislativo/Judiciário/MP (publicidade institucional), de
-      partido ou com nome de candidato.
+      partido ou com nome de candidato. Logo depois, as **categorias sensíveis** (`anuncios-categorias.ts`, pelo texto e
+      pelo domínio): apostas/bets, cassino e mercados de previsão (Polymarket, Kalshi e afins) recusados; bebida alcoólica
+      gera aviso no painel (`avisoCategoria`) e é recusada se a janela do anúncio cruzar 25/10 de 0h às 17h (Brasília).
+    - **Imagens (contrato v2, anunciantes v2)**: a logo aparece na **proporção natural**, sem o quadrado branco. O painel
+      mede cada imagem UMA vez, no envio (`admin/analiseLogo.ts`: recorta as margens vazias na resolução original, grava
+      PNG — nunca JPEG com transparência — e calcula o contraste da silhueta contra os fundos dos dois temas) e grava o
+      `AjusteImagem` no anúncio (`logoAjuste`, `logoEscuroAjuste`, `imagemAjuste`: proporção, placa clara/escura/nenhuma
+      por tema, origem auto/manual, `comFundo`); o site só obedece (`LogoMarca`, `apresentacaoLogo`). `logoEscuro` é a
+      versão da logo para fundo escuro (tema escuro, TV/live no escuro e imagens). Interruptor `LOGO_NATURAL`
+      (`src/shared/anuncios-flags.ts`, módulo folha reexportado por `anuncios.ts`: as peças do site importam de lá sem
+      levar a validação para o JS do visitante): `false` = a placa clara quadrada de antes. Logos gravadas antes do ajuste: botão
+      **"Ajustar agora"** no painel (o recorte é feito no navegador — o servidor não decodifica alfa de WebP) com o
+      comando `anuncio-logo`, que troca SÓ a logo e os ajustes (ausente mantém, `null` apaga). **Sem animação:**
+      `imagemAnimada` recusa APNG, WebP animado e SVG com animação no salvar; num estado restaurado sai só a imagem animada
+      (o anúncio fica, com aviso no log); o painel sempre redesenha a imagem (o 1º quadro).
     - **Admin** (seção Anunciantes, pensada para 390 px): lista com situação (no ar · agendado · pausado · encerrado),
       formatos, cota, peso e métricas (totais, 48 h por hora); formulário com marca, id (`idDaMarca`, fixo depois de
       criado), título, texto, botão, link https, logo e peça (redimensionadas no navegador), formatos, cota, peso, ativo,
       início/fim (Brasília) e a declaração obrigatória "não político-eleitoral"; relatório de entrega com CSV; contato da
       página `/anuncie`. `PreviaAnuncio` (admin) é a prévia simples; o ponto de troca pelos componentes do site está
       comentado nele.
-    - **Motor** (`AdminState.anuncios` ≤ 24, `AdminState.anuncie`): comandos `anuncio-salvar` (valida com `validaAnuncio`;
-      substitui pelo id; imagem que volta do painel como URL do servidor mantém a que o anúncio já tem), `anuncio-remover`,
-      `anuncio-ativo`, `anuncie-contato`. `LiveStatus.anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`;
+    - **Motor** (`AdminState.anuncios` ≤ 24, `AdminState.anuncie`, `AdminState.anunciosSuspensos`): comandos
+      `anuncio-salvar` (valida com `validaAnuncio`; substitui pelo id; imagem — logo, versão escura ou peça — que volta do
+      painel como URL do servidor mantém a que o anúncio já tem; **master sobreposto** — dois masters ativos, sem reserva,
+      num formato prioritário e com janelas que se cruzam, `conflitoMaster` — é recusado, também ao reativar),
+      `anuncio-remover`, `anuncio-ativo`, `anuncio-logo`, `anuncios-suspensao` (interruptor geral: guarda `{ desde,
+      motivo }`; o status sai com `anuncios: []`, `patrocinio: null` e `anunciosSuspensos: true`; voltar devolve exatamente
+      o que estava; pausar/ativar continua valendo) e `anuncie-contato`. `LiveStatus.anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`;
       memorizado até o próximo início/fim) como `AnuncioPublico` (link com UTM `link`, `destino` = domínio; no demo as
       imagens seguem em data URI). LEGADO: o comando `patrocinio` vira/atualiza o anúncio master `patrocinio` (formatos
       topo + nativo + tv, título = texto cortado em 60, botão "Saiba mais"); um estado salvo com o patrocínio antigo é
-      migrado uma vez; `LiveStatus.patrocinio` é derivado do master (ou do 1º) com `topo`. `state()` copia o estado
+      migrado uma vez; `LiveStatus.patrocinio` é derivado do master (senão do 1º pago, por último da reserva) com `topo`;
+      o título do legado é cortado na última palavra, sem "…". `state()` copia o estado
       compartilhando as strings (as imagens não são duplicadas a cada consulta).
-    - **Servidor** (`src/server/anuncios.ts`): imagens pelo hash do conteúdo (`/api/anuncio/img`, cache imutável, SVG em
-      sandbox; o painel também recebe URLs, e o servidor troca pelo conteúdo ao salvar); `/api/anuncio/ir/:id?f=` conta o
+    - **Servidor** (`src/server/anuncios.ts`): imagens (logo, versão escura e peça) pelo hash do conteúdo
+      (`/api/anuncio/img`, cache imutável, SVG em sandbox; nenhum data URI no `/api/status`; o painel também recebe URLs,
+      e o servidor troca pelo conteúdo ao salvar e no `anuncio-logo`; corpo do comando até 1,5 MB: logo + versão escura +
+      peça); `/api/anuncio/ir/:id?f=` conta o
       clique e redireciona com UTM (id desconhecido → `/`; só conta GET de navegação vinda do site — `Sec-Fetch-Dest`
       documento, `Sec-Fetch-Site` same-origin/none — e só formatos com link: `topo`, `rodape`, `nativo`, `teste`);
       `POST /api/anuncio/evento` conta a impressão visível (só do próprio site: `Origin`/`Sec-Fetch-Site`, sem os dois
       → 204 sem contar; anúncio no ar com aquele formato; `compartilhamento` não é medido; aceita o `text/plain` do
       `sendBeacon`). UTM: `utm_medium` = formato, exceto o do Teste Cego, que sai `conteudo` (não revela que a visita fez
-      o teste). Métricas em memória por
-      anúncio × formato × hora (48 h no detalhe, totais desde sempre), gravadas de forma atômica em
-      `STATE_DIR/anuncios-metricas.json` a cada 60 s e no encerramento; `GET /api/admin/anuncios/metricas`.
-    - **Contagem honesta e LGPD**: o visitante é só a chave anonimizada do app (hash da rede com sal por processo: IPv4
-      inteiro, IPv6 pelo prefixo /64 — trocar de endereço dentro da faixa não zera nada), usada em memória como número de
-      53 bits para descartar repetições (impressão: mesmo visitante, anúncio e formato em 5 min; clique: 30 min) e
-      limitar abusos (60 eventos/min; no máximo 100 mil visitantes por janela em memória); nunca é gravada. Robôs de
-      prévia/busca não contam. Atrás de uma mesma rede (CGNAT), várias pessoas contam como uma: a contagem é conservadora.
-    - **Imagens OG**: com anúncio `compartilhamento` no ar, faixa própria de 32 px no pé, centralizada ("Oferecimento:
-      <marca>", só texto, separada por linha), nos cartões genéricos (`CARTOES_COM_OFERECIMENTO` em
-      `og-oferecimento.ts`; o cartão perde ~8 px de altura útil) e no placar (og-placar.ts, faixa desenhada no próprio
-      layout, abaixo do rodapé do Sintonia). Nesses cartões o conjunto de anunciantes entra na chave de cache e no `&v=` das
-      meta tags (`tagOferecimento`/`imagemComOferecimento`): trocar o anunciante gera imagens novas; as demais imagens não
-      mudam com o anunciante.
+      o teste). Métricas em memória por anúncio × formato × hora (**14 dias** no detalhe), totais por dia de Brasília (para
+      sempre) e desde sempre, gravadas de forma atômica em `STATE_DIR/anuncios-metricas.json` (`v: 1` com `versao: 2` — o `v: 1` é de propósito:
+      a versão anterior do servidor lê o arquivo numa volta de versão; o arquivo da versão anterior também é lido) a cada
+      60 s e no encerramento; `GET /api/admin/anuncios/metricas?horas=<1–336>` (padrão 48) devolve também `entregue`
+      (desde o início dos anúncios com meta), `esgotadoEm` e `alcance` (`MetricasAnunciosResposta`).
+    - **Contagem honesta e LGPD**: a **pessoa** é a rede (hash com sal por processo: IPv4 inteiro, IPv6 pelo prefixo /64 —
+      trocar de endereço dentro da faixa não zera nada) + um hash de 32 bits do navegador (User-Agent), com **teto por
+      rede** numa janela de 5 min (400 navegadores num IPv4, 8 num /64; acima disso, ou com mais de 300 mil pares na
+      janela, a pessoa nova conta pela rede — quem troca de navegador para inflar não passa do teto) e, dentro disso,
+      **teto por rede em cada anúncio** (`TETO_PESSOAS_ANUNCIO`: 100 num IPv4, 8 num /64, em 5 min — um script num só IPv4
+      trocando o User-Agent soma no máximo ~101 impressões por formato a cada 5 min a um anúncio, em vez de ~400, e não
+      esgota sozinho uma meta). Rede no teto vira uma linha de aviso no log por janela (só a contagem). Usada em memória
+      como número de 53 bits para descartar repetições (impressão: mesma pessoa, anúncio e formato em 5 min; clique:
+      30 min; até 600 mil chaves por geração) e limitar abusos por rede (3.000 eventos/min num IPv4, 300 num /64; cliques
+      1.000/100; com mais de 100 mil redes no mesmo minuto, a rede nova passa sem esse limite em vez de perder a
+      impressão); nunca é gravada. Robôs de prévia/busca não contam. Interruptor `ANUNCIO_PESSOA=0` no ambiente: conta pela
+      rede, como antes (60 eventos/min por rede).
+    - **Alcance** (`src/server/alcance.ts`): pessoas diferentes por ESTIMATIVA (HyperLogLog, p = 12, erro ≈ 1,6%; hash =
+      8 bytes do sha256 da chave de pessoa), um esboço por anúncio e dia de Brasília e um da noite (`NOITE_ELEICAO`,
+      25/10 17h → 26/10 2h). O sal muda a cada processo, então cada processo grava o seu segmento e a estimativa é o
+      MAIOR entre os segmentos (conservadora; com mais de um segmento no período — reinício no meio — a página do
+      relatório avisa "estimativa conservadora"); campanha = união dos dias a partir do início; segmentos parados há mais
+      de 14 dias são podados. Nada de pessoa é recuperável dos registradores.
+    - **Meta de impressões** (`limiteImpressoes`, 1.000 a 50 milhões, exige início; nunca vai ao site): a cada 15 s (e
+      depois de cada comando do painel) o servidor compara o entregue desde o início com a meta; ao atingir, o anúncio
+      sai do site (`anunciosParaSite` filtra; a geração dos esgotados entra na chave do cache do `/api/status`). As
+      impressões que ainda chegarem contam (bônus); aumentar ou tirar a meta faz voltar; a reserva preenche o espaço que
+      vagar. As imagens de compartilhamento não são medidas e não contam para a meta (seguem com o anúncio).
+    - **Relatório por link privado** (`src/server/relatorios.ts`, página `/relatorio#k=<token>`): o painel gera o link
+      (token de 128 bits mostrado uma vez; `STATE_DIR/relatorios.json` guarda só o sha256, permissão 600; até 5 ativos por
+      anúncio e 100 no total; revogável); `POST /api/anuncie/relatorio { k }` devolve `RelatorioAnunciante`
+      (`src/shared/relatorio.ts`: horas × formato dos 14 dias, dias anteriores — tudo a partir do início da campanha,
+      como a meta e o alcance —, alcance da campanha e da noite, meta só com "mostrar meta"; remover o anúncio revoga os
+      links dele), só do próprio site, 20/min por rede, `no-store`, `noindex`, `no-referrer`, 30 s em memória.
+      `/relatorio` fica fora dos buscadores (`noindex` e `Disallow` no robots) e da navegação do site, sem anúncio.
+      Interruptor `RELATORIOS=0`: a rota dá 404 e o painel esconde os links.
+    - **Imagens OG**: com anúncio `compartilhamento` no ar, faixa própria no pé, centralizada e separada por linha, nos
+      cartões genéricos (`CARTOES_COM_OFERECIMENTO` em `og-oferecimento.ts`) e no placar (og-placar.ts, só com
+      `OFERECIMENTO_NO_PLACAR`): **logo ou nome** — com logo utilizável (PNG/JPEG com ajuste; a versão escura, se houver,
+      e a placa do tema escuro), "Oferecimento" + a logo de 26 px numa faixa de 44 px (ícone leva também o nome);
+      senão, "Oferecimento: <marca>" só em texto, na faixa de 32 px. Interruptor `OG_LOGO_OFERECIMENTO`. Nesses cartões o
+      conjunto de anunciantes (com uma assinatura barata da logo) entra na chave de cache e no `&v=` das meta tags
+      (`tagOferecimento`/`imagemComOferecimento`): trocar o anunciante ou a logo gera imagens novas; as demais imagens
+      não mudam com o anunciante. Suspensão geral: nenhuma faixa.
+    - **Site (anunciantes v2)**: escolha justa por página (`nucleo.ts`, `escolhaDaPagina`): o 1º cartão nativo evita o
+      anunciante do topo (se sobrar outro) e nunca usa o da barra fixa; do 2º em diante o do topo pode entrar; nunca o
+      mesmo anunciante em dois cartões; o "Anuncie no Sintonia" só quando não sobra nenhum anúncio (no máximo 1 por
+      página) e nunca com a suspensão geral. A faixa do topo tem 60 px no celular e 64 px no desktop, com o logotipo no
+      lugar do nome em texto (o `aria-label` continua "Publicidade de <marca>…"). Logo com placa (o contraste pediu):
+      imagem com 76% da altura do espaço, folga de 12% × 20%, e a placa abraça a imagem quando a largura máxima a limita
+      (nunca uma pílula grande com a marca miúda). Barra do rodapé com logotipo ou logo larga (proporção > 1,35): só a
+      seta no lugar do botão com texto (o texto segue no `aria-label`) e título longo em até 3 linhas.
+      Prévias num tema fixo (painel, vitrine das imagens): `TemaLocal` (contexto do `pecas.tsx`, lido por `useTemaLogo`)
+      junto com `data-tema-local="claro|escuro"` no elemento, que troca os tokens de cor só ali (`styles.css`). Rede de
+      segurança da barra do rodapé: `SELETOR_CANDIDATO` em `faixaLivre.ts` (`[class*="cand-"]`, `[style*="--cand-"]`,
+      `[data-candidato]`, fora de `[data-sem-anuncio-fixo]`; acima de 2.000 elementos, a barra some na página); o
+      `DataTable` marca `data-sem-anuncio-fixo` por padrão. Página `/relatorio` (fora do AppShell, chunk próprio, sem
+      anúncio): `src/app/pages/relatorio/RelatorioPage.tsx`, contas só de `src/shared/relatorio.ts`.
 
 ---
 

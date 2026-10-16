@@ -4,6 +4,7 @@
 import { INICIO_APURACAO } from '../shared/constants';
 import {
   ANUNCIO_LIMITES,
+  imagemAnimada,
   validaAnuncio,
   validaContatoAnuncie,
   type AnuncioConfig,
@@ -62,6 +63,7 @@ export function estadoPadrao(modo: 'servidor' | 'demo', wall: number, cenario: S
     nomesReais: false,
     patrocinio: null,
     anuncios: [],
+    anunciosSuspensos: null,
     anuncie: null,
     contatos: null,
     trocaAuto: trocaAutoPadrao(),
@@ -158,11 +160,17 @@ export function validaPatrocinio(v: unknown): { ok: Patrocinio } | { erro: strin
   return { ok: out };
 }
 
+/** Opções de `parseAdminState`. */
+export interface OpcoesParseEstado {
+  /** avisos para o log do monitor (ex.: imagem animada tirada de um anúncio restaurado) */
+  aviso?: (msg: string) => void;
+}
+
 /**
  * Restaura um AdminState de JSON (string ou objeto), completando/corrigindo campos com `fallback`.
  * Nunca lança por conteúdo inválido: campos ruins voltam ao fallback (cenário inválido → cenário do fallback).
  */
-export function parseAdminState(raw: unknown, fallback: AdminState, st: Structure): AdminState {
+export function parseAdminState(raw: unknown, fallback: AdminState, st: Structure, opcoes: OpcoesParseEstado = {}): AdminState {
   let v: unknown = raw;
   if (typeof raw === 'string') {
     try {
@@ -220,7 +228,8 @@ export function parseAdminState(raw: unknown, fallback: AdminState, st: Structur
     nomesReais: typeof v.nomesReais === 'boolean' ? v.nomesReais : (fallback.nomesReais ?? false),
     // LEGADO: o patrocínio único vira um anúncio (migrado uma vez; ver `migraPatrocinio`) e o campo fica null
     patrocinio: null,
-    anuncios: migraPatrocinio(parseAnunciosSalvos(v.anuncios, fallback.anuncios ?? []), parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null)),
+    anuncios: migraPatrocinio(parseAnunciosSalvos(v.anuncios, fallback.anuncios ?? [], opcoes.aviso), parsePatrocinioSalvo(v.patrocinio, fallback.patrocinio ?? null)),
+    anunciosSuspensos: parseSuspensao(v.anunciosSuspensos, fallback.anunciosSuspensos ?? null),
     anuncie: parseContatoSalvo(v.anuncie, fallback.anuncie ?? null),
     contatos: parseContatosSalvos(v.contatos, fallback.contatos ?? null),
     trocaAuto: parseTrocaAuto(v.trocaAuto, fallback.trocaAuto ?? trocaAutoPadrao()),
@@ -245,10 +254,38 @@ export const ID_PATROCINIO = 'patrocinio';
 /** Imagem guardada no estado: só data URI (a URL do servidor é resolvida antes de chegar ao motor). */
 const ehDataUri = (v: string | undefined): v is string => typeof v === 'string' && v.startsWith('data:');
 
+/** Imagens de um anúncio e o ajuste de desenho de cada uma (o ajuste nunca fica sem a imagem). */
+const IMAGENS_ANUNCIO = [
+  ['logo', 'logoAjuste'],
+  ['logoEscuro', 'logoEscuroAjuste'],
+  ['imagem', 'imagemAjuste'],
+] as const;
+
 /**
- * Anúncio validado para guardar no estado: só os campos do contrato e imagens em data URI. Uma imagem que veio como
- * URL do próprio servidor (`/api/anuncio/img?h=…`, ida e volta pelo admin) e que o servidor não trocou pelo conteúdo
- * mantém a imagem que o anúncio de mesmo id já tem; sem anterior, fica sem imagem.
+ * Imagens que o estado guarda: só data URI. Uma imagem que veio como URL do próprio servidor (`/api/anuncio/img?h=…`,
+ * ida e volta pelo admin) e que o servidor não trocou pelo conteúdo mantém a imagem que o anúncio de mesmo id já tem
+ * no mesmo campo; sem anterior, sai — e o ajuste dela sai junto. Muda `a` no lugar.
+ */
+export function imagensDoEstado(a: AnuncioConfig, anterior?: AnuncioConfig | null): AnuncioConfig {
+  for (const [campo, campoAjuste] of IMAGENS_ANUNCIO) {
+    const x = a[campo];
+    if (x === undefined || ehDataUri(x)) {
+      if (x === undefined) delete a[campoAjuste];
+      continue;
+    }
+    const antes = anterior?.[campo];
+    if (ehDataUri(antes)) a[campo] = antes;
+    else {
+      delete a[campo];
+      delete a[campoAjuste];
+    }
+  }
+  return a;
+}
+
+/**
+ * Anúncio validado para guardar no estado: só os campos do contrato e imagens em data URI (`imagensDoEstado`: logo,
+ * versão escura e peça; URL do servidor não resolvida mantém a imagem anterior do mesmo campo).
  */
 export function normalizaAnuncio(
   v: unknown,
@@ -258,31 +295,64 @@ export function normalizaAnuncio(
 ): { ok: AnuncioConfig } | { erro: string } {
   const r = validaAnuncio(v, { nomesCandidatos });
   if ('erro' in r) return r;
-  const a = { ...r.ok };
-  for (const campo of ['logo', 'imagem'] as const) {
-    const x = a[campo];
-    if (x === undefined || ehDataUri(x)) continue;
-    const antes = anterior?.[campo];
-    if (ehDataUri(antes)) a[campo] = antes;
-    else delete a[campo];
-  }
-  return { ok: a };
+  return { ok: imagensDoEstado({ ...r.ok }, anterior) };
 }
 
-/** Anúncios de um estado restaurado: inválidos e ids repetidos saem; no máximo `ANUNCIO_LIMITES.maxAnuncios` (nunca lança). */
-export function parseAnunciosSalvos(v: unknown, fallback: AnuncioConfig[]): AnuncioConfig[] {
+/**
+ * Anúncios de um estado restaurado: inválidos e ids repetidos saem; no máximo `ANUNCIO_LIMITES.maxAnuncios` (nunca
+ * lança). Imagem ANIMADA (gravada antes da trava, ou estado editado à mão) sai sozinha, com o ajuste dela — o anúncio
+ * fica, sem aquela imagem, e o motivo vai para o log (`aviso`).
+ */
+export function parseAnunciosSalvos(v: unknown, fallback: AnuncioConfig[], aviso?: (msg: string) => void): AnuncioConfig[] {
   if (v === undefined) return fallback.map((a) => ({ ...a, formatos: [...a.formatos] }));
   if (!Array.isArray(v)) return [];
   const out: AnuncioConfig[] = [];
   const ids = new Set<string>();
-  for (const x of v) {
+  for (const bruto of v) {
     if (out.length >= ANUNCIO_LIMITES.maxAnuncios) break;
+    let x: unknown = bruto;
+    if (isObj(bruto)) {
+      const animadas = IMAGENS_ANUNCIO.filter(([campo]) => typeof bruto[campo] === 'string' && imagemAnimada(bruto[campo] as string));
+      if (animadas.length) {
+        const copia: Record<string, unknown> = { ...bruto };
+        for (const [campo, campoAjuste] of animadas) {
+          delete copia[campo];
+          delete copia[campoAjuste];
+        }
+        x = copia;
+        const nomes = animadas.map(([campo]) => (campo === 'logo' ? 'logo' : campo === 'logoEscuro' ? 'versão para fundo escuro' : 'peça'));
+        aviso?.(`Anúncio ${typeof bruto.marca === 'string' ? bruto.marca.slice(0, 40) : '?'} (${typeof bruto.id === 'string' ? bruto.id.slice(0, 40) : '?'}): imagem animada removida (${nomes.join(', ')}) — o Sintonia só exibe imagens paradas`);
+      }
+    }
     const r = normalizaAnuncio(x);
-    if (!('ok' in r) || ids.has(r.ok.id)) continue;
+    if (!('ok' in r)) {
+      // regra endurecida depois da gravação (categorias, bebida no dia da votação, meta sem início…): o anúncio não
+      // volta — e a próxima gravação o tira do admin.json. Fica o registro para o dono refazer (ou restaurar o backup)
+      const b = isObj(bruto) ? bruto : {};
+      const marca = typeof b.marca === 'string' ? b.marca.slice(0, 40) : '?';
+      const id = typeof b.id === 'string' ? b.id.slice(0, 40) : '?';
+      aviso?.(`Anúncio ${marca} (${id}) não restaurado: ${r.erro}`);
+      continue;
+    }
+    if (ids.has(r.ok.id)) {
+      aviso?.(`Anúncio ${r.ok.marca} (${r.ok.id}) repetido no estado salvo: fica só o primeiro`);
+      continue;
+    }
     ids.add(r.ok.id);
     out.push(r.ok);
   }
   return out;
+}
+
+/**
+ * Interruptor geral dos anúncios num estado restaurado: ausente → fallback; null → desligado; `{ desde, motivo? }`
+ * válido → ligado (motivo aparado, até 140); outra coisa → desligado (nunca lança).
+ */
+export function parseSuspensao(v: unknown, fallback: AdminState['anunciosSuspensos'] = null): { desde: number; motivo?: string } | null {
+  if (v === undefined) return fallback ? { ...fallback } : null;
+  if (!isObj(v) || typeof v.desde !== 'number' || !Number.isFinite(v.desde) || v.desde <= 0) return null;
+  const motivo = typeof v.motivo === 'string' ? v.motivo.trim().replace(/\s+/g, ' ').slice(0, 140) : '';
+  return motivo ? { desde: Math.floor(v.desde), motivo } : { desde: Math.floor(v.desde) };
 }
 
 /** Contato da página /anuncie de um estado restaurado (inválido/vazio → null; ausente → fallback). */
@@ -303,8 +373,17 @@ function parseContatosSalvos(v: unknown, fallback: ContatosPublicos | null): Con
   return 'ok' in r && Object.keys(r.ok).length ? r.ok : null;
 }
 
-/** Corta em `max` caracteres com reticências, sem deixar espaço antes delas. */
-const cortarTexto = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, Math.max(1, max - 1)).trimEnd()}…`);
+/**
+ * Corta em até `max` caracteres na última palavra inteira, sem reticências (título cortado com "…" parece erro e
+ * esconde o fim da frase); tira a pontuação que sobrar no fim. Uma palavra só maior que `max` é cortada no limite.
+ */
+export const cortarTexto = (s: string, max: number) => {
+  if (s.length <= max) return s;
+  const cabe = s.slice(0, max + 1);
+  const espaco = cabe.lastIndexOf(' ');
+  const corte = espaco > 0 ? cabe.slice(0, espaco) : s.slice(0, max);
+  return corte.replace(/[\s,;:.\u2013\u2014-]+$/u, '') || s.slice(0, max);
+};
 
 /**
  * LEGADO: o patrocínio único (comando 'patrocinio' e estados salvos antes dos anúncios) como anúncio id 'patrocinio':

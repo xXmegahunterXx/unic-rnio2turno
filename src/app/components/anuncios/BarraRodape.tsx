@@ -17,7 +17,8 @@ import { Icon } from '@/app/ui/Icon';
 import { useAnunciosDaPagina } from './contexto';
 import { useImpressaoVisivel } from './impressao';
 import { useFaixaLivre } from './faixaLivre';
-import { CtaAnuncio, LinkAnuncio, LogoMarca } from './pecas';
+import { apresentacaoLogo } from './logo';
+import { CtaAnuncio, LinkAnuncio, LogoMarca, useTemaLogo } from './pecas';
 import { fecharRodape, rodapeFechado } from './visita';
 
 /** Altura da barra (sem a área segura), também reservada no fim da página. */
@@ -130,6 +131,20 @@ export function BarraRodapePeca({
 }) {
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'rodape', bloco: 'rodape', vista, ativo: !previa });
+  // logotipo (já traz o nome): sem a linha da marca em texto; o botão vira só a seta e o título ganha a largura. Logo
+  // larga que não é logotipo (proporção entre 1,35 e 2, ex.: UPdePix): também só a seta — o botão com texto espremia
+  // o título. O texto do botão segue no rótulo do link (leitor de tela). Logo antiga (quadrada): como sempre foi.
+  const ap = apresentacaoLogo(a, useTemaLogo());
+  const logotipo = ap?.logotipo ?? false;
+  const soSeta = logotipo || !!(ap?.ajuste && !ap.icone);
+  // título longo (o sugerido para a Lynx tem 57 caracteres): até 3 linhas um pouco menores, que cabem nos 60 px —
+  // nunca cortado com "…" a 360/390 px
+  const longo = a.titulo.length > 40;
+  const seta = (
+    <span aria-hidden className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-fg text-bg transition-opacity group-hover:opacity-90">
+      <Icon name="seta" size={16} />
+    </span>
+  );
   return (
     <aside
       aria-label="Publicidade"
@@ -147,12 +162,30 @@ export function BarraRodapePeca({
         Publicidade
       </span>
       <LinkAnuncio ref={ref} anuncio={a} formato="rodape" previa={previa} className="flex h-full min-w-0 flex-1 items-center gap-2.5 rounded-xl">
-        <LogoMarca anuncio={a} tamanho="md" className="h-11 w-11" />
-        <span className="min-w-0 flex-1 leading-tight">
-          <span className="block truncate text-[11.5px] font-semibold text-fg-muted">{a.marca}</span>
-          <span className="mt-0.5 line-clamp-2 text-[13.5px] font-semibold leading-[1.18] text-fg">{a.titulo}</span>
-        </span>
-        <CtaAnuncio texto={a.cta} tamanho="sm" className="max-[359px]:hidden" />
+        {logotipo ? (
+          <>
+            <LogoMarca anuncio={a} className="ml-1 [--logo-h:32px] [--logo-max:100px]" />
+            <span aria-hidden className="h-8 w-px shrink-0 bg-line" />
+            <span
+              className={cn(
+                'min-w-0 flex-1 font-semibold text-fg',
+                longo ? 'line-clamp-3 text-[12.5px] leading-[1.15]' : 'line-clamp-2 text-[13.5px] leading-[1.18]',
+              )}
+            >
+              {a.titulo}
+            </span>
+            {seta}
+          </>
+        ) : (
+          <>
+            <LogoMarca anuncio={a} className="[--logo-h:40px] [--logo-max:104px]" />
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block truncate text-[11.5px] font-semibold text-fg-muted">{a.marca}</span>
+              <span className="mt-0.5 line-clamp-2 text-[13.5px] font-semibold leading-[1.18] text-fg">{a.titulo}</span>
+            </span>
+            {soSeta ? seta : <CtaAnuncio texto={a.cta} tamanho="sm" className="max-[359px]:hidden" />}
+          </>
+        )}
       </LinkAnuncio>
       <button
         type="button"

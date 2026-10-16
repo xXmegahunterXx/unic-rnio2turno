@@ -86,7 +86,13 @@ function Miolo({ fato, finalistas }: Omit<CartaoCuriosidadeProps, 'formato'>) {
   const fonteContexto = (retrato ? 32 : 23) * k;
 
   return (
-    <div ref={ref} className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden" style={{ gap: (retrato ? 34 : 18) * k, paddingTop: 16 * k, paddingBottom: 16 * k }}>
+    <div
+      ref={ref}
+      // com os finalistas: a barra fixa do rodapé não passa por cima (ARCHITECTURE §1.5)
+      data-sem-anuncio-fixo={fato.par ? '' : undefined}
+      className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden"
+      style={{ gap: (retrato ? 34 : 18) * k, paddingTop: 16 * k, paddingBottom: 16 * k }}
+    >
       <div className="flex shrink-0 items-center font-semibold uppercase text-brand-fg" style={{ gap: 10 * k, fontSize: 17 * k, letterSpacing: '0.16em' }}>
         <Icon name={ICONE_TEMA[fato.tema]} size={Math.round(22 * k)} />
         {rotuloTema(fato.tema)}

@@ -98,6 +98,92 @@ describe('escolhaDaPagina', () => {
   });
 });
 
+describe('escolha justa dos cartões e cota Reserva (anunciantes v2)', () => {
+  const todos: AnuncioPublico['formatos'] = ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento', 'chat', 'live'];
+  const tres = () => [ad('lynx', todos, { cota: 'master' }), ad('updepix', todos), ad('vulpix', ['topo', 'rodape', 'nativo', 'teste', 'chat'])];
+  const id = (n: ReturnType<ReturnType<typeof escolhaDaPagina>['nativo']>) => (n === CASA ? 'CASA' : (n?.id ?? null));
+  const N = 2000;
+  const semente = (i: number) => `v${i.toString(36)}x${(i * 7919).toString(36)}|/apuracao`;
+
+  it('1 master e 2 apoios, sem a barra (desktop): o nativo-1 evita o do topo e o nativo-2 pode ser o master (~50%)', () => {
+    let master2 = 0;
+    for (let i = 0; i < N; i++) {
+      const e = escolhaDaPagina(tres(), semente(i), { rodapeNaTela: false });
+      expect(e.topo?.id).toBe('lynx');
+      expect(id(e.nativo(1))).not.toBe('lynx');
+      if (id(e.nativo(2)) === 'lynx') master2++;
+    }
+    expect(master2 / N).toBeGreaterThan(0.4);
+    expect(master2 / N).toBeLessThan(0.6);
+  });
+
+  it('com a barra no celular e 3 pagantes: o nativo-2 é sempre pago (nunca o "Anuncie no Sintonia")', () => {
+    for (let i = 0; i < N; i++) {
+      const e = escolhaDaPagina(tres(), semente(i));
+      const n2 = id(e.nativo(2));
+      expect(n2).not.toBe('CASA');
+      expect(n2).not.toBeNull();
+      expect(n2).not.toBe(e.rodape?.id);
+    }
+  });
+
+  it('nunca o mesmo anunciante em dois cartões, nem o da barra fixa; a casa só quando não sobra ninguém', () => {
+    for (let i = 0; i < 300; i++) {
+      const e = escolhaDaPagina(tres(), semente(i));
+      const ids = [1, 2, 3, 4, 5].map((k) => id(e.nativo(k)));
+      const anunciantes = ids.filter((x) => x && x !== 'CASA');
+      expect(new Set(anunciantes).size).toBe(anunciantes.length);
+      expect(anunciantes).not.toContain(e.rodape?.id);
+      // 3 anunciantes, 1 na barra: 2 cartões pagos, depois a casa uma vez e nada
+      expect(ids.slice(2)).toEqual(['CASA', null, null]);
+    }
+  });
+
+  it('interruptor geral: tudo null, inclusive o "Anuncie no Sintonia"', () => {
+    for (const lista of [tres(), []]) {
+      const e = escolhaDaPagina(lista, 's|/', { suspenso: true });
+      expect([e.topo, e.rodape, e.teste, e.tv]).toEqual([null, null, null, null]);
+      for (let k = 1; k <= 5; k++) expect(e.nativo(k)).toBeNull();
+    }
+  });
+
+  it('Reserva: nunca vence um pago; preenche o formato sem pago e o cartão em que os pagos já apareceram', () => {
+    const lista = [ad('lynx', todos, { reserva: true, cota: 'apoio', peso: 10 }), ad('updepix', ['topo', 'rodape', 'nativo', 'teste', 'tv'], { peso: 1 })];
+    for (let i = 0; i < 200; i++) {
+      const e = escolhaDaPagina(lista, semente(i), { rodapeNaTela: false });
+      expect(e.topo?.id).toBe('updepix');
+      expect(e.tv?.id).toBe('updepix');
+      // nativo-1 evita o do topo (de leve): sobra a reserva; nativo-2: o pago (sobrou só ele)
+      expect(id(e.nativo(1))).toBe('lynx');
+      expect(id(e.nativo(2))).toBe('updepix');
+      expect(id(e.nativo(3))).toBe('CASA');
+    }
+    // sem o topo na lista dos cartões: o pago primeiro, a reserva no 2º cartão (antes do "Anuncie no Sintonia")
+    const semTopo = [ad('lynx', ['nativo'], { reserva: true }), ad('updepix', ['nativo'])];
+    for (let i = 0; i < 100; i++) {
+      const e = escolhaDaPagina(semTopo, semente(i));
+      expect([1, 2, 3].map((k) => id(e.nativo(k)))).toEqual(['updepix', 'lynx', 'CASA']);
+    }
+  });
+
+  it('aceite E10: Lynx como Reserva e UPdePix pago no topo — topo 100% UPdePix; chat e live (só a Lynx) 100% Lynx', async () => {
+    const { escolherChat } = await import('./OferecimentoChat');
+    const { anuncioDaLive } = await import('./OferecimentoLive');
+    const lista = [ad('lynx', todos, { reserva: true }), ad('updepix', ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento'])];
+    for (let i = 0; i < N; i++) {
+      const e = escolhaDaPagina(lista, semente(i));
+      expect(e.topo?.id).toBe('updepix');
+      expect(escolherChat(lista, `${semente(i)}|chat`, e.topo?.id, e.rodape?.id)?.id).toBe('lynx');
+      expect(anuncioDaLive(lista, semente(i), i * 60_000)?.id).toBe('lynx');
+    }
+  });
+
+  it('master com reserva é tratado como apoio (não vence o topo)', () => {
+    const lista = [ad('casa-grupo', ['topo'], { cota: 'master', reserva: true }), ad('pago', ['topo'])];
+    for (let i = 0; i < 50; i++) expect(escolhaDaPagina(lista, semente(i)).topo?.id).toBe('pago');
+  });
+});
+
 describe('hrefDoAnuncio', () => {
   it('no servidor acrescenta ?f=<formato> ao link de clique', () => {
     expect(hrefDoAnuncio('https://sintonia2026.com.br/api/anuncio/ir/marca-exemplo', 'topo', false)).toBe(

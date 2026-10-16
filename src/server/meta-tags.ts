@@ -524,6 +524,18 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
   if (s0 === 'admin' && seg.length === 1) {
     return pagina({ titulo: `Admin · ${APP_NAME}`, descricao: 'Painel de simulação.', imagem: ogApuracao(), imagemAlt: altPlacar(''), noindex: true });
   }
+  // relatório do anunciante por link privado (o token vai no fragmento #k=, que não chega ao servidor): fora dos
+  // buscadores e com a prévia genérica (sem placar nem candidato)
+  if (s0 === 'relatorio' && seg.length === 1) {
+    return pagina({
+      titulo: `Relatório de entrega · ${APP_NAME}`,
+      descricao: 'Relatório de entrega da campanha no Sintonia: impressões visíveis, alcance estimado e cliques.',
+      imagem: '/api/og/anuncie.png',
+      imagemAlt: 'Anuncie no Sintonia: sua marca na noite da apuração',
+      canonico: path,
+      noindex: true,
+    });
+  }
   if (ctx.kit && s0 === 'kit' && (seg.length === 1 || (seg.length === 2 && s1 === 'viz'))) {
     return pagina({ titulo: `Kit visual · ${APP_NAME}`, descricao: 'Vitrine do design system.', imagem: ogApuracao(), imagemAlt: altPlacar(''), noindex: true });
   }

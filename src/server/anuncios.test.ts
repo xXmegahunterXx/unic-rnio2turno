@@ -6,12 +6,12 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AdminSnapshot } from '../shared/api';
-import type { AnuncioConfig, MetricaAnuncio } from '../shared/anuncios';
+import type { AnuncioConfig, MetricaAnuncio, MetricasAnunciosResposta } from '../shared/anuncios';
 import type { AdminState, LiveStatus } from '../shared/types';
-import { HORA_MS, LimiteJanela, MetricasAnuncios, Repeticoes, TabelaAnuncios, ehRobo, hashImagem, numeroDe } from './anuncios';
-import { CC, CSP_IMAGEM, EVENTOS_ANUNCIO_MIN } from './app';
+import { HORA_MS, LimiteJanela, MetricasAnuncios, Repeticoes, TETO_PESSOAS, TETO_PESSOAS_ANUNCIO, TabelaAnuncios, ehRobo, hashImagem, numeroDe } from './anuncios';
+import { CC, CSP_IMAGEM, EVENTOS_ANUNCIO_MIN, EVENTOS_REDE_MIN } from './app';
 import { comando, login, montar, type Montado } from './test-helpers';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
@@ -177,6 +177,27 @@ describe('status e imagens', () => {
     expect(r.status).toBe(200);
     expect(m.controller.state().anuncios!.find((a) => a.id === 'grande')!.imagem!.length).toBe(peca.length);
   });
+
+  it('comando: campos do contrato v2 aceitos pela rota (antes: "campo desconhecido"); categorias sensíveis recusadas', async () => {
+    const ajuste = { proporcao: 3.216, placaClaro: 'escura', placaEscuro: 'nenhuma', origem: 'auto' } as const;
+    const v2 = anuncio('v2', {
+      logo: PNG,
+      logoAjuste: ajuste,
+      logoEscuro: SVG,
+      logoEscuroAjuste: ajuste,
+      imagem: PNG,
+      imagemAjuste: { ...ajuste, comFundo: true },
+      reserva: true,
+      limiteImpressoes: 25_000,
+      inicio: AGORA,
+    });
+    expect((await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: v2 })).status).toBe(200);
+    expect(m.controller.state().anuncios!.find((a) => a.id === 'v2')).toMatchObject({ cota: 'apoio', reserva: true, limiteImpressoes: 25_000, logoAjuste: ajuste, logoEscuro: SVG });
+    expect(JSON.stringify(await status(m))).not.toContain('base64');
+    const bet = await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('bet', { marca: 'Bet Brasil' }) });
+    expect(bet.status).toBe(400);
+    expect(((await bet.json()) as { erro: string }).erro).toMatch(/^Anúncio recusado: o Sintonia não aceita anúncios de apostas/);
+  });
 });
 
 describe('clique: GET /api/anuncio/ir/:id', () => {
@@ -276,12 +297,12 @@ describe('clique e impressão: só do próprio site, só formatos medidos, rede 
     expect(total((await metricas(m, cookie)).metricas, 'lynx', 'tv').impressoes).toBe(1);
   });
 
-  it('IPv6: trocar o endereço dentro da mesma faixa /64 não zera repetição nem limite', async () => {
+  it('IPv6: trocar o endereço dentro da mesma faixa /64 não zera repetição nem limite (300 eventos/min por /64)', async () => {
     const ip = (n: number) => `2001:db8:abcd:12::${n.toString(16)}`;
     for (let i = 1; i <= 5; i++) await m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: como(ip(i)) });
     for (let i = 1; i <= 5; i++) await evento(m, { id: 'lynx', formato: 'topo' }, como(ip(100 + i)));
     let r: Response | null = null;
-    for (let i = 0; i <= EVENTOS_ANUNCIO_MIN; i++) r = await evento(m, { id: 'lynx', formato: 'nativo' }, como(ip(1000 + i)));
+    for (let i = 0; i <= EVENTOS_REDE_MIN.v6; i++) r = await evento(m, { id: 'lynx', formato: 'nativo' }, como(ip(1000 + i)));
     expect(r!.status).toBe(429);
     // outra faixa /64 é outro visitante
     await m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: como('2001:db8:abcd:13::1') });
@@ -331,9 +352,9 @@ describe('impressão: POST /api/anuncio/evento', () => {
     expect(ms).toEqual([]);
   });
 
-  it(`limite por visitante (${EVENTOS_ANUNCIO_MIN}/min → 429) e robôs não contam`, async () => {
+  it(`limite por rede (${EVENTOS_REDE_MIN.v4}/min num IPv4 → 429) e robôs não contam`, async () => {
     let r: Response | null = null;
-    for (let i = 0; i <= EVENTOS_ANUNCIO_MIN; i++) r = await evento(m, { id: 'lynx', formato: i % 2 ? 'topo' : 'nativo' }, como('203.0.113.20'));
+    for (let i = 0; i <= EVENTOS_REDE_MIN.v4; i++) r = await evento(m, { id: 'lynx', formato: i % 2 ? 'topo' : 'nativo' }, como('203.0.113.20'));
     expect(r!.status).toBe(429);
     expect((await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.21'))).status).toBe(204);
     m.relogio.t += 61_000;
@@ -383,7 +404,7 @@ describe('relatório do admin e persistência', () => {
     expect(existsSync(arq)).toBe(true);
     const texto = readFileSync(arq, 'utf8');
     expect(texto).not.toContain('203.0.113');
-    expect(JSON.parse(texto)).toMatchObject({ v: 1, desde: AGORA, series: [{ id: 'lynx', f: 'topo', i: 1, c: 1 }] });
+    expect(JSON.parse(texto)).toMatchObject({ v: 1, versao: 2, desde: AGORA, series: [{ id: 'lynx', f: 'topo', i: 1, c: 1, d: [['2026-10-15', 1, 1]] }] });
     expect(linhas.join('\n')).not.toContain('203.0.113');
     // sem contagem nova: não regrava
     m.relogio.t += 60_000;
@@ -439,6 +460,10 @@ describe('peças puras', () => {
     expect(lc.tamanho).toBe(3);
     t += 1000;
     expect(lc.tentar('d')).toBe(true);
+    // 'deixa' (contagem dos anúncios): mapa cheio → a chave nova passa sem limite, sem crescer o mapa
+    const ld = new LimiteJanela(1, 1000, () => t, 2, 'deixa');
+    expect(['a', 'b', 'c', 'c', 'a'].map((k) => ld.tentar(k))).toEqual([true, true, true, true, false]);
+    expect(ld.tamanho).toBe(2);
     expect(numeroDe('abc')).toBe(numeroDe('abc'));
     expect(numeroDe('abc')).not.toBe(numeroDe('abd'));
     expect(Number.isSafeInteger(numeroDe('qualquer coisa longa'.repeat(10)))).toBe(true);
@@ -486,5 +511,271 @@ describe('contatos públicos (painel → Comunicação)', () => {
     const antigo = { ...(m.store.ler() as AdminState), anuncie: { email: 'contato@example.com', whatsapp: '5511999999999' } };
     const m2 = await montar({ stateDir: m.stateDir, estadoInicial: antigo });
     expect((await status(m2)).anuncie).toEqual({ whatsapp: '5511999999999' });
+  });
+});
+
+// ---- anunciantes v2 no servidor (E8, E12, E14, E15, E16) ------------------------------------------------------------
+
+/** PNG "de verdade" (assinatura + chunks) com `bytes` de dados: passa na regra das imagens (parada, tamanho). */
+function pngGrande(bytes: number, semente = 0): string {
+  const dados = Buffer.alloc(bytes);
+  for (let i = 0; i < bytes; i++) dados[i] = (i * 31 + semente * 7) & 0xff;
+  const chunk = (tipo: string, corpo: Buffer) => {
+    const c = Buffer.alloc(12 + corpo.length);
+    c.writeUInt32BE(corpo.length, 0);
+    c.write(tipo, 4, 'latin1');
+    corpo.copy(c, 8);
+    return c;
+  };
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', Buffer.alloc(13)), chunk('IDAT', dados), chunk('IEND', Buffer.alloc(0))]);
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+/** APNG mínimo (acTL antes do IDAT). */
+const APNG = (() => {
+  const partes: Buffer[] = [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])];
+  for (const [tipo, tam] of [['IHDR', 13], ['acTL', 8], ['IDAT', 10], ['IEND', 0]] as const) {
+    const c = Buffer.alloc(12 + tam);
+    c.writeUInt32BE(tam, 0);
+    c.write(tipo, 4, 'latin1');
+    partes.push(c);
+  }
+  return `data:image/png;base64,${Buffer.concat(partes).toString('base64')}`;
+})();
+const svgDe = (txt: string) => `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="10"><text>${txt}</text></svg>`).toString('base64')}`;
+const AJUSTE = { proporcao: 3.216, placaClaro: 'escura', placaEscuro: 'nenhuma', origem: 'auto' } as const;
+/** User-Agent de navegador comum (não `headless`), variando a versão. */
+const uaN = (n: number) => `Mozilla/5.0 (Linux; Android 14; SM-A${100 + (n % 900)}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${100 + n}.0.0.0 Mobile Safari/537.36`;
+const caminhoDe = (u: string) => new URL(u).pathname + new URL(u).search;
+
+describe('v2: imagens (logo, versão escura e peça), anuncio-logo, interruptor geral e corpo do comando', () => {
+  let m: Montado;
+  let cookie: string;
+  beforeEach(async () => {
+    ({ m, cookie } = await novo());
+  });
+
+  it('12 anúncios com versão escura: /api/status e o painel sem nenhum data URI; a versão escura servida pelo hash, imutável', async () => {
+    for (let i = 0; i < 12; i++) {
+      const r = await comando(m, cookie, {
+        tipo: 'anuncio-salvar',
+        anuncio: anuncio(`marca-${i}`, { logo: svgDe(`claro ${i}`), logoAjuste: AJUSTE, logoEscuro: svgDe(`escuro ${i}`), logoEscuroAjuste: AJUSTE, imagem: pngGrande(200, i), imagemAjuste: AJUSTE, formatos: ['nativo'] }),
+      });
+      expect(r.status).toBe(200);
+    }
+    const s = await status(m);
+    expect(s.anuncios).toHaveLength(12);
+    expect(JSON.stringify(s)).not.toContain('data:image');
+    const a5 = s.anuncios![5];
+    expect(a5.logoEscuro).toBe(`http://localhost/api/anuncio/img?h=${hashImagem(svgDe('escuro 5'))}`);
+    expect(a5.logoEscuroAjuste).toEqual(AJUSTE);
+    expect(a5.logoAjuste).toEqual(AJUSTE);
+    expect(a5.imagemAjuste).toEqual(AJUSTE);
+    const img = await m.app.request(caminhoDe(a5.logoEscuro!));
+    expect(img.status).toBe(200);
+    expect(img.headers.get('cache-control')).toBe(CC.anuncioImg);
+    expect(await img.text()).toContain('escuro 5');
+    const snap = (await (await m.app.request('/api/admin/state', { headers: { cookie } })).json()) as AdminSnapshot;
+    expect(JSON.stringify(snap)).not.toContain('data:image');
+    // ida e volta pelo painel (URLs) mantém as três imagens
+    const salvo = snap.state.anuncios!.find((a) => a.id === 'marca-5')!;
+    expect((await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: { ...salvo, titulo: 'Outro título' } })).status).toBe(200);
+    expect(m.controller.state().anuncios!.find((a) => a.id === 'marca-5')).toMatchObject({ logo: svgDe('claro 5'), logoEscuro: svgDe('escuro 5'), imagem: pngGrande(200, 5), logoEscuroAjuste: AJUSTE });
+  });
+
+  it('corpo do comando: logo de 150 KB + versão escura de 150 KB + peça de 400 KB → 200; acima de 1,5 MB → 413', async () => {
+    const logo = pngGrande(150 * 1024 - 200, 1);
+    const escura = pngGrande(150 * 1024 - 200, 2);
+    const peca = pngGrande(400 * 1024 - 200, 3);
+    const r = await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('grande', { logo, logoEscuro: escura, imagem: peca }) });
+    expect(r.status).toBe(200);
+    expect(m.controller.state().anuncios!.find((a) => a.id === 'grande')).toMatchObject({ logo, logoEscuro: escura, imagem: peca });
+    const enorme = await m.app.request('/api/admin/command', {
+      method: 'POST',
+      headers: { cookie, 'content-type': 'application/json', origin: 'http://localhost', 'content-length': String(1.6 * 1024 * 1024) },
+      body: JSON.stringify({ tipo: 'anuncio-salvar', anuncio: anuncio('x', { imagem: `data:image/png;base64,${'A'.repeat(1_650_000)}` }) }),
+    });
+    expect(enorme.status).toBe(413);
+  });
+
+  it('anuncio-logo pela rota: URL do servidor vira o conteúdo (resolverAnuncio); animada → 400 "imagem parada"; id desconhecido → 400', async () => {
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logo: SVG, imagem: PNG }) });
+    const urlLogo = (await status(m)).anuncios![0].logo!;
+    // "Ajustar agora": logo nova (PNG recortado) com o ajuste; o desfazer devolve o data URI original sem ajuste
+    expect((await comando(m, cookie, { tipo: 'anuncio-logo', id: 'lynx', logo: PNG, logoAjuste: AJUSTE })).status).toBe(200);
+    expect(m.controller.state().anuncios![0]).toMatchObject({ logo: PNG, logoAjuste: AJUSTE, imagem: PNG });
+    expect((await comando(m, cookie, { tipo: 'anuncio-logo', id: 'lynx', logo: SVG, logoAjuste: null })).status).toBe(200);
+    expect(m.controller.state().anuncios![0].logo).toBe(SVG);
+    expect(m.controller.state().anuncios![0].logoAjuste).toBeUndefined();
+    // a URL do servidor (hash conhecido) vale como a imagem
+    expect((await comando(m, cookie, { tipo: 'anuncio-logo', id: 'lynx', logoEscuro: caminhoDe(urlLogo), logoEscuroAjuste: AJUSTE })).status).toBe(200);
+    expect(m.controller.state().anuncios![0]).toMatchObject({ logoEscuro: SVG, logoEscuroAjuste: AJUSTE });
+    const animada = await comando(m, cookie, { tipo: 'anuncio-logo', id: 'lynx', logo: APNG });
+    expect(animada.status).toBe(400);
+    expect(((await animada.json()) as { erro: string }).erro).toMatch(/imagem parada/);
+    const salvar = await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('outro', { logo: APNG }) });
+    expect(salvar.status).toBe(400);
+    expect(((await salvar.json()) as { erro: string }).erro).toMatch(/imagem parada/);
+    expect((await comando(m, cookie, { tipo: 'anuncio-logo', id: 'nao-existe', logo: PNG })).status).toBe(400);
+    expect((await comando(m, cookie, { tipo: 'anuncio-logo', id: 'lynx', logo: PNG, marca: 'x' })).status).toBe(400);
+  });
+
+  it('interruptor geral pela rota: status sem anúncios e com anunciosSuspensos; impressão → 404; voltar devolve os mesmos', async () => {
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logo: SVG, cota: 'master' }) });
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('vulpix') });
+    const antes = (await status(m)).anuncios;
+    expect(antes).toHaveLength(2);
+    expect((await comando(m, cookie, { tipo: 'anuncios-suspensao', suspender: true, motivo: 'teste' })).status).toBe(200);
+    const s = await status(m);
+    expect(s.anuncios).toEqual([]);
+    expect(s.patrocinio).toBeNull();
+    expect(s.anunciosSuspensos).toBe(true);
+    expect((await evento(m, { id: 'lynx', formato: 'topo' })).status).toBe(404);
+    const snap = (await (await m.app.request('/api/admin/state', { headers: { cookie } })).json()) as AdminSnapshot;
+    expect(snap.state.anunciosSuspensos).toEqual({ desde: AGORA, motivo: 'teste' });
+    expect((await comando(m, cookie, { tipo: 'anuncios-suspensao', suspender: true, motivo: 'x'.repeat(141) })).status).toBe(400);
+    expect((await comando(m, cookie, { tipo: 'anuncios-suspensao', suspender: false })).status).toBe(200);
+    const depois = await status(m);
+    expect(depois.anuncios).toEqual(antes);
+    expect(depois.anunciosSuspensos).toBeUndefined();
+  });
+});
+
+describe('v2: contagem por pessoa (rede + navegador, E14)', () => {
+  let m: Montado;
+  let cookie: string;
+  beforeEach(async () => {
+    ({ m, cookie } = await novo());
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx') });
+  });
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  const impressoes = async () => total((await metricas(m, cookie)).metricas, 'lynx', 'topo').impressoes;
+
+  it('70 navegadores no mesmo IPv4 contam 70; o mesmo navegador de novo em 5 min não conta', async () => {
+    for (let i = 0; i < 70; i++) expect((await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.50', { 'user-agent': uaN(i) }))).status).toBe(204);
+    expect(await impressoes()).toBe(70);
+    for (let i = 0; i < 70; i++) await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.50', { 'user-agent': uaN(i) }));
+    expect(await impressoes()).toBe(70);
+    m.relogio.t += 4 * 60_000;
+    await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.50', { 'user-agent': uaN(0) }));
+    expect(await impressoes()).toBe(70);
+    m.relogio.t += 7 * 60_000;
+    await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.50', { 'user-agent': uaN(0) }));
+    expect(await impressoes()).toBe(71);
+  });
+
+  it('teto por rede num anúncio: 450 navegadores num IPv4 contam 100 + 1 (a rede); 20 num /64 de IPv6 contam 8 + 1', async () => {
+    for (let i = 0; i < 450; i++) await evento(m, { id: 'lynx', formato: 'topo' }, como('198.51.100.7', { 'user-agent': uaN(i) }));
+    expect(await impressoes()).toBe(TETO_PESSOAS_ANUNCIO.v4 + 1);
+    for (let i = 0; i < 20; i++) await evento(m, { id: 'lynx', formato: 'nativo' }, como(`2001:db8:1:2::${(i + 1).toString(16)}`, { 'user-agent': uaN(i) }));
+    expect(total((await metricas(m, cookie)).metricas, 'lynx', 'nativo').impressoes).toBe(9);
+  });
+
+  it('teto da rede inteira: 450 navegadores num IPv4 espalhados por 5 anúncios contam 400 + 1', async () => {
+    const ids = ['a1', 'a2', 'a3', 'a4', 'a5'];
+    for (const id of ids) await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio(id, { formatos: ['nativo'] }) });
+    for (let i = 0; i < 450; i++) await evento(m, { id: ids[Math.floor(i / 90)], formato: 'nativo' }, como('198.51.100.8', { 'user-agent': uaN(i) }));
+    const lista = (await metricas(m, cookie)).metricas;
+    expect(ids.reduce((n, id) => n + total(lista, id, 'nativo').impressoes, 0)).toBe(TETO_PESSOAS.v4 + 1);
+  });
+
+  it('inflação trocando o User-Agent num IPv4: um anúncio com 7 formatos soma no máximo (100 + 1) × formatos em 5 min', async () => {
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('meta', { formatos: ['topo', 'nativo', 'teste'] }) });
+    for (let i = 0; i < 300; i++)
+      for (const formato of ['topo', 'nativo', 'teste']) await evento(m, { id: 'meta', formato }, como('198.51.100.9', { 'user-agent': uaN(i) }));
+    const lista = (await metricas(m, cookie)).metricas;
+    const soma = ['topo', 'nativo', 'teste'].reduce((n, f) => n + total(lista, 'meta', f).impressoes, 0);
+    expect(soma).toBe((TETO_PESSOAS_ANUNCIO.v4 + 1) * 3);
+  });
+
+  it('clique também conta por pessoa (redirecionamento sempre)', async () => {
+    for (let i = 0; i < 5; i++) {
+      const r = await m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: como('203.0.113.60', { 'user-agent': uaN(i) }) });
+      expect(r.status).toBe(302);
+    }
+    await m.app.request('/api/anuncio/ir/lynx?f=topo', { headers: como('203.0.113.60', { 'user-agent': uaN(0) }) });
+    expect(total((await metricas(m, cookie)).metricas, 'lynx', 'topo').cliques).toBe(5);
+  });
+
+  it('ANUNCIO_PESSOA=0: conta pela rede, como antes (70 navegadores no mesmo IPv4 = 1; 60 eventos/min por rede)', async () => {
+    vi.stubEnv('ANUNCIO_PESSOA', '0');
+    ({ m, cookie } = await novo());
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx') });
+    for (let i = 0; i < 59; i++) await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.70', { 'user-agent': uaN(i) }));
+    expect(await impressoes()).toBe(1);
+    expect((await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.70'))).status).toBe(204);
+    expect((await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.70'))).status).toBe(429);
+    expect(EVENTOS_ANUNCIO_MIN).toBe(60);
+  });
+});
+
+describe('v2: métricas de 14 dias, alcance e meta de impressões (E15, E16)', () => {
+  it('?horas= de 1 a 336 (padrão 48); entregue, esgotadoEm e alcance na resposta', async () => {
+    const { m, cookie } = await novo();
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx') });
+    await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.80'));
+    m.relogio.t += 72 * HORA_MS;
+    const ck = await login(m);
+    await evento(m, { id: 'lynx', formato: 'topo' }, como('203.0.113.81'));
+    const r48 = await metricas(m, ck);
+    expect(total(r48.metricas, 'lynx', 'topo')).toMatchObject({ impressoes: 2 });
+    expect((total(r48.metricas, 'lynx', 'topo') as MetricaAnuncio).porHora).toHaveLength(1);
+    const r336 = (await (await m.app.request('/api/admin/anuncios/metricas?horas=336', { headers: { cookie: ck } })).json()) as MetricasAnunciosResposta;
+    expect((total(r336.metricas, 'lynx', 'topo') as MetricaAnuncio).porHora).toHaveLength(2);
+    expect(r336.alcance!.lynx).toEqual({ campanha: 2, noite: null }); // 2 pessoas: o teto é o nº de impressões
+    expect(r336.entregue).toEqual({});
+    expect(r336.esgotadoEm).toEqual({});
+    for (const q of ['0', '337', 'abc', '1.5']) expect((await m.app.request(`/api/admin/anuncios/metricas?horas=${q}`, { headers: { cookie: ck } })).status).toBe(400);
+  });
+
+  it('meta de 1.000 com início agora: 1.000 impressões → sai do /api/status (e a chave do cache muda); aumentar a meta faz voltar', async () => {
+    const { m, cookie } = await novo();
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { limiteImpressoes: 1000, inicio: AGORA - 60_000 }) });
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('vulpix') });
+    expect((await status(m)).anuncios!.map((a) => a.id)).toEqual(['lynx', 'vulpix']);
+    for (let i = 0; i < 999; i++) await evento(m, { id: 'lynx', formato: i % 2 ? 'topo' : 'nativo' }, como(`10.${i >> 8}.${i & 255}.1`, { 'user-agent': uaN(i) }));
+    m.verificarMetas();
+    expect((await status(m)).anuncios!.map((a) => a.id)).toEqual(['lynx', 'vulpix']);
+    await evento(m, { id: 'lynx', formato: 'teste' }, como('10.9.9.9'));
+    expect(m.verificarMetas()).toBe(true);
+    // mesmo segundo (o corpo do status fica em cache 1 s): a geração dos esgotados entra na chave
+    const s = await status(m);
+    expect(s.anuncios!.map((a) => a.id)).toEqual(['vulpix']);
+    const r = (await (await m.app.request('/api/admin/anuncios/metricas', { headers: { cookie } })).json()) as MetricasAnunciosResposta;
+    expect(r.entregue).toEqual({ lynx: 1000 });
+    expect(r.esgotadoEm).toEqual({ lynx: AGORA });
+    // impressão que ainda chegar conta (bônus)
+    expect((await evento(m, { id: 'lynx', formato: 'topo' }, como('10.9.9.10'))).status).toBe(204);
+    // aumentar a meta: volta na hora (o servidor confere a meta depois de cada comando)
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { limiteImpressoes: 2000, inicio: AGORA - 60_000 }) });
+    expect((await status(m)).anuncios!.map((a) => a.id)).toEqual(['lynx', 'vulpix']);
+    // tirar a meta também
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { limiteImpressoes: 1000, inicio: AGORA - 60_000 }) });
+    expect((await status(m)).anuncios!.map((a) => a.id)).toEqual(['vulpix']);
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { inicio: AGORA - 60_000 }) });
+    expect((await status(m)).anuncios!.map((a) => a.id)).toEqual(['lynx', 'vulpix']);
+  });
+
+  it('reinício: números, dias, alcance e metas atingidas continuam (arquivo v2); a v1 é lida', async () => {
+    const { m, cookie } = await novo({ metricasEmDisco: true });
+    await comando(m, cookie, { tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { limiteImpressoes: 1000, inicio: AGORA }) });
+    for (let i = 0; i < 1000; i++) await evento(m, { id: 'lynx', formato: 'topo' }, como(`10.1.${i >> 8}.${i & 255}`, { 'user-agent': uaN(i) }));
+    m.verificarMetas();
+    await m.persistirMetricasAnuncios();
+    const outro = await novo({ metricasEmDisco: true, stateDir: m.stateDir, estadoInicial: m.controller.state() });
+    outro.m.relogio.t = m.relogio.t;
+    const r = (await (await outro.m.app.request('/api/admin/anuncios/metricas', { headers: { cookie: outro.cookie } })).json()) as MetricasAnunciosResposta;
+    expect(total(r.metricas, 'lynx', 'topo').impressoes).toBe(1000);
+    expect(r.esgotadoEm).toEqual({ lynx: AGORA });
+    expect(r.alcance!.lynx.campanha).toBeGreaterThanOrEqual(950);
+    expect(r.alcance!.lynx.campanha).toBeLessThanOrEqual(1000);
+    expect((await status(outro.m)).anuncios).toEqual([]);
+    // arquivo da versão anterior (v1): totais, horas e os dias tirados das horas
+    const v1 = { v: 1, desde: AGORA - 86_400_000, salvoEm: AGORA, series: [{ id: 'lynx', f: 'topo', i: 15, c: 2, h: [[Math.floor(AGORA / HORA_MS) * HORA_MS, 10, 1]] }] };
+    const mt = new MetricasAnuncios(() => AGORA);
+    expect(mt.carregar(v1)).toBe(true);
+    expect(mt.lista()[0]).toMatchObject({ impressoes: 15, cliques: 2 });
+    expect(mt.paraRelatorio('lynx').dias).toEqual([{ dia: '2026-10-14', impressoes: 5, cliques: 1 }]);
   });
 });

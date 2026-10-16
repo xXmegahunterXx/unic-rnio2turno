@@ -1,7 +1,8 @@
 /**
  * Quem aparece em cada posição de anúncio da página atual. O provedor fica no AppShell (e no Modo TV, que tem
  * moldura própria) e recalcula a escolha a cada página (semente = visita + caminho; `escolhaDaPagina` em nucleo.ts).
- * Sem provedor (ex.: widgets incorporados, admin), nenhum bloco aparece.
+ * Sem provedor (ex.: widgets incorporados, admin, /relatorio), nenhum bloco aparece. Com o interruptor geral ligado
+ * (`status.anunciosSuspensos`), nenhum bloco nem o "Anuncie no Sintonia".
  */
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
@@ -34,9 +35,11 @@ function useCalcular(): AnunciosDaPagina {
   // a barra do rodapé só existe no celular (e fora das telas de pergunta): no desktop os cartões não a evitam
   const celular = !useMediaQuery('(min-width: 768px)', true);
   const rodapeNaTela = celular && rodapePermitido(pathname);
+  // interruptor geral do painel ("Tirar todos do ar"): nenhum bloco, nem o "Anuncie no Sintonia"
+  const suspenso = status.data?.anunciosSuspensos === true;
   const escolha = useMemo(
-    () => escolhaDaPagina(anuncios, `${idDaVisita()}|${pathname}`, { rodapeNaTela }),
-    [anuncios, pathname, rodapeNaTela],
+    () => escolhaDaPagina(anuncios, `${idDaVisita()}|${pathname}`, { rodapeNaTela, suspenso }),
+    [anuncios, pathname, rodapeNaTela, suspenso],
   );
   useEffect(() => {
     if (status.data) {
@@ -44,7 +47,10 @@ function useCalcular(): AnunciosDaPagina {
       lembrarTv(!!escolha.tv);
     }
   }, [status.data, escolha.topo, escolha.tv]);
-  return useMemo(() => ({ escolha, vista: `${pathname}#${key}`, pronto, anuncios: anuncios ?? [] }), [escolha, pathname, key, pronto, anuncios]);
+  return useMemo(
+    () => ({ escolha, vista: `${pathname}#${key}`, pronto, anuncios: suspenso ? [] : (anuncios ?? []) }),
+    [escolha, pathname, key, pronto, anuncios, suspenso],
+  );
 }
 
 export function ProvedorAnuncios({ children }: { children: ReactNode }) {

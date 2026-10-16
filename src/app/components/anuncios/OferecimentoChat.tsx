@@ -14,14 +14,15 @@ import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { useAnunciosDaPagina } from './contexto';
 import { useImpressaoVisivel } from './impressao';
-import { LinkAnuncio, LogoMarca } from './pecas';
+import { ehLogotipo } from './logo';
+import { LinkAnuncio, LogoMarca, useTemaLogo } from './pecas';
 import { idDaVisita } from './visita';
 
 /**
  * Escolha do anúncio da sala evitando, em ordem: o da faixa do topo e o da barra do rodapé; se não sobrar outro, só o do
  * topo (no desktop a barra do rodapé nem aparece — evitar os dois fazia a sala repetir o anunciante do topo).
  */
-export function escolherChat<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota'>>(
+export function escolherChat<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota' | 'reserva'>>(
   anuncios: readonly T[] | null | undefined,
   semente: string,
   topo?: string,
@@ -65,6 +66,8 @@ export function OferecimentoChatPeca({
 }) {
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'chat', bloco: 'chat', vista, ativo: !previa });
+  // logotipo (já traz o nome): o texto passa a ser só o título (o nome segue no rótulo do link)
+  const logotipo = ehLogotipo(a, useTemaLogo());
   return (
     <aside aria-label="Publicidade" className={cn(noPe ? 'border-t border-line bg-surface-2/60' : 'border-b border-line bg-surface-2/60', className)}>
       <LinkAnuncio
@@ -75,14 +78,20 @@ export function OferecimentoChatPeca({
         anelDentro
         className={cn('flex items-center gap-2.5 px-4 transition-colors hover:bg-surface-2', noPe ? 'min-h-[40px] py-1.5' : 'min-h-[48px] py-2')}
       >
-        <LogoMarca anuncio={a} tamanho="xs" />
+        <LogoMarca anuncio={a} className="[--logo-h:28px] [--logo-max:92px]" />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-subtle">Sala oferecida por</span>
           {/* a mensagem comprada pelo anunciante: inteira, em até 2 linhas (3 no celular, ao lado do botão) — cortada no
               meio do preço da oferta, não */}
           <span className={cn('mt-0.5 text-[13.5px] font-semibold leading-snug text-fg', compacta ? 'line-clamp-2' : 'line-clamp-3 sm:line-clamp-2')}>
-            {a.marca}
-            {a.titulo ? <span className="font-normal text-fg-muted"> · {a.titulo}</span> : null}
+            {logotipo ? (
+              a.titulo
+            ) : (
+              <>
+                {a.marca}
+                {a.titulo ? <span className="font-normal text-fg-muted"> · {a.titulo}</span> : null}
+              </>
+            )}
           </span>
         </span>
         {compacta ? (

@@ -46,6 +46,9 @@ export const C = {
   azulInk: 'rgb(4,18,48)',
   outros: 'rgb(139,139,163)',
   pending: 'rgb(58,58,80)',
+  /** placas atrás da logo do anunciante (tokens `--placa-clara`/`--placa-escura` do app, iguais nos dois temas) */
+  placaClara: 'rgb(255,255,255)',
+  placaEscura: 'rgb(17,17,26)',
 };
 
 /** Cor (rgb) do candidato a partir de `Candidate.cor` — a que vem dos dados, nunca deduzida da posição. */

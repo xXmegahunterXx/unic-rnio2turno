@@ -22,9 +22,12 @@ import type { AdminCommand, AdminSnapshot, PublicMeta } from '../shared/api';
 import {
   ANUNCIO_LIMITES,
   anuncioNoAr,
+  conflitoMaster,
   dominioAnuncio,
+  mensagemConflitoMaster,
   urlComUtm,
   validaContatoAnuncie,
+  validaLogoAnuncio,
   type AnuncioConfig,
   type AnuncioPublico,
 } from '../shared/anuncios';
@@ -87,6 +90,7 @@ import {
   estadoPadrao,
   FONTES,
   ID_PATROCINIO,
+  imagensDoEstado,
   INICIO_SIMULACAO,
   normalizaAnuncio,
   parseAdminState,
@@ -206,7 +210,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
 
   const padraoCen = cenarioPadrao(st);
   const fallback = estadoPadrao(modo, iniciadoEm, padraoCen, st);
-  let state: AdminState = opts.initialState ? parseAdminState(opts.initialState, fallback, st) : fallback;
+  let state: AdminState = opts.initialState ? parseAdminState(opts.initialState, fallback, st, { aviso: log }) : fallback;
 
   const modelos = new Map<string, ModeloEntry>();
   const obterModelo = (cen: AdminState['cenario']): ModeloEntry => {
@@ -493,7 +497,9 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         if ('erro' in a) throw new CommandError(a.erro);
         if (!anterior && lista.length >= ANUNCIO_LIMITES.maxAnuncios)
           throw new CommandError(`Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios cadastrados: remova um antes de publicar o patrocínio.`);
-        state = { ...state, patrocinio: null, anuncios: anterior ? lista.map((x) => (x.id === ID_PATROCINIO ? a.ok : x)) : [a.ok, ...lista] };
+        const conflito = conflitoMaster(lista, a.ok);
+        if (conflito) throw new CommandError(mensagemConflitoMaster(conflito));
+        state ={ ...state, patrocinio: null, anuncios: anterior ? lista.map((x) => (x.id === ID_PATROCINIO ? a.ok : x)) : [a.ok, ...lista] };
         log(`Patrocínio publicado como anúncio master (${a.ok.marca})`);
         break;
       }
@@ -506,6 +512,9 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         if ('erro' in v) throw new CommandError(v.erro);
         if (!anterior && lista.length >= ANUNCIO_LIMITES.maxAnuncios)
           throw new CommandError(`Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios cadastrados: remova um antes de criar outro.`);
+        // venda: dois masters (sem reserva, ativos) no mesmo formato prioritário e com janelas que se cruzam → recusado
+        const conflito = conflitoMaster(lista, v.ok);
+        if (conflito) throw new CommandError(mensagemConflitoMaster(conflito));
         state = { ...state, anuncios: anterior ? lista.map((x) => (x.id === v.ok.id ? v.ok : x)) : [...lista, v.ok] };
         log(`Anúncio ${anterior ? 'atualizado' : 'criado'}: ${v.ok.marca} (${v.ok.id}${v.ok.ativo ? '' : ', pausado'})`);
         break;
@@ -525,8 +534,65 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         const a = lista.find((x) => x.id === id);
         if (!a) throw new CommandError(`Anúncio "${id.slice(0, 40)}" não encontrado.`);
         if (typeof cmd.ativo !== 'boolean') throw new CommandError('anuncio-ativo: informe "ativo" (true ou false).');
+        // reativar um master pausado não pode sobrepor outro master (mesma regra do salvar)
+        const conflito = cmd.ativo && !a.ativo ? conflitoMaster(lista, { ...a, ativo: true }) : null;
+        if (conflito) throw new CommandError(mensagemConflitoMaster(conflito));
         state = { ...state, anuncios: lista.map((x) => (x.id === id ? { ...x, ativo: cmd.ativo } : x)) };
         log(`Anúncio ${cmd.ativo ? 'ativado' : 'pausado'}: ${a.marca} (${a.id})`);
+        break;
+      }
+      case 'anuncio-logo': {
+        // "Ajustar agora" (e o desfazer): troca SÓ a logo e a versão escura (com os ajustes). Campo ausente = mantém;
+        // null = apaga (apagar a imagem apaga o ajuste dela). Sem declaração nova: mesma marca, mesmo conteúdo.
+        const lista = state.anuncios ?? [];
+        const id = String(cmd.id ?? '').trim().toLowerCase();
+        const a = lista.find((x) => x.id === id);
+        if (!a) throw new CommandError(`Anúncio "${id.slice(0, 40)}" não encontrado.`);
+        const junto: Record<string, unknown> = { logo: a.logo, logoAjuste: a.logoAjuste, logoEscuro: a.logoEscuro, logoEscuroAjuste: a.logoEscuroAjuste };
+        for (const [campo, campoAjuste] of [
+          ['logo', 'logoAjuste'],
+          ['logoEscuro', 'logoEscuroAjuste'],
+        ] as const) {
+          const img = cmd[campo];
+          if (img === null) {
+            junto[campo] = undefined;
+            junto[campoAjuste] = undefined;
+          } else if (img !== undefined) {
+            if (typeof img !== 'string' || !img.trim()) throw new CommandError(`Anúncio: ${campo === 'logo' ? 'logo' : 'versão para fundo escuro'} inválida.`);
+            junto[campo] = img.trim();
+          }
+          const ajuste = cmd[campoAjuste];
+          if (ajuste === null) junto[campoAjuste] = undefined;
+          else if (ajuste !== undefined) junto[campoAjuste] = ajuste;
+        }
+        const v = validaLogoAnuncio(junto);
+        if ('erro' in v) throw new CommandError(v.erro);
+        const novo: AnuncioConfig = { ...a };
+        delete novo.logo;
+        delete novo.logoAjuste;
+        delete novo.logoEscuro;
+        delete novo.logoEscuroAjuste;
+        Object.assign(novo, v.ok);
+        // a peça e o resto do anúncio seguem como estão; URL do servidor não resolvida mantém a imagem anterior
+        imagensDoEstado(novo, a);
+        state = { ...state, anuncios: lista.map((x) => (x.id === id ? novo : x)) };
+        log(`Logo ajustada: ${a.marca} (${a.id})`);
+        break;
+      }
+      case 'anuncios-suspensao': {
+        // interruptor geral: nada é apagado nem pausado; voltar devolve exatamente o que estava no ar
+        if (typeof cmd.suspender !== 'boolean') throw new CommandError('anuncios-suspensao: informe "suspender" (true ou false).');
+        const motivo = typeof cmd.motivo === 'string' ? cmd.motivo.trim().replace(/\s+/g, ' ') : '';
+        if (motivo.length > 140) throw new CommandError('Comando inválido — motivo: máximo de 140 caracteres');
+        if (cmd.suspender) {
+          const desde = state.anunciosSuspensos?.desde ?? wall;
+          state = { ...state, anunciosSuspensos: motivo ? { desde, motivo } : { desde } };
+          log(`Anúncios suspensos: todos fora do ar${motivo ? ` (${motivo})` : ''}`);
+        } else {
+          const estava = !!state.anunciosSuspensos;
+          state = { ...state, anunciosSuspensos: null };
+          log(estava ? 'Anúncios de volta ao ar (fim da suspensão geral)' : 'Anúncios: suspensão geral já estava desligada');
+        }
         break;
       }
       case 'contatos': {
@@ -658,6 +724,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       anonimizado: sim && !state.nomesReais,
       patrocinio: pub.patrocinio,
       anuncios: pub.anuncios,
+      ...(state.anunciosSuspensos ? { anunciosSuspensos: true as const } : {}),
       anuncie: state.anuncie ? { ...state.anuncie } : null,
       contatos: state.contatos ? { ...state.contatos } : null,
     };
@@ -668,17 +735,30 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
    * Lista pública memorizada pela lista do estado (trocada a cada comando) e válida até o próximo início/fim de
    * janela: o status é consultado a cada requisição.
    */
-  let memoPub: { ref: AnuncioConfig[] | undefined; desde: number; ate: number; anuncios: AnuncioPublico[]; patrocinio: Patrocinio | null } | null = null;
+  let memoPub: {
+    ref: AnuncioConfig[] | undefined;
+    suspensos: boolean;
+    desde: number;
+    ate: number;
+    anuncios: AnuncioPublico[];
+    patrocinio: Patrocinio | null;
+  } | null = null;
   const anunciosPublicos = (wall: number) => {
     const lista = state.anuncios;
-    if (memoPub && memoPub.ref === lista && wall >= memoPub.desde && wall < memoPub.ate) return memoPub;
+    const suspensos = !!state.anunciosSuspensos;
+    if (memoPub && memoPub.ref === lista && memoPub.suspensos === suspensos && wall >= memoPub.desde && wall < memoPub.ate) return memoPub;
+    // interruptor geral ligado: nenhum anúncio no site, nas lives nem nas imagens (nem o patrocínio legado)
+    if (suspensos) {
+      memoPub = { ref: lista, suspensos, desde: wall, ate: Infinity, anuncios: [], patrocinio: null };
+      return memoPub;
+    }
     let ate = Infinity;
     for (const a of lista ?? []) {
       if (a.inicio && a.inicio > wall) ate = Math.min(ate, a.inicio);
       if (a.fim && a.fim > wall) ate = Math.min(ate, a.fim);
     }
     const noAr = (lista ?? []).filter((a) => anuncioNoAr(a, wall));
-    memoPub = { ref: lista, desde: wall, ate, anuncios: noAr.map(anuncioPublico), patrocinio: patrocinioLegado(noAr) };
+    memoPub = { ref: lista, suspensos, desde: wall, ate, anuncios: noAr.map(anuncioPublico), patrocinio: patrocinioLegado(noAr) };
     return memoPub;
   };
 
@@ -854,7 +934,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     status,
     state: () => structuredCloneSafe(state),
     setState(s: AdminState) {
-      const next = parseAdminState(s, state, st);
+      const next = parseAdminState(s, state, st, { aviso: log });
       if (cenarioKey(next.cenario) !== cenarioKey(state.cenario)) aplicaCenario(next.cenario);
       state = next;
     },
@@ -989,16 +1069,24 @@ export function anuncioPublico(a: AnuncioConfig): AnuncioPublico {
   };
   if (a.logo) p.logo = a.logo;
   if (a.imagem) p.imagem = a.imagem;
+  // contrato v2: como desenhar as imagens, versão escura da logo e a cota Reserva — NUNCA a meta (`limiteImpressoes`)
+  if (a.logo && a.logoAjuste) p.logoAjuste = { ...a.logoAjuste };
+  if (a.logoEscuro) {
+    p.logoEscuro = a.logoEscuro;
+    if (a.logoEscuroAjuste) p.logoEscuroAjuste = { ...a.logoEscuroAjuste };
+  }
+  if (a.imagem && a.imagemAjuste) p.imagemAjuste = { ...a.imagemAjuste };
+  if (a.reserva) p.reserva = true;
   return p;
 }
 
 /**
- * LEGADO: qual anúncio vira o `LiveStatus.patrocinio` das telas antigas — dos anúncios no ar, o master com o formato
- * 'topo' (senão o 1º com 'topo'). O servidor usa a mesma escolha para montar o link de clique.
+ * LEGADO: qual anúncio vira o `LiveStatus.patrocinio` das telas antigas — dos anúncios no ar com o formato 'topo', o
+ * master; senão o 1º pago (sem reserva); senão o 1º. O servidor usa a mesma escolha para montar o link de clique.
  */
-export function anuncioDoLegado<T extends Pick<AnuncioConfig, 'formatos' | 'cota'>>(noAr: readonly T[] | null | undefined): T | undefined {
+export function anuncioDoLegado<T extends Pick<AnuncioConfig, 'formatos' | 'cota' | 'reserva'>>(noAr: readonly T[] | null | undefined): T | undefined {
   const topo = (noAr ?? []).filter((a) => a.formatos.includes('topo'));
-  return topo.find((x) => x.cota === 'master') ?? topo[0];
+  return topo.find((x) => x.cota === 'master' && !x.reserva) ?? topo.find((x) => !x.reserva) ?? topo[0];
 }
 
 /** LEGADO `LiveStatus.patrocinio`: link com UTM do formato 'topo' (no servidor, /api/anuncio/ir/<id>?f=topo). */

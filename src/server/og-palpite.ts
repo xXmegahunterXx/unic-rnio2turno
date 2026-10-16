@@ -101,7 +101,7 @@ export function registrarOgPalpite(app: App, d: DepsOgPalpite): void {
     if (memo?.tag !== tag) {
       const of = oferecimentoDe(anuncios, 'palpite');
       const t0 = performance.now();
-      const pr = renderPng(of ? comOferecimento(layoutPalpite(), of.marca) : layoutPalpite());
+      const pr = renderPng(of ? comOferecimento(layoutPalpite(), of.marca, of.logo) : layoutPalpite());
       const atual = { tag, png: pr };
       memo = atual;
       pr.then(

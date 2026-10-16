@@ -46,6 +46,9 @@ export function CenaLive({ className, selo = false }: { className?: string; selo
  * vitrine), com a barra do Sintonia em esboço (blocos neutros no lugar do placar) e a peça real "Oferecido por" na aba
  * presa à marca, do lado oposto ao placar. A tela da live é desenhada inteira e recortada pela moldura.
  */
+/** Largura mínima da moldura para os selos decorativos ("Ao vivo", "Live no OBS"). */
+const LARGURA_SELOS = 360;
+
 export function MolduraLiveVitrine({ anuncio }: { anuncio: AnuncioPublico }) {
   const [ref, size] = useElementSize<HTMLDivElement>();
   // unidade da live "desenhada": o dobro da moldura, e nunca menor que 6,5 px (a marca do anunciante fica legível no celular)
@@ -94,14 +97,20 @@ export function MolduraLiveVitrine({ anuncio }: { anuncio: AnuncioPublico }) {
           </div>
         </div>
       ) : null}
-      <span aria-hidden className="absolute left-[3%] top-[5%] inline-flex items-center gap-1 rounded-md bg-fg px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-bg">
-        <span className="h-1.5 w-1.5 rounded-full bg-bg" />
-        Ao vivo
-      </span>
-      <span className="absolute right-[3%] top-[5%] inline-flex items-center gap-1 rounded-md bg-surface/85 px-1.5 py-0.5 text-[10px] font-semibold text-fg-muted">
-        <Icon name="ao-vivo" size={11} />
-        Live no OBS · detalhe
-      </span>
+      {/* selos decorativos só com folga: numa moldura estreita (prévia do painel no celular) a aba da peça, mais alta
+          com logotipo, sobe até o topo e o selo cobriria o rótulo "Oferecido por" */}
+      {size.w >= LARGURA_SELOS ? (
+        <>
+          <span aria-hidden className="absolute left-[3%] top-[5%] inline-flex items-center gap-1 rounded-md bg-fg px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-bg">
+            <span className="h-1.5 w-1.5 rounded-full bg-bg" />
+            Ao vivo
+          </span>
+          <span className="absolute right-[3%] top-[5%] inline-flex items-center gap-1 rounded-md bg-surface/85 px-1.5 py-0.5 text-[10px] font-semibold text-fg-muted">
+            <Icon name="ao-vivo" size={11} />
+            Live no OBS · detalhe
+          </span>
+        </>
+      ) : null}
     </div>
   );
 }

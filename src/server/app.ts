@@ -13,20 +13,33 @@ import { bodyLimit } from 'hono/body-limit';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import type { HttpBindings } from '@hono/node-server';
 import type { AdminCommand, AdminSnapshot, MetricasServidor, ServidorInfo } from '../shared/api';
-import { FORMATOS_COM_CLIQUE, FORMATOS_COM_IMPRESSAO, urlComUtm, type FormatoAnuncio } from '../shared/anuncios';
+import { FORMATOS_COM_CLIQUE, FORMATOS_COM_IMPRESSAO, urlComUtm, type FormatoAnuncio, type MetricasAnunciosResposta } from '../shared/anuncios';
+import { NOITE_ELEICAO, type RelatorioAnunciante, type SituacaoRelatorio } from '../shared/relatorio';
 import { contatosEfetivos } from '../shared/contatos';
 import type { AdminMetrics, LiveStatus, Race, RaceId, Summary, TseConfig, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import type { MunicipiosBr } from '../shared/dataset';
 import type { LoadedDataset, Controller } from '../engine/api';
 import { NotFoundError } from '../engine/api';
-import { anuncioDoLegado } from '../engine/controller';
-import { LimiteJanela, MetricasAnuncios, TabelaAnuncios, ehRobo } from './anuncios';
+import { anuncioDoLegado, anuncioPublico } from '../engine/controller';
+import {
+  HORAS_DETALHE,
+  HORAS_PAINEL,
+  LimiteJanela,
+  MetricasAnuncios,
+  PessoasPorAnuncio,
+  PessoasPorRede,
+  TETO_PESSOAS,
+  TETO_PESSOAS_ANUNCIO,
+  TabelaAnuncios,
+  ehRobo,
+} from './anuncios';
+import { registrarRelatorios } from './relatorios';
 import { imagemComOferecimento, tagOferecimento } from './og-oferecimento';
 import { SalaChat, registrarChatAdmin, registrarChatPublico } from './chat';
 import { RegistroEnvios } from './chat-registro';
 import { registrarCrescimento, type StoresCrescimento } from './crescimento';
-import type { JsonStore } from './state-store';
+import { createJsonStore, type JsonStore } from './state-store';
 import { COOKIE_SESSAO, LimiteTaxa, Sessoes, chaveCliente, redeDoCliente, senhaConfere } from './auth';
 import { motivoSemSimulacao, type ServerConfig } from './config';
 import { Dados, type InstanteNormalizado, type NivelApuracao } from './dados';
@@ -86,6 +99,15 @@ export interface AppDeps {
    * Ausente = só em memória (a sala nasce fechada a cada subida).
    */
   chatStore?: JsonStore;
+  /**
+   * Contagem por pessoa (rede + navegador) nos anúncios (E14). Ausente = `ANUNCIO_PESSOA` do ambiente (`0` desliga:
+   * conta pela rede, como antes).
+   */
+  anuncioPessoa?: boolean;
+  /** Relatório do anunciante por link privado (E17). Ausente = `RELATORIOS` do ambiente (`0` desliga: a rota dá 404). */
+  relatorios?: boolean;
+  /** STATE_DIR/relatorios.json (só os hashes dos tokens). Ausente = criado em `config.stateDir`. */
+  relatoriosStore?: JsonStore;
 }
 
 /** Permissions-Policy das páginas: nada de câmera, microfone, localização, pagamentos, USB nem "tópicos" de anúncio. */
@@ -123,7 +145,7 @@ export const CC = {
 
 type Ctx = Context<{ Bindings: HttpBindings }>;
 
-export const ROBOTS_TXT = ['User-agent: *', 'Allow: /api/og/', 'Disallow: /api/', 'Disallow: /admin', ''].join('\n');
+export const ROBOTS_TXT = ['User-agent: *', 'Allow: /api/og/', 'Disallow: /api/', 'Disallow: /admin', 'Disallow: /relatorio', ''].join('\n');
 
 /** robots.txt com o endereço do sitemap (absoluto, como o protocolo exige). */
 export const robotsTxt = (origem: string) => `${ROBOTS_TXT}\nSitemap: ${origem}/sitemap.xml\n`;
@@ -167,10 +189,11 @@ export const MAX_URL = 8192;
 /** Corpo máximo de qualquer requisição (o admin tem limites menores por rota). */
 export const MAX_CORPO = 512 * 1024;
 /**
- * Corpo máximo do POST /api/admin/command: o anúncio leva a logo (≤ 150 KB) e a peça (≤ 400 KB) em data URI
- * (base64 ≈ 4/3 → ~750 KB). Só esta rota (com sessão de admin) passa de MAX_CORPO.
+ * Corpo máximo do POST /api/admin/command: o anúncio leva a logo (≤ 150 KB), a versão da logo para fundo escuro
+ * (≤ 150 KB) e a peça (≤ 400 KB) em data URI (base64 ≈ 4/3 → ~935 KB, mais os textos e os ajustes). Só esta rota (com
+ * sessão de admin) passa de MAX_CORPO.
  */
-export const MAX_CORPO_COMANDO = 1024 * 1024;
+export const MAX_CORPO_COMANDO = 1.5 * 1024 * 1024;
 
 /**
  * Content-Security-Policy das páginas: scripts só do próprio site + os scripts inline do index.html autorizados pelo
@@ -224,10 +247,19 @@ const ehQuente = (p: string) =>
  */
 export const CSP_IMAGEM = "sandbox; default-src 'none'; style-src 'unsafe-inline'";
 
-/** Eventos de anúncio (impressões) contados por visitante por minuto; acima disso → 429. */
+/**
+ * Eventos de anúncio (impressões) por REDE por minuto, com a contagem por pessoa (E14): IPv4 inteiro (CGNAT de
+ * operadora: muita gente atrás de um endereço) e IPv6 /64. Acima disso → 429.
+ */
+export const EVENTOS_REDE_MIN = { v4: 3000, v6: 300 } as const;
+/** Cliques contados por rede por minuto (acima disso o redirecionamento acontece, mas não conta). */
+export const CLIQUES_REDE_MIN = { v4: 1000, v6: 100 } as const;
+/** Com `ANUNCIO_PESSOA=0` (conta pela rede, como antes): eventos por rede por minuto; acima disso → 429. */
 export const EVENTOS_ANUNCIO_MIN = 60;
-/** Cliques contados por visitante por minuto (acima disso o redirecionamento acontece, mas não conta). */
+/** Com `ANUNCIO_PESSOA=0`: cliques contados por rede por minuto. */
 export const CLIQUES_ANUNCIO_MIN = 20;
+/** Meta de impressões (E16): conferida a cada 15 s (e logo depois de cada comando do painel). */
+export const INTERVALO_METAS_MS = 15_000;
 
 /** Host (com porta) bem formado; o resto vira null (não entra em URL absoluta nem no cache). */
 const hostValido = (h: string | undefined | null): string | null =>
@@ -513,7 +545,7 @@ export function createApp(deps: AppDeps) {
     // headers direto no objeto (c.header() após o fim recriaria a Response e perderia o envio rápido do node-server)
     const h = c.res.headers;
     h.set('x-content-type-options', 'nosniff');
-    h.set('referrer-policy', 'strict-origin-when-cross-origin');
+    if (!h.has('referrer-policy')) h.set('referrer-policy', 'strict-origin-when-cross-origin');
     h.set('x-request-id', id);
     h.set('x-sintonia-versao', config.build.commit);
     if (config.producao) h.set('strict-transport-security', 'max-age=31536000; includeSubDomains');
@@ -609,8 +641,74 @@ export function createApp(deps: AppDeps) {
     const salvo = deps.metricasAnunciosStore.ler();
     if (salvo && metricasAnuncios.carregar(salvo)) log.info(`Métricas dos anúncios restauradas de ${deps.metricasAnunciosStore.caminho}`);
   }
-  const limiteEventos = new LimiteJanela(EVENTOS_ANUNCIO_MIN, 60_000, now);
-  const limiteCliques = new LimiteJanela(CLIQUES_ANUNCIO_MIN, 60_000, now);
+  // contagem por pessoa (rede + navegador, E14); ANUNCIO_PESSOA=0 → pela rede, com os limites de antes
+  const anuncioPessoa = deps.anuncioPessoa ?? process.env.ANUNCIO_PESSOA !== '0';
+  if (!anuncioPessoa) log.aviso('Anúncios: contagem por pessoa DESLIGADA (ANUNCIO_PESSOA=0) — impressões e cliques contam pela rede');
+  // rede no teto de pessoas: uma linha por janela de 5 min, só a contagem (nunca a rede) — muitas seguidas podem ser
+  // alguém trocando o User-Agent para inflar a contagem (RUNBOOK §3.9: ANUNCIO_PESSOA=0)
+  const pessoas = new PessoasPorRede(now, undefined, undefined, undefined, (n) =>
+    log.aviso(`Anúncios: ${n} rede(s) chegaram ao teto de pessoas (${TETO_PESSOAS.v4} navegadores por IPv4, ${TETO_PESSOAS.v6} por /64) em 5 min`),
+  );
+  const tetoAnuncio = (o: string) =>
+    new PessoasPorAnuncio(now, undefined, undefined, undefined, (n) =>
+      log.aviso(
+        `Anúncios: ${n} par(es) rede × anúncio chegaram ao teto de ${TETO_PESSOAS_ANUNCIO.v4} pessoas (IPv4) em 5 min nas ${o} — se repetir muito, pode ser contagem inflada (RUNBOOK §3.9)`,
+      ),
+    );
+  /** pessoas que UMA rede soma a UM anúncio (impressões e cliques à parte): limita a inflação da contagem e da meta */
+  const pessoasImpressao = tetoAnuncio('impressões');
+  const pessoasClique = tetoAnuncio('cliques');
+  const limitePorRede = (porRede: { v4: number; v6: number }, comoAntes: number) => {
+    // mapa cheio (mais de 100 mil redes no mesmo minuto, pico da noite): a rede nova passa sem limite em vez de levar
+    // 429 e perder a impressão — a repetição e o teto de pessoas seguem valendo
+    const v4 = new LimiteJanela(anuncioPessoa ? porRede.v4 : comoAntes, 60_000, now, undefined, 'deixa');
+    const v6 = anuncioPessoa ? new LimiteJanela(porRede.v6, 60_000, now, undefined, 'deixa') : v4;
+    return (k: { rede: string; v6: boolean }) => (k.v6 ? v6 : v4).tentar(k.rede);
+  };
+  const limiteEventos = limitePorRede(EVENTOS_REDE_MIN, EVENTOS_ANUNCIO_MIN);
+  const limiteCliques = limitePorRede(CLIQUES_REDE_MIN, CLIQUES_ANUNCIO_MIN);
+  /**
+   * Quem conta na métrica dos anúncios: `rede` (hash com sal da rede: IPv4 inteiro, IPv6 /64) e `pessoa` (rede + hash
+   * do navegador, com teto por rede — `PessoasPorRede`). Só em memória; nunca vai ao log nem ao disco.
+   */
+  const contagemDe = (c: Ctx): { rede: string; pessoa: string; v6: boolean } => {
+    const ip = ipDe(c);
+    const v6 = redeDoCliente(ip).includes(':');
+    const rede = chaveCliente(ip, salCliente);
+    return { rede, v6, pessoa: anuncioPessoa ? pessoas.pessoa(rede, c.req.header('user-agent') ?? '', v6) : rede };
+  };
+
+  /**
+   * Meta de impressões (E16): a cada 15 s (e depois de cada comando do painel) compara o entregue com a meta de cada
+   * anúncio; ao atingir, o anúncio sai do site (`anunciosParaSite`); meta aumentada ou retirada → volta. As imagens de
+   * compartilhamento não são medidas nem contam para a meta, e seguem com o anúncio.
+   */
+  const verificarMetas = (): boolean => {
+    sincAnuncios();
+    const antes = new Set(metricasAnuncios.esgotadoEm.keys());
+    if (!metricasAnuncios.verificarMetas(anuncios.todos())) return false;
+    for (const id of metricasAnuncios.esgotadoEm.keys())
+      if (!antes.has(id)) log.info(`Anúncios: meta de impressões atingida — ${anuncios.config(id)?.marca ?? id} (${id}) sai do site`);
+    for (const id of antes) if (!metricasAnuncios.esgotadoEm.has(id)) log.info(`Anúncios: ${anuncios.config(id)?.marca ?? id} (${id}) de volta ao site (meta aumentada ou retirada)`);
+    return true;
+  };
+  verificarMetas();
+  /** Alcance estimado (pessoas) na campanha (a partir do dia do início) e na noite; nunca acima das impressões. */
+  const alcanceDe = (id: string, inicio?: number | null): { campanha: number | null; noite: number | null } => {
+    const teto = (v: number | null, max: number) => (v === null ? null : Math.min(v, max));
+    return {
+      campanha: teto(metricasAnuncios.alcance.estimar(id, 'campanha', inicio), metricasAnuncios.totalImpressoes(id)),
+      noite: teto(metricasAnuncios.alcance.estimar(id, 'noite'), metricasAnuncios.impressoesEntre(id, NOITE_ELEICAO.inicio, NOITE_ELEICAO.fim)),
+    };
+  };
+  const timerMetas = setInterval(() => {
+    try {
+      verificarMetas();
+    } catch (e) {
+      log.erro('Anúncios: falha ao conferir as metas de impressões', e);
+    }
+  }, INTERVALO_METAS_MS);
+  timerMetas.unref?.();
 
   // logo do patrocínio em data URI sai do status (consultado por todos a cada poucos segundos) e vira uma URL
   // com o hash do conteúdo, servida por /api/patrocinio/logo com cache longo
@@ -638,13 +736,20 @@ export function createApp(deps: AppDeps) {
    */
   const anunciosParaSite = (st: LiveStatus, origem: string): Pick<LiveStatus, 'anuncios' | 'patrocinio'> => {
     sincAnuncios(st.versao);
-    const out: Pick<LiveStatus, 'anuncios' | 'patrocinio'> = { anuncios: (st.anuncios ?? []).map((a) => anuncios.publico(a, origem)) };
+    // meta de impressões atingida (E16): o anúncio sai do site (as impressões que ainda chegarem contam como bônus)
+    const esg = metricasAnuncios.esgotadoEm;
+    const noAr = esg.size ? (st.anuncios ?? []).filter((a) => !esg.has(a.id)) : (st.anuncios ?? []);
+    const out: Pick<LiveStatus, 'anuncios' | 'patrocinio'> = { anuncios: noAr.map((a) => anuncios.publico(a, origem)) };
     const p = st.patrocinio;
-    const a = p ? anuncioDoLegado(st.anuncios) : undefined;
-    if (p && a) {
+    const a = p ? anuncioDoLegado(noAr) : undefined;
+    if (p && a && a.id === anuncioDoLegado(st.anuncios)?.id) {
       const { imagem: img, ...resto } = p;
       const l = img?.startsWith('data:') ? logo(img) : null;
       out.patrocinio = { ...resto, url: `${origem}/api/anuncio/ir/${encodeURIComponent(a.id)}?f=topo`, ...(l ? { imagem: `${origem}/api/patrocinio/logo?h=${l.h}` } : {}) };
+    } else if (p && a) {
+      // o anúncio do legado bateu a meta: o patrocínio das telas antigas passa ao próximo (mesma escolha do motor)
+      const imagem = anuncios.url(a.logo, origem);
+      out.patrocinio = { marca: a.marca, texto: a.texto || a.titulo, url: `${origem}/api/anuncio/ir/${encodeURIComponent(a.id)}?f=topo`, ...(imagem ? { imagem } : {}) };
     } else out.patrocinio = null;
     return out;
   };
@@ -670,7 +775,7 @@ export function createApp(deps: AppDeps) {
   app.get('/api/status', async (c) => {
     const st = dados.status();
     const fr = dados.frescor();
-    const chave = `status|${origemDe(c)}|${st.versao}|${st.fase}|${st.aviso?.texto ?? ''}|${agendador.avisoPublico() ? 1 : 0}|${tseEncerrado() ? 1 : 0}|${fr ? Object.values(fr).map((f) => f?.marca).join(',') : ''}`;
+    const chave = `status|${origemDe(c)}|${st.versao}|${st.fase}|${st.aviso?.texto ?? ''}|${agendador.avisoPublico() ? 1 : 0}|${tseEncerrado() ? 1 : 0}|${fr ? Object.values(fr).map((f) => f?.marca).join(',') : ''}|e${metricasAnuncios.geracaoEsgotados}`;
     const { p, hit } = respostas.obter(chave, () => ({ bruto: Buffer.from(JSON.stringify(statusPublico(c))) }));
     metricas.cache(hit);
     return enviar(c, await p, { 'cache-control': CC.status, 'access-control-allow-origin': '*' });
@@ -763,8 +868,8 @@ export function createApp(deps: AppDeps) {
     const f = c.req.query('f');
     const formato = formatoValido(f, noAr.formatos, FORMATOS_COM_CLIQUE) ? f : null;
     if (formato && navegacaoDoSite(c) && !ehRobo(c.req.header('user-agent'))) {
-      const cliente = clienteDe(c);
-      if (limiteCliques.tentar(cliente)) metricasAnuncios.clique(id, formato, cliente);
+      const k = contagemDe(c);
+      if (limiteCliques(k)) metricasAnuncios.clique(id, formato, pessoasClique.pessoa(k, id));
     }
     return c.body(null, 302, { ...h, location: urlComUtm(cfg.url, cfg.id, formato ?? 'link') });
   });
@@ -794,9 +899,9 @@ export function createApp(deps: AppDeps) {
       const a = dados.status().anuncios?.find((x) => x.id === id);
       if (!a) throw new NotFoundError('Anúncio fora do ar.');
       if (!formatoValido(formato, a.formatos, FORMATOS_COM_IMPRESSAO)) throw new ErroValidacao('Formato que este anúncio não usa ou que não é medido.');
-      const cliente = clienteDe(c);
-      if (!limiteEventos.tentar(cliente)) throw new ErroHttp(429, 'Muitos eventos; tente mais tarde.', { 'retry-after': '60' });
-      if (eventoDoSite(c) && !ehRobo(c.req.header('user-agent'))) metricasAnuncios.impressao(id, formato, cliente);
+      const k = contagemDe(c);
+      if (!limiteEventos(k)) throw new ErroHttp(429, 'Muitos eventos; tente mais tarde.', { 'retry-after': '60' });
+      if (eventoDoSite(c) && !ehRobo(c.req.header('user-agent'))) metricasAnuncios.impressao(id, formato, pessoasImpressao.pessoa(k, id));
       return c.body(null, 204, { 'cache-control': CC.privado });
     },
   );
@@ -942,7 +1047,8 @@ export function createApp(deps: AppDeps) {
     }
     await next();
   });
-  // 64 KB em geral; 1 MB no /command (o anúncio traz a logo e a peça em data URI: até ~750 KB)
+  // 64 KB em geral; 1,5 MB no /command (o anúncio traz a logo, a versão para fundo escuro e a peça em data URI:
+  // 150 + 150 + 400 KB, ~935 KB em JSON)
   const limite = (kb: number) => bodyLimit({ maxSize: kb * 1024, onError: (c) => c.json({ erro: 'Corpo grande demais.' }, 413) });
   const limitePadrao = limite(64);
   const limiteComando = limite(MAX_CORPO_COMANDO / 1024);
@@ -1047,12 +1153,19 @@ export function createApp(deps: AppDeps) {
     if (cmd.tipo === 'anuncio-salvar') {
       sincAnuncios();
       cmd = { ...cmd, anuncio: anuncios.resolverAnuncio(cmd.anuncio) };
+    } else if (cmd.tipo === 'anuncio-logo') {
+      sincAnuncios();
+      cmd = anuncios.resolverAnuncio(cmd);
     }
     if (motivoSim && ligaSimulacao(cmd)) {
       log.aviso(`Admin: comando "${cmd.tipo}" recusado — simulação bloqueada em produção (ALLOW_SIMULACAO)`);
       throw new ErroHttp(403, motivoSim);
     }
     controller.command(cmd);
+    // anúncio removido: os links de relatório dele morrem junto (um id recriado não reabre o link antigo)
+    if (cmd.tipo === 'anuncio-remover') relatorios.revogarDoAnuncio(cmd.id);
+    // meta aumentada/retirada ou anúncio novo com meta: o site reflete já, sem esperar os 15 s
+    if (cmd.tipo.startsWith('anuncio')) verificarMetas();
     const s = controller.state();
     if (cmd.tipo === 'fonte' || cmd.tipo === 'tse' || cmd.tipo === 'relogio' || cmd.tipo === 'troca-auto') deps.tse.sincronizar(s.fonte, s.tse);
     log.info(`Admin: comando "${cmd.tipo}"${'acao' in cmd ? ` (${cmd.acao})` : ''} aplicado (versão ${s.versao}, fonte ${s.fonte})`);
@@ -1061,8 +1174,30 @@ export function createApp(deps: AppDeps) {
     return c.json(snapshotAdmin(c));
   });
 
-  /** Relatório de entrega dos anúncios (agregado: impressões visíveis e cliques por anúncio × formato × hora). */
-  admin.get('/anuncios/metricas', (c) => c.json({ metricas: metricasAnuncios.lista(), desde: metricasAnuncios.desde }));
+  /**
+   * Relatório de entrega dos anúncios (agregado: impressões visíveis e cliques por anúncio × formato × hora; `?horas=`
+   * de 1 a 336, padrão 48), mais o entregue desde o início dos anúncios com meta, as metas atingidas e o alcance
+   * estimado (campanha e noite da eleição).
+   */
+  admin.get('/anuncios/metricas', (c) => {
+    const q = c.req.query('horas');
+    const horas = q === undefined || q === '' ? HORAS_PAINEL : Number(q);
+    if (!Number.isInteger(horas) || horas < 1 || horas > HORAS_DETALHE) throw new ErroValidacao(`Use ?horas= de 1 a ${HORAS_DETALHE}.`);
+    sincAnuncios();
+    const cfgs = anuncios.todos();
+    const entregue: Record<string, number> = {};
+    for (const a of cfgs) if (a.limiteImpressoes && a.inicio) entregue[a.id] = metricasAnuncios.entregueDesde(a.id, a.inicio);
+    const alcance: NonNullable<MetricasAnunciosResposta['alcance']> = {};
+    for (const id of new Set([...cfgs.map((a) => a.id), ...metricasAnuncios.alcance.ids()])) alcance[id] = alcanceDe(id, anuncios.config(id)?.inicio);
+    const r: MetricasAnunciosResposta = {
+      metricas: metricasAnuncios.lista(horas),
+      desde: metricasAnuncios.desde,
+      entregue,
+      esgotadoEm: Object.fromEntries(metricasAnuncios.esgotadoEm),
+      alcance,
+    };
+    return c.json(r);
+  });
 
   admin.get('/presets', (c) => c.json(controller.presets()));
 
@@ -1091,6 +1226,65 @@ export function createApp(deps: AppDeps) {
     stores: deps.crescimentoStores,
     // produção: o formulário só abre com um e-mail de privacidade configurado no painel (canal para retirar o consentimento)
     formularioFechado: () => (config.producao && !contatosEfetivos(dados.status().contatos).privacidade ? 'O formulário abre em breve.' : null),
+  });
+
+  // relatório do anunciante por link privado (src/server/relatorios.ts): rota pública + links no painel
+  const relatoriosLigados = deps.relatorios ?? process.env.RELATORIOS !== '0';
+  if (!relatoriosLigados) log.aviso('Relatórios dos anunciantes DESLIGADOS (RELATORIOS=0): /api/anuncie/relatorio responde 404');
+  const relatoriosStore =
+    deps.relatoriosStore ?? createJsonStore(config.stateDir, 'relatorios.json', { debounceMs: 1000, onErro: (e) => log.erro('Falha ao salvar os links de relatório', e) });
+  /** Relatório de entrega de um anúncio (agregado), como a página /relatorio recebe. null = anúncio removido. */
+  const relatorioDe = (id: string, mostrarMeta: boolean, origem: string): RelatorioAnunciante | null => {
+    sincAnuncios();
+    const cfg = anuncios.config(id);
+    if (!cfg) return null;
+    const t = now();
+    const esgotado = metricasAnuncios.esgotadoEm.has(id);
+    const situacao: SituacaoRelatorio = esgotado
+      ? 'meta-atingida'
+      : cfg.fim && t >= cfg.fim
+        ? 'encerrado'
+        : dados.status().anunciosSuspensos
+          ? 'suspenso'
+          : !cfg.ativo
+            ? 'pausado'
+            : cfg.inicio && t < cfg.inicio
+              ? 'agendado'
+              : 'no-ar';
+    const r: RelatorioAnunciante = {
+      geradoEm: t,
+      desde: metricasAnuncios.desde,
+      // imagens por URL; sem link de clique (a página do relatório não conta clique)
+      anuncio: { ...anuncios.publico(anuncioPublico(cfg), origem), href: '' },
+      situacao,
+      inicio: cfg.inicio ?? null,
+      fim: cfg.fim ?? null,
+      // só a partir do início da campanha (como a meta e o alcance)
+      ...metricasAnuncios.paraRelatorio(id, cfg.inicio),
+      alcance: {
+        ...alcanceDe(id, cfg.inicio),
+        segmentos: {
+          campanha: metricasAnuncios.alcance.segmentosCom(id, 'campanha', cfg.inicio),
+          noite: metricasAnuncios.alcance.segmentosCom(id, 'noite'),
+        },
+      },
+    };
+    if (mostrarMeta && cfg.limiteImpressoes && cfg.inicio) r.meta = { limite: cfg.limiteImpressoes, entregue: metricasAnuncios.entregueDesde(id, cfg.inicio) };
+    return r;
+  };
+  const relatorios = registrarRelatorios(app, admin, {
+    now,
+    log,
+    ligado: relatoriosLigados,
+    store: relatoriosStore,
+    origemPermitida,
+    redeDe: clienteDe,
+    origemDe,
+    anuncioExiste: (id) => {
+      sincAnuncios();
+      return !!anuncios.config(id);
+    },
+    relatorio: relatorioDe,
   });
 
   app.route('/api/admin', admin);
@@ -1233,12 +1427,14 @@ export function createApp(deps: AppDeps) {
   /** SIGTERM: /readyz passa a 503 e as respostas fecham a conexão keep-alive (main.ts drena e encerra). */
   const encerrar = () => {
     encerrando = true;
+    clearInterval(timerMetas);
     agendador.parar();
     metricas.pararEventLoop();
   };
 
-  /** Grava as métricas dos anúncios (se houver contagem nova) e espera terminar. */
+  /** Grava as métricas dos anúncios (se houver contagem nova) e os links de relatório pendentes, e espera terminar. */
   const persistirMetricasAnuncios = async (): Promise<void> => {
+    await relatorios.persistir();
     const store = deps.metricasAnunciosStore;
     if (!store) return;
     if (metricasAnuncios.sujo) {
@@ -1263,6 +1459,8 @@ export function createApp(deps: AppDeps) {
     prontidao,
     metricasAnuncios,
     persistirMetricasAnuncios,
+    verificarMetas,
+    relatorios,
     crescimento,
   };
 }

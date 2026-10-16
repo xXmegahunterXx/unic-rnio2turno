@@ -358,7 +358,13 @@ function Cotas({ className }: { className?: string }) {
     },
   ];
   return (
-    <Bloco className={className} id="cotas" eyebrow="Cotas" titulo="Master ou apoio" descricao="Valores e períodos sob consulta. Os anúncios podem ter data de início e de fim e podem ser pausados a qualquer momento.">
+    <Bloco
+      className={className}
+      id="cotas"
+      eyebrow="Cotas"
+      titulo="Master ou apoio"
+      descricao="Valores e períodos sob consulta. Os anúncios podem ter data de início e de fim e podem ser pausados a qualquer momento. Também vendemos por meta de impressões visíveis, com relatório ao vivo por link privado."
+    >
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         {cotas.map((c) => (
           <div
@@ -390,7 +396,7 @@ const REGRAS: { icone: IconName; titulo: string; texto: ReactNode }[] = [
   {
     icone: 'selo',
     titulo: 'Só anunciantes não políticos',
-    texto: 'Candidatos, partidos, campanhas, órgãos públicos e peças com conteúdo político-eleitoral não são aceitos. O cadastro exige essa declaração e recusa nomes de candidatos, números, siglas e termos de eleição.',
+    texto: 'Candidatos, partidos, campanhas, órgãos públicos e peças com conteúdo político-eleitoral não são aceitos. O cadastro exige essa declaração e recusa nomes de candidatos, números, siglas e termos de eleição. Também não são aceitos anúncios de apostas, cassino e mercados de previsão; bebida alcoólica fica fora do ar no dia da votação até as 17h.',
   },
   { icone: 'info', titulo: 'Sempre identificado', texto: '“Publicidade”, “Patrocinado” ou “Oferecido por” em todo formato.' },
   {
@@ -443,8 +449,24 @@ function Envio({ className }: { className?: string }) {
   const kb = (dataUri: number) => Math.round((((dataUri - 64) * 3) / 4 / 1024) / 10) * 10;
   const L = ANUNCIO_LIMITES;
   const itens: { item: string; detalhe: ReactNode }[] = [
-    { item: 'Logo', detalhe: <>PNG, SVG, WebP ou JPEG, até <span className="num">{fmtInt(kb(L.logoDataUri))}</span> KB. Quadrada fica melhor.</> },
-    { item: 'Peça (opcional)', detalhe: <>PNG, JPEG ou WebP, até <span className="num">{fmtInt(kb(L.imagemDataUri))}</span> KB, em qualquer proporção. Aparece inteira, sem corte.</> },
+    {
+      item: 'Logo',
+      detalhe: (
+        <>
+          PNG com fundo transparente, de preferência a versão horizontal da marca, até <span className="num">{fmtInt(kb(L.logoDataUri))}</span> KB. Se tiver,
+          mande também a versão para fundo escuro (o site tem tema escuro e o Modo TV).
+        </>
+      ),
+    },
+    {
+      item: 'Peça (opcional)',
+      detalhe: (
+        <>
+          PNG, JPEG ou WebP, até <span className="num">{fmtInt(kb(L.imagemDataUri))}</span> KB, em qualquer proporção. Aparece inteira, sem corte. Sem
+          animação.
+        </>
+      ),
+    },
     { item: 'Chamada', detalhe: <>Até <span className="num">{fmtInt(L.titulo)}</span> caracteres.</> },
     { item: 'Texto de apoio', detalhe: <>Até <span className="num">{fmtInt(L.texto)}</span> caracteres.</> },
     { item: 'Botão', detalhe: <>Até <span className="num">{fmtInt(L.cta)}</span> caracteres, ex.: “Abrir conta”, “Saiba mais”.</> },

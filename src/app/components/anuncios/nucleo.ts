@@ -4,9 +4,15 @@
  *
  * Escolha por página (semente = visita + caminho): a mesma posição não troca a cada renderização, muda entre visitas
  * e entre páginas. A cadeia é sempre a mesma, então cada posição é calculada sozinha (sem registro de blocos):
- *   topo → rodapé (evita o do topo) → nativo-1, nativo-2… (evitam topo, rodapé e os nativos anteriores) → teste → tv.
- * Um nativo nunca repete um anunciante já mostrado em OUTRO nativo da mesma página: sem anúncio novo para a posição,
- * entra o anúncio da casa ("Anuncie no Sintonia", no máximo 1 por página) e, depois dele, nada.
+ *   topo → rodapé (evita o do topo) → nativo-1, nativo-2… → teste → tv.
+ * Cartões (escolha justa, anunciantes v2):
+ *  - o nativo-1 evita o anunciante do topo, de leve (só se sobrar outro: os dois ficam perto na tela); do nativo-2 em
+ *    diante o do topo pode entrar (a faixa rola com a página e já saiu da tela) — o master aparece também nos cartões;
+ *  - um anunciante nunca aparece em dois cartões da mesma página, nem o da barra FIXA do rodapé (ficaria empilhado com
+ *    ela na tela);
+ *  - o anúncio da casa ("Anuncie no Sintonia") só entra quando não sobra NENHUM anunciante para o cartão, no máximo 1
+ *    por página; depois dele, nada. A cota Reserva (empresas do grupo) preenche antes dele (`escolherAnuncio`).
+ * Interruptor geral (`LiveStatus.anunciosSuspensos`): nenhuma posição, nem o anúncio da casa.
  */
 // só a escolha (módulo pequeno): a validação e os limites do painel ficam fora do JS inicial do site
 import { escolherAnuncio } from '@/shared/anuncios-escolha';
@@ -28,12 +34,23 @@ export interface EscolhaPagina {
 /** Posições nativas calculadas por página (curiosidades chega a ~5; acima disso, nada). */
 const MAX_NATIVOS = 12;
 
+/** Página sem nenhum anúncio (interruptor geral ligado). */
+const NADA: EscolhaPagina = { topo: null, rodape: null, teste: null, tv: null, nativo: () => null };
+
 export function escolhaDaPagina(
   anuncios: readonly AnuncioPublico[] | null | undefined,
   semente: string,
-  /** a barra do rodapé está na tela (celular)? Fora dela, os demais blocos não precisam evitar o anunciante dela. */
-  { rodapeNaTela = true }: { rodapeNaTela?: boolean } = {},
+  {
+    rodapeNaTela = true,
+    suspenso = false,
+  }: {
+    /** a barra do rodapé está na tela (celular)? Fora dela, os demais blocos não precisam evitar o anunciante dela. */
+    rodapeNaTela?: boolean;
+    /** interruptor geral "Tirar todos do ar" (`LiveStatus.anunciosSuspensos`): nada, nem o anúncio da casa */
+    suspenso?: boolean;
+  } = {},
 ): EscolhaPagina {
+  if (suspenso) return NADA;
   const lista = anuncios ?? [];
   const topo = escolherAnuncio(lista, 'topo', `${semente}|topo`);
   const rodape = escolherAnuncio(lista, 'rodape', `${semente}|rodape`, topo ? [topo.id] : []);
@@ -47,14 +64,15 @@ export function escolhaDaPagina(
   let casaUsada = false;
   const calcular = (ate: number) => {
     for (let k = nativos.length + 1; k <= Math.min(ate, MAX_NATIVOS); k++) {
-      const a = escolherAnuncio(lista, 'nativo', `${semente}|nativo-${k}`, [...fixos, ...vistos]);
-      // sem sobra (pool esgotado), a escolha volta a um já mostrado: o da barra FIXA do rodapé nunca (ela fica na tela
-      // e os dois apareceriam empilhados), nem o mesmo em dois cartões — vira o "Anuncie aqui" (uma vez) ou nada. O da
-      // faixa do topo pode repetir quando é o único (a faixa rola com a página e já saiu da tela)
-      if (a && !vistos.includes(a.id) && a.id !== rodapeFixo) {
+      // pool estrito: com o formato, ainda não mostrado num cartão e diferente do da barra fixa do rodapé
+      const pool = lista.filter((x) => x.formatos.includes('nativo') && !vistos.includes(x.id) && x.id !== rodapeFixo);
+      // só o 1º cartão evita (de leve) o do topo; a escolha justa fica com `escolherAnuncio` (peso; pago antes da reserva)
+      const a = escolherAnuncio(pool, 'nativo', `${semente}|nativo-${k}`, k === 1 && topo ? [topo.id] : []);
+      if (a) {
         vistos.push(a.id);
         nativos.push(a);
       } else if (!casaUsada) {
+        // nenhum anunciante sobrando para o cartão: o "Anuncie no Sintonia" (uma vez) e, depois dele, nada
         casaUsada = true;
         nativos.push(CASA);
       } else nativos.push(null);

@@ -27,6 +27,9 @@ export default {
         ok: { DEFAULT: v('ok'), fg: v('ok-fg') },
         alert: { DEFAULT: v('alert'), fg: v('alert-fg') },
         pending: v('pending'),
+        // placas atrás das imagens de anunciantes (logo/peça): as MESMAS nos dois temas — a escolha clara/escura vem do
+        // contraste medido no painel (AjusteImagem, src/shared/anuncios.ts)
+        placa: { clara: v('placa-clara'), escura: v('placa-escura') },
       },
       fontFamily: {
         display: ['"Bricolage Grotesque Variable"', 'ui-sans-serif', 'system-ui', 'sans-serif'],

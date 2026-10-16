@@ -186,7 +186,7 @@ export function registrarOg(app: App, d: DepsOg): void {
    */
   const comOf = (no: No, chave: CartaoComOferecimento): No => {
     const of = oferecimentoDe(dados.status().anuncios, chave);
-    return of ? comOferecimento(no, of.marca) : no;
+    return of ? comOferecimento(no, of.marca, of.logo) : no;
   };
 
   /** PNG com ETag (rota + versão|modo + instante da geração), 304 e CORS (robôs de outras origens). */

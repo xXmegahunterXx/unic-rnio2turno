@@ -48,8 +48,9 @@ type Termo = readonly [RegExp, string];
 
 const TERMOS: Readonly<Record<CategoriaSensivel, readonly Termo[]>> = {
   previsao: [
-    [/\bmercados? de (previsao|previsoes|predicao|predicoes|eventos)\b|\bprediction markets?\b/, 'mercado de previsão'],
-    [/\bcontratos? de eventos?\b|\bevent contracts?\b/, 'contrato de evento'],
+    // "mercado de eventos" e "contrato de eventos" ficam de fora: em português são o setor de festas e feiras
+    [/\bmercados? de (previsao|previsoes|predicao|predicoes)\b|\bprediction markets?\b/, 'mercado de previsão'],
+    [/\bevent contracts?\b/, 'contrato de evento'],
     [/\bpolymarket\b/, 'Polymarket'],
     [/\bkalshi\b/, 'Kalshi'],
     [/\bpredictit\b/, 'PredictIt'],
@@ -62,7 +63,7 @@ const TERMOS: Readonly<Record<CategoriaSensivel, readonly Termo[]>> = {
     [/\bloterias?\b|\bmega ?sena\b|\blotofacil\b|\blotomania\b|\braspadinhas?\b|\bjogo do bicho\b/, 'loteria'],
     [/\bbol(ao|oes)\b/, 'bolão'],
     [
-      /\b(betano|betfair|betway|betsson|betmgm|betnacional|betboo|betsul|betpix\d*|betvip|betwarrior|betmotion|betcris|sportingbet|parimatch|rivalo|brazino\d*|esportes da sorte|rei do pitaco|mc ?games)\b/,
+      /\b(betano|betfair|betway|betsson|betmgm|betnacional|betboo|betsul|betpix\d*|betvip|betwarrior|betmotion|betcris|sportingbet|parimatch|rivalo|brazino\d*|esportes da sorte|rei do pitaco|mc ?games|kto)\b/,
       'casa de apostas',
     ],
   ],
@@ -78,12 +79,19 @@ const TERMOS: Readonly<Record<CategoriaSensivel, readonly Termo[]>> = {
   ],
   alcool: [
     [/\bbebidas? alcoolicas?\b|\bdestilados?\b/, 'bebida alcoólica'],
-    [/\bcervejas?\b|\bcervejarias?\b|\bchopes?\b|\bchopps?\b|\bchoperias?\b/, 'cerveja'],
-    [/\bvinhos?\b|\bvinicolas?\b|\bespumantes?\b|\bchampanh?es?\b|\bchampagnes?\b|\bproseccos?\b|\bsidras?\b/, 'vinho'],
+    // "cerveja sem álcool" / "chope zero álcool" não é bebida alcoólica (a marca de cerveja continua pega pelo nome)
+    [/\b(cervejas?|chopes?|chopps?)\b(?! (sem|zero) alcool\b)|\bcervejarias?\b|\bchoperias?\b/, 'cerveja'],
+    // "cor vinho", "tom champanhe" e listas de cores ("preto, branco e vinho", "vinho e marinho"): cor, não bebida.
+    // Depois de "vinho" não valem branco/rosa ("vinho branco", "vinho rosé" são bebida)
+    [
+      /(?<!\b(cor|tom|cor de|cores|preto|preta|branco|branca|azul|verde|cinza|rosa|bege|marrom|amarelo|amarela|vermelho|vermelha|roxo|roxa|lilas|laranja|dourado|dourada|prata|marinho|grafite|creme|mostarda|bordo|nude)( e)? )(\bvinhos?\b(?! e (preto|preta|azul|verde|cinza|bege|marrom|amarelo|amarela|vermelho|vermelha|roxo|roxa|lilas|laranja|dourado|dourada|prata|marinho|grafite|creme|mostarda|bordo|nude)\b)|\bchampanh?es?\b|\bchampagnes?\b)|\bvinicolas?\b|\bespumantes?\b|\bproseccos?\b|\bsidras?\b/,
+      'vinho',
+    ],
     [/\bcachacas?\b|\bcachacarias?\b|\bcaipirinhas?\b|\bcaipiroskas?\b|\bcatuaba\b/, 'cachaça'],
     [/\bwhiske?ys?\b|\buisques?\b|\bvodkas?\b|\bgin\b|\bgins\b|\brum\b|\btequilas?\b|\blicor(es)?\b|\bconhaques?\b|\babsinto\b|\bvermutes?\b/, 'destilado'],
     [
-      /\b(heineken|brahma|skol|budweiser|stella artois|itaipava|amstel|eisenbahn|spaten|michelob|bohemia|devassa|smirnoff|absolut|johnnie walker|jack daniel ?s|ypioca|pitu|campari|aperol|jagermeister|bacardi|chandon|tanqueray|beefeater|jose cuervo|velho barreiro|chivas|jameson|ciroc|grey goose|cinzano)\b/,
+      // "pitu" (camarão) e "devassa" (palavra comum) só contam no domínio (ROTULOS)
+      /\b(heineken|brahma|skol|budweiser|stella artois|itaipava|amstel|eisenbahn|spaten|michelob|bohemia|smirnoff|absolut|johnnie walker|jack daniel ?s|ypioca|campari|aperol|jagermeister|bacardi|chandon|tanqueray|beefeater|jose cuervo|velho barreiro|chivas|jameson|ciroc|grey goose|cinzano)\b/,
       'marca de bebida alcoólica',
     ],
   ],
@@ -92,8 +100,11 @@ const TERMOS: Readonly<Record<CategoriaSensivel, readonly Termo[]>> = {
 /** Ordem da busca: as recusadas antes da bebida alcoólica (que só gera aviso e a regra do dia da votação). */
 const ORDEM: readonly CategoriaSensivel[] = ['previsao', 'apostas', 'cassino', 'alcool'];
 
-/** Palavras terminadas em "bet" que não são apostas. */
-const NAO_E_BET = new Set(['alphabet', 'alphabets', 'tibet', 'sorbet', 'sorbets', 'sherbet', 'sherbets', 'abet', 'gibbet']);
+/** Palavras (e nomes próprios) terminadas em "bet" que não são apostas. */
+const NAO_E_BET = new Set([
+  'alphabet', 'alphabets', 'tibet', 'thibet', 'sorbet', 'sorbets', 'sherbet', 'sherbets', 'abet', 'gibbet', 'barbet', 'quodlibet',
+  'elizabet', 'elisabet', 'lisbet', 'isabet', 'babet',
+]);
 
 /** Palavra (ou rótulo de domínio) com cara de casa de apostas: "bet", "bets", "bet365", "pixbet", "1xbet", "f12bet"… */
 function palavraBet(p: string): boolean {
@@ -112,13 +123,14 @@ const TLD_JOGO: readonly [RegExp, CategoriaRecusada][] = [
 const ROTULOS: Readonly<Partial<Record<CategoriaSensivel, ReadonlySet<string>>>> = {
   apostas: new Set(['kto', 'blaze', 'stake', 'apostas', 'aposta', 'loteria', 'loterias']),
   cassino: new Set(['casino', 'cassino', 'casinos', 'cassinos', 'bingo', 'poker']),
-  previsao: new Set(['augur', 'manifold']),
-  alcool: new Set(['skol', 'pitu', 'wine', 'wines', 'evino', 'beer', 'beers', 'cerveja', 'cervejas', 'vinho', 'vinhos', 'vodka', 'whisky', 'cachaca', 'gin']),
+  previsao: new Set(['augur', 'manifold', 'smarkets']),
+  alcool: new Set(['skol', 'pitu', 'devassa', 'wine', 'wines', 'evino', 'beer', 'beers', 'cerveja', 'cervejas', 'vinho', 'vinhos', 'vodka', 'whisky', 'cachaca', 'gin']),
 };
 
 /** Nomes compactos (≥ 6 letras) procurados dentro do domínio inteiro, sem pontos e hifens. */
 const COMPACTOS: Readonly<Partial<Record<CategoriaSensivel, readonly string[]>>> = {
-  previsao: ['polymarket', 'kalshi', 'predictit', 'polkamarkets', 'forecastex', 'smarkets'],
+  // "smarkets" só como rótulo exato (dentro do nome pegaria "farmersmarkets")
+  previsao: ['polymarket', 'kalshi', 'predictit', 'polkamarkets', 'forecastex'],
   apostas: ['betano', 'betfair', 'betway', 'betsson', 'betmgm', 'betnacional', 'sportingbet', 'parimatch', 'esportesdasorte', 'reidopitaco', 'brazino', 'casadeapostas', 'loterica'],
   cassino: ['cassino', 'casino', 'cacaniquel'],
   alcool: ['heineken', 'brahma', 'budweiser', 'stellaartois', 'itaipava', 'eisenbahn', 'smirnoff', 'johnniewalker', 'jackdaniels', 'jagermeister', 'bacardi', 'cervejaria', 'vinicola', 'cachacaria'],
@@ -135,7 +147,8 @@ function destinoDaCategoria(url: string): AchadoCategoria | null {
   const achado = (categoria: CategoriaSensivel): AchadoCategoria => ({ categoria, termo: `site de ${NOME_CATEGORIA[categoria]}`, campo: 'destino' });
   for (const [re, categoria] of TLD_JOGO) if (re.test(host)) return achado(categoria);
   const rotulos = host.split(/[.-]/);
-  const compacto = host.replace(/[.-]/g, '');
+  // "Praia do Cassino" / "Balneário Cassino" (Rio Grande, RS) é lugar, não jogo
+  const compacto = host.replace(/[.-]/g, '').replace(/(praiado|balneario)cass?ino/g, '');
   for (const categoria of ORDEM) {
     if (categoria === 'apostas' && rotulos.some(palavraBet)) return achado(categoria);
     if (rotulos.some((r) => ROTULOS[categoria]?.has(r))) return achado(categoria);

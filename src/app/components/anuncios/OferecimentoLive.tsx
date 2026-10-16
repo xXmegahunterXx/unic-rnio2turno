@@ -13,6 +13,8 @@
  *    atualizada ao ativar a cena). NÃO é a audiência da live — quantas pessoas assistem cada transmissão só a
  *    plataforma (Twitch/YouTube/Kick) sabe.
  *  - Medidas em `--u` (≈ 1% da altura da tela da live).
+ *  - Logotipo (anunciantes v2: logo com ajuste e proporção ≥ 2): a logo grande, na proporção natural, no lugar do nome em
+ *    texto — no cabeçalho, "Oferecido por" ao lado; na aba, em cima. Ícone ou logo antiga: logo + nome, como antes.
  */
 import { useRef } from 'react';
 import { escolherAnuncio } from '@/shared/anuncios-escolha';
@@ -21,7 +23,8 @@ import { useStatus } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { useNow } from '@/app/lib/useNow';
 import { useImpressaoVisivel } from './impressao';
-import { imagemDoAnuncio, iniciaisDaMarca } from './nucleo';
+import { ehLogotipo } from './logo';
+import { LogoMarca, useTemaLogo } from './pecas';
 import { idDaVisita } from './visita';
 
 /** Revezamento entre anunciantes elegíveis numa live longa (com um só anunciante, nada muda). */
@@ -64,11 +67,21 @@ export function OferecimentoLivePeca({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'live', bloco: 'live', vista, ativo: !previa });
-  const logo = imagemDoAnuncio(a.logo);
   const aba = variante === 'aba';
-  const caixa = aba
-    ? 'h-[calc(var(--u)*3.6)] w-[calc(var(--u)*3.6)] rounded-[calc(var(--u)*0.9)] p-[calc(var(--u)*0.4)]'
-    : 'h-[calc(var(--u)*5.6)] w-[calc(var(--u)*5.6)] rounded-[calc(var(--u)*1.3)] p-[calc(var(--u)*0.6)]';
+  const logotipo = ehLogotipo(a, useTemaLogo());
+  const rotulo = (
+    // "Oferecido por" em cima da marca também na aba: a pílula cabe na largura da marca do Sintonia (nunca avança sobre a
+    // foto do 1º candidato) e a marca ganha a largura toda
+    <div
+      className={cn(
+        'whitespace-nowrap font-semibold uppercase leading-none text-fg-subtle',
+        aba ? 'text-[length:calc(var(--u)*1.05)] tracking-[0.14em]' : 'text-[length:calc(var(--u)*1.2)] tracking-[0.16em]',
+        aba && !logotipo && 'mb-[calc(var(--u)*0.35)]',
+      )}
+    >
+      Oferecido por
+    </div>
+  );
   return (
     <div
       ref={ref}
@@ -77,43 +90,41 @@ export function OferecimentoLivePeca({
       data-anuncio-live={a.id}
       className={cn('flex min-w-0 items-center', aba ? 'gap-[calc(var(--u)*0.9)]' : 'gap-[calc(var(--u)*1.2)]', className)}
     >
-      {logo ? (
-        <span className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden bg-brand-ink ring-1 ring-inset ring-line', caixa)}>
-          <img src={logo} alt="" decoding="async" draggable={false} className="h-full w-full object-contain" />
-        </span>
+      {logotipo ? (
+        aba ? (
+          // aba: o rótulo em cima e a logo embaixo (a pílula cabe na largura da marca do Sintonia)
+          <div className="flex min-w-0 flex-col items-start gap-[calc(var(--u)*0.45)]">
+            {rotulo}
+            <LogoMarca anuncio={a} prioridade className="[--logo-h:calc(var(--u)*3.4)] [--logo-max:calc(var(--u)*18)]" />
+          </div>
+        ) : (
+          // cabeçalho: o rótulo ao lado e a logo na altura da barra, sem placa duplicada
+          <>
+            {rotulo}
+            <LogoMarca anuncio={a} prioridade className="[--logo-h:calc(var(--u)*5.6)] [--logo-max:calc(var(--u)*24)]" />
+          </>
+        )
       ) : (
-        <span
-          aria-hidden
-          className={cn(
-            'inline-flex shrink-0 items-center justify-center bg-surface-3 font-display font-semibold text-fg ring-1 ring-inset ring-line',
-            caixa,
-            aba ? 'text-[length:calc(var(--u)*1.4)]' : 'text-[length:calc(var(--u)*2.1)]',
-          )}
-        >
-          {iniciaisDaMarca(a.marca)}
-        </span>
+        <>
+          <LogoMarca
+            anuncio={a}
+            prioridade
+            className={aba ? '[--logo-h:calc(var(--u)*3.6)] [--logo-max:calc(var(--u)*8)]' : '[--logo-h:calc(var(--u)*5.6)] [--logo-max:calc(var(--u)*12)]'}
+          />
+          <div className="min-w-0">
+            {rotulo}
+            {/* a marca é o que o anunciante paga para mostrar: nunca cortada (quebra em até 2 linhas) */}
+            <div
+              className={cn(
+                'line-clamp-2 break-words font-display font-semibold tracking-[-0.02em] text-fg [overflow-wrap:anywhere]',
+                aba ? 'text-[length:calc(var(--u)*1.9)] leading-[1.05]' : 'mt-[calc(var(--u)*0.45)] text-[length:calc(var(--u)*2.4)] leading-[1.05]',
+              )}
+            >
+              {a.marca}
+            </div>
+          </div>
+        </>
       )}
-      <div className="min-w-0">
-        {/* "Oferecido por" em cima da marca também na aba: a pílula cabe na largura da marca do Sintonia (nunca avança
-            sobre a foto do 1º candidato) e a marca ganha a largura toda */}
-        <div
-          className={cn(
-            'whitespace-nowrap font-semibold uppercase leading-none text-fg-subtle',
-            aba ? 'mb-[calc(var(--u)*0.35)] text-[length:calc(var(--u)*1.05)] tracking-[0.14em]' : 'text-[length:calc(var(--u)*1.2)] tracking-[0.16em]',
-          )}
-        >
-          Oferecido por
-        </div>
-        {/* a marca é o que o anunciante paga para mostrar: nunca cortada (quebra em até 2 linhas) */}
-        <div
-          className={cn(
-            'line-clamp-2 break-words font-display font-semibold tracking-[-0.02em] text-fg [overflow-wrap:anywhere]',
-            aba ? 'text-[length:calc(var(--u)*1.9)] leading-[1.05]' : 'mt-[calc(var(--u)*0.45)] text-[length:calc(var(--u)*2.4)] leading-[1.05]',
-          )}
-        >
-          {a.marca}
-        </div>
-      </div>
     </div>
   );
 }

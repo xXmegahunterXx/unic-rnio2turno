@@ -28,8 +28,11 @@ export interface RelatorioAnunciante {
   horas: { hora: number; formato: FormatoAnuncio; impressoes: number; cliques: number }[];
   /** 'AAAA-MM-DD' (Brasília): os dias FORA das 14 d de detalhe por hora (sem a divisão por formato) */
   dias: { dia: string; impressoes: number; cliques: number }[];
-  /** estimativas (HLL) */
-  alcance: { campanha: number | null; noite: number | null };
+  /**
+   * estimativas (HLL). `segmentos` (opcional): quantos processos do servidor contaram no período — mais de 1 = houve
+   * reinício no meio e a estimativa é conservadora (o maior entre eles).
+   */
+  alcance: { campanha: number | null; noite: number | null; segmentos?: { campanha: number; noite: number } };
 }
 
 export interface LinkRelatorio {

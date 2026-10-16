@@ -8,14 +8,16 @@
  *    ao lado da marca do Sintonia) ou numa faixa própria acima do letreiro (retrato). A marca nunca é cortada (até 2
  *    linhas). Medidas em `--u` (unidade da TV, ≈ 1% da altura útil). Antes de o status chegar, a altura fica
  *    reservada se a última consulta tinha anúncio de TV (sem pulo de layout).
+ *  - Logotipo (anunciantes v2: logo com ajuste e proporção ≥ 2): a logo grande, na proporção natural, no lugar do nome em
+ *    texto (o nome segue no rótulo de leitor de tela). Ícone ou logo antiga: logo + nome, como antes.
  */
 import { useRef } from 'react';
 import type { AnuncioPublico } from '@/shared/anuncios';
 import { cn } from '@/app/lib/cn';
 import { useAnunciosDaPagina } from './contexto';
 import { useImpressaoVisivel } from './impressao';
-import { imagemDoAnuncio, iniciaisDaMarca } from './nucleo';
-import { BrilhoMarca, CtaAnuncio, LinkAnuncio, LogoMarca, RotuloAnuncio } from './pecas';
+import { ehLogotipo } from './logo';
+import { BrilhoMarca, CtaAnuncio, LinkAnuncio, LogoMarca, RotuloAnuncio, useTemaLogo } from './pecas';
 import { tvEsperado } from './visita';
 
 /** Slot do Teste Cego (página de resultado). */
@@ -45,6 +47,7 @@ export function OferecimentoTestePeca({
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'teste', bloco: 'teste', vista, ativo: !previa });
   const sm = (c: string) => (compacta ? '' : c);
+  const logotipo = ehLogotipo(a, useTemaLogo());
   return (
     <aside aria-label="Publicidade" className={cn('relative', className)}>
       <LinkAnuncio
@@ -59,11 +62,20 @@ export function OferecimentoTestePeca({
       >
         <BrilhoMarca anuncio={a} className="-left-16 -top-20 -z-10 h-56 w-56 opacity-45 dark:opacity-30" />
         <div className={cn('flex min-w-0 flex-col items-center gap-3', sm('sm:flex-1 sm:flex-row sm:gap-4'))}>
-          <LogoMarca anuncio={a} tamanho="lg" />
+          {logotipo ? null : <LogoMarca anuncio={a} className="[--logo-h:56px] [--logo-max:104px]" />}
           <div className="min-w-0">
             <RotuloAnuncio>{rotulo}</RotuloAnuncio>
-            <p className="mt-1.5 truncate font-display text-[20px] font-semibold leading-tight tracking-[-0.02em] text-fg">{a.marca}</p>
-            <p className="mt-0.5 text-pretty text-[13.5px] leading-snug text-fg-muted">{a.titulo}</p>
+            {logotipo ? (
+              // logotipo: a logo grande NUM BLOCO PRÓPRIO abaixo do rótulo (centralizada no celular), no lugar do nome em
+              // texto. O bloco é o que quebra a linha: a raiz do LogoMarca é inline-flex (e `cn` não resolve conflito de
+              // classes), então classes de display nela não valeriam
+              <div className={cn('mt-3 flex justify-center', sm('sm:mt-2.5 sm:justify-start'))}>
+                <LogoMarca anuncio={a} className="[--logo-h:48px] [--logo-max:240px]" />
+              </div>
+            ) : (
+              <p className="mt-1.5 truncate font-display text-[20px] font-semibold leading-tight tracking-[-0.02em] text-fg">{a.marca}</p>
+            )}
+            <p className={cn('text-pretty text-[13.5px] leading-snug text-fg-muted', logotipo ? 'mt-2' : 'mt-0.5')}>{a.titulo}</p>
           </div>
         </div>
         <CtaAnuncio texto={a.cta} tamanho="md" className={cn('w-full', sm('sm:w-auto'))} />
@@ -114,9 +126,14 @@ export function OferecimentoTvPeca({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'tv', bloco: 'tv', vista, ativo: !previa });
-  const logo = imagemDoAnuncio(a.logo);
   const compacta = variante === 'cabecalho';
-  const caixa = compacta ? 'h-[calc(var(--u)*6.4)] w-[calc(var(--u)*6.4)] rounded-[calc(var(--u)*1.5)] p-[calc(var(--u)*0.7)]' : 'h-[calc(var(--u)*9)] w-[calc(var(--u)*9)] rounded-[calc(var(--u)*2)] p-[calc(var(--u)*1)]';
+  const logotipo = ehLogotipo(a, useTemaLogo());
+  const rotulo = (
+    <div className={cn('whitespace-nowrap font-semibold uppercase leading-none tracking-[0.16em] text-fg-subtle', compacta ? 'text-[length:calc(var(--u)*1.25)]' : 'text-[length:calc(var(--u)*1.5)]')}>
+      Oferecimento
+    </div>
+  );
+  const destino = a.destino && !compacta ? <div className="mt-[calc(var(--u)*0.5)] truncate text-[length:calc(var(--u)*1.6)] text-fg-muted">{a.destino}</div> : null;
   return (
     <div
       ref={ref}
@@ -124,37 +141,41 @@ export function OferecimentoTvPeca({
       aria-label={`Publicidade: oferecimento de ${a.marca}`}
       className={cn('flex min-w-0 items-center', compacta ? 'gap-[calc(var(--u)*1.1)]' : 'gap-[calc(var(--u)*1.6)]', ALTURA_TV[variante], className)}
     >
-      {logo ? (
-        <span className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden bg-brand-ink ring-1 ring-inset ring-line', caixa)}>
-          <img src={logo} alt="" decoding="async" className="h-full w-full object-contain" />
-        </span>
+      {logotipo ? (
+        // logotipo: "Oferecimento" ao lado e a logo na altura toda (lida de longe, no telão), sem placa duplicada
+        <>
+          <div className="min-w-0 shrink-0">
+            {rotulo}
+            {destino}
+          </div>
+          <LogoMarca
+            anuncio={a}
+            prioridade
+            className={compacta ? '[--logo-h:calc(var(--u)*6.4)] [--logo-max:calc(var(--u)*30)]' : '[--logo-h:calc(var(--u)*9)] [--logo-max:calc(var(--u)*42)]'}
+          />
+        </>
       ) : (
-        <span
-          aria-hidden
-          className={cn(
-            'inline-flex shrink-0 items-center justify-center bg-surface-3 font-display font-semibold text-fg ring-1 ring-inset ring-line',
-            caixa,
-            compacta ? 'text-[length:calc(var(--u)*2.4)]' : 'text-[length:calc(var(--u)*3.4)]',
-          )}
-        >
-          {iniciaisDaMarca(a.marca)}
-        </span>
+        <>
+          <LogoMarca
+            anuncio={a}
+            prioridade
+            className={compacta ? '[--logo-h:calc(var(--u)*6.4)] [--logo-max:calc(var(--u)*14)]' : '[--logo-h:calc(var(--u)*9)] [--logo-max:calc(var(--u)*18)]'}
+          />
+          <div className="min-w-0">
+            {rotulo}
+            {/* a marca é o que o anunciante paga para mostrar: nunca cortada (quebra em até 2 linhas) */}
+            <div
+              className={cn(
+                'line-clamp-2 break-words font-display font-semibold tracking-[-0.02em] text-fg [overflow-wrap:anywhere]',
+                compacta ? 'mt-[calc(var(--u)*0.45)] text-[length:calc(var(--u)*2.2)] leading-[1.05]' : 'mt-[calc(var(--u)*0.3)] text-[length:calc(var(--u)*3.2)] leading-tight',
+              )}
+            >
+              {a.marca}
+            </div>
+            {destino}
+          </div>
+        </>
       )}
-      <div className="min-w-0">
-        <div className={cn('font-semibold uppercase leading-none tracking-[0.16em] text-fg-subtle', compacta ? 'text-[length:calc(var(--u)*1.25)]' : 'text-[length:calc(var(--u)*1.5)]')}>
-          Oferecimento
-        </div>
-        {/* a marca é o que o anunciante paga para mostrar: nunca cortada (quebra em até 2 linhas) */}
-        <div
-          className={cn(
-            'line-clamp-2 break-words font-display font-semibold tracking-[-0.02em] text-fg [overflow-wrap:anywhere]',
-            compacta ? 'mt-[calc(var(--u)*0.45)] text-[length:calc(var(--u)*2.2)] leading-[1.05]' : 'mt-[calc(var(--u)*0.3)] text-[length:calc(var(--u)*3.2)] leading-tight',
-          )}
-        >
-          {a.marca}
-        </div>
-        {a.destino && !compacta ? <div className="mt-[calc(var(--u)*0.2)] truncate text-[length:calc(var(--u)*1.6)] text-fg-muted">{a.destino}</div> : null}
-      </div>
     </div>
   );
 }

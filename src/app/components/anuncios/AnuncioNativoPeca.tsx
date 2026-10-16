@@ -1,16 +1,22 @@
 /**
  * Peças do formato 'nativo' (regras e o slot em AnuncioNativo.tsx): o cartão do anunciante (`faixa` ou `cartao`, com a
  * peça inteira) e o anúncio da casa. Chunk à parte: carregado pelo slot e usado direto pela /anuncie e pela prévia.
+ *
+ * Anunciantes v2: logotipo grande em cima do título (sem a linha da marca em texto); peça TRANSPARENTE com ajuste numa
+ * área da cor pedida pelo contraste (placa clara, placa escura ou a superfície), sem a cópia desfocada atrás quando há
+ * placa; peça com ajuste tem a altura reservada pela proporção (nada pula quando chega).
  */
-import { useRef, type ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { AnuncioPublico } from '@/shared/anuncios';
+import { LOGO_NATURAL } from '@/shared/anuncios-flags';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { LogoMark } from '@/app/components/layout/Logo';
 import { useImpressaoVisivel } from './impressao';
+import { ehLogotipo, placaDaPeca } from './logo';
 import { imagemDoAnuncio } from './nucleo';
-import { BrilhoMarca, CtaAnuncio, DestinoAnuncio, LinkAnuncio, LogoMarca, RotuloAnuncio } from './pecas';
+import { BrilhoMarca, CtaAnuncio, DestinoAnuncio, LinkAnuncio, LogoMarca, RotuloAnuncio, useTemaLogo } from './pecas';
 
 export type VarianteNativo = 'auto' | 'faixa' | 'cartao';
 
@@ -37,7 +43,12 @@ export function AnuncioNativoPeca({
 }) {
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'nativo', bloco, vista, ativo: !previa });
+  const tema = useTemaLogo();
+  const logotipo = ehLogotipo(a, tema);
   const peca = imagemDoAnuncio(a.imagem);
+  // peça transparente com ajuste: o fundo da área pela placa do tema (null = peça opaca ou sem ajuste: como antes)
+  const placaPeca = placaDaPeca(a, tema);
+  const propPeca = LOGO_NATURAL && a.imagemAjuste && a.imagemAjuste.proporcao > 0 ? a.imagemAjuste.proporcao : null;
   const temPeca = !!peca || (previa && !!pecaPrevia);
   const tipo = variante === 'auto' ? (temPeca ? 'cartao' : 'faixa') : variante === 'cartao' && !temPeca ? 'faixa' : variante;
 
@@ -50,13 +61,25 @@ export function AnuncioNativoPeca({
 
   const corpo = (titulo: string) => (
     <>
-      <div className="flex min-w-0 items-center gap-3">
-        <LogoMarca anuncio={a} tamanho={tipo === 'cartao' ? 'md' : 'lg'} className={tipo === 'faixa' ? 'sm:h-[72px] sm:w-[72px] sm:rounded-[20px] sm:p-2' : undefined} />
+      {logotipo ? (
+        // logotipo: a logo em cima, grande e na proporção natural (é ela que o anunciante paga para mostrar), e o título
+        // embaixo — sem a linha da marca em texto (o nome segue no rótulo do link)
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-fg-muted">{a.marca}</p>
-          <p className={cn('mt-0.5 text-balance font-display font-semibold leading-[1.12] tracking-[-0.02em] text-fg', titulo)}>{a.titulo}</p>
+          <LogoMarca
+            anuncio={a}
+            className={tipo === 'faixa' ? '[--logo-h:48px] [--logo-max:240px] sm:[--logo-h:60px] sm:[--logo-max:300px]' : '[--logo-h:40px] [--logo-max:220px]'}
+          />
+          <p className={cn('mt-3.5 text-balance font-display font-semibold leading-[1.12] tracking-[-0.02em] text-fg', titulo)}>{a.titulo}</p>
         </div>
-      </div>
+      ) : (
+        <div className="flex min-w-0 items-center gap-3">
+          <LogoMarca anuncio={a} className={tipo === 'faixa' ? '[--logo-h:56px] [--logo-max:104px] sm:[--logo-h:72px] sm:[--logo-max:120px]' : '[--logo-h:48px] [--logo-max:96px]'} />
+          <div className="min-w-0">
+            <p className="truncate text-[13px] font-semibold text-fg-muted">{a.marca}</p>
+            <p className={cn('mt-0.5 text-balance font-display font-semibold leading-[1.12] tracking-[-0.02em] text-fg', titulo)}>{a.titulo}</p>
+          </div>
+        </div>
+      )}
       {a.texto ? <p className="mt-3 text-pretty text-[14px] leading-relaxed text-fg-muted sm:text-[15px]">{a.texto}</p> : null}
     </>
   );
@@ -73,28 +96,45 @@ export function AnuncioNativoPeca({
         <BrilhoMarca anuncio={a} className="-right-24 -top-28 -z-10 h-72 w-72 opacity-50 dark:opacity-35" />
         {tipo === 'cartao' ? (
           <div className={cn('grid grid-cols-1 gap-0', !empilhado && 'md:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]')}>
-            <div className={cn('relative flex min-h-[180px] items-center justify-center overflow-hidden bg-surface-2', !empilhado && 'md:order-2 md:min-h-[300px]')}>
+            <div
+              data-peca-placa={peca ? (placaPeca ?? 'legado') : undefined}
+              className={cn(
+                'relative flex min-h-[180px] items-center justify-center overflow-hidden',
+                placaPeca === 'clara' ? 'bg-placa-clara' : placaPeca === 'escura' ? 'bg-placa-escura' : 'bg-surface-2',
+                // peça transparente: respiro em volta (o desenho já vem sem margens vazias)
+                peca && placaPeca && 'p-4 sm:p-6',
+                !empilhado && 'md:order-2 md:min-h-[300px]',
+              )}
+            >
               {peca ? (
                 <>
-                  {/* fundo feito da própria peça (desfocada), para a peça inteira caber sem corte e sem faixas vazias */}
+                  {/* fundo feito da própria peça (desfocada), para a peça inteira caber sem corte e sem faixas vazias — não
+                      quando a peça transparente está numa placa (o fundo é a placa) */}
                   {/* a mesma URL nas duas (um download só), baixada perto da tela e com prioridade baixa: não disputa banda
                       com a foto do topo da página */}
-                  <img
-                    src={peca}
-                    alt=""
-                    aria-hidden
-                    decoding="async"
-                    loading="lazy"
-                    fetchPriority="low"
-                    className="absolute inset-0 h-full w-full scale-125 object-cover opacity-50 blur-2xl"
-                  />
+                  {placaPeca === 'clara' || placaPeca === 'escura' ? null : (
+                    <img
+                      src={peca}
+                      alt=""
+                      aria-hidden
+                      decoding="async"
+                      loading="lazy"
+                      fetchPriority="low"
+                      className="absolute inset-0 h-full w-full scale-125 object-cover opacity-50 blur-2xl"
+                    />
+                  )}
                   <img
                     src={peca}
                     alt={`Peça publicitária de ${a.marca}`}
                     decoding="async"
                     loading="lazy"
                     fetchPriority="low"
-                    className="relative max-h-[320px] w-auto max-w-full object-contain md:max-h-[360px]"
+                    // com ajuste: largura e proporção reservadas (altura máxima de 320/360 px), nada pula quando a peça chega
+                    style={propPeca ? ({ aspectRatio: String(propPeca), width: `min(100%, calc(var(--peca-h) * ${propPeca}))` } as CSSProperties) : undefined}
+                    className={cn(
+                      'relative object-contain',
+                      propPeca ? 'h-auto max-w-full [--peca-h:320px] md:[--peca-h:360px]' : 'max-h-[320px] w-auto max-w-full md:max-h-[360px]',
+                    )}
                   />
                 </>
               ) : (

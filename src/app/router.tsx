@@ -73,6 +73,8 @@ const routes: RouteObject[] = [
   { path: '/live', element: page(() => import('./pages/live/LivePage')), errorElement: <ErroRota variante="transparente" /> },
   // Widgets para incorporar (iframe em sites de terceiros): sem AppShell.
   { path: '/embed/:tipo', element: page(() => import('./pages/embed/EmbedPage')), errorElement: <ErroRota variante="tela" /> },
+  // Relatório de entrega do anunciante (link privado `#k=`): fora do AppShell, sem nenhum anúncio do site.
+  { path: '/relatorio', element: page(() => import('./pages/relatorio/RelatorioPage')), errorElement: <ErroRota variante="tela" /> },
 ];
 
 export const router = __DEMO__ ? createHashRouter(routes) : createBrowserRouter(routes);

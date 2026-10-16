@@ -276,3 +276,352 @@ describe('anúncios: persistência e cópias', () => {
     expect(performance.now() - t0).toBeLessThan(1_500);
   });
 });
+
+describe('anúncios: compatibilidade do contrato v2 com o estado gravado', () => {
+  const fb = estadoPadrao('servidor', AGORA, cenarioPadrao(st), st);
+  /** WebP como a logo da Lynx no ar: VP8X com ICC + alfa (flags 0x30), sem animação. */
+  const WEBP = (() => {
+    const chunk = (tipo: string, dados: number[]) => {
+      const c = Buffer.alloc(8 + dados.length + (dados.length % 2));
+      c.write(tipo, 0, 'latin1');
+      c.writeUInt32LE(dados.length, 4);
+      Buffer.from(dados).copy(c, 8);
+      return c;
+    };
+    const corpo = Buffer.concat([chunk('VP8X', [0x30, 0, 0, 0, 0xff, 1, 0, 0xff, 1, 0]), chunk('ALPH', [0, 1, 2]), chunk('VP8 ', [1, 2, 3, 4])]);
+    const cab = Buffer.alloc(12);
+    cab.write('RIFF', 0, 'latin1');
+    cab.writeUInt32LE(4 + corpo.length, 4);
+    cab.write('WEBP', 8, 'latin1');
+    return `data:image/webp;base64,${Buffer.concat([cab, corpo]).toString('base64')}`;
+  })();
+  const JPEG = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/';
+  const D = 86_400_000;
+
+  /**
+   * Os anúncios como a versão no ar (b88dfe1) grava em STATE_DIR/admin.json: os mesmos campos, na mesma ordem, imagens
+   * em data URI (a Lynx com a logo WebP e o título cortado de produção). Nenhum campo do contrato v2.
+   */
+  const gravadosNoAr = (): AnuncioConfig[] => [
+    {
+      ...anuncio('patrocinio', {
+        marca: 'Lynx',
+        titulo: 'Oferece a apuração ao vivo. Carteira digital com Pix em tem…',
+        texto: 'Oferece a apuração ao vivo. Carteira digital com Pix em tempo real, cartão virtual e sem mensalidade.',
+        cta: 'Saiba mais',
+        url: 'https://lynxpix.cc',
+        formatos: ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento'],
+        cota: 'master',
+      }),
+      logo: WEBP,
+      imagem: PNG,
+    },
+    {
+      ...anuncio('updepix', {
+        marca: 'UPdepix',
+        titulo: 'Pague com Pix e receba DePix na hora',
+        texto: 'Gateway Pix para DePix na Liquid Network. Cadastro simples, saque de volta para Pix e suporte humano quando precisar.',
+        cta: 'Começar agora',
+        url: 'https://updepix.com',
+        formatos: ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento'],
+      }),
+      logo: PNG,
+      imagem: PNG,
+    },
+    { ...anuncio('vulpix', { marca: 'Vulpix', titulo: 'Números virtuais para verificação', texto: 'Receba SMS em segundos, sem chip.', cta: 'Conhecer', formatos: ['rodape', 'nativo', 'chat'], peso: 4 }), logo: PNG },
+    { ...anuncio('cafe-aurora', { marca: 'Café Aurora', titulo: 'Café especial torrado na semana', formatos: ['nativo'], peso: 3 }), logo: PNG },
+    { ...anuncio('mercado-bom', { marca: 'Mercado Bom', titulo: 'Ofertas da semana no app', texto: '', formatos: ['nativo'], peso: 3, inicio: AGORA - D }), logo: PNG },
+    { ...anuncio('otica-visao', { marca: 'Ótica Visão', titulo: 'Exame de vista sem custo', formatos: ['nativo'], peso: 3, ativo: false }), logo: JPEG },
+    { ...anuncio('livraria-pagina', { marca: 'Livraria Página', titulo: 'Frete grátis acima de R$ 99', texto: '', formatos: ['nativo'], peso: 3, inicio: AGORA - 3 * D, fim: AGORA - 2 * D }), logo: SVG },
+  ];
+
+  it('o estado gravado pela versão no ar (b88dfe1) continua carregando inteiro, sem campos novos', () => {
+    const salvo = JSON.parse(JSON.stringify({ ...fb, patrocinio: null, anuncios: gravadosNoAr(), anuncie: { whatsapp: '5511999990000' } }));
+    const p = parseAdminState(salvo, fb, st);
+    expect(p.anuncios).toStrictEqual(gravadosNoAr());
+    const c = novo('servidor', p).c;
+    expect(c.state().anuncios).toHaveLength(7);
+    // no ar: todos menos o pausado (Ótica) e o que já terminou (Livraria)
+    expect(c.status().anuncios!.map((a) => a.id)).toEqual(['patrocinio', 'updepix', 'vulpix', 'cafe-aurora', 'mercado-bom']);
+    expect(c.status().anuncios!.find((a) => a.id === 'patrocinio')).toMatchObject({ cota: 'master', logo: WEBP });
+    // e a ida e volta não muda nada
+    expect(JSON.parse(c.toJSON()).anuncios).toStrictEqual(gravadosNoAr());
+  });
+
+  it('um anúncio com todos os campos v2 sobrevive à persistência (serialize → parse)', () => {
+    const { c } = novo();
+    const ajuste = { proporcao: 3.216, placaClaro: 'escura', placaEscuro: 'nenhuma', origem: 'auto' } as const;
+    c.command({
+      tipo: 'anuncio-salvar',
+      anuncio: anuncio('lynx', {
+        logo: PNG,
+        logoAjuste: ajuste,
+        logoEscuro: SVG,
+        logoEscuroAjuste: { ...ajuste, placaClaro: 'nenhuma' },
+        imagem: PNG,
+        imagemAjuste: { proporcao: 3.2, placaClaro: 'nenhuma', placaEscuro: 'nenhuma', origem: 'manual', comFundo: true },
+        reserva: true,
+        cota: 'master',
+        limiteImpressoes: 100_000,
+        inicio: AGORA,
+      }),
+    });
+    const salvo = c.state().anuncios![0];
+    expect(salvo).toMatchObject({ cota: 'apoio', reserva: true, limiteImpressoes: 100_000, logoAjuste: ajuste, logoEscuro: SVG });
+    const json = c.toJSON();
+    const parsed = parseAdminState(JSON.parse(json), fb, st);
+    expect(parsed.anuncios).toStrictEqual([salvo]);
+    expect(JSON.stringify(parsed)).toBe(json);
+  });
+});
+
+// ---- contrato v2 no motor: anuncio-logo, interruptor geral, master sobreposto, reserva e imagem animada ----------
+
+/** APNG mínimo (acTL antes do IDAT): a detecção só olha a ordem dos chunks. */
+const APNG = (() => {
+  const partes: Buffer[] = [Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])];
+  for (const [tipo, tam] of [['IHDR', 13], ['acTL', 8], ['IDAT', 10], ['IEND', 0]] as const) {
+    const c = Buffer.alloc(12 + tam);
+    c.writeUInt32BE(tam, 0);
+    c.write(tipo, 4, 'latin1');
+    partes.push(c);
+  }
+  return `data:image/png;base64,${Buffer.concat(partes).toString('base64')}`;
+})();
+const AJUSTE = { proporcao: 3.216, placaClaro: 'escura', placaEscuro: 'nenhuma', origem: 'auto' } as const;
+
+describe('anúncios v2: comando anuncio-logo ("Ajustar agora")', () => {
+  it('troca SÓ a logo (e o ajuste); o resto do anúncio fica igual, sem pedir a declaração de novo', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logo: SVG, imagem: PNG, cota: 'master', peso: 7, formatos: ['topo', 'tv'] }) });
+    const antes = c.state().anuncios![0];
+    const v0 = c.state().versao;
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logo: PNG, logoAjuste: AJUSTE });
+    const depois = c.state().anuncios![0];
+    expect(c.state().versao).toBe(v0 + 1);
+    expect(depois).toStrictEqual({ ...antes, logo: PNG, logoAjuste: AJUSTE });
+    expect(c.status().anuncios![0]).toMatchObject({ logo: PNG, logoAjuste: AJUSTE, imagem: PNG });
+    expect(c.metrics().log.at(-1)?.msg).toBe('Logo ajustada: Marca lynx (lynx)');
+  });
+
+  it('campo ausente mantém; null apaga a imagem E o ajuste dela; o ajuste sozinho pode ser trocado ou apagado', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logo: PNG, logoAjuste: AJUSTE, logoEscuro: SVG, logoEscuroAjuste: { ...AJUSTE, placaEscuro: 'clara' } }) });
+    // só a versão escura muda; a logo e o ajuste dela ficam
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logoEscuro: PNG });
+    expect(c.state().anuncios![0]).toMatchObject({ logo: PNG, logoAjuste: AJUSTE, logoEscuro: PNG, logoEscuroAjuste: { ...AJUSTE, placaEscuro: 'clara' } });
+    // o desfazer do painel: o data URI original com o ajuste apagado
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logo: SVG, logoAjuste: null });
+    expect(c.state().anuncios![0].logo).toBe(SVG);
+    expect(c.state().anuncios![0].logoAjuste).toBeUndefined();
+    // null apaga a imagem e o ajuste
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logoEscuro: null });
+    expect(c.state().anuncios![0].logoEscuro).toBeUndefined();
+    expect(c.state().anuncios![0].logoEscuroAjuste).toBeUndefined();
+    expect(c.status().anuncios![0].logoEscuro).toBeUndefined();
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logo: null });
+    expect(c.state().anuncios![0]).not.toHaveProperty('logo');
+    // ajuste sem imagem não fica
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logoAjuste: AJUSTE });
+    expect(c.state().anuncios![0]).not.toHaveProperty('logoAjuste');
+  });
+
+  it('imagem animada é recusada (logo e versão escura); id desconhecido → CommandError; nada muda', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logo: PNG }) });
+    const v0 = c.state().versao;
+    expect(() => c.command({ tipo: 'anuncio-logo', id: 'lynx', logo: APNG })).toThrow(/imagem parada/);
+    expect(() => c.command({ tipo: 'anuncio-logo', id: 'lynx', logoEscuro: APNG })).toThrow(/imagem parada/);
+    expect(() => c.command({ tipo: 'anuncio-logo', id: 'nao-existe', logo: PNG })).toThrow(CommandError);
+    expect(() => c.command({ tipo: 'anuncio-logo', id: 'lynx', logo: 'data:image/gif;base64,R0lGODlh' })).toThrow(/150 KB/);
+    expect(c.state().versao).toBe(v0);
+    expect(c.state().anuncios![0].logo).toBe(PNG);
+  });
+
+  it('URL do servidor que não foi resolvida mantém a logo que o anúncio já tem (como no salvar)', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logo: PNG, logoEscuro: SVG }) });
+    c.command({ tipo: 'anuncio-logo', id: 'lynx', logo: '/api/anuncio/img?h=0123456789abcdef', logoAjuste: AJUSTE, logoEscuro: '/api/anuncio/img?h=fedcba9876543210' });
+    expect(c.state().anuncios![0]).toMatchObject({ logo: PNG, logoAjuste: AJUSTE, logoEscuro: SVG });
+  });
+});
+
+describe('anúncios v2: interruptor geral (anuncios-suspensao)', () => {
+  it('suspender tira todos do ar (e o patrocínio legado); voltar devolve exatamente o que estava; ativo intacto', () => {
+    const { c, r } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { cota: 'master', formatos: ['topo', 'tv'] }) });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('vulpix', { formatos: ['nativo', 'chat'] }) });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('pausado', { ativo: false }) });
+    const noAr = c.status().anuncios;
+    expect(noAr!.map((a) => a.id)).toEqual(['lynx', 'vulpix']);
+    expect(c.status().patrocinio).not.toBeNull();
+    expect(c.status().anunciosSuspensos).toBeUndefined();
+
+    c.command({ tipo: 'anuncios-suspensao', suspender: true, motivo: '  teste   do interruptor ' });
+    expect(c.state().anunciosSuspensos).toEqual({ desde: AGORA, motivo: 'teste do interruptor' });
+    expect(c.status().anuncios).toEqual([]);
+    expect(c.status().patrocinio).toBeNull();
+    expect(c.status().anunciosSuspensos).toBe(true);
+    expect(c.state().anuncios!.map((a) => [a.id, a.ativo])).toEqual([['lynx', true], ['vulpix', true], ['pausado', false]]);
+    // suspenso, pausar/ativar continua funcionando e define o que volta
+    c.command({ tipo: 'anuncio-ativo', id: 'pausado', ativo: true });
+    expect(c.status().anuncios).toEqual([]);
+    // suspender de novo não muda o "desde"
+    r.add(60_000);
+    c.command({ tipo: 'anuncios-suspensao', suspender: true });
+    expect(c.state().anunciosSuspensos!.desde).toBe(AGORA);
+
+    c.command({ tipo: 'anuncios-suspensao', suspender: false });
+    expect(c.state().anunciosSuspensos).toBeNull();
+    expect(c.status().anunciosSuspensos).toBeUndefined();
+    expect(c.status().anuncios!.map((a) => a.id)).toEqual(['lynx', 'vulpix', 'pausado']);
+    expect(c.status().anuncios!.slice(0, 2)).toStrictEqual(noAr);
+  });
+
+  it('o estado da suspensão persiste (serialize → parse) e ausente vira null', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx') });
+    c.command({ tipo: 'anuncios-suspensao', suspender: true, motivo: 'manutenção' });
+    const fb = estadoPadrao('servidor', AGORA, cenarioPadrao(st), st);
+    const p = parseAdminState(JSON.parse(c.toJSON()), fb, st);
+    expect(p.anunciosSuspensos).toEqual({ desde: AGORA, motivo: 'manutenção' });
+    const c2 = novo('servidor', p).c;
+    expect(c2.status().anuncios).toEqual([]);
+    expect(c2.status().anunciosSuspensos).toBe(true);
+    // estado antigo (sem o campo) e lixo → desligado
+    const { anunciosSuspensos: _, ...semCampo } = JSON.parse(c.toJSON());
+    expect(parseAdminState(semCampo, fb, st).anunciosSuspensos).toBeNull();
+    expect(parseAdminState({ ...semCampo, anunciosSuspensos: { desde: 'ontem' } }, fb, st).anunciosSuspensos).toBeNull();
+    expect(fb.anunciosSuspensos).toBeNull();
+  });
+
+  it('motivo com mais de 140 caracteres é recusado; o demo (motor no navegador) aceita o comando', () => {
+    const { c } = novo('demo');
+    expect(() => c.command({ tipo: 'anuncios-suspensao', suspender: true, motivo: 'x'.repeat(141) })).toThrow(/140/);
+    c.command({ tipo: 'anuncios-suspensao', suspender: true });
+    expect(c.status().anunciosSuspensos).toBe(true);
+    expect(c.state().anunciosSuspensos).toEqual({ desde: AGORA });
+  });
+});
+
+describe('anúncios v2: master sobreposto, reserva e campos públicos', () => {
+  const H = 3_600_000;
+  /** 25/10/2026 23:00 de Brasília (UTC−3) = 26/10 02:00 UTC. */
+  const V23 = Date.parse('2026-10-25T23:00:00-03:00');
+
+  it('master sobreposto no mesmo formato prioritário é recusado; horários encostados passam (virada 23h → 0h em UTC−3)', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { marca: 'Lynx', cota: 'master', formatos: ['topo', 'nativo'], inicio: V23 - 2 * H, fim: V23 + H }) });
+    expect(() =>
+      c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('alvorada', { cota: 'master', formatos: ['topo'], inicio: V23, fim: V23 + 2 * H }) }),
+    ).toThrow('Já há um master em Topo nesse horário (Lynx). Mude o horário, use Apoio ou ponha Lynx como Reserva.');
+    // encostado: começa à 0h de 26/10 (= fim da Lynx)
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('alvorada', { cota: 'master', formatos: ['topo'], inicio: V23 + H, fim: V23 + 3 * H }) });
+    // formato sem prioridade (nativo) não conflita; apoio e reserva não conflitam
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('kappa', { cota: 'master', formatos: ['nativo'] }) });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('vulpe', { cota: 'apoio', formatos: ['topo'] }) });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('grupo', { cota: 'master', reserva: true, formatos: ['topo'] }) });
+    expect(c.state().anuncios!.find((a) => a.id === 'grupo')).toMatchObject({ cota: 'apoio', reserva: true });
+    // editar o próprio master não conflita com ele mesmo
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { marca: 'Lynx', cota: 'master', formatos: ['topo', 'nativo'], inicio: V23 - 2 * H, fim: V23 + H, peso: 9 }) });
+    // reativar um master pausado que se sobrepõe também é recusado
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('tv-master', { cota: 'master', formatos: ['tv'], ativo: false }) });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('tv-outro', { marca: 'Outro', cota: 'master', formatos: ['tv'] }) });
+    expect(() => c.command({ tipo: 'anuncio-ativo', id: 'tv-master', ativo: true })).toThrow(/master em Modo TV nesse horário \(Outro\)/);
+  });
+
+  it('status leva os campos v2 (ajustes, versão escura, reserva) e NUNCA a meta de impressões', () => {
+    const { c } = novo();
+    c.command({
+      tipo: 'anuncio-salvar',
+      anuncio: anuncio('lynx', {
+        logo: PNG,
+        logoAjuste: AJUSTE,
+        logoEscuro: SVG,
+        logoEscuroAjuste: { ...AJUSTE, placaClaro: 'nenhuma' },
+        imagem: PNG,
+        imagemAjuste: { proporcao: 3.2, placaClaro: 'nenhuma', placaEscuro: 'nenhuma', origem: 'auto', comFundo: true },
+        reserva: true,
+        limiteImpressoes: 50_000,
+        inicio: AGORA - 1000,
+      }),
+    });
+    const p = c.status().anuncios![0];
+    expect(p).toMatchObject({ logoAjuste: AJUSTE, logoEscuro: SVG, logoEscuroAjuste: { ...AJUSTE, placaClaro: 'nenhuma' }, reserva: true, cota: 'apoio' });
+    expect(p.imagemAjuste).toEqual({ proporcao: 3.2, placaClaro: 'nenhuma', placaEscuro: 'nenhuma', origem: 'auto', comFundo: true });
+    expect(p).not.toHaveProperty('limiteImpressoes');
+    expect(JSON.stringify(c.status())).not.toContain('limiteImpressoes');
+  });
+
+  it('patrocínio legado prefere o pago: master sem reserva, depois o 1º pago, por último a reserva', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('grupo', { marca: 'Grupo', reserva: true, formatos: ['topo'] }) });
+    expect(c.status().patrocinio?.marca).toBe('Grupo');
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('pago', { marca: 'Pago', formatos: ['topo'] }) });
+    expect(c.status().patrocinio?.marca).toBe('Pago');
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('master', { marca: 'Master', cota: 'master', formatos: ['topo'] }) });
+    expect(c.status().patrocinio?.marca).toBe('Master');
+  });
+});
+
+describe('anúncios v2: imagens no estado restaurado', () => {
+  const fb = estadoPadrao('servidor', AGORA, cenarioPadrao(st), st);
+
+  it('imagem animada num estado salvo sai SÓ a imagem (com o ajuste dela); o anúncio fica, e o log diz por quê', () => {
+    const salvo = {
+      ...fb,
+      anuncios: [
+        { ...anuncio('lynx', { marca: 'Lynx' }), logo: APNG, logoAjuste: AJUSTE, imagem: PNG },
+        { ...anuncio('alvorada'), logo: PNG, imagem: APNG, imagemAjuste: AJUSTE, logoEscuro: APNG },
+      ],
+    };
+    const avisos: string[] = [];
+    const p = parseAdminState(JSON.parse(JSON.stringify(salvo)), fb, st, { aviso: (m) => avisos.push(m) });
+    expect(p.anuncios!.map((a) => a.id)).toEqual(['lynx', 'alvorada']);
+    expect(p.anuncios![0]).not.toHaveProperty('logo');
+    expect(p.anuncios![0]).not.toHaveProperty('logoAjuste');
+    expect(p.anuncios![0].imagem).toBe(PNG);
+    expect(p.anuncios![1]).toMatchObject({ logo: PNG });
+    expect(p.anuncios![1]).not.toHaveProperty('imagem');
+    expect(p.anuncios![1]).not.toHaveProperty('imagemAjuste');
+    expect(p.anuncios![1]).not.toHaveProperty('logoEscuro');
+    expect(avisos).toHaveLength(2);
+    expect(avisos[0]).toMatch(/Lynx \(lynx\): imagem animada removida \(logo\)/);
+    expect(avisos[1]).toMatch(/peça|versão para fundo escuro/);
+    // e o motor criado com esse estado registra no log do monitor
+    const c = novo('servidor', JSON.parse(JSON.stringify(salvo))).c;
+    expect(c.metrics().log.some((l) => /imagem animada removida/.test(l.msg))).toBe(true);
+  });
+
+  it('anúncio que deixou de passar na validação (regra endurecida) não volta, mas o log diz qual e por quê', () => {
+    const salvo = {
+      ...fb,
+      anuncios: [
+        { ...anuncio('bet', { marca: 'Bet Rápida' }) },
+        { ...anuncio('lynx', { marca: 'Lynx' }), limiteImpressoes: 5000 }, // meta sem início
+        anuncio('ok'),
+        anuncio('ok'),
+      ],
+    };
+    const avisos: string[] = [];
+    const p = parseAdminState(JSON.parse(JSON.stringify(salvo)), fb, st, { aviso: (m) => avisos.push(m) });
+    expect(p.anuncios!.map((a) => a.id)).toEqual(['ok']);
+    expect(avisos).toHaveLength(3);
+    expect(avisos[0]).toMatch(/^Anúncio Bet Rápida \(bet\) não restaurado: Anúncio recusado: o Sintonia não aceita anúncios de apostas/);
+    expect(avisos[1]).toMatch(/^Anúncio Lynx \(lynx\) não restaurado: .*início/);
+    expect(avisos[2]).toMatch(/repetido/);
+  });
+
+  it('salvar com a versão escura como URL do servidor não resolvida mantém a anterior; sem anterior, sai com o ajuste', () => {
+    const { c } = novo();
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logoEscuro: SVG }) });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('lynx', { logoEscuro: '/api/anuncio/img?h=0123456789abcdef', logoEscuroAjuste: AJUSTE }) });
+    expect(c.state().anuncios![0]).toMatchObject({ logoEscuro: SVG, logoEscuroAjuste: AJUSTE });
+    c.command({ tipo: 'anuncio-salvar', anuncio: anuncio('novo', { logoEscuro: '/api/anuncio/img?h=0123456789abcdef', logoEscuroAjuste: AJUSTE, imagem: '/api/anuncio/img?h=0123456789abcdee', imagemAjuste: AJUSTE }) });
+    const n = c.state().anuncios!.find((a) => a.id === 'novo')!;
+    expect(n).not.toHaveProperty('logoEscuro');
+    expect(n).not.toHaveProperty('logoEscuroAjuste');
+    expect(n).not.toHaveProperty('imagem');
+    expect(n).not.toHaveProperty('imagemAjuste');
+  });
+});

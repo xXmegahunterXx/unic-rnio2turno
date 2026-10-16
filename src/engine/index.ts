@@ -20,7 +20,8 @@
  *   - `await ctrl.carregaLocais(uf)` antes de zona/seção traz `local` (escola/endereço) em cada seção; sem ele, a
  *     1ª consulta da UF dispara o carregamento em segundo plano;
  *   - anúncios (src/shared/anuncios.ts): comandos 'anuncio-salvar' | 'anuncio-remover' | 'anuncio-ativo' |
- *     'anuncie-contato'; `status().anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`), com o link já com UTM;
+ *     'anuncio-logo' (troca só a logo: "Ajustar agora") | 'anuncios-suspensao' (interruptor geral) | 'anuncie-contato';
+ *     `status().anuncios` = anúncios no ar pelo relógio REAL (`anuncioNoAr`), com o link já com UTM;
  *     o comando legado 'patrocinio' vira o anúncio master 'patrocinio' e `status().patrocinio` é derivado dele.
  *
  * Fonte 'tse': o controller só guarda a escolha e `state.tse`; o servidor intercepta as rotas de apuração.

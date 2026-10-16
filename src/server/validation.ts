@@ -254,7 +254,7 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
     .object({
       tipo: z.literal('anuncios-suspensao'),
       suspender: z.boolean(),
-      motivo: z.string().trim().max(140, 'motivo: máximo de 140 caracteres').optional(),
+      motivo: z.string().trim().max(140, 'máximo de 140 caracteres').optional(), // a mensagem sai como "motivo: máximo…"
     })
     .strict(),
   z.object({ tipo: z.literal('anuncie-contato'), contato: contatoAnuncie }).strict(),

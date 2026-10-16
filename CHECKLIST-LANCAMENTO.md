@@ -131,6 +131,20 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | A9.5 | depois de A9.1–A9.4 | `deploy/update.sh` na VPS e repetir A7 | — |
 | A9.6 | **logo depois da 1ª atualização desta leva** (a que saiu da 58efd31; a b88dfe1 já está no ar desde 16/10) e **antes** da próxima | guarde a versão antiga à parte: `docker tag sintonia-app:anterior sintonia-app:pre-anuncios`; depois `deploy/update.sh --forcar` (ou a próxima atualização normal) para o `:anterior` passar a ser uma versão com anúncios. Confira com o comando do RUNBOOK §3.5: o `:anterior` não pode ser `58efd31`. Sem isso, o `--rollback` rápido volta para a versão sem anúncios (RUNBOOK §3.5) | — |
 
+### A10. Anunciantes v2 (depois do deploy desta leva; RUNBOOK §3.9)
+
+| # | O quê | Como conferir | Quem | Bloqueia? |
+|---|---|---|---|---|
+| A10.1 | **"Ajustar agora"** feito nas logos gravadas antes do ajuste automático (Lynx e UPdePix) — melhor ainda: reenviar a logo horizontal em PNG transparente e, se houver, a versão para fundo escuro, conferindo a prévia claro e escuro | Painel → Anunciantes: o aviso "N logos gravadas antes do ajuste automático" não aparece mais | Dono | sim |
+| A10.2 | **Títulos sem "…"** (cortados): reescrever, em especial o da Lynx ("Oferece a apuração ao vivo. Carteira digital com Pix em tem…"; sugestão neutra: "Carteira digital com Pix em tempo real e sem mensalidade"). Nada de "apuração", "eleição" ou "resultado" ligado à marca | Painel → Anunciantes: nenhum aviso de título no cartão | Dono | sim |
+| A10.3 | **Chat e Lives** marcados em pelo menos um anúncio (sem isso, a noite fica com os dois vazios) | Painel → Anunciantes → "Espaços agora": Chat e Lives preenchidos | Dono | não |
+| A10.4 | **Cloudflare guarda as imagens dos anúncios** (senão cada logo sai da VPS em toda visita) | `u=$(curl -s https://seu-dominio/api/status \| grep -o '/api/anuncio/img?h=[a-f0-9]*' \| head -1); curl -sI "https://seu-dominio$u" >/dev/null; curl -sI "https://seu-dominio$u" \| grep -i cf-cache-status` → `HIT`; `/api/status` → `HIT` ou `EXPIRED`; `curl -sI https://seu-dominio/api/anuncio/ir/x \| grep -i cf-cache-status` → `BYPASS` ou `DYNAMIC` | Técnico | sim (para a noite) |
+| A10.5 | **Interruptor geral testado** numa hora tranquila: some tudo e volta igual | `deploy/painel.sh anuncios-suspender "teste"` → `/` e `/tv` sem anúncio; `deploy/painel.sh anuncios-voltar` → `deploy/painel.sh anuncios-estado` igual ao de antes | Técnico | sim |
+| A10.6 | **Reserva** decidida: quais empresas do grupo ficam como Reserva (só no espaço que nenhum pago ocupa) e quais como pagas. Se um terceiro comprar o master, a do grupo vira Reserva | Painel → Anunciantes: selo "Reserva" nos cartões certos | Dono | não |
+| A10.7 | **Relatório por link** (se for vender por meta ou com relatório): gerar um link de teste, abrir `/relatorio#k=…` no celular, revogar e ver o 404 | Painel → cartão do anúncio → "Relatório do anunciante" | Técnico | não |
+| A10.8 | **Contagem por pessoa** no ar sem pesar: no pico, o resumo por minuto do log sem p95 alto nas rotas de anúncio | `docker compose logs --since 5m app \| grep '"reqPorSeg"' \| tail -n 3`; se pesar: `ANUNCIO_PESSOA=0` (RUNBOOK §3.9) | Técnico | não |
+| A10.9 | **Rollback dos anunciantes v2 entendido**: o `:anterior` do `--rollback` rápido passa a ser a leva 2, que ignora a suspensão geral, a meta e a Reserva, e apaga os campos do v2 (e os totais por dia e o alcance das métricas) na 1ª gravação | Ler o aviso "voltar dos anunciantes v2 para a leva 2" no RUNBOOK §3.5; com a suspensão ligada, pausar cada anúncio ANTES de qualquer rollback | Técnico + Dono | sim |
+
 ---
 
 ## B. Humana
@@ -153,6 +167,7 @@ alguns dias: para testar de novo depois de uma mudança, acrescente `?v=2` ao li
 | B1.11 | **Palpite do 2º turno** | Prazo até 23h59 de 24/10, palpite travado e sem compartilhar no dia da votação, sem número agregado. Basta para não ser lido como pesquisa/prognóstico? | Jurídico | sim |
 | B1.12 | **Números de audiência na /anuncie** (interruptor desligado) | Só o pico do sinal das páginas, maior dia em únicos e páginas vistas, "desde <data>". A forma de medir (conservadora) está descrita; ligar depois de zerar a medição (A3.8) | Dono | não |
 | B1.13 | **Manhã de 25/10 (votação, até 17h)** | A imagem de prévia do placar (OG), o topo da Home, a /apuracao e a /live mostram o resultado do 1º turno com foto oficial, nome e número de urna ("PT · 13" / "PL · 22"). O Palpite tirou o número de urna dos cartões pelo argumento do "santinho". O placar do 1º turno com número de urna pode ficar no ar durante a votação? Se não: esconder o número de urna enquanto a fase for "pre" no dia 25 (og-placar, Home, /live) | Jurídico | sim |
+| B1.14 | **Categorias sensíveis dos anúncios** | O painel recusa sozinho apostas/bets, cassino e mercados de previsão (Polymarket, Kalshi e afins), e bebida alcoólica com janela que cruze 25/10 de 0h às 17h (avisa no painel nos outros dias). A detecção é conservadora: "aposta" em sentido figurado e "bolão" também são recusados (outra redação resolve). Confirmar a regra e a leitura da janela da bebida | Jurídico + Dono | não |
 
 ### B2. Revisão editorial
 

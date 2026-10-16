@@ -9,8 +9,10 @@ import { LogoMark } from '@/app/components/layout/Logo';
 import { AnuncioNativoPeca } from './AnuncioNativoPeca';
 import { BarraRodapePeca } from './BarraRodape';
 import { FaixaTopoPeca } from './FaixaTopoPeca';
+import { apresentacaoLogo } from './logo';
 import { imagemDoAnuncio } from './nucleo';
 import { OferecimentoTestePeca, OferecimentoTvPeca } from './Oferecimento';
+import { LogoMarca, TemaLocal } from './pecas';
 import { MolduraChatVitrine } from './OferecimentoChat';
 import { MolduraLiveVitrine } from '@/app/components/live/Cena';
 
@@ -160,26 +162,48 @@ export function VitrineFormato({
         </div>
       );
     case 'compartilhamento':
+      // as imagens de compartilhamento são sempre escuras (servidor OG): a moldura também, com a logo do tema escuro
       return (
-        <div className="overflow-hidden rounded-2xl border border-line bg-bg">
-          <div className="relative aspect-[1200/630] w-full">
-            <div aria-hidden className="absolute inset-0 flex flex-col p-[4%]">
-              <div className="flex items-center gap-2">
-                <LogoMark size={20} />
-                <span className="font-display text-[13px] font-semibold text-fg">Sintonia</span>
-              </div>
-              <div className="mt-[3%] h-3 w-1/3 rounded-full bg-surface-3" />
-              <div className="mt-[3%] flex flex-1 items-end gap-[3%] pb-[6%]">
-                <div className="h-3/4 flex-1 rounded-xl bg-surface-2" />
-                <div className="h-3/4 flex-1 rounded-xl bg-surface-2" />
-              </div>
-            </div>
-            <div className="absolute inset-x-0 bottom-0 flex h-[11%] min-h-[22px] items-center justify-center gap-1.5 border-t border-line bg-surface px-[4%] text-[11px] sm:text-[13px]">
-              <span className="text-fg-subtle">Oferecimento:</span>
-              <span className="font-semibold text-fg">{anuncio.marca}</span>
-            </div>
-          </div>
-        </div>
+        <TemaLocal.Provider value="escuro">
+          <VitrineCompartilhamento anuncio={anuncio} />
+        </TemaLocal.Provider>
       );
   }
+}
+
+/**
+ * Cartão de compartilhamento (1200×630) desenhado, com a faixa "Oferecimento" no pé como o servidor desenha (E7): com a
+ * logo ajustada (versão para fundo escuro, se houver), "Oferecimento" + a logo; logo antiga ou sem logo, o texto
+ * "Oferecimento: <marca>".
+ */
+function VitrineCompartilhamento({ anuncio }: { anuncio: AnuncioPublico }) {
+  const comLogo = !!apresentacaoLogo(anuncio, 'escuro')?.ajuste;
+  return (
+    <div data-tema-local="escuro" className="overflow-hidden rounded-2xl border border-line bg-bg text-fg">
+      <div className="relative aspect-[1200/630] w-full">
+        <div aria-hidden className="absolute inset-0 flex flex-col p-[4%]">
+          <div className="flex items-center gap-2">
+            <LogoMark size={20} />
+            <span className="font-display text-[13px] font-semibold text-fg">Sintonia</span>
+          </div>
+          <div className="mt-[3%] h-3 w-1/3 rounded-full bg-surface-3" />
+          <div className="mt-[3%] flex flex-1 items-end gap-[3%] pb-[6%]">
+            <div className="h-3/4 flex-1 rounded-xl bg-surface-2" />
+            <div className="h-3/4 flex-1 rounded-xl bg-surface-2" />
+          </div>
+        </div>
+        {comLogo ? (
+          <div className="absolute inset-x-0 bottom-0 flex h-[13%] min-h-[34px] items-center justify-center gap-2.5 border-t border-line bg-surface px-[4%]">
+            <span className="text-[11px] text-fg-subtle sm:text-[13px]">Oferecimento</span>
+            <LogoMarca anuncio={anuncio} className="[--logo-h:22px] [--logo-max:200px] sm:[--logo-h:26px] sm:[--logo-max:300px]" />
+          </div>
+        ) : (
+          <div className="absolute inset-x-0 bottom-0 flex h-[11%] min-h-[22px] items-center justify-center gap-1.5 border-t border-line bg-surface px-[4%] text-[11px] sm:text-[13px]">
+            <span className="text-fg-subtle">Oferecimento:</span>
+            <span className="font-semibold text-fg">{anuncio.marca}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

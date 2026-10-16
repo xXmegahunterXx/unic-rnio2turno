@@ -1,47 +1,68 @@
 /**
  * Seção "Anunciantes" do painel (substitui a antiga "Patrocínio"): vários anunciantes ao mesmo tempo, cada um com os
- * formatos em que aparece, cota (master/apoio), peso na rotação e janela de exibição — contrato em
- * src/shared/anuncios.ts; comandos 'anuncio-salvar' | 'anuncio-remover' | 'anuncio-ativo' | 'anuncie-contato'.
+ * formatos em que aparece, cota (master/apoio/reserva), peso na rotação e janela de exibição — contrato em
+ * src/shared/anuncios.ts; comandos 'anuncio-salvar' | 'anuncio-remover' | 'anuncio-ativo' | 'anuncio-logo' |
+ * 'anuncios-suspensao' | 'anuncie-contato'.
  *
- * Feita para o celular (o dono administra pelo telefone): lista em cartões com situação, formatos e métricas (com as
- * barrinhas das últimas 48 h), ações grandes; formulário em uma coluna (FormAnuncio). Relatório de entrega com CSV e o
- * contato da página /anuncie. Métricas só agregadas (impressões visíveis e cliques; sem dado pessoal) — vêm de
- * GET /api/admin/anuncios/metricas (só no servidor; no demo não há contagem).
+ * Feita para o celular (o dono administra pelo telefone): lista em cartões com situação, formatos (com a fatia real de
+ * cada um), avisos, meta e métricas (com as barrinhas das últimas 48 h), ações grandes; formulário em uma coluna
+ * (FormAnuncio). Relatório de entrega com CSV e o contato da página /anuncie. Métricas só agregadas (impressões visíveis
+ * e cliques; sem dado pessoal) — vêm de GET /api/admin/anuncios/metricas (só no servidor; no demo não há contagem).
+ *
+ * Anunciantes v2: "Espaços agora" (EspacosAgora), "Ajustar agora" para as logos gravadas antes do ajuste automático
+ * (AjustarLogos), Duplicar, cota Reserva, interruptor geral "Tirar todos do ar" (nada é apagado; voltar devolve
+ * exatamente o que estava), meta de impressões no cartão e o link privado do relatório do anunciante (LinksRelatorio).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ANUNCIO_LIMITES, validaContatoAnuncie, type AnuncioConfig, type MetricaAnuncio } from '@/shared/anuncios';
-import { fmtDataHora, fmtHora, fmtInt, fmtPct } from '@/shared/format';
+import {
+  ANUNCIO_LIMITES,
+  NOME_CURTO_FORMATO,
+  validaContatoAnuncie,
+  type AnuncioConfig,
+  type FormatoAnuncio,
+  type MetricaAnuncio,
+  type MetricasAnunciosResposta,
+} from '@/shared/anuncios';
+import { fmtDataHora, fmtHora, fmtInt, fmtLista, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { useNow } from '@/app/lib/useNow';
-import { Badge, Button, Icon, type BadgeTone } from '@/app/ui';
+import { Badge, Button, Dialog, Icon, Sheet, toast, type BadgeTone } from '@/app/ui';
 import { useAdmin } from './dados';
 import { AreaTexto, CabecalhoSecao, Callout, Campo, Painel, Rotulo } from './kit';
 import { mensagemErro, urlPublica } from './rotulos';
 import {
   ROTULO_CURTO,
   ROTULO_SITUACAO,
+  aCreditar,
+  avisosDoAnuncio,
   baixarArquivo,
   csvPorHora,
   csvRelatorio,
   ctr,
+  duplicarAnuncio,
+  fatiaDoAnuncio,
+  fmtFatia,
   linhasRelatorio,
+  previsaoEntrega,
   serieHoras,
   situacaoDe,
+  textoPrevisao,
   totais48h,
   totaisDe,
+  type ForaDoAr,
   type Situacao,
   type Totais,
 } from './anunciosAdmin';
 import { FormAnuncio } from './FormAnuncio';
 import { LogoAnuncio } from './PreviaAnuncio';
+import { AjustarLogos, logoPendente, type DesfazerLogos } from './AjustarLogos';
+import { EspacosAgora } from './EspacosAgora';
+import { LinksRelatorio, useLinksRelatorio } from './LinksRelatorio';
 
-const TOM_SITUACAO: Record<Situacao, BadgeTone> = { 'no-ar': 'ok', agendado: 'brand', pausado: 'neutral', encerrado: 'pending' };
+const TOM_SITUACAO: Record<Situacao, BadgeTone> = { 'no-ar': 'ok', agendado: 'brand', pausado: 'neutral', encerrado: 'pending', 'meta-atingida': 'ok' };
 
-interface RespostaMetricas {
-  metricas: MetricaAnuncio[];
-  desde: number;
-}
+type RespostaMetricas = MetricasAnunciosResposta;
 
 /** Relatório de entrega (servidor). No demo não existe: o motor local não conta impressões. */
 function useMetricasAnuncios(ativo: boolean) {
@@ -133,24 +154,97 @@ function Barras48h({ serie, className }: { serie: { hora: number; impressoes: nu
   );
 }
 
+/** Barra da meta: "Entregue 41.200 de 100.000 (41%)", previsão e o "a creditar" depois do fim. */
+function MetaDoAnuncio({
+  a,
+  agora,
+  entregue,
+  esgotadoEm,
+  metricas,
+  onAumentar,
+}: {
+  a: AnuncioConfig;
+  agora: number;
+  entregue: number | undefined;
+  esgotadoEm: number | undefined;
+  metricas: MetricaAnuncio[] | null;
+  onAumentar: () => void;
+}) {
+  const limite = a.limiteImpressoes!;
+  if (entregue === undefined)
+    return (
+      <p className="num text-[12px] text-fg-muted">
+        Meta: {fmtInt(limite)} impressões {__DEMO__ ? '(contagem só no servidor)' : '· carregando…'}
+      </p>
+    );
+  const pct = Math.min(100, (100 * entregue) / limite);
+  const sit = situacaoDe(a, agora, esgotadoEm);
+  const previsao = sit === 'no-ar' && metricas ? textoPrevisao(previsaoEntrega(serieHoras(metricas, agora, a.id, 3), entregue, limite, agora, a.fim)) : null;
+  const credito = aCreditar(a, entregue, agora);
+  return (
+    <div data-meta>
+      <p className="num text-[12px] text-fg">
+        Entregue <span className="font-semibold">{fmtInt(entregue)}</span> de {fmtInt(limite)} ({fmtPct(pct, 0)})
+      </p>
+      <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={limite} aria-valuenow={entregue} aria-label="Impressões entregues da meta">
+        <div className={cn('h-full rounded-full', esgotadoEm ? 'bg-ok' : 'bg-brand-2')} style={{ width: `${pct}%` }} />
+      </div>
+      {previsao ? <p className="num mt-1.5 text-[11.5px] leading-snug text-fg-muted">{previsao}</p> : null}
+      {esgotadoEm && sit === 'meta-atingida' ? (
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="num text-[12px] font-semibold text-ok-fg">Meta atingida {fmtHora(esgotadoEm)}: fora do ar</span>
+          <Button variant="secondary" size="sm" icon="mais" onClick={onAumentar} className="h-8 shrink-0">
+            Aumentar meta
+          </Button>
+        </div>
+      ) : esgotadoEm ? (
+        <p className="num mt-1.5 text-[11.5px] font-semibold text-ok-fg">Meta atingida {fmtDataHora(esgotadoEm)}</p>
+      ) : null}
+      {credito > 0 ? (
+        <p className="num mt-1.5 text-[11.5px] font-medium text-alert-fg">
+          A creditar: {fmtInt(credito)} impressões (o anúncio terminou antes da meta).
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function CartaoAnuncio({
   a,
   agora,
   metricas,
+  resposta,
+  anuncios,
+  fora,
+  relatorios,
   onEditar,
+  onDuplicar,
+  onRelatorio,
 }: {
   a: AnuncioConfig;
   agora: number;
   metricas: MetricaAnuncio[] | null;
+  resposta: RespostaMetricas | undefined;
+  anuncios: AnuncioConfig[];
+  fora: ForaDoAr;
+  /** links de relatório ligados no servidor (sem eles, a ação some) */
+  relatorios: boolean;
   onEditar: () => void;
+  onDuplicar: () => void;
+  onRelatorio: () => void;
 }) {
   const { run, pendente, confirmar } = useAdmin();
-  const sit = situacaoDe(a, agora);
+  const esgotadoEm = resposta?.esgotadoEm?.[a.id];
+  const sit = situacaoDe(a, agora, esgotadoEm);
   const tot = metricas ? totaisDe(metricas, a.id) : null;
   const t48 = metricas ? totais48h(metricas, agora, a.id) : null;
   const serie = metricas ? serieHoras(metricas, agora, a.id) : null;
   const chaveAtivo = `anuncio-ativo:${a.id}`;
   const chaveRemover = `anuncio-remover:${a.id}`;
+  const noAr = sit === 'no-ar';
+  // fatia real de cada formato marcado (só faz sentido no ar e sem a suspensão geral)
+  const fatias = noAr && !fora.suspenso ? Object.fromEntries(a.formatos.map((f) => [f, fatiaDoAnuncio(a, f, anuncios, agora, fora)])) : null;
+  const avisos = avisosDoAnuncio(a, { anuncios, agora, fora });
 
   async function remover() {
     const ok = await confirmar({
@@ -168,42 +262,78 @@ function CartaoAnuncio({
       : 'sem data marcada';
 
   return (
-    <article className={cn('flex min-w-0 flex-col rounded-2xl border bg-surface shadow-card', sit === 'no-ar' ? 'border-ok/30' : 'border-line')}>
+    <article data-anuncio={a.id} className={cn('flex min-w-0 flex-col rounded-2xl border bg-surface shadow-card', noAr && !fora.suspenso ? 'border-ok/30' : 'border-line')}>
       <div className="flex items-start gap-3 p-4 pb-3">
         <LogoAnuncio anuncio={a} tamanho="lg" />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <h3 className="min-w-0 truncate font-display text-[17px] font-semibold leading-tight tracking-[-0.01em] text-fg">{a.marca}</h3>
-            <Badge tone={TOM_SITUACAO[sit]} size="sm" dot={sit === 'no-ar'} className="shrink-0">
+            <Badge tone={TOM_SITUACAO[sit]} size="sm" dot={noAr && !fora.suspenso} className="shrink-0">
               {ROTULO_SITUACAO[sit]}
             </Badge>
           </div>
           <p className="mt-0.5 truncate text-[13px] text-fg-muted">{a.titulo}</p>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-fg-subtle">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11.5px] text-fg-subtle">
             <span className="font-mono">{a.id}</span>
             <span aria-hidden>·</span>
-            <span className={cn(a.cota === 'master' && 'font-semibold text-brand-fg')}>{a.cota === 'master' ? 'Master' : 'Apoio'}</span>
+            {a.reserva ? (
+              <Badge tone="neutral" size="xs" caps>
+                Reserva
+              </Badge>
+            ) : (
+              <span className={cn(a.cota === 'master' && 'font-semibold text-brand-fg')}>{a.cota === 'master' ? 'Master' : 'Apoio'}</span>
+            )}
             <span aria-hidden>·</span>
             <span>
               peso <span className="num">{a.peso}</span>
             </span>
+            {fora.suspenso ? (
+              <Badge tone="alert" size="xs" caps>
+                Suspenso (geral)
+              </Badge>
+            ) : null}
           </p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1.5 px-4">
-        {a.formatos.map((f) => (
-          <span key={f} className="inline-flex h-6 items-center rounded-lg bg-surface-2 px-2 text-[11.5px] font-medium text-fg-muted ring-1 ring-inset ring-line">
-            {ROTULO_CURTO[f]}
-          </span>
-        ))}
+        {a.formatos.map((f) => {
+          const x = fatias?.[f];
+          const zero = x && x.fatia === 0;
+          return (
+            <span
+              key={f}
+              data-formato={f}
+              data-fatia={x ? x.pct : undefined}
+              title={zero ? (x.motivo ?? 'Não aparece neste formato agora.') : undefined}
+              className={cn(
+                'inline-flex h-6 items-center gap-1 rounded-lg px-2 text-[11.5px] font-medium ring-1 ring-inset ring-line',
+                zero ? 'bg-transparent text-fg-subtle line-through decoration-fg-subtle/60' : 'bg-surface-2 text-fg-muted',
+              )}
+            >
+              {ROTULO_CURTO[f]}
+              {x ? <span className={cn('num', zero ? 'text-fg-subtle' : 'text-fg')}>{fmtFatia(x.pct)}</span> : null}
+            </span>
+          );
+        })}
       </div>
       <p className="mt-2 flex items-center gap-1.5 px-4 text-[12px] text-fg-subtle">
         <Icon name="calendario" size={13} />
         <span className="num truncate">{janela}</span>
       </p>
+      {avisos.length ? (
+        <ul className="num mx-4 mt-2.5 space-y-1 rounded-xl border border-alert/25 bg-alert/[0.05] px-3 py-2 text-[12px] leading-snug text-fg-muted" data-avisos>
+          {avisos.map((t) => (
+            <li key={t} className="flex gap-1.5">
+              <Icon name="alerta" size={13} className="mt-px shrink-0 text-alert-fg" />
+              <span>{t}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-      <div className="mx-4 mt-3 rounded-xl border border-line bg-surface-2/50 p-3">
+      <div className="mx-4 mt-3 space-y-3 rounded-xl border border-line bg-surface-2/50 p-3">
+        {a.limiteImpressoes ? <MetaDoAnuncio a={a} agora={agora} entregue={resposta?.entregue?.[a.id]} esgotadoEm={esgotadoEm} metricas={metricas} onAumentar={onEditar} /> : null}
         {tot && t48 && serie ? (
           <>
             <div className="grid grid-cols-3 gap-2">
@@ -211,14 +341,14 @@ function CartaoAnuncio({
               <Numero rotulo="Cliques" valor={fmtInt(tot.cliques)} sub={`48 h: ${fmtInt(t48.cliques)}`} />
               <Numero rotulo="CTR" valor={fmtCtr(tot)} sub={`48 h: ${fmtCtr(t48)}`} />
             </div>
-            <Barras48h serie={serie} className="mt-3" />
+            <Barras48h serie={serie} />
           </>
         ) : (
           <p className="text-[12.5px] text-fg-muted">{__DEMO__ ? 'Métricas de entrega só no servidor (o demo não conta impressões).' : 'Carregando métricas…'}</p>
         )}
       </div>
 
-      <div className="mt-auto grid grid-cols-3 gap-2 p-4 pt-3">
+      <div className="mt-auto grid grid-cols-3 gap-2 p-4 pb-2 pt-3">
         <Button variant="secondary" size="md" icon="ajustes" onClick={onEditar} className="px-2">
           Editar
         </Button>
@@ -237,7 +367,19 @@ function CartaoAnuncio({
         >
           {a.ativo ? 'Pausar' : 'Ativar'}
         </Button>
-        <Button variant="ghost" size="md" icon="fechar" className="px-2 text-alert-fg hover:text-alert-fg" loading={pendente(chaveRemover)} onClick={() => void remover()}>
+        <Button variant="outline" size="md" icon="copiar" onClick={onDuplicar} className="px-2">
+          Duplicar
+        </Button>
+      </div>
+      <div className="flex items-center justify-between gap-2 px-4 pb-3">
+        {relatorios ? (
+          <Button variant="ghost" size="sm" icon="link" onClick={onRelatorio} className="-ml-2">
+            Relatório do anunciante
+          </Button>
+        ) : (
+          <span />
+        )}
+        <Button variant="ghost" size="sm" icon="fechar" className="-mr-2 text-alert-fg hover:text-alert-fg" loading={pendente(chaveRemover)} onClick={() => void remover()}>
           Remover
         </Button>
       </div>
@@ -245,8 +387,9 @@ function CartaoAnuncio({
   );
 }
 
-function Resumo({ anuncios, agora, metricas }: { anuncios: AnuncioConfig[]; agora: number; metricas: MetricaAnuncio[] | null }) {
-  const noAr = anuncios.filter((a) => situacaoDe(a, agora) === 'no-ar').length;
+function Resumo({ anuncios, agora, metricas, fora }: { anuncios: AnuncioConfig[]; agora: number; metricas: MetricaAnuncio[] | null; fora: ForaDoAr }) {
+  const esg = new Set(fora.esgotados ?? []);
+  const noAr = fora.suspenso ? 0 : anuncios.filter((a) => situacaoDe(a, agora, esg.has(a.id) ? 1 : null) === 'no-ar').length;
   const t48 = metricas ? totais48h(metricas, agora) : null;
   const itens = [
     { rotulo: 'No ar agora', valor: `${fmtInt(noAr)} de ${fmtInt(anuncios.length)}`, sub: 'anúncios cadastrados', icone: 'ao-vivo' as const },
@@ -458,51 +601,295 @@ function PaginaAnuncie() {
   );
 }
 
+// ---- interruptor geral, "Ajustar agora", Preencher ---------------------------------------------------------------
+
+/** Faixa vermelha fixa no topo da seção enquanto a suspensão geral está ligada. */
+function FaixaSuspensao({ desde, motivo }: { desde: number; motivo?: string }) {
+  const { run, pendente } = useAdmin();
+  return (
+    <div
+      role="status"
+      data-faixa-suspensao
+      className="sticky top-[101px] z-20 -mx-4 -mt-5 mb-4 border-b border-alert/40 bg-alert/[0.14] px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:top-[84px] lg:mx-0 lg:mt-0 lg:mb-5 lg:rounded-2xl lg:border"
+    >
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-3">
+        <span className="flex min-w-0 flex-1 items-start gap-2 text-[13.5px] leading-snug text-fg">
+          <Icon name="pause" size={16} className="mt-px shrink-0 text-alert-fg" />
+          <span className="min-w-0">
+            <span className="font-semibold">
+              Anúncios suspensos desde <span className="num">{fmtHora(desde)}</span>
+            </span>
+            {motivo ? <span className="text-fg-muted"> · {motivo}</span> : null}
+            <span className="block text-[12px] text-fg-muted">Nada foi apagado: o site, as lives e as imagens estão sem anúncios.</span>
+          </span>
+        </span>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon="play"
+          className="self-start sm:self-auto"
+          loading={pendente('anuncios-suspensao')}
+          onClick={() => void run({ tipo: 'anuncios-suspensao', suspender: false }, { chave: 'anuncios-suspensao', sucesso: 'Anúncios de volta ao ar' })}
+        >
+          Voltar com os anúncios
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** Confirmação do "Tirar todos do ar", com o motivo opcional (fica no registro). */
+function DialogoSuspender({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { run, pendente } = useAdmin();
+  const [motivo, setMotivo] = useState('');
+  useEffect(() => {
+    if (open) setMotivo('');
+  }, [open]);
+  const longo = motivo.trim().length > 140;
+  async function suspender() {
+    const snap = await run(
+      { tipo: 'anuncios-suspensao', suspender: true, ...(motivo.trim() ? { motivo: motivo.trim() } : {}) },
+      { chave: 'anuncios-suspensao', sucesso: 'Todos os anúncios fora do ar' },
+    );
+    if (snap) onClose();
+  }
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Tirar todos os anúncios do ar?"
+      description="Todos os anúncios saem do site, das lives e das imagens em até ~5 s. Nada é apagado: “Voltar com os anúncios” devolve exatamente o que estava no ar."
+      size="md"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <button
+            type="button"
+            onClick={() => void suspender()}
+            disabled={longo || pendente('anuncios-suspensao')}
+            data-autofocus
+            className={cn(
+              'inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-alert/45 bg-alert/15 px-4 text-sm font-semibold text-alert-fg',
+              'transition-colors hover:bg-alert/25 active:scale-[0.97] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+            )}
+          >
+            <Icon name="pause" size={16} />
+            Tirar todos do ar
+          </button>
+        </>
+      }
+    >
+      <AreaTexto
+        rotulo="Motivo (fica no registro)"
+        rows={2}
+        value={motivo}
+        maxLength={160}
+        placeholder="Opcional"
+        onChange={(e) => setMotivo(e.target.value)}
+        dica={<span className={cn('num flex justify-end', longo && 'font-semibold text-alert-fg')}>{`${motivo.trim().length}/140`}</span>}
+      />
+    </Dialog>
+  );
+}
+
+/** "Preencher" do Espaços agora: escolher o anúncio que passa a ter o formato (ou um novo). */
+function FolhaPreencher({
+  formato,
+  anuncios,
+  onClose,
+  onEscolher,
+}: {
+  formato: FormatoAnuncio | null;
+  anuncios: AnuncioConfig[];
+  onClose: () => void;
+  onEscolher: (id: string | 'novo', f: FormatoAnuncio) => void;
+}) {
+  const candidatos = formato ? anuncios.filter((a) => !a.formatos.includes(formato)) : [];
+  return (
+    <Sheet
+      open={!!formato}
+      onClose={onClose}
+      title={formato ? `Preencher ${NOME_CURTO_FORMATO[formato]}` : ''}
+      description="Escolha o anúncio que passa a aparecer neste formato. O formulário abre com ele marcado; confira e confirme a declaração."
+      width="sm"
+    >
+      <div className="space-y-2">
+        {candidatos.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => formato && onEscolher(a.id, formato)}
+            className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface-2/50 p-3 text-left transition-colors hover:border-brand/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            <LogoAnuncio anuncio={a} tamanho="md" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-[14px] font-semibold text-fg">{a.marca}</span>
+              <span className="block truncate text-[12px] text-fg-muted">{a.formatos.map((f) => ROTULO_CURTO[f]).join(' · ')}</span>
+            </span>
+            <Icon name="chevron-direita" size={16} className="shrink-0 text-fg-subtle" />
+          </button>
+        ))}
+        <Button variant="secondary" icon="mais" block onClick={() => formato && onEscolher('novo', formato)}>
+          Novo anúncio
+        </Button>
+      </div>
+    </Sheet>
+  );
+}
+
 // ---- seção -----------------------------------------------------------------------------------------------
 
+/** O que a seção mostra no lugar da lista: o formulário de um anúncio. */
+type Edicao = { modo: 'novo' | 'editar' | 'duplicar'; id?: string; formato?: FormatoAnuncio; modelo?: Omit<AnuncioConfig, 'naoPolitico'> };
+
 export function SecaoAnuncios() {
-  const { snap } = useAdmin();
+  const { snap, run } = useAdmin();
   const anuncios = snap.state.anuncios ?? [];
+  const suspensao = snap.state.anunciosSuspensos ?? null;
   const agora = useAgoraServidor();
   const q = useMetricasAnuncios(true);
   const metricas = q.data?.metricas ?? null;
-  /** null = lista; 'novo' = criar; id = editar */
-  const [editando, setEditando] = useState<string | null>(null);
+  const links = useLinksRelatorio(true);
+  const relatoriosLigados = !__DEMO__ && links.data?.ligado !== false;
+  const fora: ForaDoAr = useMemo(() => ({ esgotados: Object.keys(q.data?.esgotadoEm ?? {}), suspenso: !!suspensao }), [q.data?.esgotadoEm, suspensao]);
+  const [edicao, setEdicao] = useState<Edicao | null>(null);
+  const [suspender, setSuspender] = useState(false);
+  const [ajustar, setAjustar] = useState(false);
+  const [preencher, setPreencher] = useState<FormatoAnuncio | null>(null);
+  const [relatorioDe, setRelatorioDe] = useState<string | null>(null);
+  const [desfazer, setDesfazer] = useState<DesfazerLogos | null>(null);
+  const [desfazendo, setDesfazendo] = useState(false);
   const lotado = anuncios.length >= ANUNCIO_LIMITES.maxAnuncios;
 
   useEffect(() => {
     window.scrollTo({ top: 0 });
-  }, [editando]);
+  }, [edicao]);
 
-  if (editando !== null) {
-    const inicial = editando === 'novo' ? null : (anuncios.find((a) => a.id === editando) ?? null);
-    return <FormAnuncio key={editando} inicial={inicial} onFechar={() => setEditando(null)} />;
+  // [Desfazer] do "Ajustar agora" fica 10 s na tela
+  useEffect(() => {
+    if (!desfazer) return;
+    const t = window.setTimeout(() => setDesfazer(null), 10_000);
+    return () => window.clearTimeout(t);
+  }, [desfazer]);
+
+  if (edicao !== null) {
+    const inicial = edicao.modo === 'editar' ? (anuncios.find((a) => a.id === edicao.id) ?? null) : null;
+    return (
+      <FormAnuncio
+        key={`${edicao.modo}:${edicao.id ?? ''}:${edicao.formato ?? ''}`}
+        inicial={inicial}
+        modelo={edicao.modelo ?? null}
+        formatoExtra={edicao.formato}
+        agora={agora}
+        fora={fora}
+        onFechar={() => setEdicao(null)}
+      />
+    );
   }
 
-  const ordem: Record<string, number> = { 'no-ar': 0, agendado: 1, pausado: 2, encerrado: 3 };
+  const ordem: Record<Situacao, number> = { 'no-ar': 0, 'meta-atingida': 1, agendado: 2, pausado: 3, encerrado: 4 };
+  const esg = q.data?.esgotadoEm ?? {};
   const ordenados = [...anuncios].sort(
-    (a, b) => ordem[situacaoDe(a, agora)] - ordem[situacaoDe(b, agora)] || (a.cota === b.cota ? 0 : a.cota === 'master' ? -1 : 1),
+    (a, b) => ordem[situacaoDe(a, agora, esg[a.id])] - ordem[situacaoDe(b, agora, esg[b.id])] || (a.cota === b.cota ? 0 : a.cota === 'master' ? -1 : 1),
   );
+  const noAr = suspensao ? 0 : anuncios.filter((a) => situacaoDe(a, agora, esg[a.id]) === 'no-ar').length;
+  const pendentes = anuncios.filter(logoPendente);
+  const nLogos = pendentes.reduce((n, a) => n + (a.logo && !a.logoAjuste ? 1 : 0) + (a.logoEscuro && !a.logoEscuroAjuste ? 1 : 0), 0);
+  const relatorioAnuncio = relatorioDe ? (anuncios.find((a) => a.id === relatorioDe) ?? null) : null;
+
+  async function desfazerAjuste() {
+    if (!desfazer) return;
+    setDesfazendo(true);
+    let ok = 0;
+    for (const it of desfazer.itens) {
+      const snapNovo = await run(
+        {
+          tipo: 'anuncio-logo',
+          id: it.id,
+          ...(it.logo ? { logo: it.logo, logoAjuste: null } : {}),
+          ...(it.logoEscuro ? { logoEscuro: it.logoEscuro, logoEscuroAjuste: null } : {}),
+        },
+        { chave: `anuncio-logo:${it.id}` },
+      );
+      if (snapNovo) ok++;
+    }
+    setDesfazendo(false);
+    setDesfazer(null);
+    if (ok) toast(ok > 1 ? 'Logos de volta como estavam' : 'Logo de volta como estava', { tone: 'ok' });
+  }
 
   return (
     <div>
+      {suspensao ? <FaixaSuspensao desde={suspensao.desde} motivo={suspensao.motivo} /> : null}
       <CabecalhoSecao
         titulo="Anunciantes"
         icone="selo"
-        descricao="Vários anunciantes ao mesmo tempo, com rotação por peso. Sempre rotulado como publicidade, sem pop-up e sem som."
+        descricao={
+          <>
+            Vários anunciantes ao mesmo tempo, com rotação por peso. Sempre rotulado como publicidade, sem pop-up e sem som.
+            <span className="num mt-1 block font-medium text-fg" data-no-ar>
+              {suspensao ? 'No ar: nenhum anúncio (suspensão geral)' : `No ar: ${fmtInt(noAr)} ${noAr === 1 ? 'anúncio' : 'anúncios'}`}
+            </span>
+          </>
+        }
         acoes={
-          <Button variant="primary" icon="mais" onClick={() => setEditando('novo')} disabled={lotado} title={lotado ? `Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios` : undefined}>
-            Novo anúncio
-          </Button>
+          <>
+            {!suspensao && anuncios.length ? (
+              <button
+                type="button"
+                onClick={() => setSuspender(true)}
+                className={cn(
+                  'inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-alert/45 px-3.5 text-sm font-semibold text-alert-fg',
+                  'transition-colors hover:bg-alert/10 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert',
+                )}
+              >
+                <Icon name="pause" size={16} />
+                Tirar todos do ar
+              </button>
+            ) : null}
+            <Button variant="primary" icon="mais" onClick={() => setEdicao({ modo: 'novo' })} disabled={lotado} title={lotado ? `Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios` : undefined}>
+              Novo anúncio
+            </Button>
+          </>
         }
       />
 
       <Callout tom="alerta" titulo="Somente anunciantes não políticos" className="mb-4 lg:mb-5">
         Proibido: partido, federação, candidato, campanha, mandato, governo ou órgão público com mensagem institucional, e qualquer conteúdo
-        político-eleitoral (Lei 9.504/97). Na dúvida, não publique.
+        político-eleitoral (Lei 9.504/97). Também não aceitamos apostas, cassino e mercados de previsão; bebida alcoólica fica fora do ar em 25/10
+        até as 17h. Na dúvida, não publique.
       </Callout>
 
-      {anuncios.length > 0 ? <Resumo anuncios={anuncios} agora={agora} metricas={metricas} /> : null}
+      {desfazer ? (
+        <div role="status" className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-ok/35 bg-ok/[0.08] px-3.5 py-2.5 lg:mb-5" data-desfazer>
+          <span className="flex min-w-0 items-center gap-2 text-[13.5px] font-medium text-fg">
+            <Icon name="check-circulo" size={17} className="shrink-0 text-ok-fg" />
+            Logos ajustadas
+          </span>
+          <Button variant="secondary" size="sm" icon="reset" loading={desfazendo} onClick={() => void desfazerAjuste()}>
+            Desfazer
+          </Button>
+        </div>
+      ) : null}
+
+      {pendentes.length && !desfazer ? (
+        <Callout tom="info" titulo="Logos para ajustar" className="mb-4 lg:mb-5">
+          <span className="num" data-logos-pendentes={nLogos}>
+            {nLogos === 1 ? '1 logo gravada' : `${fmtInt(nLogos)} logos gravadas`} antes do ajuste automático ({fmtLista([...new Set(pendentes.map((a) => a.marca))])}).{' '}
+            {nLogos === 1 ? 'Ela aparece pequena' : 'Elas aparecem pequenas'}, numa placa branca quadrada.
+          </span>
+          <span className="mt-2.5 block">
+            <Button variant="primary" size="sm" icon="ajustes" onClick={() => setAjustar(true)}>
+              Ajustar agora
+            </Button>
+          </span>
+        </Callout>
+      ) : null}
+
+      {anuncios.length > 0 ? <Resumo anuncios={anuncios} agora={agora} metricas={metricas} fora={fora} /> : null}
+      {anuncios.length > 0 ? <EspacosAgora anuncios={anuncios} agora={agora} fora={fora} onPreencher={setPreencher} /> : null}
 
       {anuncios.length === 0 ? (
         <div className="mb-5 flex flex-col items-center rounded-2xl border border-dashed border-line bg-surface/60 px-5 py-10 text-center">
@@ -511,17 +898,35 @@ export function SecaoAnuncios() {
           </span>
           <h2 className="mt-4 font-display text-[20px] font-semibold tracking-[-0.01em] text-fg">Nenhum anunciante ainda</h2>
           <p className="mt-1.5 max-w-sm text-pretty text-[13.5px] leading-relaxed text-fg-muted">
-            Cadastre a marca, a chamada, o link e onde aparece: faixa no topo, cartão no conteúdo, barra do celular, Teste Cego, Modo TV e as
+            Cadastre a marca, a chamada, o link e onde aparece: faixa no topo, cartão no conteúdo, barra do celular, Teste Cego, Modo TV, chat, lives e as
             imagens compartilhadas.
           </p>
-          <Button variant="primary" icon="mais" className="mt-5" onClick={() => setEditando('novo')}>
+          <Button variant="primary" icon="mais" className="mt-5" onClick={() => setEdicao({ modo: 'novo' })}>
             Cadastrar o primeiro anúncio
           </Button>
         </div>
       ) : (
         <div className="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 lg:gap-4 2xl:grid-cols-3">
           {ordenados.map((a) => (
-            <CartaoAnuncio key={a.id} a={a} agora={agora} metricas={metricas} onEditar={() => setEditando(a.id)} />
+            <CartaoAnuncio
+              key={a.id}
+              a={a}
+              agora={agora}
+              metricas={metricas}
+              resposta={q.data}
+              anuncios={anuncios}
+              fora={fora}
+              relatorios={relatoriosLigados}
+              onEditar={() => setEdicao({ modo: 'editar', id: a.id })}
+              onDuplicar={() => {
+                if (lotado) {
+                  toast(`Limite de ${ANUNCIO_LIMITES.maxAnuncios} anúncios cadastrados: remova um para duplicar.`, { tone: 'alert' });
+                  return;
+                }
+                setEdicao({ modo: 'duplicar', modelo: duplicarAnuncio(a, anuncios.map((x) => x.id)) });
+              }}
+              onRelatorio={() => setRelatorioDe(a.id)}
+            />
           ))}
         </div>
       )}
@@ -531,6 +936,19 @@ export function SecaoAnuncios() {
         <Relatorio anuncios={anuncios} resposta={q.data} erro={q.error} agora={agora} />
         <PaginaAnuncie />
       </div>
+
+      <DialogoSuspender open={suspender} onClose={() => setSuspender(false)} />
+      <AjustarLogos open={ajustar} onClose={() => setAjustar(false)} pendentes={pendentes} onAplicado={setDesfazer} />
+      <FolhaPreencher
+        formato={preencher}
+        anuncios={anuncios}
+        onClose={() => setPreencher(null)}
+        onEscolher={(id, f) => {
+          setPreencher(null);
+          setEdicao(id === 'novo' ? { modo: 'novo', formato: f } : { modo: 'editar', id, formato: f });
+        }}
+      />
+      {relatorioAnuncio ? <LinksRelatorio anuncio={relatorioAnuncio} open={!!relatorioAnuncio} onClose={() => setRelatorioDe(null)} /> : null}
     </div>
   );
 }

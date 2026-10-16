@@ -5,9 +5,12 @@
  *  - Em todas as larguras: logo abaixo do cabeçalho, ROLA junto com a página (não fica presa ao cabeçalho fixo). Fixa,
  *    a faixa passava colada aos percentuais, nomes e fotos de candidato ao rolar (ARCHITECTURE §1.5: anúncio nunca
  *    colado a foto, nome ou número de candidato). A impressão conta na carga, com a faixa no topo.
- *  - No celular, a barra fixa é o formato 'rodape' (que se recolhe diante de placar e resultado). Versão compacta: logo, "Publicidade · marca" e o título INTEIRO em até duas
- *    linhas (o anunciante escreve até 60 caracteres); abaixo de 400 px o botão vira só a seta (o texto do botão segue
- *    no rótulo do link), para sobrar espaço para o título.
+ *  - No celular, a barra fixa é o formato 'rodape' (que se recolhe diante de placar e resultado).
+ *  - Faixa "premium" (anunciantes v2): 60 px abaixo de 1024 px e 64 px a partir dele, com o LOGOTIPO grande no lugar do
+ *    nome em texto (o nome segue no rótulo do link). Abaixo de 1024 px: logo, filete, "Publicidade" e o título INTEIRO em
+ *    até duas linhas (o anunciante escreve até 60 caracteres), e a seta (o texto do botão segue no rótulo do link). A
+ *    partir de 1024 px: "Publicidade", filete, logo, o título inteiro numa linha, o destino (xl) e o botão. Com ícone
+ *    ou logo antiga, o nome da marca continua em texto ("Publicidade · marca").
  *  - Altura reservada antes de o status chegar (sem pulo de layout); sem anúncio no topo, a faixa não aparece.
  */
 import { lazy, Suspense } from 'react';
@@ -15,8 +18,10 @@ import { cn } from '@/app/lib/cn';
 import { useAnunciosDaPagina } from './contexto';
 import { topoEsperado } from './visita';
 
-/** Altura da faixa: 52 px (no celular cabem "Publicidade · marca" + o título em duas linhas). */
-export const ALTURA_TOPO = 'h-[52px]';
+/** Altura da faixa: 60 px abaixo de 1024 px (logo de 34 px + "Publicidade" + o título em duas linhas) e 64 px a partir dele. */
+export const ALTURA_TOPO = 'h-[60px] lg:h-16';
+/** Altura da versão compacta (vitrine e prévia em coluna estreita): a do celular. */
+export const ALTURA_TOPO_COMPACTA = 'h-[60px]';
 
 /** Fundo da faixa (a peça usa o mesmo; o lugar reservado também). */
 export const FUNDO_TOPO = 'relative overflow-hidden border-b border-line bg-surface-2';

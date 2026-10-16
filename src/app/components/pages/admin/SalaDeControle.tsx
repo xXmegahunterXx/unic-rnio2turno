@@ -27,6 +27,7 @@ import { SecaoChat } from './SecaoChat';
 import { SecaoAudiencia } from './SecaoAudiencia';
 import { SecaoInteressados, useInteressadosNovos } from './SecaoInteressados';
 import { situacaoDe } from './anunciosAdmin';
+import { fmtHora } from '@/shared/format';
 
 export function SalaDeControle({ offline }: { offline: boolean }) {
   const { secao } = useAdmin();
@@ -45,6 +46,7 @@ export function SalaDeControle({ offline }: { offline: boolean }) {
         <div className="relative lg:pl-[72px] xl:pl-[248px]">
           <BarraSuperior />
           <CabecalhoMovel />
+          <FaixaSuspensaoMovel />
           {offline ? <FaixaOffline /> : null}
           <main
             ref={mainRef}
@@ -104,9 +106,16 @@ function Marca({ compacta }: { compacta?: boolean }) {
 
 const FONTE_CURTA = { pre: 'Pré', simulacao: 'Simulação', tse: 'TSE' } as const;
 
-/** Anúncios no ar agora (relógio real do servidor). */
+/**
+ * Anúncios no ar agora: os que o SITE recebe (o status do painel é o mesmo do site — relógio real, sem os de meta de
+ * impressões atingida). Sem a lista no status, pela situação de cada um.
+ */
 function useAnunciosNoAr(): number {
   const { snap } = useAdmin();
+  // interruptor geral ligado: nenhum no ar (o chip "Anúncios suspensos" avisa)
+  if (snap.state.anunciosSuspensos) return 0;
+  const doSite = snap.status.anuncios;
+  if (doSite) return doSite.length;
   return (snap.state.anuncios ?? []).filter((a) => situacaoDe(a, snap.status.wallNow) === 'no-ar').length;
 }
 
@@ -264,6 +273,56 @@ function Sidebar() {
 
 // ---- barra superior (desktop) --------------------------------------------------------------------------
 
+/**
+ * Chip do interruptor geral dos anúncios ("Tirar todos do ar", seção Anunciantes): aparece no cabeçalho em todas as
+ * seções enquanto a suspensão está ligada; leva à seção.
+ */
+function ChipSuspensao({ className }: { className?: string }) {
+  const { snap, irPara } = useAdmin();
+  const s = snap.state.anunciosSuspensos;
+  if (!s) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => irPara('anuncios')}
+      title={`Anúncios suspensos desde ${fmtHora(s.desde)}${s.motivo ? ` · ${s.motivo}` : ''}`}
+      data-chip-suspensao
+      className={cn(
+        'inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full border border-alert/45 bg-alert/15 px-2.5 text-[12px] font-semibold text-alert-fg',
+        'transition-colors hover:bg-alert/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-alert',
+        className,
+      )}
+    >
+      <Icon name="pause" size={13} />
+      Anúncios suspensos
+    </button>
+  );
+}
+
+/**
+ * Celular: a mesma informação numa faixa fina logo abaixo do cabeçalho (no cabeçalho não há espaço), em todas as
+ * seções menos Anunciantes (que tem a faixa própria, com "Voltar com os anúncios").
+ */
+function FaixaSuspensaoMovel() {
+  const { snap, secao, irPara } = useAdmin();
+  const s = snap.state.anunciosSuspensos;
+  if (!s || secao === 'anuncios') return null;
+  return (
+    <button
+      type="button"
+      onClick={() => irPara('anuncios')}
+      data-chip-suspensao
+      className="sticky top-[101px] z-20 flex w-full items-center gap-2 border-b border-alert/35 bg-alert/[0.14] px-4 py-2 text-left text-[12.5px] text-fg backdrop-blur lg:hidden"
+    >
+      <Icon name="pause" size={14} className="shrink-0 text-alert-fg" />
+      <span className="min-w-0 flex-1 truncate">
+        <span className="font-semibold">Anúncios suspensos</span> desde <span className="num">{fmtHora(s.desde)}</span>
+      </span>
+      <span className="shrink-0 font-semibold text-alert-fg">Ver</span>
+    </button>
+  );
+}
+
 function BarraSuperior() {
   const { snap, irPara, anon } = useAdmin();
   const fonte = snap.state.fonte;
@@ -299,6 +358,7 @@ function BarraSuperior() {
         <SepV />
         <ProgressoPres />
         <div className="ml-auto flex items-center gap-3">
+          <ChipSuspensao />
           <Transporte />
           <SeletorVelocidade variante="select" />
         </div>

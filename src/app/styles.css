@@ -23,6 +23,9 @@
  *    `*-ink` sobre o preenchimento: ≥ 3:1 (só ícones/sinais).
  *  - `fg-subtle` ≥ 4,5:1 sobre surface e surface-2; `brand`/`brand-deep` aceitam texto branco (≥ 4,5:1).
  */
+/* `[data-tema-local]`: um trecho da página num tema fixo (prévias claro | escuro do painel, vitrine das imagens de
+   compartilhamento), com o contexto `TemaLocal` (components/anuncios/pecas.tsx) para os componentes que leem o tema. */
+[data-tema-local='escuro'],
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
@@ -64,6 +67,10 @@
   --alert: 251 113 133;
   --alert-fg: 251 113 133;
   --pending: 58 58 80; /* território ainda não apurado */
+  /* placas atrás das logos/peças de anunciantes: as MESMAS nos dois temas (clara = surface do claro, escura = surface do
+     escuro); qual delas, e se há placa, vem do contraste medido no painel (AjusteImagem) */
+  --placa-clara: 255 255 255;
+  --placa-escura: 17 17 26;
   /*
    * Partidos (cargos do 1º turno: Senado, Câmara, Assembleias, governadores eleitos): paleta categórica estável.
    * PL = azul do Flávio Bolsonaro e PT = vermelho do Lula (mesmo token, decisão do dono do produto); os outros 8
@@ -83,6 +90,7 @@
   --partido-10: 37 129 1; /* verde */
 }
 
+[data-tema-local='claro'],
 :root[data-theme='light'] {
   color-scheme: light;
   --bg: 246 246 251;

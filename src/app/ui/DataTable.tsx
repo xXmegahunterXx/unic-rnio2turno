@@ -73,7 +73,10 @@ export interface DataTableProps<R> {
   /** Legenda (visível só para leitores de tela). */
   caption?: string;
   empty?: ReactNode;
-  /** tabela com números de candidato: a barra de anúncio do rodapé e a pílula do chat não ficam por cima */
+  /**
+   * a barra de anúncio do rodapé e a pílula do chat não ficam por cima (padrão: true — as tabelas do site mostram números
+   * de candidato; `false` só para tabela sem nenhum dado de candidato)
+   */
   semAnuncioFixo?: boolean;
   className?: string;
 }
@@ -120,7 +123,7 @@ export function DataTable<R>({
   caption,
   empty,
   className,
-  semAnuncioFixo,
+  semAnuncioFixo = true,
 }: DataTableProps<R>) {
   const [sortLocal, setSortLocal] = useState<SortState | null>(initialSort ?? null);
   const sort = sortCtrl !== undefined ? sortCtrl : sortLocal;

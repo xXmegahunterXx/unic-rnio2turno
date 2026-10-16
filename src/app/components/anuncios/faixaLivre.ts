@@ -14,11 +14,40 @@
  * nessa hora vigiaria a faixa errada para sempre. Rede de segurança: na rolagem (1× por quadro), se a altura mudou o
  * observador é refeito, e um bloco marcado na faixa (pela geometria) esconde a barra mesmo que o observador não tenha
  * avisado.
+ *
+ * Rede de segurança contra candidato (anunciantes v2): além dos blocos marcados, a barra some diante de QUALQUER
+ * elemento com cor de candidato (`SELETOR_CANDIDATO`: classe `*cand-*`, estilo com `--cand-*` ou `data-candidato`) fora
+ * de um bloco já marcado e fora de peças fixas — um bloco novo que esqueceu a marca continua protegido. Com mais de
+ * `MAX_CANDIDATOS` desses elementos na página, a barra fica escondida nela (lado seguro, sem vigiar milhares).
  */
 import { useEffect, useState } from 'react';
 
 /** Atributo dos blocos que a barra fixa não pode cobrir (use `data-sem-anuncio-fixo` no elemento). */
 export const SELETOR_SEM_ANUNCIO_FIXO = '[data-sem-anuncio-fixo]';
+
+/**
+ * Elementos com cor de candidato (fora dos blocos marcados, que já são vigiados inteiros, e fora das peças fixas — a
+ * própria barra, a tab bar, a pílula do chat).
+ */
+export const SELETOR_CANDIDATO =
+  '[class*="cand-"]:not([data-sem-anuncio-fixo] *):not(.fixed *), [style*="--cand-"]:not([data-sem-anuncio-fixo] *):not(.fixed *), [data-candidato]';
+
+/** Acima disto, a página tem cor de candidato demais para vigiar: a barra fica escondida nela. */
+export const MAX_CANDIDATOS = 2000;
+
+/** Classe ou estilo com cor de candidato? (a mesma regra de `SELETOR_CANDIDATO`, para os testes e a reserva sem IO) */
+export function temCorDeCandidato(classe: string | null | undefined, estilo: string | null | undefined): boolean {
+  return (classe ?? '').includes('cand-') || (estilo ?? '').includes('--cand-');
+}
+
+/** Blocos vigiados agora: os marcados e os com cor de candidato (`excesso` = cor de candidato demais na página). */
+function vigiados(): { els: Set<Element>; excesso: boolean } {
+  const cand = document.querySelectorAll(SELETOR_CANDIDATO);
+  const excesso = cand.length > MAX_CANDIDATOS;
+  const els = new Set<Element>(document.querySelectorAll(SELETOR_SEM_ANUNCIO_FIXO));
+  if (!excesso) cand.forEach((el) => els.add(el));
+  return { els, excesso };
+}
 
 /**
  * Altura da faixa de baixo vigiada (px): tab bar (60) + barra (60 + 8) + área segura típica (34) + respiro (~40).
@@ -70,11 +99,12 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
     if (typeof IntersectionObserver === 'undefined') {
       // navegador muito antigo: confere na rolagem
       const conferir = () => {
-        const els = document.querySelectorAll(SELETOR_SEM_ANUNCIO_FIXO);
-        let ocupado = false;
-        els.forEach((el) => {
-          if (!ocupado && naFaixa(el.getBoundingClientRect(), alturaTela())) ocupado = true;
-        });
+        const { els, excesso } = vigiados();
+        let ocupado = excesso;
+        for (const el of els) {
+          if (ocupado) break;
+          if (naFaixa(el.getBoundingClientRect(), alturaTela())) ocupado = true;
+        }
         setLivre(!ocupado);
       };
       conferir();
@@ -88,6 +118,8 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
 
     const dentro = new Set<Element>();
     const observados = new Set<Element>();
+    // cor de candidato demais na página (> MAX_CANDIDATOS): a barra fica escondida nela
+    let excesso = false;
     let io: IntersectionObserver | null = null;
     let tMostrar = 0;
     let tVarrer = 0;
@@ -96,21 +128,22 @@ export function useFaixaLivre(ativo: boolean, chave: string): boolean {
     let altura = alturaTela();
 
     const aplicar = () => {
-      if (dentro.size > 0) {
+      if (dentro.size > 0 || excesso) {
         if (tMostrar) window.clearTimeout(tMostrar);
         tMostrar = 0;
         setLivre(false);
       } else if (!tMostrar) {
         tMostrar = window.setTimeout(() => {
           tMostrar = 0;
-          setLivre(dentro.size === 0);
+          setLivre(dentro.size === 0 && !excesso);
         }, ESPERA_LIVRE_MS);
       }
     };
     const varrer = () => {
       tVarrer = 0;
       if (!io) return;
-      const atuais = new Set(document.querySelectorAll(SELETOR_SEM_ANUNCIO_FIXO));
+      const { els: atuais, excesso: demais } = vigiados();
+      excesso = demais;
       for (const el of observados) {
         if (!atuais.has(el)) {
           io.unobserve(el);

@@ -55,6 +55,8 @@ usam a senha do `.env` por dentro do contêiner, sem passar pela internet.
 | Chat: situação (aberta/fechada, modo lento, fixada, denúncias) | `deploy/painel.sh chat-estado` |
 | Chat: abrir · **fechar (emergência)** · apagar tudo | `deploy/painel.sh chat-abrir` · `deploy/painel.sh chat-fechar` · `deploy/painel.sh chat-limpar` |
 | Chat: modo lento e mensagem fixada | `deploy/painel.sh chat-lento 20` · `deploy/painel.sh chat-fixar "texto"` · `deploy/painel.sh chat-sem-fixada` |
+| Anúncios: o que está no ar e a situação de cada um | `deploy/painel.sh anuncios-estado` |
+| **Tirar TODOS os anúncios do ar** (sem apagar nada) · voltar | `deploy/painel.sh anuncios-suspender "motivo"` · `deploy/painel.sh anuncios-voltar` (seção 3.9) |
 | Log do app ao vivo (Ctrl+C sai) | `docker compose logs -f --since 5m app` |
 | Só a troca automática no log | `docker compose logs --since 2h app \| grep 'Troca automática'` |
 | Só erros | `docker compose logs --since 15m app \| grep '"nivel":"erro"'` |
@@ -86,6 +88,7 @@ Aviso no site:    nenhum
 Simulação:        bloqueada (correto no site público)
 Códigos do TSE:   pleito 3221 · Presidente 6258 · Governador 6260 · a cada 15 s
 Chat ao vivo:     fechada · modo lento 10 s · sem mensagem fixada
+Anúncios:         4 no ar: Lynx, UPdePix, Vulpix, Café Aurora
 ```
 
 (Em produção a sala só recebe mensagens a partir das 17h de 25/10: aberta antes disso, o `chat-estado` diz "ABERTA no
@@ -316,9 +319,37 @@ deploy/update.sh --rollback      # volta para a imagem anterior em ~5 s, sem der
 deploy/status.sh                 # confira "imagem no ar"
 ```
 
-O rollback troca só o código. O estado do painel não muda. Se ele também precisar voltar (ex.: alguém mexeu no que
-não devia), use `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>`. O app fica parado ~5 s; o restore faz um
-backup do estado atual antes (e preserva o registro cifrado do chat).
+O rollback troca só o código; os arquivos do estado continuam os mesmos — mas a versão antiga só entende o que ela
+conhece (veja o aviso logo abaixo para a volta dos anunciantes v2 à leva 2). Se o estado também precisar voltar (ex.:
+alguém mexeu no que não devia), use `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>`. O app fica parado
+~5 s; o restore faz um backup do estado atual antes (e preserva o registro cifrado do chat).
+
+**Atenção — voltar dos anunciantes v2 para a leva 2** (com a publicação desta leva, o `:anterior` do rollback rápido É
+a leva 2). A leva 2 não conhece nada do v2, e isso tem efeito na hora e efeito permanente:
+
+- **Na hora:** a **suspensão geral é ignorada** (os anúncios voltam ao ar sem ninguém perceber — e ela é o interruptor
+  de "reclamação jurídica / dúvida sobre a regra eleitoral"); a **meta de impressões não vale** (anúncio com meta
+  atingida volta); a **Reserva disputa como paga** (aparece no lugar dos pagos); as logos voltam à placa branca
+  quadrada; as categorias recusadas e a regra da bebida no dia da votação não são checadas no salvar.
+- **Para sempre, na 1ª gravação da versão antiga** (qualquer comando do painel, ou a troca automática das 17h):
+  `admin.json` perde `logoAjuste`, `logoEscuro`, `reserva`, `limiteImpressoes` e a suspensão de todos os anúncios; e,
+  no 1º salvamento das métricas (~60 s), `anuncios-metricas.json` é reescrito sem os totais por dia e sem o alcance
+  (os totais e as últimas 48 h ficam). O relatório da noite perde o alcance.
+
+Antes do rollback (se der tempo; se não, logo depois):
+
+1. **Suspensão ligada?** Pause CADA anúncio no painel (Anunciantes → cartão → Pausar) — a leva 2 entende `ativo` — ou
+   não faça o rollback.
+2. **Anúncios com meta e de Reserva:** pause-os também (na leva 2 a meta não vale e a Reserva disputa como paga).
+3. Guarde o estado do v2: `deploy/backup.sh` (o restore `--so-admin` depois devolve os campos do v2).
+
+Ao voltar para o v2 (`docker tag … && deploy/update.sh --rollback`, como abaixo):
+
+1. Se nada foi gravado na leva 2, está tudo como antes. Se foi: restaure **só o painel** do backup do passo 3
+   (`deploy/restore.sh <backup> --so-admin`) ou refaça à mão: **"Ajustar agora"** nas logos, reenvie as **versões
+   para fundo escuro**, remarque **Reserva** e **metas**, e religue a **suspensão**, se for o caso.
+2. Os totais por dia (além das 48 h) e o alcance que se perderam não voltam: avise o anunciante que o relatório da
+   campanha passa a contar só daí (os totais desde sempre continuam certos).
 
 **Atenção — voltar para uma versão de ANTES de out/2026** (a imagem `sintonia-app:pre-anuncios`, ou o `:anterior` logo
 depois da primeira atualização desta leva): ela não conhece os anúncios, o contato da /anuncie nem os contatos
@@ -371,6 +402,41 @@ deploy/restore.sh /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz --so-adm
 2. Na Cloudflare, troque o IP do registro A para o da VPS nova (com a nuvem laranja vale na hora; sem a Cloudflare,
    depende do TTL do DNS).
 3. Tempo total: ~20–30 min com o backup em mãos.
+
+### 3.9 Anúncios: tirar todos do ar e desligar recursos
+
+**Tirar todos do ar** (anúncio com problema que não dá para achar, reclamação jurídica, dúvida sobre a regra eleitoral,
+qualquer coisa estranha perto de resultado): é o interruptor geral. Nada é apagado nem pausado; voltar devolve
+exatamente o que estava no ar.
+
+- **Painel:** Anunciantes → **"Tirar todos do ar"**, com o motivo (fica no registro). Com a suspensão ligada, a seção
+  mostra a faixa "Anúncios suspensos desde …" com **"Voltar com os anúncios"**.
+- **Terminal:** `deploy/painel.sh anuncios-suspender "motivo"` e, para voltar, `deploy/painel.sh anuncios-voltar`.
+  Confira com `deploy/painel.sh anuncios-estado`.
+- Efeito: em até ~5 s nenhum anúncio no site (nem o "Anuncie no Sintonia"), no Modo TV, nas lives (`/live`), no chat e
+  nas imagens de compartilhamento novas (a CDN pode servir uma imagem já gerada por mais alguns minutos). As impressões
+  param de contar. Pausar e ativar cada anúncio continua valendo durante a suspensão e define o que volta.
+- **Um anúncio só:** pause no painel (Anunciantes → o cartão → Pausar), como antes.
+
+**Desligar um recurso novo dos anunciantes** sem tirar os anúncios:
+
+| O quê | Como desliga | Efeito |
+|---|---|---|
+| Contagem por pessoa (rede + navegador) | `ANUNCIO_PESSOA=0` no `.env` e `docker compose up -d` | Impressões e cliques contam pela rede, como antes (60 eventos/min por rede). Use se o log mostrar o app lento nas rotas `/api/anuncio/` ou **suspeita de contagem inflada**: avisos "rede(s) chegaram ao teto de pessoas" / "par(es) rede × anúncio chegaram ao teto" repetidos janela após janela, ou uma meta atingida muito antes da previsão |
+| Relatório público por link (`/relatorio`) | `RELATORIOS=0` no `.env` e `docker compose up -d` (ou revogue só um link no painel) | `/api/anuncie/relatorio` responde 404 e o painel esconde os links |
+| Meta de impressões de um anúncio | Painel: tire a meta (ou aumente) no formulário | O anúncio volta ao site na hora |
+| Logo nas imagens de compartilhamento | `OG_LOGO_OFERECIMENTO = false` em `src/server/og-oferecimento.ts` e atualização do código | As imagens voltam ao texto "Oferecimento: marca" |
+| Desenho novo das logos no site | `LOGO_NATURAL = false` em `src/shared/anuncios-flags.ts` e atualização do código | Logo na placa clara quadrada, como antes |
+| Reserva (empresas do grupo) | Painel: troque a cota do anúncio para Apoio | Disputa a rotação normal com os pagos |
+
+**Anúncio sumiu depois de um reinício?** Uma regra endurecida (categorias, bebida no dia da votação, meta sem início)
+pode recusar, na subida, um anúncio gravado antes. Ele não volta, e a próxima gravação o tira do `admin.json`. O log
+diz qual e por quê: `docker compose logs app | grep "não restaurado"` ("Anúncio <marca> (<id>) não restaurado: <motivo>").
+Refaça-o no painel com outra redação, ou restaure só o painel de um backup (`deploy/restore.sh <arquivo> --so-admin`) e
+corrija o anúncio logo em seguida.
+
+`LOGO_NATURAL` e `OG_LOGO_OFERECIMENTO` exigem código novo: na semana da eleição, prefira o interruptor geral ou pausar o
+anúncio e deixe a troca de código para depois da noite (seção 4: nada de atualizar depois das 14h do domingo).
 
 ---
 
