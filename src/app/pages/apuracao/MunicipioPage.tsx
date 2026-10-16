@@ -168,7 +168,7 @@ export default function MunicipioPage() {
           />
         </div>
         <p className="mb-4 text-[12.5px] text-fg-muted">% dos votos válidos {emMun(snap.nome)}</p>
-        <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto />
+        <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto anonimizado={!!statusQ.data?.anonimizado} />
       </section>
     ) : null;
 

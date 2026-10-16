@@ -45,6 +45,7 @@ import { layoutTeste, renderPng, type No } from './og';
 import { OFERECIMENTO_NO_PLACAR, comOferecimento, oferecimentoDe, tagOferecimento, type CartaoComOferecimento } from './og-oferecimento';
 import { FORMATOS_OG, renderPlacarPng, type FormatoOg, type OgPlacarInput } from './og-placar';
 import { registrarOgPalpite } from './og-palpite';
+import { registrarOgAnuncie } from './og-anuncie';
 import {
   layoutCalculadora,
   layoutCandidato,
@@ -168,6 +169,8 @@ export function registrarOg(app: App, d: DepsOg): void {
   const { dados, races, fotos, estaticos, log, servico } = d;
   // Palpite (/api/og/palpite.png): genérico, nunca lê palpite algum (o palpite vai depois do "#" do link)
   registrarOgPalpite(app, { status: () => dados.status(), log });
+  // /anuncie: prévia genérica, sem candidato nem anunciante (a página de vendas circula no WhatsApp)
+  registrarOgAnuncie(app);
   const dominio = d.dominio ?? undefined;
 
   /** Conjunto de anunciantes das imagens ('' = nenhum; '|of…' entra no modo do cache). */

@@ -9,11 +9,12 @@
  * candidato, foto ou cor de candidato aqui.
  */
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import { ANUNCIO_LIMITES, FORMATOS_ANUNCIO, ROTULO_FORMATO, type AnuncioPublico, type FormatoAnuncio } from '@/shared/anuncios';
 import { fmtInt } from '@/shared/format';
 import { OFERECIMENTO_COM_CANDIDATOS } from '@/shared/oferecimento';
 import { useStatus } from '@/app/data/hooks';
+import { useContatos } from '@/app/data/contatos';
+import { emailProvisorio } from '@/shared/contatos';
 import { cn } from '@/app/lib/cn';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import { ButtonLink, buttonClasses } from '@/app/ui/Button';
@@ -46,8 +47,11 @@ export default function AnunciePage() {
   useTitulo('Anuncie no Sintonia');
   useRolarParaHash();
   const contato = useStatus().data?.anuncie ?? null;
+  const contatos = useContatos();
+  // e-mail comercial: o da /anuncie; sem ele, o contato geral do site (painel → Comunicação → Contatos públicos)
+  const enderecoEmail = (contato?.email && !emailProvisorio(contato.email) ? contato.email : null) ?? contatos.geral ?? undefined;
   const zap = linkWhatsApp(contato?.whatsapp);
-  const email = linkEmail(contato?.email);
+  const email = linkEmail(enderecoEmail);
   // números REAIS medidos pelo site (só com o interruptor do painel ligado)
   const audiencia = useDivulgacao().data?.audiencia ?? null;
 
@@ -66,7 +70,7 @@ export default function AnunciePage() {
         <Cotas className="order-2 lg:order-none" />
         <Regras className="order-2 lg:order-none" />
         <Envio className="order-2 lg:order-none" />
-        <Contato className="order-1 lg:order-none" zap={zap} email={email} whatsapp={contato?.whatsapp} enderecoEmail={contato?.email} />
+        <Contato className="order-1 lg:order-none" zap={zap} email={email} whatsapp={contato?.whatsapp} enderecoEmail={enderecoEmail} />
         <SigaSintonia variante="cartao" className="order-3 mt-14 sm:mt-20 lg:order-none" />
       </Container>
     </>
@@ -197,17 +201,17 @@ const MOTIVOS: { icone: IconName; titulo: string; texto: string }[] = [
   {
     icone: 'ao-vivo',
     titulo: '25 de outubro, ao vivo',
-    texto: 'A apuração do 2º turno a partir das 17h, com placar, mapa e cada seção atualizados ao longo da noite. Sua marca junto da tela de acompanhar a eleição.',
+    texto: 'A apuração do 2º turno a partir das 17h, com placar, mapa e cada seção atualizados ao longo da noite. Sua marca junto da tela em que o país acompanha a eleição.',
   },
   {
     icone: 'olho-fechado',
     titulo: 'Teste Cego e Palpite, feitos para circular',
-    texto: 'Quem faz o teste ou crava o palpite do 2º turno compartilha e desafia os amigos. As duas telas trazem “oferecido por” a sua marca, abaixo das ações de compartilhar.',
+    texto: 'Quem faz o teste ou crava o palpite do 2º turno compartilha e desafia os amigos. As duas telas trazem “Oferecido por” com a sua marca: no Teste Cego, abaixo das ações de compartilhar; no Palpite, no fim da página.',
   },
   {
     icone: 'compartilhar',
     titulo: 'Sua marca nas imagens compartilhadas',
-    texto: 'Os cartões que vão para o X e o WhatsApp — Teste Cego, Palpite, calculadora do 2º turno e capa das curiosidades — levam “Oferecimento: sua marca” numa faixa própria no rodapé.',
+    texto: 'As imagens de prévia que aparecem quando alguém compartilha o link do Teste Cego, do Palpite, da calculadora do 2º turno e da capa das curiosidades no X e no WhatsApp levam “Oferecimento: sua marca” numa faixa própria no rodapé.',
   },
   {
     icone: 'grafico',
@@ -238,15 +242,15 @@ function PorQue() {
 // Galeria de formatos (componentes reais)
 
 const ONDE: Record<FormatoAnuncio, string> = {
-  topo: 'Logo abaixo do cabeçalho, em todas as páginas. No computador acompanha a rolagem; no celular, em versão compacta.',
+  topo: 'Logo abaixo do cabeçalho, em todas as páginas, rolando com a página (nunca presa por cima de placar ou candidato). No celular, em versão compacta.',
   rodape: 'Barra no pé da tela do celular, acima do menu, depois que a pessoa rola a página — e nunca por cima de placar ou de candidato. Pode ser fechada e aparece de novo na próxima visita.',
   nativo: 'Cartão “Patrocinado” entre as seções da página inicial, da apuração, dos governadores, das curiosidades e da calculadora.',
   teste: 'Na tela de resultado do Teste Cego, depois que a pessoa revela e abaixo das ações de compartilhar (“Teste Cego oferecido por”), e no fim da página do Palpite do 2º turno (“Palpite oferecido por”).',
   tv: '“Oferecimento” com a sua logo na barra do topo do Modo TV, a tela cheia para transmissões e telões — fora do placar.',
   // o texto acompanha OFERECIMENTO_COM_CANDIDATOS (src/shared/oferecimento.ts): a página diz exatamente onde a marca aparece
   compartilhamento: OFERECIMENTO_COM_CANDIDATOS
-    ? '“Oferecimento: sua marca” numa faixa própria no rodapé das imagens postadas no X e no WhatsApp: Teste Cego, calculadora, capa das curiosidades e convite do Palpite — e também nos cartões do placar e do Palpite, que mostram candidatos, fotos oficiais e números: nesses, só texto, numa faixa abaixo da marca do Sintonia, nunca sobre foto, nome ou número. Nunca na ficha de candidato.'
-    : '“Oferecimento: sua marca” numa faixa própria no rodapé das imagens postadas no X e no WhatsApp: Teste Cego, calculadora, capa das curiosidades e a imagem-convite do Palpite. Nunca em imagem com candidato: placar, resultado, cartão de palpite com nomes e percentuais ou ficha de candidato.',
+    ? '“Oferecimento: sua marca” numa faixa própria no rodapé das imagens de prévia dos links compartilhados no X e no WhatsApp: Teste Cego, calculadora, capa das curiosidades e convite do Palpite — e também nos cartões do placar e do Palpite, que mostram candidatos, fotos oficiais e números: nesses, só texto, numa faixa abaixo da marca do Sintonia, nunca sobre foto, nome ou número. Nunca na ficha de candidato.'
+    : '“Oferecimento: sua marca” numa faixa própria no rodapé das imagens de prévia que aparecem quando alguém compartilha o link do Teste Cego, da calculadora, da capa das curiosidades e do Palpite no X e no WhatsApp. Nunca em imagem com candidato: placar, resultado, cartão de palpite com nomes e percentuais ou ficha de candidato.',
   chat: '“Sala oferecida por sua marca” no chat ao vivo da apuração, onde o público comenta cada atualização: no topo da sala no computador e no pé dela no celular, sempre fora das mensagens.',
   live: '“Oferecido por sua marca” na barra do Sintonia que streamers põem nas lives (Twitch, YouTube, Kick) pelo OBS: a sua marca na tela de quem transmite a apuração, sem link e separada do placar pela marca do Sintonia.',
 };
@@ -338,7 +342,7 @@ function Cotas({ className }: { className?: string }) {
       destaque: 'Patrocinador principal',
       marca: true,
       itens: [
-        'Prioridade na faixa do topo, no Modo TV e nas imagens de compartilhamento',
+        'Prioridade na faixa do topo, no Modo TV, nas lives (OBS) e nas imagens de compartilhamento',
         'Pode aparecer também nos cartões do conteúdo, no rodapé do celular e no Teste Cego',
         'Período e formatos combinados com você',
       ],
@@ -354,7 +358,7 @@ function Cotas({ className }: { className?: string }) {
     },
   ];
   return (
-    <Bloco className={className} id="cotas" eyebrow="Cotas" titulo="Master ou apoio" descricao="Valores e períodos sob consulta. Todos os anúncios têm data de início e de fim e podem ser pausados a qualquer momento.">
+    <Bloco className={className} id="cotas" eyebrow="Cotas" titulo="Master ou apoio" descricao="Valores e períodos sob consulta. Os anúncios podem ter data de início e de fim e podem ser pausados a qualquer momento.">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-5">
         {cotas.map((c) => (
           <div
@@ -488,7 +492,7 @@ function Contato({
         <div aria-hidden className="pointer-events-none absolute -left-24 -top-24 -z-10 h-72 w-72 rounded-full bg-brand/15 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute -bottom-28 -right-20 -z-10 h-72 w-72 rounded-full bg-brand-2/10 blur-3xl" />
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,300px)] lg:gap-12">
-          <FormLead />
+          <FormLead temOutroCanal={tem} />
           <aside aria-label="Outras formas de contato" className="min-w-0 border-t border-line pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-1">
             <h3 className="font-display text-[18px] font-semibold tracking-[-0.01em] text-fg">Prefere conversar agora?</h3>
             {tem ? (
@@ -524,13 +528,7 @@ function Contato({
                 </ul>
               </>
             ) : (
-              <p className="mt-1.5 text-pretty text-[14.5px] leading-relaxed text-fg-muted">
-                Veja os outros canais na página{' '}
-                <Link to="/sobre#contato" className="font-medium text-fg underline decoration-line/[3] underline-offset-[3px] hover:decoration-brand-fg">
-                  Sobre
-                </Link>
-                .
-              </p>
+              <p className="mt-1.5 text-pretty text-[14.5px] leading-relaxed text-fg-muted">O canal comercial do Sintonia chega em breve.</p>
             )}
           </aside>
         </div>

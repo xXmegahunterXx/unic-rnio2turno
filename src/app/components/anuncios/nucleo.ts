@@ -37,7 +37,8 @@ export function escolhaDaPagina(
   const lista = anuncios ?? [];
   const topo = escolherAnuncio(lista, 'topo', `${semente}|topo`);
   const rodape = escolherAnuncio(lista, 'rodape', `${semente}|rodape`, topo ? [topo.id] : []);
-  const fixos = [topo?.id, rodapeNaTela ? rodape?.id : undefined].filter((x): x is string => !!x);
+  const rodapeFixo = rodapeNaTela ? rodape?.id : undefined;
+  const fixos = [topo?.id, rodapeFixo].filter((x): x is string => !!x);
   const teste = escolherAnuncio(lista, 'teste', `${semente}|teste`, fixos);
   const tv = escolherAnuncio(lista, 'tv', `${semente}|tv`);
 
@@ -47,7 +48,10 @@ export function escolhaDaPagina(
   const calcular = (ate: number) => {
     for (let k = nativos.length + 1; k <= Math.min(ate, MAX_NATIVOS); k++) {
       const a = escolherAnuncio(lista, 'nativo', `${semente}|nativo-${k}`, [...fixos, ...vistos]);
-      if (a && !vistos.includes(a.id)) {
+      // sem sobra (pool esgotado), a escolha volta a um já mostrado: o da barra FIXA do rodapé nunca (ela fica na tela
+      // e os dois apareceriam empilhados), nem o mesmo em dois cartões — vira o "Anuncie aqui" (uma vez) ou nada. O da
+      // faixa do topo pode repetir quando é o único (a faixa rola com a página e já saiu da tela)
+      if (a && !vistos.includes(a.id) && a.id !== rodapeFixo) {
         vistos.push(a.id);
         nativos.push(a);
       } else if (!casaUsada) {
@@ -75,9 +79,20 @@ export function escolhaDaPagina(
  * baixo da tela, e no resultado o botão "Revelar" também — a barra atrapalharia e geraria toques sem querer (o
  * resultado já tem o próprio espaço, "Teste Cego oferecido por").
  */
-export const rodapePermitido = (pathname: string): boolean =>
-  // /ao-vivo: a sala ocupa a tela e já tem "Sala oferecida por" (com a faixa do topo, seriam 3 anúncios numa tela)
-  !pathname.startsWith('/teste') && !pathname.startsWith('/duelo') && pathname.replace(/\/+$/, '') !== '/ao-vivo';
+export const rodapePermitido = (pathname: string): boolean => {
+  const p = pathname.replace(/\/+$/, '');
+  return (
+    !p.startsWith('/teste') &&
+    !p.startsWith('/duelo') &&
+    // /ao-vivo: a sala ocupa a tela e já tem "Sala oferecida por" (com a faixa do topo, seriam 3 anúncios numa tela)
+    p !== '/ao-vivo' &&
+    // ficha do candidato: a página inteira é sobre um candidato (foto, nome, número, votos) — a barra fixa passaria
+    // por cima de algum desses blocos ao rolar (ARCHITECTURE §1.5)
+    !p.startsWith('/candidato') &&
+    // a própria página de vendas: a barra de outro anunciante cobriria o contato comercial
+    p !== '/anuncie'
+  );
+};
 
 /** Link de clique contado pelo servidor: termina em /api/anuncio/ir/<id> (o app acrescenta ?f=<formato>). */
 const RE_IR = /\/api\/anuncio\/ir\/[a-z0-9-]{2,40}$/;

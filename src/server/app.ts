@@ -652,7 +652,10 @@ export function createApp(deps: AppDeps) {
   /** LiveStatus público: + pessoas agora (estimativa arredondada), anúncios com imagens por URL e fase 'encerrada' no TSE. */
   const statusPublico = (c: Ctx): LiveStatus => {
     const st = dados.status();
-    const out: LiveStatus = { ...st, pessoasAgora: metricas.pessoasAgora(), ...anunciosParaSite(st, origemDe(c)) };
+    // "N pessoas agora": o maior entre o que chega à origem e a presença pelo sinal das páginas — com a Cloudflare na
+    // frente, só o sinal atravessa a CDN (o da origem ficava em ~1/3 do real e caía pela metade quando o intervalo subia)
+    const pessoasAgora = Math.max(metricas.pessoasAgora(), crescimento?.audiencia.presencaAgora ?? 0);
+    const out: LiveStatus = { ...st, pessoasAgora, ...anunciosParaSite(st, origemDe(c)) };
     if (st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado()) out.fase = 'encerrada';
     // troca automática esperando o TSE responder: aviso discreto (só se o admin não publicou um aviso próprio)
     if (!st.aviso && agendador.avisoPublico()) out.aviso = { nivel: 'info', texto: AVISO_AGUARDANDO_TSE };
@@ -1120,7 +1123,11 @@ export function createApp(deps: AppDeps) {
         if (dados.fonteDe(race) === 'tse') return null;
         return placarMeta(race, controller.municipio(race, uf, cod));
       },
-      fase: () => dados.status().fase,
+      // fase PÚBLICA (a do /api/status): na fonte TSE o motor fica em 'apurando' e o 'encerrada' vem de tseEncerrado()
+      fase: () => {
+        const st = dados.status();
+        return st.fonte === 'tse' && st.fase === 'apurando' && tseEncerrado() ? 'encerrada' : st.fase;
+      },
       // a vitrine /kit só existe no dev e no build demo (no build normal a rota cai no 404 do app)
       kit: !config.producao,
       ficha: (sq) => ({ lida: dadosEstaticos.ficha(sq), existe: dadosEstaticos.existeCandidato(sq) }),

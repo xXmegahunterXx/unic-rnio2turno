@@ -29,7 +29,8 @@ export function FaixaTopoPeca({
 }) {
   const ref = useRef<HTMLElement>(null);
   useImpressaoVisivel(ref, { id: a.id, formato: 'topo', bloco: 'topo', vista, ativo: !previa });
-  // classes que só valem a partir de 768 px (ou nunca, na versão compacta)
+  // classes que só valem a partir de 1024 px (ou nunca, na versão compacta). Até 1023 px (celular e tablet em retrato) a
+  // versão de duas linhas: numa linha só, o título de 60 caracteres saía cortado no iPad em retrato
   const md = (c: string) => (compacta ? '' : c);
   return (
     <aside aria-label="Publicidade" className={cn(FUNDO, compacta ? 'h-[52px]' : ALTURA_TOPO, className)}>
@@ -46,10 +47,12 @@ export function FaixaTopoPeca({
           // -mx-2 px-2: o anel de foco (por dentro) ganha folga e não passa por cima do rótulo nem do botão
           className={cn('-mx-2 flex h-full min-w-0 items-center gap-2.5 rounded-xl px-2', md('md:gap-3'))}
         >
-          <RotuloAnuncio className={cn('hidden', md('lg:inline'))}>Oferecido por</RotuloAnuncio>
+          {/* "Publicidade" (não "Oferecido por"): logo acima do título de uma página, "Oferecido por" soava como patrocínio
+              da apuração ou do Palpite */}
+          <RotuloAnuncio className={cn('hidden', md('lg:inline'))}>Publicidade</RotuloAnuncio>
           <LogoMarca anuncio={a} tamanho="xs" className={cn('h-8 w-8', md('md:h-8 md:w-8'))} />
           {/* celular: "Publicidade · marca" + o título inteiro em até duas linhas */}
-          <span className={cn('min-w-0 flex-1', md('md:hidden'))}>
+          <span className={cn('min-w-0 flex-1', md('lg:hidden'))}>
             <span className="flex min-w-0 items-center gap-1.5 text-[10.5px] font-semibold uppercase leading-[1.2] tracking-[0.12em] text-fg-subtle">
               <span className="shrink-0">Publicidade</span>
               <span aria-hidden>·</span>
@@ -59,11 +62,10 @@ export function FaixaTopoPeca({
           </span>
           {/* tablet/desktop: uma linha */}
           {compacta ? null : (
-            <span className="hidden min-w-0 flex-1 items-baseline gap-2 md:flex">
+            <span className="hidden min-w-0 flex-1 items-baseline gap-2 lg:flex">
               <span className="shrink-0 text-[14px] font-semibold text-fg">{a.marca}</span>
               <span aria-hidden className="text-fg-subtle">·</span>
               <span className="truncate text-[14px] text-fg-muted">{a.titulo}</span>
-              <RotuloAnuncio className="ml-1 lg:hidden">Publicidade</RotuloAnuncio>
             </span>
           )}
           {a.destino && !compacta ? <span className="hidden shrink-0 text-[12.5px] text-fg-subtle xl:inline">{a.destino}</span> : null}

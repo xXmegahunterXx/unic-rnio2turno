@@ -45,7 +45,7 @@ function ilustracao(): No {
       padding: '36px 36px 32px',
     },
     h('div', { justifyContent: 'space-between' }, lado('?%', 'flex-start'), h('div', { fontSize: 40, color: C.subtle, alignSelf: 'flex-end', marginBottom: 14 }, '×'), lado('?%', 'flex-end')),
-    // trilha: metades suaves, preenchimento do meio até o divisor, marca dos 50% e o divisor
+    // trilha: metades suaves e o divisor no meio (50/50), com setas para os dois lados
     h(
       'div',
       { position: 'relative', height: 56, marginTop: 34, alignItems: 'center' },
@@ -54,10 +54,11 @@ function ilustracao(): No {
         { width: 388, height: 16, borderRadius: 8, background: C.surface3, overflow: 'hidden', position: 'relative' },
         h('div', { position: 'absolute', left: 0, top: 0, width: 194, height: 16, background: 'rgba(124,92,255,0.28)' }),
         h('div', { position: 'absolute', left: 194, top: 0, width: 194, height: 16, background: 'rgba(196,168,255,0.22)' }),
-        h('div', { position: 'absolute', left: 194, top: 0, width: 58, height: 16, background: C.brand }),
       ),
-      h('div', { position: 'absolute', left: 193, top: 12, width: 3, height: 32, borderRadius: 2, background: 'rgba(244,244,250,0.6)' }),
-      h('div', { position: 'absolute', left: 240, top: 6, width: 24, height: 44, borderRadius: 12, background: C.fg, border: `1px solid ${C.line}` }),
+      // divisor no MEIO (50/50, como o controle começa): puxado para um lado, a ilustração "genérica" sugeria um palpite
+      h('div', { position: 'absolute', left: 150, top: 18, fontSize: 22, color: C.subtle }, '‹'),
+      h('div', { position: 'absolute', left: 226, top: 18, fontSize: 22, color: C.subtle }, '›'),
+      h('div', { position: 'absolute', left: 182, top: 6, width: 24, height: 44, borderRadius: 12, background: C.fg, border: `1px solid ${C.line}` }),
     ),
     h('div', { fontSize: 20, color: C.muted, marginTop: 14 }, '% dos votos válidos · somam 100%'),
   );

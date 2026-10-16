@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { AdminSnapshot } from '../shared/api';
 import type { AnuncioConfig, MetricaAnuncio } from '../shared/anuncios';
-import type { LiveStatus } from '../shared/types';
+import type { AdminState, LiveStatus } from '../shared/types';
 import { HORA_MS, LimiteJanela, MetricasAnuncios, Repeticoes, TabelaAnuncios, ehRobo, hashImagem, numeroDe } from './anuncios';
 import { CC, CSP_IMAGEM, EVENTOS_ANUNCIO_MIN } from './app';
 import { comando, login, montar, type Montado } from './test-helpers';
@@ -459,5 +459,32 @@ describe('peças puras', () => {
     expect(ehRobo('Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/129.0 Mobile Safari/537.36 Instagram 350.0')).toBe(false);
     for (const b of ['Twitterbot/1.0', 'facebookexternalhit/1.1', 'WhatsApp/2.2', 'Googlebot/2.1', 'curl/8.4', 'Mozilla/5.0 HeadlessChrome/120', '', undefined])
       expect(ehRobo(b)).toBe(true);
+  });
+});
+
+describe('contatos públicos (painel → Comunicação)', () => {
+  it('comando "contatos": vai para o status, fica no admin.json e volta depois de reiniciar; null limpa', async () => {
+    const { m, cookie } = await novo();
+    const contatos = { geral: 'contato@sintonia2026.com.br', privacidade: 'privacidade@sintonia2026.com.br', responsavel: 'Empresa Exemplo Ltda.', cnpj: '11.222.333/0001-81' };
+    expect((await comando(m, cookie, { tipo: 'contatos', contatos })).status).toBe(200);
+    const s = await status(m);
+    expect(s.contatos).toEqual({ ...contatos, cnpj: '11222333000181' });
+    // inválidos: domínio reservado, campo desconhecido, CNPJ errado
+    expect((await comando(m, cookie, { tipo: 'contatos', contatos: { imprensa: 'imprensa@sintonia.example' } })).status).toBe(400);
+    expect((await comando(m, cookie, { tipo: 'contatos', contatos: { telefone: '1' } })).status).toBe(400);
+    expect((await comando(m, cookie, { tipo: 'contatos', contatos: { responsavel: 'X Ltda', cnpj: '11222333000182' } })).status).toBe(400);
+    await m.store.flush();
+    const m2 = await montar({ stateDir: m.stateDir, estadoInicial: m.store.ler() as AdminState });
+    expect((await status(m2)).contatos).toEqual({ ...contatos, cnpj: '11222333000181' });
+    expect((await comando(m, cookie, { tipo: 'contatos', contatos: null })).status).toBe(200);
+    expect((await status(m)).contatos).toBeNull();
+  });
+
+  it('e-mail provisório (example.com) nunca vai para a /anuncie: recusado no comando; salvo por versão antiga, sai só ele', async () => {
+    const { m, cookie } = await novo();
+    expect((await comando(m, cookie, { tipo: 'anuncie-contato', contato: { email: 'contato@example.com' } })).status).toBe(400);
+    const antigo = { ...(m.store.ler() as AdminState), anuncie: { email: 'contato@example.com', whatsapp: '5511999999999' } };
+    const m2 = await montar({ stateDir: m.stateDir, estadoInicial: antigo });
+    expect((await status(m2)).anuncie).toEqual({ whatsapp: '5511999999999' });
   });
 });

@@ -93,7 +93,7 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
 
   if (variant === 'list') {
     return (
-      <dl className={cn(className)}>
+      <dl data-sem-anuncio-fixo className={cn(className)}>
         {itens.map((it) => (
           <div key={it.key} className="flex items-center gap-3 border-b border-line py-3 first:pt-0 last:border-0 last:pb-0">
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-fg-muted">
@@ -117,7 +117,7 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
   }
 
   return (
-    <dl className={cn('grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5', showValidos && 'lg:grid-cols-6', className)}>
+    <dl data-sem-anuncio-fixo className={cn('grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5', showValidos && 'lg:grid-cols-6', className)}>
       {itens.map((it, i) => (
         <div
           key={it.key}
@@ -126,7 +126,8 @@ export function StatsGrid({ t, showValidos, variant = 'cards', className }: Stat
             i === 0 && itens.length % 2 === 1 && 'col-span-2 lg:col-span-1',
           )}
         >
-          <dt className="flex items-center gap-1.5 text-[11.5px] font-semibold uppercase tracking-[0.1em] text-fg-muted">
+          {/* abaixo de 380 px, letra e espaçamento menores: "COMPARECIMENTO" cabe no cartão (nunca cortado) */}
+          <dt className="flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.06em] text-fg-muted min-[380px]:text-[11.5px] min-[380px]:tracking-[0.1em]">
             <Icon name={it.icon} size={14} />
             {it.label}
           </dt>

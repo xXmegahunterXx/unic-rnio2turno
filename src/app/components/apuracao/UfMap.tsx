@@ -209,7 +209,7 @@ export function UfMap({
   }
 
   return (
-    <div className={cn('relative w-full', className)}>
+    <div data-sem-anuncio-fixo className={cn('relative w-full', className)}>
       <div className="relative">
         <div
           ref={(el) => {

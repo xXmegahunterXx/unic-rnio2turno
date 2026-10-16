@@ -18,6 +18,22 @@ import { LinkAnuncio, LogoMarca } from './pecas';
 import { idDaVisita } from './visita';
 
 /**
+ * Escolha do anúncio da sala evitando, em ordem: o da faixa do topo e o da barra do rodapé; se não sobrar outro, só o do
+ * topo (no desktop a barra do rodapé nem aparece — evitar os dois fazia a sala repetir o anunciante do topo).
+ */
+export function escolherChat<T extends Pick<AnuncioPublico, 'id' | 'formatos' | 'peso' | 'cota'>>(
+  anuncios: readonly T[] | null | undefined,
+  semente: string,
+  topo?: string,
+  rodape?: string,
+): T | null {
+  const a = escolherAnuncio(anuncios, 'chat', semente, [topo, rodape].filter((x): x is string => !!x));
+  // pool esgotado com os dois evitados e a escolha caiu no do topo: tenta evitando só ele
+  if (a && topo && a.id === topo) return escolherAnuncio(anuncios, 'chat', semente, [topo]) ?? a;
+  return a;
+}
+
+/**
  * Slot da sala (sem provedor, sem status ou sem anúncio 'chat' no ar: nada). `noPe`: no PÉ da sala, logo acima do
  * campo de mensagem (folha do celular: longe do placar que fica à vista acima da folha).
  */
@@ -25,10 +41,7 @@ export function OferecimentoChat({ className, compacta, noPe }: { className?: st
   const { anuncios, escolha, vista, semProvedor, pronto } = useAnunciosDaPagina();
   const topo = escolha.topo?.id;
   const rodape = escolha.rodape?.id;
-  const a = useMemo(
-    () => escolherAnuncio(anuncios, 'chat', `${idDaVisita()}|chat`, [topo, rodape].filter((x): x is string => !!x)),
-    [anuncios, topo, rodape],
-  );
+  const a = useMemo(() => escolherChat(anuncios, `${idDaVisita()}|chat`, topo, rodape), [anuncios, topo, rodape]);
   if (semProvedor || !pronto || !a) return null;
   return <OferecimentoChatPeca anuncio={a} vista={vista} className={className} compacta={compacta} noPe={noPe} />;
 }
@@ -65,7 +78,8 @@ export function OferecimentoChatPeca({
         <LogoMarca anuncio={a} tamanho="xs" />
         <span className="min-w-0 flex-1 leading-tight">
           <span className="block text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-subtle">Sala oferecida por</span>
-          <span className="mt-0.5 block truncate text-[13.5px] font-semibold text-fg">
+          {/* a mensagem comprada pelo anunciante: inteira, em até 2 linhas (cortada no meio do preço da oferta, não) */}
+          <span className="mt-0.5 line-clamp-2 text-[13.5px] font-semibold leading-snug text-fg">
             {a.marca}
             {a.titulo ? <span className="font-normal text-fg-muted"> · {a.titulo}</span> : null}
           </span>

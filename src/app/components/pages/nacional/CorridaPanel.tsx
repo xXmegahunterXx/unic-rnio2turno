@@ -28,7 +28,7 @@ export const CorridaPanel = memo(function CorridaPanel({ serie, race, className 
   const largo = useMediaQuery('(min-width: 1360px)');
   const [areaRef, area] = useElementSize<HTMLDivElement>();
   return (
-    <section aria-labelledby="corrida-titulo" className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
+    <section aria-labelledby="corrida-titulo" data-sem-anuncio-fixo className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
       <div className="mb-3 flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5">
         <div className="min-w-0 flex-[1_1_14rem]">
           <h2 id="corrida-titulo" className="font-display text-[19px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[21px]">

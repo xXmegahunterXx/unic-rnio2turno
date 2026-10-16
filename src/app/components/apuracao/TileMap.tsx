@@ -180,6 +180,7 @@ export function TileMap({
   return (
     <div
       ref={boxRef}
+      data-sem-anuncio-fixo
       className={cn('relative w-full select-none', className)}
       onPointerLeave={() => tip && !tip.fixo && setTip(null)}
     >

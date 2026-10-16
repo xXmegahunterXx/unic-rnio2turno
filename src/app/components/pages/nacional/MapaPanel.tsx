@@ -155,7 +155,7 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
   };
 
   return (
-    <section aria-labelledby="mapa-titulo" className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface shadow-card', className)}>
+    <section aria-labelledby="mapa-titulo" data-sem-anuncio-fixo className={cn('flex min-w-0 flex-col rounded-2xl border border-line bg-surface shadow-card', className)}>
       <div className="px-4 pt-4 sm:px-5 sm:pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

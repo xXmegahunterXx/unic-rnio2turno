@@ -4,6 +4,7 @@
  * (afirmações únicas com escala de concordância: redação, posições documentadas, fórmula, documentos-fonte e
  * aviso de revisão editorial).
  */
+import { useContatos } from '@/app/data/contatos';
 import { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -27,7 +28,6 @@ import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import {
-  CONTATO,
   Destaque,
   Email,
   Ficha,
@@ -53,6 +53,9 @@ const SUMARIO = [
 
 export default function MetodologiaPage() {
   const { data: meta } = useMeta();
+  // correções: o e-mail de correções do painel; sem ele, o contato geral (nunca um endereço provisório)
+  const contatos = useContatos();
+  const emailCorrecoes = contatos.correcoes ?? contatos.geral;
   const totais = useMemo(() => {
     if (!meta) return null;
     let secoes = 0;
@@ -352,15 +355,26 @@ export default function MetodologiaPage() {
         {EM_REVISAO ? (
           <Destaque icone="alerta" tom="alerta" titulo="Revisão editorial">
             As afirmações e as posições foram preparadas a partir dos documentos oficiais e estão em revisão humana editorial e jurídica final.
-            Cada posição será conferida contra o documento registrado no TSE antes da publicação definitiva. Viu algum problema? Escreva para{' '}
-            <Email endereco={CONTATO.correcoes} />.
+            Cada posição será conferida contra o documento registrado no TSE antes da publicação definitiva.
+            {emailCorrecoes ? (
+              <>
+                {' '}
+                Viu algum problema? Escreva para <Email endereco={emailCorrecoes} />.
+              </>
+            ) : null}
           </Destaque>
         ) : null}
       </Secao>
 
       <Secao id="correcoes" titulo="Correções">
         <p>
-          Erramos? Queremos saber. Correções de dados, de texto ou de fonte podem ser enviadas para <Email endereco={CONTATO.correcoes} />.
+          Erramos? Queremos saber.
+          {emailCorrecoes ? (
+            <>
+              {' '}
+              Correções de dados, de texto ou de fonte podem ser enviadas para <Email endereco={emailCorrecoes} />.
+            </>
+          ) : null}{' '}
           Correções relevantes são registradas nesta página, com data.
         </p>
       </Secao>

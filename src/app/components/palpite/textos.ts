@@ -67,3 +67,27 @@ export const mancheteResultado = (av: Avaliacao, pessoa: 'eu' | 'voce' | 'recebi
   if (pessoa === 'voce') return `Você errou por ${fmtDiferenca(av.erro)}`;
   return `Errou por ${fmtDiferenca(av.erro)}`;
 };
+
+/**
+ * Cartão de quem chega ao /palpite depois do prazo sem palpite salvo: o texto segue a fase REAL do processo (nunca
+ * "a apuração começou" durante a votação, nem "começou" depois do fim).
+ */
+export function textoSemPalpite(votacao: boolean, fase: 'pre' | 'apurando' | 'encerrada' | undefined): { titulo: string; texto: string; botao: string } {
+  if (votacao || fase === 'pre')
+    return {
+      titulo: 'A apuração começa às 17h',
+      texto: 'Às 17h (horário de Brasília), quando termina a votação, os números do TSE aparecem aqui, estado por estado, cidade por cidade, seção por seção.',
+      botao: 'Ver a contagem regressiva',
+    };
+  if (fase === 'encerrada')
+    return {
+      titulo: 'A apuração do 2º turno terminou',
+      texto: 'Veja o resultado oficial do TSE, estado por estado, cidade por cidade, seção por seção.',
+      botao: 'Ver o resultado',
+    };
+  return {
+    titulo: 'A apuração do 2º turno está em andamento',
+    texto: 'Acompanhe os números do TSE estado por estado, cidade por cidade, seção por seção.',
+    botao: 'Acompanhar a apuração',
+  };
+}

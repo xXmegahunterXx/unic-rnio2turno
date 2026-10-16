@@ -219,7 +219,7 @@ export default function UfPage() {
   ) : !t1 && raceT1 && snapT1 ? (
     <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
       <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
-      <ComparaTurnos race={race} raceT1={raceT1} t2={r} t1={snapT1.resumo} compacto />
+      <ComparaTurnos race={race} raceT1={raceT1} t2={r} t1={snapT1.resumo} compacto anonimizado={!!statusQ.data?.anonimizado} />
     </section>
   ) : (
     <ParticipacaoCartao t={r} titulo="Participação no 1º turno" className="h-full" />

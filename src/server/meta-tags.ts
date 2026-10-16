@@ -171,7 +171,9 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
   if (s0 === 'apuracao') {
     if (seg.length === 1) {
       return pagina({
-        titulo: `Apuração ao vivo · ${tituloRace} · ${APP_NAME}`,
+        // depois do fim, "ao vivo" não vale mais (a prévia do link continua circulando)
+        titulo:
+          race?.turno !== 1 && ctx.fase?.() === 'encerrada' ? `Resultado do 2º turno · ${tituloRace} · ${APP_NAME}` : `Apuração ao vivo · ${tituloRace} · ${APP_NAME}`,
         descricao: comPlacar('Resultados do 2º turno seção por seção, com mapa por estado, gráfico da apuração e o que falta apurar.'),
         imagem: ogApuracao(),
         imagemAlt: altPlacar('Brasil'),
@@ -507,8 +509,15 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
     metodologia: ['Metodologia', 'Como calculamos e exibimos a apuração: fontes (TSE e IBGE), regras de percentuais e simulação.'],
     privacidade: ['Privacidade', 'O que coletamos (quase nada) e por que suas respostas do Teste Cego nunca saem do seu aparelho.'],
     sobre: ['Sobre', 'O Sintonia é um projeto apartidário de visualização da apuração e de comparação de propostas.'],
-    anuncie: ['Anuncie no Sintonia', 'Formatos de anúncio para marcas não políticas na apuração do 2º turno e no Teste Cego: topo, rodapé no celular, cartões, Modo TV e imagens de compartilhamento.'],
+    anuncie: [
+      'Anuncie no Sintonia',
+      'Formatos de anúncio para marcas não políticas na apuração do 2º turno: faixa no topo, barra no celular, cartões, Teste Cego, Palpite, Modo TV, chat ao vivo, lives (OBS) e prévias de link.',
+    ],
   };
+  if (seg.length === 1 && s0 === 'anuncie') {
+    // prévia genérica: sem foto, nome ou número de candidato ao lado do convite para anunciantes (§1.5)
+    return pagina({ titulo: `${estaticas.anuncie[0]} · ${APP_NAME}`, descricao: estaticas.anuncie[1], imagem: '/api/og/anuncie.png', imagemAlt: 'Anuncie no Sintonia: sua marca na noite da apuração', canonico: path });
+  }
   if (seg.length === 1 && estaticas[s0]) {
     return pagina({ titulo: `${estaticas[s0][0]} · ${APP_NAME}`, descricao: estaticas[s0][1], imagem: ogApuracao(), imagemAlt: altPlacar(''), canonico: path });
   }

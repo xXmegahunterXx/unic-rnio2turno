@@ -46,6 +46,7 @@ import { emMun, emUf, fmt4 } from '@/app/components/pages/detalhe/fmt';
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { LocalVotacaoCartao } from '@/app/components/pages/detalhe/LocalVotacao';
 import { PrimeiroTurnoSecao } from '@/app/components/pages/detalhe/PrimeiroTurnoSecao';
+import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 import { BotaoCompartilharSecao } from '@/app/components/share/cartoes/Secao';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 
@@ -365,7 +366,10 @@ export default function SecaoPage() {
             </Cartao>
           ) : null}
 
-          {racesT1.length ? (
+          {racesT1.length && ctx.anonimizado ? (
+            // simulação com nomes ocultos: o boletim OFICIAL do 1º turno ao lado do 2º fictício diria quem é o Candidato A
+            <AvisoT1Oculto titulo="Esta seção no 1º turno" />
+          ) : racesT1.length ? (
             <PrimeiroTurnoSecao uf={uf!} cod={cod} zona={zona!} secao={secao!} races={racesT1} nomeMunicipio={nomeMun} />
           ) : null}
 

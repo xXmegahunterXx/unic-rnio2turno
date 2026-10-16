@@ -16,6 +16,8 @@ import { copiarTexto, urlAbsoluta } from '@/app/lib/share';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { useNaTela } from '@/app/lib/useNaTela';
 import { useStatus } from '@/app/data/hooks';
+import { useContatos } from '@/app/data/contatos';
+import { emailProvisorio } from '@/shared/contatos';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import { ButtonLink, buttonClasses } from '@/app/ui/Button';
 import { Segmented } from '@/app/ui/Segmented';
@@ -72,6 +74,8 @@ export default function StreamersPage() {
   useTitulo('Para streamers · Use o Sintonia na sua live');
   useRolarParaHash();
   const contato = useStatus().data?.anuncie ?? null;
+  // sem e-mail na /anuncie, o contato geral do site (painel → Comunicação → Contatos públicos)
+  const geral = useContatos().geral;
   return (
     <>
       <Hero />
@@ -79,7 +83,7 @@ export default function StreamersPage() {
         <Layouts />
         <PassoAPasso />
         <Regras />
-        <Parceria whatsapp={contato?.whatsapp} email={contato?.email} />
+        <Parceria whatsapp={contato?.whatsapp} email={(contato?.email && !emailProvisorio(contato.email) ? contato.email : null) ?? geral ?? undefined} />
       </Container>
     </>
   );
@@ -601,9 +605,7 @@ function Parceria({ whatsapp, email }: { whatsapp?: string; email?: string }) {
               ) : null}
             </div>
           ) : (
-            <ButtonLink to="/sobre#contato" variant="outline" size="lg" iconRight="seta" className="shrink-0">
-              Ver contatos
-            </ButtonLink>
+            <p className="text-[14.5px] font-medium text-fg-muted lg:max-w-[14rem] lg:text-right">O canal de parcerias chega em breve.</p>
           )}
         </div>
       </div>

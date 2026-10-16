@@ -17,6 +17,7 @@ Horários de **Brasília**. Pressupõe o site instalado pelo [`DEPLOY.md`](./DEP
 |---|---|---|---|
 | Operador técnico | | | roda os comandos, acompanha a VPS e a Cloudflare |
 | Responsável editorial | | | publica e tira avisos no site (só os textos da seção 5) |
+| Moderador do chat (17h–23h de 25/10) | | | painel → Chat ao vivo: denúncias, apagar, silenciar, mensagem fixada; fecha a sala numa enxurrada de desinformação |
 | Dono do produto | | | voltar para "Pré-eleição", ligar a Cloudflare às pressas, aumentar a VPS, qualquer coisa fora deste roteiro |
 
 **Onde rodar os comandos:** na VPS, como root, dentro da pasta do projeto:
@@ -51,6 +52,9 @@ usam a senha do `.env` por dentro do contêiner, sem passar pela internet.
 | Pôr o TSE sem conferir o feed (último recurso) | `deploy/painel.sh fonte tse` |
 | Publicar aviso no site | `deploy/painel.sh aviso "texto"` · com destaque: `deploy/painel.sh alerta "texto"` |
 | Tirar o aviso | `deploy/painel.sh sem-aviso` |
+| Chat: situação (aberta/fechada, modo lento, fixada, denúncias) | `deploy/painel.sh chat-estado` |
+| Chat: abrir · **fechar (emergência)** · apagar tudo | `deploy/painel.sh chat-abrir` · `deploy/painel.sh chat-fechar` · `deploy/painel.sh chat-limpar` |
+| Chat: modo lento e mensagem fixada | `deploy/painel.sh chat-lento 20` · `deploy/painel.sh chat-fixar "texto"` · `deploy/painel.sh chat-sem-fixada` |
 | Log do app ao vivo (Ctrl+C sai) | `docker compose logs -f --since 5m app` |
 | Só a troca automática no log | `docker compose logs --since 2h app \| grep 'Troca automática'` |
 | Só erros | `docker compose logs --since 15m app \| grep '"nivel":"erro"'` |
@@ -58,12 +62,19 @@ usam a senha do `.env` por dentro do contêiner, sem passar pela internet.
 | Cartões barrados por limite (429 nas imagens) | `docker compose logs --since 15m app \| grep '"status":429' \| grep -c '/api/og/'` |
 | CPU e memória ao vivo | `docker stats` (Ctrl+C sai) |
 | Backup agora | `deploy/backup.sh` |
-| Voltar para a versão anterior do código | `deploy/update.sh --rollback` (≈ 5 s) |
+| Voltar para a versão anterior do código | `deploy/update.sh --rollback` (≈ 5 s; leia a seção 3.5) |
 | Restaurar o estado do painel | `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>` |
-| Reiniciar só o app (≈ 2–4 s; o Caddy segura as requisições) | `docker compose restart app` |
+| Reiniciar só o app (≈ 2–4 s; o proxy segura as requisições) | `docker compose restart app` |
+| Atualização automática: situação e congelamento | `deploy/auto-update.sh estado` · desligar: `deploy/auto-update.sh desligar` |
 
 `deploy/painel.sh --help` lista tudo. A simulação **não** pode ser ligada por esse script, e em produção o servidor
-também a recusa.
+também a recusa. O `painel.sh` faz login com a senha do `.env` e está sujeito ao **mesmo limite de tentativas** do painel
+(HTTP 429: espere 1 min).
+
+**Depois de QUALQUER reinício do app** (update, `restart`, VPS reiniciada ou aumentada, vigia do healthcheck):
+`deploy/painel.sh chat-estado`. A configuração da sala (aberta/fechada, modo lento, mensagem fixada) volta sozinha (fica
+em `chat.json` no volume); as **mensagens e os silenciamentos não** voltam (ficam só na memória): silencie de novo quem
+estava silenciado, se ainda for preciso. Abas abertas recarregam sozinhas uma vez ao navegar depois de um update.
 
 **Como ler o `painel.sh estado` num dia normal antes da eleição:**
 
@@ -74,7 +85,11 @@ Troca automática: agendada para 25/10 17:00:00
 Aviso no site:    nenhum
 Simulação:        bloqueada (correto no site público)
 Códigos do TSE:   pleito 3221 · Presidente 6258 · Governador 6260 · a cada 15 s
+Chat ao vivo:     fechada · modo lento 10 s · sem mensagem fixada
 ```
+
+(Em produção a sala só recebe mensagens a partir das 17h de 25/10: aberta antes disso, o `chat-estado` diz "ABERTA no
+painel, mas ainda sem receber mensagens".)
 
 Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar com calma (seção 3).
 
@@ -86,13 +101,14 @@ Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar c
 
 | Quando | O quê | Como conferir |
 |---|---|---|
-| **até 12h00** | **Última atualização de código.** Depois disso, código congelado até segunda | `deploy/update.sh`; no fim, `deploy/status.sh` mostra a imagem nova `healthy` |
+| **até 12h00** | **Última atualização de código.** Depois disso, código congelado até segunda. Só versão **marcada** (`[deploy]` na mensagem do commit): `deploy/auto-update.sh rodar` vai até a última marcada; o `update.sh` pergunta antes de publicar um commit sem a marca | `git -C /opt/sintonia log -1 --format='%h %s' '@{u}'` antes; no fim, `deploy/status.sh` mostra a imagem nova `healthy` |
+| até 12h00 | Atualização automática: congelada a partir das 12h de 24/10 até 06h de 26/10 (padrão), ou desligada | `deploy/auto-update.sh estado` mostra o intervalo; se tiver dúvida, `deploy/auto-update.sh desligar` |
 | até 12h00 | Situação do TSE no Governador: o "Testar conexão" diz quais UFs ainda não têm arquivo do 2º turno (hoje, TO). Se o TSE tiver mudado o quadro (ex.: TO eleito no 1º turno), a decisão é do dono e o procedimento está no README, "Mudança no quadro do 2º turno"; **não** faça isso no domingo | `deploy/painel.sh testar-tse` |
-| 14h00 | **Aumentar a VPS** para 4 vCPU / 8 GB, se ainda não estiver (o provedor reinicia a máquina: ≈ 1–2 min fora do ar; tudo volta sozinho) | depois: `deploy/status.sh` (tudo `healthy`) |
+| 14h00 | **Aumentar a VPS** para 4 vCPU / 8 GB, se ainda não estiver (o provedor reinicia a máquina: ≈ 1–2 min fora do ar; tudo volta sozinho) | depois: `deploy/status.sh` (tudo `healthy`) e `deploy/painel.sh chat-estado` (a configuração da sala voltou) |
 | 15h00 | (Opcional) **ensaio da troca**: `deploy/painel.sh marcar HH:MM` (daqui a 3 min). No horário, `deploy/painel.sh estado` deve mostrar "feita". As páginas continuam no 1º turno (a fase depende da data da eleição) | `deploy/painel.sh estado` |
 | logo depois do ensaio | **Desfazer o ensaio** (obrigatório se ensaiou): `deploy/painel.sh fonte pre` e `deploy/painel.sh horario-padrao` | `painel.sh estado` = **"agendada para 25/10 17:00:00"** |
 | 18h00 | Cloudflare conferida (cache `HIT` na API, nuvem laranja, "Sempre usar HTTPS" desligado); monitor de uptime verde; relógio sincronizado | DEPLOY §5 item 7; `timedatectl` → *synchronized: yes* |
-| 20h00 | Backup **copiado para fora da VPS**; escala do domingo confirmada; textos de aviso (seção 5) aprovados pelo editorial | `scp root@IP:/var/backups/sintonia/sintonia-*.tar.gz ./` |
+| 20h00 | Backup **copiado para fora da VPS** (só o mais recente, **cifrado**: leva pedidos de anunciantes e o `.env`; apague as cópias antigas em até 30 dias); escala do domingo confirmada (inclusive o moderador do chat); textos de aviso (seção 5) aprovados pelo editorial | DEPLOY §7 (`scp` do mais recente + `gpg -c`) |
 
 ### Domingo, 25/10 (eleição)
 
@@ -104,8 +120,9 @@ Cloudflare, nenhum reinício da VPS, salvo pelo plano de contingência (seção 
 
 **16h00 — conferência T−60:**
 
-1. `deploy/status.sh`: app e Caddy `healthy`; memória do app abaixo de 600 MB; disco com folga; certificado válido;
-   último backup há menos de 1 h.
+1. `deploy/status.sh`: app `healthy` (na VPS exclusiva, o Caddy do Sintonia também; na compartilhada, as portas 80/443
+   são do proxy da máquina e o status mostra isso); memória do app abaixo de 600 MB; disco com folga; certificado
+   válido; último backup há menos de 1 h.
 2. `deploy/painel.sh estado`: exatamente o bloco "dia normal" da seção 1 (fonte Pré-eleição, **agendada para 25/10
    17:00:00**, aviso nenhum, simulação bloqueada, códigos 3221/6258/6260).
 3. `deploy/painel.sh testar-tse`: deve dizer "Feed ok: eleição 6258 (2º turno)…" com 0 seções totalizadas (o arquivo
@@ -122,6 +139,11 @@ Cloudflare, nenhum reinício da VPS, salvo pelo plano de contingência (seção 
 2. Abra o log ao vivo numa janela: `docker compose logs -f --since 1m app | grep -E 'Troca|erro|aviso'`.
 3. Deixe o painel aberto em *Fonte de dados → Troca automática para o TSE* (mostra a contagem e as tentativas).
 4. Faça um backup manual: `deploy/backup.sh`.
+5. **Chat (se o dono e o advogado decidiram usar — CHECKLIST B1.9):** abra a sala agora — painel → *Chat ao vivo* →
+   *Abrir a sala*, ou `deploy/painel.sh chat-abrir` — com o modo lento (`deploy/painel.sh chat-lento 20`) e, se o
+   editorial quiser, a mensagem fixada (`deploy/painel.sh chat-fixar "…"`). A sala fica "abre às 17h" e **só passa a
+   receber mensagens às 17h00** (o servidor bloqueia antes: Lei 9.504/97, art. 39, § 5º). `deploy/painel.sh chat-estado`
+   deve dizer "ABERTA no painel, mas ainda sem receber mensagens".
 
 **17h00 — troca automática.** Sem ninguém clicar, o servidor:
 
@@ -140,6 +162,11 @@ Confira às **17h01** com `deploy/painel.sh estado`:
 | `Troca automática: agendada para …` (outro horário) ou `desligada` | alguém mexeu na troca | `deploy/painel.sh trocar-agora` |
 | `Troca automática: DESABILITADA no servidor` | `TSE_AUTO=0` no `.env` | `deploy/painel.sh fonte tse` (sem conferência) e, depois da noite, apague a linha |
 | `Fase no site: antes da apuração` com a fonte TSE, **depois das 17h** | relógio da VPS errado | `timedatectl`; seção 3.4 |
+
+**17h01 — chat.** Abra `https://seu-dominio/ao-vivo` no celular: o campo "Comentar…" apareceu. `deploy/painel.sh
+chat-estado` → "ABERTA (recebendo mensagens)". O moderador fica de plantão no painel (*Chat ao vivo*) das 17h às 23h.
+Enxurrada de desinformação, ataque ou dúvida: **`deploy/painel.sh chat-fechar`** (a sala fica só leitura na hora) e
+avise o dono.
 
 **17h00–17h30 — primeiras seções.** O TSE costuma publicar os primeiros números poucos minutos depois das 17h.
 
@@ -161,11 +188,13 @@ Presidente ficou matematicamente definido por volta das 20h; é aí que o tráfe
 | painel → Monitor: p99 / atraso do event loop | < 0,3 s / < 0,1 s | p99 > 1 s por minutos seguidos |
 | `deploy/painel.sh tse` | "feed: ok", horário do TSE avançando | "COM FALHAS" ou horário parado > 5 min com o TSE avançando |
 | erros no log (comando da seção 1) | nenhum ou raros | vários por minuto |
+| reinícios do app no log (`docker compose logs --since 15m app \| grep -c 'Sintonia no ar'`) | 0 | qualquer um: veja o motivo (`grep -E 'healthz falhou\|SIGTERM'`) e, depois, `deploy/painel.sh chat-estado` |
+| chat (`deploy/painel.sh chat-estado`) | aberta, denúncias sendo revisadas | muitas recusadas por "fraude"/"ofensa" ou denúncias acumulando: reforce a moderação; em último caso, `chat-fechar` |
 | 429 nas imagens (comando da seção 1) | 0 a poucos | dezenas a cada 15 min: seção 3.3, "cartões sem imagem" |
 | Cloudflare → Analytics → Cache | maioria servida pela Cloudflare | a maioria indo para a VPS: confira as regras de cache (DEPLOY §5) |
 
-"Pessoas agora" conta só quem chega até a VPS; com a Cloudflare na frente, é bem menor que a audiência real. É
-normal.
+"Pessoas agora" no site é o maior entre quem chega à VPS e a presença pelo sinal das páginas (que atravessa a
+Cloudflare); continua sendo uma estimativa por baixo. É normal.
 
 **Resultado matematicamente definido.** O site mostra sozinho o evento ("matematicamente definida", texto neutro). Não
 publique aviso sobre isso e não poste projeções: o site só mostra o que o TSE divulga.
@@ -242,21 +271,34 @@ por minutos, ou números claramente errados:
 2. **Com Cloudflare, mas a VPS ainda sofre:** Analytics → Cache. Se a maior parte não vier do cache, as regras de
    cache não estão valendo (confira a expressão e o domínio na regra 1). Nunca ligue o modo "Estou sob ataque": ele
    bloqueia as atualizações automáticas da apuração.
-3. **Aumentar a VPS** (decisão do dono): mais vCPU ajuda o Caddy, a compressão e as imagens. Reinicia a máquina:
-   ≈ 1–2 min fora do ar (com a Cloudflare, quem já carregou continua vendo o último dado guardado).
-4. **Último recurso, sem CDN:** réplicas (DEPLOY §10). Leia as limitações antes; com Cloudflare, use 1 réplica.
+3. **Aumentar a VPS** (decisão do dono): mais vCPU ajuda o proxy, a compressão e as imagens. Reinicia a máquina:
+   ≈ 1–2 min fora do ar (com a Cloudflare, quem já carregou continua vendo o último dado guardado). Depois:
+   `deploy/painel.sh chat-estado`.
+4. **Réplicas NÃO:** não funcionam na VPS compartilhada (porta fixa em `127.0.0.1`: a 2ª não sobe) e, com o chat, os
+   pedidos de anunciantes e a audiência na memória/no volume, não devem ser usadas (DEPLOY §10).
+5. **Rajada que fura a borda:** Cloudflare → Analytics → Cache → *Top URLs*: endereço com `?x=` aleatório em
+   `/api/status`/`/api/apuracao`, ou muita página (HTML) de poucos IPs? Crie as Regras 3/4 e a regra de *Rate limiting*
+   do DEPLOY §5 (valem em segundos, sem reiniciar nada).
+6. **O vigia do healthcheck não reinicia por lentidão** (só se o processo travar de verdade: batimento parado). Se ainda
+   assim aparecerem reinícios em série no log (`/healthz falhou … SIGTERM`), ponha `AUTORREINICIO=0` no `.env` e rode
+   `docker compose up -d app` (~3 s); um travamento real passa a depender de você (`docker compose restart app`).
+   Depois de qualquer reinício: `deploy/painel.sh chat-estado`.
 
 **Cartões sem imagem no X** (log com muitos 429 em `/api/og/`): o limite de imagens novas por visitante pode estar
 barrando os robôs de prévia. Suba o limite no `.env` (`OG_LIMITE_MIN=120`; `0` = sem limite, a fila de geração ainda
-protege a CPU) e rode `docker compose up -d` (recria o app em ~3 s).
+protege a CPU) e rode `docker compose up -d app` (recria o app em ~3 s; depois, `deploy/painel.sh chat-estado`).
 
-**Caddy perto do limite de memória** (> 450 MB sem CDN): `CADDY_MEMORIA=1G` e `CADDY_GOMEMLIMIT=800MiB` no `.env` e
-`docker compose up -d caddy` (o HTTPS fica ~2–5 s fora do ar). Melhor ainda: Cloudflare na frente.
+**Caddy perto do limite de memória** (> 450 MB sem CDN) — **só na VPS exclusiva** (o Caddy é do Sintonia):
+`CADDY_MEMORIA=1G` e `CADDY_GOMEMLIMIT=800MiB` no `.env` e `docker compose up -d caddy` (o HTTPS fica ~2–5 s fora do
+ar). **Na VPS compartilhada** o proxy é do outro projeto: memória e logs dele são com o dono dele; **nunca** rode
+`docker compose up -d caddy` (ativaria o Caddy próprio e tentaria ocupar 80/443). Melhor ainda: Cloudflare na frente.
 
 ### 3.4 App fora do ar, travado ou com relógio errado
 
-- **Travado:** o vigia do healthcheck reinicia o processo sozinho depois de ~75 s sem resposta. Se passar de 3 min:
-  `docker compose restart app`. O estado do painel (fonte, troca, aviso) e o histórico ficam no volume e voltam iguais.
+- **Travado:** o vigia do healthcheck reinicia o processo sozinho depois de ~75 s sem resposta **com o batimento parado**
+  (lento por carga não conta). Se passar de 3 min: `docker compose restart app`. O estado do painel (fonte, troca,
+  aviso, anúncios, contatos), a configuração do chat e o histórico ficam no volume e voltam iguais; as mensagens do
+  chat e os silenciamentos, não (`deploy/painel.sh chat-estado`).
 - **Não sobe:** `docker compose logs --tail 100 app`. Se começou depois de uma atualização: `deploy/update.sh --rollback`.
 - **Relógio errado** (fase não muda às 17h, horários estranhos): `timedatectl set-ntp true`, espere sincronizar e
   `docker compose restart app`.
@@ -273,13 +315,22 @@ deploy/status.sh                 # confira "imagem no ar"
 
 O rollback troca só o código. O estado do painel não muda. Se ele também precisar voltar (ex.: alguém mexeu no que
 não devia), use `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>`. O app fica parado ~5 s; o restore faz um
-backup do estado atual antes.
+backup do estado atual antes (e preserva o registro cifrado do chat).
+
+**Atenção — voltar para uma versão de ANTES de out/2026** (a imagem `sintonia-app:pre-anuncios`, ou o `:anterior` logo
+depois da primeira atualização desta leva): ela não conhece os anúncios, o contato da /anuncie nem os contatos
+públicos — o site fica **sem anúncio** e **qualquer gravação** nessa versão (inclusive a troca automática das 17h)
+**apaga** essas listas do `admin.json`. Depois de voltar, não mexa no painel; ao subir de novo a versão nova, refaça os
+anúncios e os contatos ou restaure só o `admin.json` do último backup feito na versão nova (o app avisa no log:
+"sem a lista de anúncios"). Por isso, logo depois da primeira atualização desta leva: `docker tag
+sintonia-app:anterior sintonia-app:pre-anuncios` e `deploy/update.sh --forcar` — o rollback rápido passa a cair numa
+imagem que entende os anúncios.
 
 ### 3.6 HTTPS / Cloudflare com erro
 
 | Sintoma | O que fazer |
 |---|---|
-| Erro 526 (Cloudflare) | certificado da VPS com problema: nuvem **cinza**, `docker compose logs caddy`, volte para laranja quando o HTTPS direto funcionar |
+| Erro 526 (Cloudflare) | certificado da VPS com problema: nuvem **cinza**; VPS exclusiva: `docker compose logs caddy`; **VPS compartilhada:** o HTTPS e o certificado são do proxy da máquina (do outro projeto): `deploy/diagnostico.sh` e o dono do outro projeto — **nunca** `docker compose up -d caddy` (tentaria ocupar 80/443). Volte para laranja quando o HTTPS direto funcionar |
 | Erro 521/522 | Cloudflare não alcança a VPS: `deploy/status.sh`; firewall do provedor com 80/443 abertos? |
 | Erro 502/504 | app reiniciando ou travado: seção 3.4 |
 
@@ -307,6 +358,8 @@ backup do estado atual antes.
   eleição é desinformação com a nossa marca. Ensaios só numa cópia separada do site.
 - Nunca publicar aviso com nome de candidato, número parcial, projeção, "eleito" antes do TSE ou adjetivo. Só os
   textos da seção 5, ou outros aprovados pelo editorial.
+- Nunca `CHAT_ENSAIO=1` no `.env` do site público (abre a sala antes de 25/10) e nunca réplicas (`APP_REPLICAS`) nesta
+  VPS (DEPLOY §10).
 - Nunca voltar a fonte para "Pré-eleição" depois do encerramento.
 - Nunca usar "Congelar dados" (painel → Comunicação) na noite: é uma ferramenta de ensaio da simulação e não tem uso
   com o TSE ao vivo.

@@ -22,6 +22,7 @@
  */
 
 import { motivoPolitico } from './anuncios-politica';
+import { emailProvisorio } from './contatos';
 
 export const FORMATOS_ANUNCIO = ['topo', 'rodape', 'nativo', 'teste', 'tv', 'compartilhamento', 'chat', 'live'] as const;
 export type FormatoAnuncio = (typeof FORMATOS_ANUNCIO)[number];
@@ -272,6 +273,8 @@ export function validaContatoAnuncie(v: unknown): { ok: ContatoAnuncie } | { err
   const email = texto(v.email);
   if (email) {
     if (email.length > ANUNCIO_LIMITES.email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { erro: 'Contato: e-mail inválido.' };
+    // domínio reservado (`.example`, `example.com`…) não recebe e-mail: o site nunca publica endereço provisório
+    if (emailProvisorio(email)) return { erro: `Contato: o e-mail usa um domínio reservado (${email.split('@')[1]}), que não recebe e-mail.` };
     out.email = email;
   }
   const whatsapp = texto(v.whatsapp).replace(/\D/g, '');

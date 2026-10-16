@@ -62,6 +62,7 @@ import {
   fmtPalpite,
   mancheteResultado,
   textoMeuPalpite,
+  textoSemPalpite,
   textoResultadoPalpite,
 } from '@/app/components/palpite/textos';
 
@@ -128,7 +129,9 @@ function Hero({ finalistas, aberto, temPalpite }: { finalistas: FinalistasPalpit
         </span>
         <h1
           id="palpite-titulo"
-          className="mt-3 text-balance font-display text-[30px] font-semibold leading-[1] tracking-[-0.045em] text-fg min-[400px]:text-[34px] sm:mt-5 sm:text-[56px] lg:text-[64px]"
+          // tela baixa (360×740, 375×667): título menor e sem o parágrafo (repetido em "Como funciona"): o divisor e os
+          // "+0,1" ficam na 1ª tela, acima da tab bar
+          className="mt-3 text-balance font-display text-[30px] font-semibold leading-[1] tracking-[-0.045em] text-fg min-[400px]:text-[34px] sm:mt-5 sm:text-[56px] lg:text-[64px] [@media(max-height:760px)_and_(max-width:639px)]:text-[26px]"
         >
           {aberto ? (
             <>
@@ -144,12 +147,17 @@ function Hero({ finalistas, aberto, temPalpite }: { finalistas: FinalistasPalpit
             </>
           )}
         </h1>
-        <p className="mt-2.5 max-w-[44rem] text-pretty text-[15px] leading-relaxed text-fg-muted sm:mt-4 sm:text-[18px]">
+        <p
+          className={cn(
+            'mt-2.5 max-w-[44rem] text-pretty text-[15px] leading-relaxed text-fg-muted sm:mt-4 sm:text-[18px]',
+            aberto && '[@media(max-height:760px)_and_(max-width:639px)]:hidden',
+          )}
+        >
           {aberto
             ? 'Crave o % dos votos válidos de cada candidato a presidente. Com o resultado do TSE, veja por quantos pontos errou.'
             : temPalpite
-              ? 'Os palpites fecharam à meia-noite de 25/10, dia da votação. Com o resultado oficial do TSE, veja por quantos pontos o palpite cravado neste aparelho errou.'
-              : 'Os palpites fecharam à meia-noite de 25/10, dia da votação. Quem cravou um palpite neste aparelho vê aqui a diferença para o resultado oficial do TSE.'}
+              ? 'Os palpites fecharam às 23h59 de 24/10, véspera da votação. Com o resultado oficial do TSE, veja por quantos pontos o palpite cravado neste aparelho errou.'
+              : 'Os palpites fecharam às 23h59 de 24/10, véspera da votação. Quem cravou um palpite neste aparelho vê aqui a diferença para o resultado oficial do TSE.'}
         </p>
         <AvisoIndividual />
       </Container>
@@ -205,7 +213,7 @@ function Conteudo({
         ) : salvo ? (
           <Travado finalistas={finalistas} salvo={salvo} oficial={oficial} simulacao={!!status?.simulacao} votacao={votacao} oferecimento={oferecimento} />
         ) : (
-          <SemPalpite />
+          <SemPalpite votacao={votacao} fase={status?.simulacao ? 'apurando' : status?.fase} />
         )}
       </div>
       <aside className="min-w-0 lg:pt-1">
@@ -559,18 +567,17 @@ function Alvo() {
   );
 }
 
-function SemPalpite() {
+function SemPalpite({ votacao, fase }: { votacao: boolean; fase?: 'pre' | 'apurando' | 'encerrada' }) {
+  const t = textoSemPalpite(votacao, fase);
   return (
     <section className="rounded-[28px] border border-line bg-surface p-5 text-center shadow-card sm:p-8">
       <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-line bg-surface-2 text-fg-muted">
         <Icon name="relogio" size={24} />
       </span>
-      <h2 className="mt-3 font-display text-[22px] font-semibold tracking-[-0.02em] text-fg">A apuração do 2º turno começou</h2>
-      <p className="mx-auto mt-1.5 max-w-md text-[14.5px] leading-relaxed text-fg-muted">
-        Acompanhe os números do TSE estado por estado, cidade por cidade, seção por seção.
-      </p>
+      <h2 className="mt-3 font-display text-[22px] font-semibold tracking-[-0.02em] text-fg">{t.titulo}</h2>
+      <p className="mx-auto mt-1.5 max-w-md text-pretty text-[14.5px] leading-relaxed text-fg-muted">{t.texto}</p>
       <ButtonLink to="/apuracao" variant="primary" size="lg" iconRight="seta" className="mt-5">
-        Acompanhar a apuração
+        {t.botao}
       </ButtonLink>
     </section>
   );

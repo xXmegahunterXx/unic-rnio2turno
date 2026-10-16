@@ -10,7 +10,7 @@ import {
   type ContatoAnuncie,
 } from '../shared/anuncios';
 import type { AdminState, Aviso, ClockState, FonteDados, Patrocinio, ScenarioConfig, TrocaAutoEstado, TseConfig } from '../shared/types';
-import { validaContatosPublicos, type ContatosPublicos } from '../shared/contatos';
+import { emailProvisorio, validaContatosPublicos, type ContatosPublicos } from '../shared/contatos';
 import { normalizaCenario } from './scenario';
 import type { Structure } from './structure';
 
@@ -289,7 +289,9 @@ export function parseAnunciosSalvos(v: unknown, fallback: AnuncioConfig[]): Anun
 function parseContatoSalvo(v: unknown, fallback: ContatoAnuncie | null): ContatoAnuncie | null {
   if (v === undefined) return fallback ? { ...fallback } : null;
   if (v === null) return null;
-  const r = validaContatoAnuncie(v);
+  // e-mail provisório salvo por uma versão antiga (domínio reservado): sai só ele, o resto do contato fica
+  const salvo = v && typeof v === 'object' && typeof (v as ContatoAnuncie).email === 'string' && emailProvisorio((v as ContatoAnuncie).email!) ? { ...(v as object), email: undefined } : v;
+  const r = validaContatoAnuncie(salvo);
   return 'ok' in r && Object.keys(r.ok).length ? r.ok : null;
 }
 

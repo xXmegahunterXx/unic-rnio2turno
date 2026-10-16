@@ -77,11 +77,6 @@ export function OferecimentoLivePeca({
       data-anuncio-live={a.id}
       className={cn('flex min-w-0 items-center', aba ? 'gap-[calc(var(--u)*0.9)]' : 'gap-[calc(var(--u)*1.2)]', className)}
     >
-      {aba ? (
-        <span className="shrink-0 whitespace-nowrap text-[length:calc(var(--u)*1.15)] font-semibold uppercase leading-none tracking-[0.14em] text-fg-subtle">
-          Oferecido por
-        </span>
-      ) : null}
       {logo ? (
         <span className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden bg-brand-ink ring-1 ring-inset ring-line', caixa)}>
           <img src={logo} alt="" decoding="async" draggable={false} className="h-full w-full object-contain" />
@@ -99,9 +94,16 @@ export function OferecimentoLivePeca({
         </span>
       )}
       <div className="min-w-0">
-        {!aba ? (
-          <div className="whitespace-nowrap text-[length:calc(var(--u)*1.2)] font-semibold uppercase leading-none tracking-[0.16em] text-fg-subtle">Oferecido por</div>
-        ) : null}
+        {/* "Oferecido por" em cima da marca também na aba: a pílula cabe na largura da marca do Sintonia (nunca avança
+            sobre a foto do 1º candidato) e a marca ganha a largura toda */}
+        <div
+          className={cn(
+            'whitespace-nowrap font-semibold uppercase leading-none text-fg-subtle',
+            aba ? 'mb-[calc(var(--u)*0.35)] text-[length:calc(var(--u)*1.05)] tracking-[0.14em]' : 'text-[length:calc(var(--u)*1.2)] tracking-[0.16em]',
+          )}
+        >
+          Oferecido por
+        </div>
         {/* a marca é o que o anunciante paga para mostrar: nunca cortada (quebra em até 2 linhas) */}
         <div
           className={cn(

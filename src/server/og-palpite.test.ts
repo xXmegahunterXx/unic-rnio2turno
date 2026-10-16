@@ -105,3 +105,15 @@ describe('rota, meta tags e sitemap', () => {
     expect(sitemap).toContain('/palpite</loc>');
   }, 120_000);
 });
+
+describe('ilustração neutra do Palpite (conferência final)', () => {
+  it('o divisor fica no MEIO da trilha (sem preenchimento puxado para um lado)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const src = readFileSync('src/server/og-palpite.ts', 'utf8');
+    // trilha de 388 px: alça de 24 px centrada em 194
+    expect(src).toContain("left: 182, top: 6, width: 24");
+    expect(src).not.toMatch(/left: 194, top: 0, width: 58/);
+    const chamada = readFileSync('src/app/components/palpite/ChamadaPalpite.tsx', 'utf8');
+    expect(chamada).not.toMatch(/left-\[64%\]/);
+  });
+});

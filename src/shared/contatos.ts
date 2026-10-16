@@ -29,11 +29,11 @@ export type CampoEmail = 'geral' | 'privacidade' | 'imprensa' | 'correcoes';
 export const CAMPOS_EMAIL: readonly CampoEmail[] = ['geral', 'privacidade', 'imprensa', 'correcoes'];
 const CAMPOS: readonly (keyof ContatosPublicos)[] = [...CAMPOS_EMAIL, 'responsavel', 'cnpj'];
 
-/** Domínios reservados que não recebem e-mail (RFC 2606/6761): nunca vão para o site. */
-const RE_RESERVADO = /\.(example|invalid|test|localhost|local)$/i;
+/** Domínios reservados que não recebem e-mail (RFC 2606/6761: `.example`, `example.com`…): nunca vão para o site. */
+const RE_RESERVADO = /(\.(example|invalid|test|localhost|local)|[@.]example\.(com|net|org))$/i;
 const RE_EMAIL = /^[^@\s<>"'()[\],;:\\]+@[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$/i;
 
-/** Endereço reservado/provisório (`.example` etc.), que não recebe e-mail. */
+/** Endereço reservado/provisório (`.example`, `example.com` etc.), que não recebe e-mail. */
 export const emailProvisorio = (e: string) => RE_RESERVADO.test(e.trim());
 
 /** CNPJ com dígitos verificadores corretos (14 dígitos, não todos iguais). */

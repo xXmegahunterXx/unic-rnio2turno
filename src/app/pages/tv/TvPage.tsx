@@ -149,6 +149,7 @@ export default function TvPage() {
           simNow={simNow}
           inicio={status?.inicioApuracao}
           ao_vivo={!!status && status.fase === 'apurando' && !status.pausado && !status.congelado}
+          encerrada={status?.fase === 'encerrada'}
           simulacao={!!status?.simulacao}
           oferecimento={<OferecimentoTv variante="cabecalho" />}
           controles={
@@ -174,7 +175,7 @@ export default function TvPage() {
             ) : (
               <div className="flex-1 animate-pulse rounded-[calc(var(--u)*2.5)] bg-surface" />
             )}
-            <Rodape />
+            <Rodape simulado={simulado} />
           </section>
 
           <section aria-label="Mapa" className="relative min-h-0 min-w-0">
@@ -246,6 +247,7 @@ function BarraTopo({
   simNow,
   inicio,
   ao_vivo,
+  encerrada,
   simulacao,
   oferecimento,
   controles,
@@ -256,6 +258,8 @@ function BarraTopo({
   simNow: number;
   inicio?: number;
   ao_vivo: boolean;
+  /** fase pública 'encerrada' (o cabeçalho do site e a /live dizem "Encerrada") */
+  encerrada?: boolean;
   simulacao: boolean;
   /** "Oferecimento" (formato 'tv'): só com a TV deitada; em retrato vai para a faixa acima do letreiro */
   oferecimento?: ReactNode;
@@ -297,7 +301,7 @@ function BarraTopo({
               )}
             >
               <span className={cn('h-[calc(var(--u)*0.9)] w-[calc(var(--u)*0.9)] rounded-full', simulacao ? 'bg-brand-2' : 'bg-brand', ao_vivo && 'motion-safe:animate-pulse-dot')} />
-              {t1 ? 'Oficial' : simulacao ? 'Simulação' : ao_vivo ? 'Ao vivo' : 'Apuração'}
+              {t1 ? 'Oficial' : simulacao ? 'Simulação' : encerrada ? 'Encerrada' : ao_vivo ? 'Ao vivo' : 'Apuração'}
             </span>
             <div className="text-right">
               <div className="num font-display text-[length:calc(var(--u)*4.2)] font-semibold leading-none tracking-[-0.02em]">{fmtHoraSeg(simNow)}</div>
@@ -615,7 +619,7 @@ function MiniPlacarUf({ race, resumo }: { race: Race; resumo: Summary }) {
   );
 }
 
-function Rodape() {
+function Rodape({ simulado }: { simulado?: boolean }) {
   const url = urlAbsoluta('/apuracao');
   const host = hostExibicao() || 'sintonia';
   const qr = useMemo(() => {
@@ -646,7 +650,10 @@ function Rodape() {
         <div className="min-w-0 flex-1">
           <div className="text-[length:calc(var(--u)*1.6)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Acompanhe no celular</div>
           <div className="mt-[calc(var(--u)*0.4)] truncate font-display text-[length:calc(var(--u)*3)] font-semibold leading-tight tracking-[-0.02em]">{host}</div>
-          <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">Estado, município e seção por seção · fonte TSE</div>
+          <div className="mt-[calc(var(--u)*0.4)] text-[length:calc(var(--u)*1.7)] text-fg-muted">
+            {/* número simulado nunca sai com "fonte TSE" (ARCHITECTURE §11.10) */}
+            Estado por estado, município por município, seção por seção · {simulado ? 'simulação, dados fictícios' : 'fonte TSE'}
+          </div>
         </div>
       </div>
     </div>

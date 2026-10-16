@@ -6,6 +6,7 @@
  * No 1º turno o % é sobre TODOS os candidatos (regra do TSE); por isso os dois finalistas tendem a
  * crescer no 2º turno — explicamos isso com a linha "Demais candidatos".
  */
+import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 import type { PrimeiroTurnoLocal, Race, Tally } from '@/shared/types';
 import { pctBrancos, pctComparecimento, pctNulos, pctValidos, validos } from '@/shared/calc';
 import { fmtInt, fmtPP, fmtPct } from '@/shared/format';
@@ -38,10 +39,18 @@ export interface ComparaTurnosProps {
   participacao?: boolean;
   /** Versão enxuta (painel lateral). */
   compacto?: boolean;
+  /** simulação com nomes ocultos (`status.anonimizado`): nenhum % do 1º turno, só o aviso */
+  anonimizado?: boolean;
   className?: string;
 }
 
-export function ComparaTurnos({ race, raceT1, t2, t1, participacao = true, compacto, className }: ComparaTurnosProps) {
+export function ComparaTurnos({ race, raceT1, t2, t1, participacao = true, compacto, anonimizado, className }: ComparaTurnosProps) {
+  // simulação com nomes ocultos: os % OFICIAIS do 1º turno ao lado do 2º fictício diriam quem é o Candidato A
+  if (anonimizado) return <AvisoT1Oculto titulo="1º turno × 2º turno" className={className} />;
+  return <ComparaTurnosNumeros race={race} raceT1={raceT1} t2={t2} t1={t1} participacao={participacao} compacto={compacto} className={className} />;
+}
+
+function ComparaTurnosNumeros({ race, raceT1, t2, t1, participacao = true, compacto, className }: Omit<ComparaTurnosProps, 'anonimizado'>) {
   const b1 = tallyT1(t1);
   const tem2 = validos(t2) > 0;
   const tem1 = validos(b1) > 0;
@@ -49,7 +58,7 @@ export function ComparaTurnos({ race, raceT1, t2, t1, participacao = true, compa
   const pctOutros = iOutros >= 0 && tem1 ? pctValidos(b1, iOutros) : null;
 
   return (
-    <div className={className}>
+    <div data-sem-anuncio-fixo className={className}>
       <ul className={cn(compacto ? 'space-y-3.5' : 'space-y-5')}>
         {race.candidatos.map((c, i) => {
           // o mesmo candidato no 1º turno (casado pelo número; os índices 0/1 coincidem por construção)

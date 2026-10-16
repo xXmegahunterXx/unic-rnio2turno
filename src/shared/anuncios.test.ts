@@ -151,5 +151,8 @@ describe('utilitários', () => {
   it('contato', () => {
     expect(validaContatoAnuncie({ whatsapp: '+55 (11) 99999-9999', email: 'a@b.co' })).toEqual({ ok: { whatsapp: '5511999999999', email: 'a@b.co' } });
     expect('erro' in validaContatoAnuncie({ email: 'x' })).toBe(true);
+    // endereço provisório (domínio reservado) nunca vai para o site
+    expect(validaContatoAnuncie({ email: 'contato@example.com' })).toMatchObject({ erro: expect.stringMatching(/reservado/) });
+    expect(validaContatoAnuncie({ email: 'comercial@sintonia.example' })).toMatchObject({ erro: expect.stringMatching(/reservado/) });
   });
 });

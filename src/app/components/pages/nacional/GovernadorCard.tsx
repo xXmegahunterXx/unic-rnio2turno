@@ -81,10 +81,10 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">
               <span className="inline-flex h-6 shrink-0 items-center rounded-md bg-surface-3 px-1.5 font-mono text-[11.5px] font-semibold text-fg">{sigla}</span>
-              <h3 className="truncate font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">{nome}</h3>
+              <h3 className="line-clamp-2 break-words font-display text-[18px] font-semibold leading-tight tracking-[-0.015em] text-fg">{nome}</h3>
               {simulado ? <SimulationRibbon variant="badge" className="hidden shrink-0 sm:inline-flex" /> : null}
             </div>
-            <p className="num mt-1 truncate text-[12.5px] text-fg-muted">{sub}</p>
+            <p className="num mt-1 text-pretty text-[12.5px] leading-snug text-fg-muted">{sub}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {eleito ? (
@@ -125,8 +125,9 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
                 />
                 <div className="min-w-0 flex-1">
                   <div className={cn('line-clamp-2 text-[14.5px] leading-tight text-fg', lider ? 'font-semibold' : 'font-medium')}>{c.nomeUrna}</div>
-                  <div className="num mt-0.5 flex min-w-0 text-[12px] text-fg-muted">
-                    <span className="min-w-0 truncate">{c.partido}</span>
+                  {/* sigla nunca cortada (REPUBLICANOS × PP): sem espaço, os votos descem para a linha de baixo */}
+                  <div className="num mt-0.5 flex min-w-0 flex-wrap text-[12px] text-fg-muted">
+                    <span className="shrink-0">{c.partido}</span>
                     <span className="shrink-0 whitespace-pre"> · {fmtInt(resumo.votos[i] ?? 0)}</span>
                   </div>
                 </div>

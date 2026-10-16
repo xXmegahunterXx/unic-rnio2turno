@@ -241,7 +241,8 @@ export function TimelineChart({
   }, [serie, ultimo]);
 
   return (
-    <div className={cn('w-full', className)}>
+    // percentuais de candidato nos rótulos finais: nada fixo por cima (barra de anúncio, pílula do chat)
+    <div data-sem-anuncio-fixo className={cn('w-full', className)}>
       {!semLegenda ? (
         <ul className="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-fg-muted">
           {race.candidatos.map((c) => (

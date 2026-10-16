@@ -255,10 +255,17 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
    borda (sem a regra, cada pessoa com a sala aberta consultaria a VPS a cada 2,5 s). Os envios, denúncias, reações e o
    sinal de presença (`POST /api/chat` e `/api/chat/…`) nunca são guardados (a Cloudflare não guarda POST; a Regra 2 deixa
    explícito). O chat fica na memória do processo: use **1 instância** (com réplicas, cada uma teria a sua sala).
-   O app responde 400 a `GET /api/chat` com query string (`?x=…` só serviria para furar a cópia da borda). Para nem
-   isso chegar à VPS, crie uma **Regra 3 — "Sintonia: chat sem query"** (depois das duas): quando
-   `http.request.uri.path eq "/api/chat"`, *Elegível para cache* com *Chave de cache → Query string → Ignorar tudo*
-   (o resto como na Regra 1).
+   O app responde 400 a `GET /api/chat` com query string (`?x=…` só serviria para furar a cópia da borda).
+
+   **Regra 3 (opcional, recomendada) — "Sintonia: sem query"** (depois das duas): quando
+   `http.request.uri.path in {"/api/status" "/api/meta" "/api/chat" "/api/divulgacao"}`, *Elegível para cache* com
+   *Chave de cache → Query string → Ignorar tudo* (o resto como na Regra 1). O app nunca usa query nessas rotas: com a
+   Regra 1 sozinha, um `?x=<aleatório>` em `/api/status` (a URL mais pedida) vira um endereço novo a cada pedido e chega
+   à VPS. A regra **reduz** (não elimina) esses pedidos: num MISS ou EXPIRED a Cloudflare repassa a URL original e o app
+   responde (o `/api/status` sai do cache de 1 s da própria origem, barato; o `/api/chat` responde 400 sem guardar).
+   Para `/api/apuracao/*`, se quiser ir além: uma **Regra 4** com *Query string → Incluir só* `t`, `v` e `d` (os únicos
+   parâmetros que a apuração usa). E, em *Security → WAF → Rate limiting rules*, uma regra de limite por IP para o HTML e
+   os `POST` (ex.: 300 pedidos/10 s por IP) segura rajadas que a borda não guarda.
 
    **Audiência e "Quero anunciar"**: `/api/divulgacao` (redes do Sintonia e os números da página Anuncie) é a mesma URL
    para todos e entra na Regra 1 (a borda guarda 1 min). O sinal de audiência (`POST /api/audiencia`) e o formulário
@@ -272,9 +279,13 @@ cabeçalhos de cache certos para isso (tabela no README, seção "CDN").
 7. **Conferindo o cache** (do seu computador, duas vezes seguidas):
    ```bash
    curl -sI https://seu-dominio/api/status | grep -iE 'cf-cache-status|^age|cache-control'
+   curl -s -o /dev/null https://seu-dominio/api/chat; curl -sI https://seu-dominio/api/chat | grep -iE '^HTTP|cf-cache-status'
+   curl -sI https://seu-dominio/api/anuncio/ir/x | grep -iE '^HTTP|cf-cache-status'
    ```
    Deve aparecer `cf-cache-status: HIT` (ou `EXPIRED`/`REVALIDATED`), `age` de 0 a 2 e
-   `cache-control: public, max-age=0, s-maxage=1`. Em `/api/admin/state` deve aparecer `BYPASS` ou `DYNAMIC`.
+   `cache-control: public, max-age=0, s-maxage=1` no status e no chat; `BYPASS` ou `DYNAMIC` no `/api/anuncio/ir/…` e em
+   `/api/admin/state`. Com a Regra 3, `curl -sI 'https://seu-dominio/api/chat?x=1'` logo depois de um GET normal dá
+   `HIT` e 200 (vem da borda); um 400 isolado (borda expirada, a origem respondeu) é esperado e inofensivo.
 
 Depois de uma atualização que mude **arquivos de dados** (`public/data`, `public/geo`), limpe o cache deles:
 *Caching → Configuração → Limpar cache → Limpeza personalizada → prefixo* `seu-dominio/data/` (ou "Limpar tudo").
@@ -282,17 +293,19 @@ Eles ficam até 1 dia na Cloudflare. Código novo do site não precisa disso (os
 ficam em cache).
 
 Com a Cloudflare, o IP real do visitante chega ao app pelo cabeçalho `CF-Connecting-IP`, que o Caddy só aceita
-quando a conexão vem de um IP da própria Cloudflare (lista em `deploy/caddy/Caddyfile`). "Pessoas agora" conta
-quem chega à VPS — com cache na borda, o número fica menor que a audiência real (ver README); o pico da página
-Anuncie usa só o sinal das páginas (*Painel → Audiência*). **Depois do deploy final, antes de vender anúncio:**
+quando a conexão vem de um IP da própria Cloudflare (lista em `deploy/caddy/Caddyfile`). "Pessoas agora" (público) é o
+maior entre quem chega à VPS e a presença pelo sinal das páginas, que atravessa a borda; o pico da página Anuncie usa
+só o sinal das páginas (*Painel → Audiência*). **Depois do deploy final, antes de vender anúncio:**
 *Painel → Audiência → Zerar medição* (tira os acessos de teste) e confira a concentração por rede no pico.
 
 ### 5.1 Registro dos envios do chat (opcional, desligado)
 
 Só ligue se o dono, com o advogado, decidir guardar os dados de conexão de quem escreve no chat (Marco Civil,
-art. 15). O servidor grava, para cada mensagem publicada, id, hora, IP e porta, **cifrados** com uma chave pública;
-a chave privada fica **fora da VPS** (só com ela dá para ler). Os arquivos ficam 6 meses no volume e não entram no
-backup comum. Com o registro ligado, a sala e a página de privacidade avisam sozinhas.
+art. 15). O servidor grava, para cada mensagem publicada, id, hora, IP e porta, apelido e texto, **cifrados** com uma
+chave pública; a chave privada fica **fora da VPS** (só com ela dá para ler). Os arquivos ficam 6 meses no volume e não
+entram no backup comum (o `restore.sh` preserva a pasta). Com o registro ligado, a sala e a página de privacidade
+avisam sozinhas. Chave errada (caminho com erro, PEM inválido) **não derruba o site**: o registro fica desligado, a
+sala fica travada fechada e o log diz o motivo (`deploy/painel.sh chat-estado` também).
 
 ```bash
 # no SEU computador (não na VPS): par de chaves; guarde privada.pem em lugar seguro (cofre, pendrive)
@@ -303,13 +316,15 @@ docker compose exec -T app sh -c 'cat > /var/lib/sintonia/registro-publica.pem' 
 echo "CHAT_REGISTRO_CHAVE=/var/lib/sintonia/registro-publica.pem" >> .env
 # opcional, com Cloudflare: uma Transform Rule que mande a porta do visitante (cf.edge.client_port) num cabeçalho,
 # por exemplo x-porta-cliente, e:  echo "CHAT_REGISTRO_HEADER_PORTA=x-porta-cliente" >> .env
-docker compose up -d
+deploy/update.sh --sem-pull     # ensaia com o .env novo antes de trocar (não use docker compose up -d aqui)
 ```
 
 Para atender uma ordem judicial: copie a pasta `/var/lib/sintonia/chat-registro` (ou só o arquivo do dia,
 `AAAA-MM-DD.reg`, em UTC) para o computador que tem a chave privada e rode, na pasta do projeto,
 `npx tsx scripts/chat-registro-abrir.ts --chave privada.pem --dir ./chat-registro --dia AAAA-MM-DD --id <id da mensagem>`
-(o painel mostra o id de cada mensagem).
+(o painel mostra o id de cada mensagem). Com um print (apelido, hora e texto) e sem o id: `--dia AAAA-MM-DD --apelido
+<apelido> --texto "<trecho>"`. Numa VPS nova (desastre), copie a pasta `chat-registro/` à parte, cifrada como está —
+nunca junto com o backup comum.
 
 ## 6. Atualizando
 
@@ -334,9 +349,19 @@ O que acontece:
 | `deploy/update.sh --sem-pull` | mudou o `.env` (ex.: `VITE_SITE_URL`, domínio) e quer reconstruir sem baixar código |
 | `deploy/update.sh --forcar` | reconstruir mesmo sem código novo |
 | `deploy/update.sh --rollback` | voltar para a versão anterior (≈ 5 s) |
+| `deploy/update.sh --qualquer-commit` | publicar a ponta do branch mesmo sem `[deploy]` na mensagem |
 
-Mudou só a senha ou outra variável do servidor (não de build)? Basta
-`cd /opt/sintonia && docker compose up -d` (recria o app em ~3 s).
+**Só commits marcados vão ao ar sem perguntar:** se o commit mais novo do GitHub não tiver `[deploy]` na mensagem (ex.:
+"WIP … (não publicar)"), o `update.sh` mostra o assunto e pergunta (ou para, sem terminal). Para ir só até o último
+commit marcado: `deploy/auto-update.sh rodar`.
+
+Mudou só a senha ou outra variável do servidor (não de build)? Use `deploy/update.sh --sem-pull`: ele **ensaia** com o
+`.env` novo e só troca se o app subir (uma variável errada, como um caminho de chave com erro de digitação, não derruba
+o site). Numa emergência, `cd /opt/sintonia && docker compose up -d app` recria o app em ~3 s, sem ensaio.
+
+**Abas abertas durante uma atualização:** quem estava com o site aberto e navega para uma página ainda não carregada
+recebe a versão nova com uma recarga automática (uma vez); nada quebra na tela. A configuração do chat (aberta, modo
+lento, fixada) volta igual depois da troca; as mensagens e os silenciamentos, não (ficam só na memória).
 
 ### 6.1 Atualização automática (sem precisar entrar na VPS)
 
@@ -347,9 +372,12 @@ Mudou só a senha ou outra variável do servidor (não de build)? Basta
 A cada 5 minutos a VPS confere o GitHub e, se houver versão nova **marcada para produção** (commit com `[deploy]` na
 mensagem — os commits intermediários, de trabalho em andamento, nunca vão ao ar sozinhos), roda o `update.sh` acima
 até ela (com ensaio e volta automática). Para atualizar à mão até a última versão marcada:
-`/opt/sintonia/deploy/auto-update.sh rodar` (o `update.sh` sozinho vai até a ponta do branch). Um commit que falhou não é tentado de novo até chegar outro. **Congelada na noite da eleição**: de
-25/10 12:00 a 26/10 06:00 (Brasília) nada atualiza sozinho — mude com `AUTO_CONGELAR_DE` / `AUTO_CONGELAR_ATE`
-(ISO 8601) no `.env`. Registro em `/var/log/sintonia-auto-update.log`.
+`/opt/sintonia/deploy/auto-update.sh rodar` (o `update.sh` sozinho vai até a ponta do branch e pergunta antes de publicar
+um commit sem `[deploy]`). Um commit que falhou não é tentado de novo até chegar outro (se o update só não rodou porque
+outra operação estava em andamento, tenta de novo na próxima conferência). **Congelada da véspera à manhã seguinte**:
+de 24/10 12:00 a 26/10 06:00 (Brasília) nada atualiza sozinho — o mesmo congelamento de código do RUNBOOK; mude com
+`AUTO_CONGELAR_DE` / `AUTO_CONGELAR_ATE` (ISO 8601) no `.env`. `auto-update.sh estado` mostra o intervalo. Registro em
+`/var/log/sintonia-auto-update.log`.
 
 **Pelo celular:** um app de SSH (Termius, para Android e iPhone; ou JuiceSSH no Android) com host `IP-DA-VPS`,
 usuário `root` e a senha; depois cole o comando.
@@ -357,14 +385,22 @@ usuário `root` e a senha; depois cole o comando.
 ## 7. Backup e restauração
 
 - **Automático:** de hora em hora, em `/var/backups/sintonia/` (mantém os 72 últimos = 3 dias). Cada arquivo tem
-  o estado do painel (fonte de dados, cenário, aviso, configuração do TSE, histórico do feed) e o `.env`.
+  o estado do painel (fonte de dados, cenário, aviso, configuração do TSE, anúncios, contatos públicos, histórico do
+  feed, configuração do chat), a audiência agregada, os **pedidos de anunciantes (dados pessoais: nome, e-mail,
+  WhatsApp)** e o `.env` (com a senha do painel). Não tem o registro cifrado do chat (`chat-registro/`, por desenho).
 - **Manual:** `/opt/sintonia/deploy/backup.sh`
-- **Guarde uma cópia fora da VPS** (do seu computador):
-  `scp root@IP-DA-VPS:/var/backups/sintonia/sintonia-*.tar.gz ./`
+- **Guarde uma cópia fora da VPS** (do seu computador) — só a mais recente, **cifrada**, e apague as cópias antigas
+  em até 30 dias (a /privacidade promete isso):
+  ```bash
+  ssh root@IP-DA-VPS 'ls -1t /var/backups/sintonia/sintonia-*.tar.gz | head -1'   # nome do mais recente
+  scp root@IP-DA-VPS:/var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz ./
+  gpg -c sintonia-AAAAMMDD-HHMMSS.tar.gz && rm sintonia-AAAAMMDD-HHMMSS.tar.gz     # fica só o .gpg (senha forte)
+  ```
 - **Restaurar:** `/opt/sintonia/deploy/restore.sh --listar` e depois
   `/opt/sintonia/deploy/restore.sh /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz`
   (faz um backup do estado atual antes; o app fica parado ~5 s). A versão do estado restaurado é ajustada para
-  continuar crescendo, para nenhum cache antigo ser confundido com o estado restaurado.
+  continuar crescendo, para nenhum cache antigo ser confundido com o estado restaurado. O restore **preserva** o
+  registro cifrado do chat (`chat-registro/`, guarda de 6 meses) e a chave pública do registro (`*.pem`).
 - **VPS nova (desastre):** instale normalmente (seção 3) e rode
   `deploy/restore.sh <arquivo> --com-env` (restaura também o `.env`, com a mesma senha e segredo).
 
@@ -387,8 +423,11 @@ erros, clientes estimados). Nunca registra IP, senha, cookie nem código de Duel
 pelo mesmo motivo. Os logs do Docker giram sozinhos (5 arquivos de 20 MB por serviço).
 
 **Vigia de travamento:** o Docker verifica o `/healthz` a cada 15 s. Se o app já esteve no ar e para de
-responder por ~75 s seguidos, o próprio healthcheck reinicia o processo (testado: processo congelado →
-reiniciado em ~2 min, sem intervenção). Desligue com `AUTORREINICIO=0` no `.env`.
+responder por ~75 s seguidos **e o batimento do processo parou** (o app grava um batimento por segundo em
+`/tmp/sintonia-batimento`; num travamento de verdade o laço de eventos para), o próprio healthcheck reinicia o
+processo. **Lentidão não reinicia:** com a CPU saturada (pico, rajada que fura a CDN), o `/healthz` numa conexão nova
+pode passar de 5 s enquanto o processo segue atendendo — o log mostra "processo vivo … SEM reinício" e o contêiner
+fica `unhealthy` até a carga baixar. Desligue o vigia com `AUTORREINICIO=0` no `.env`.
 
 Depois de um reinício da VPS tudo volta sozinho (Docker habilitado no boot + `restart: unless-stopped`).
 
@@ -418,7 +457,10 @@ Se precisar de mais folga, **aumente a VPS** (mais vCPU ajuda o Caddy, a compres
 compartilhamento) antes de pensar em réplicas.
 
 **Plano B — várias instâncias atrás do Caddy** (`docker-compose.replicas.yml`), só se não houver CDN e a CPU de
-um processo saturar:
+um processo saturar. **Não funciona na VPS compartilhada** (o app é publicado numa porta fixa em `127.0.0.1` e a
+2ª réplica não sobe: "port is already allocated") e **não deve ser usado com o chat, os pedidos de anunciantes e a
+audiência**: cada réplica teria a sua sala (apagar uma mensagem numa deixa visível nas outras) e as réplicas
+sobrescreveriam o `leads.json`, o `audiencia.json` e o `chat.json` umas das outras:
 
 ```bash
 cd /opt/sintonia

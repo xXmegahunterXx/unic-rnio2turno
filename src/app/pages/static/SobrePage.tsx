@@ -1,13 +1,15 @@
 /**
  * /sobre — o que é o Sintonia, princípios (neutralidade, precisão, privacidade, beleza), apartidarismo,
- * anúncios só de marcas não políticas (contagem agregada, sem cookie e sem guardar IP), equipe (placeholder) e contato (provisório).
+ * anúncios só de marcas não políticas (contagem agregada, sem cookie e sem guardar IP) e contato — os e-mails e o responsável
+ * pelo site vêm do painel (Comunicação → Contatos públicos); sem configuração, nenhuma linha de e-mail aparece. A seção
+ * "Equipe" saiu enquanto os nomes não estão definidos (CHECKLIST-LANCAMENTO A9.2): placeholder no site público não.
  */
 import { REGRA_CORES } from '@/shared/cores';
 import { OFERECIMENTO_COM_CANDIDATOS } from '@/shared/oferecimento';
+import { formatarCnpj } from '@/shared/contatos';
+import { useContatos } from '@/app/data/contatos';
 import { ButtonLink } from '@/app/ui/Button';
-import { Icon, type IconName } from '@/app/ui/Icon';
 import {
-  CONTATO,
   Destaque,
   Email,
   Lista,
@@ -21,18 +23,11 @@ const SUMARIO = [
   { id: 'o-que-e', titulo: 'O que é' },
   { id: 'principios', titulo: 'Princípios' },
   { id: 'apartidario', titulo: 'Apartidário' },
-  { id: 'equipe', titulo: 'Equipe' },
   { id: 'contato', titulo: 'Fale com a gente' },
 ];
 
-const EQUIPE: { area: string; icone: IconName; texto: string }[] = [
-  { area: 'Produto e design', icone: 'grade', texto: 'Experiência, visual e acessibilidade.' },
-  { area: 'Dados e engenharia', icone: 'grafico', texto: 'Integração com o TSE, mapas e infraestrutura da noite da apuração.' },
-  { area: 'Editorial e checagem', icone: 'lista', texto: 'Teste Cego, textos neutros e conferência das fontes.' },
-  { area: 'Jurídico eleitoral', icone: 'selo', texto: 'Legislação eleitoral e proteção de dados.' },
-];
-
 export default function SobrePage() {
+  const c = useContatos();
   return (
     <PaginaInstitucional
       tituloAba="Sobre"
@@ -114,35 +109,40 @@ export default function SobrePage() {
         </Destaque>
       </Secao>
 
-      <Secao id="equipe" titulo="Equipe">
-        <p>Uma equipe pequena e multidisciplinar. Os nomes serão publicados aqui antes do lançamento.</p>
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {EQUIPE.map((e) => (
-            <li key={e.area} className="flex items-start gap-3.5 rounded-2xl border border-line bg-surface p-4 shadow-card">
-              <span aria-hidden className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-dashed border-line/[2.5] bg-surface-2 text-fg-subtle">
-                <Icon name={e.icone} size={19} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[15px] font-semibold text-fg">{e.area}</p>
-                <p className="mt-0.5 text-[13.5px] leading-snug text-fg-muted">{e.texto}</p>
-                <p className="mt-1.5 text-[12px] font-medium uppercase tracking-[0.12em] text-fg-subtle">Nome a definir</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Secao>
-
       <Secao id="contato" titulo="Fale com a gente">
+        {c.responsavel ? (
+          <p>
+            O Sintonia é mantido por <strong className="font-semibold text-fg">{c.responsavel}</strong>
+            {c.cnpj ? (
+              <>
+                , CNPJ <span className="num">{formatarCnpj(c.cnpj)}</span>
+              </>
+            ) : null}
+            .
+          </p>
+        ) : null}
         <ul className="space-y-2.5">
-          <li>
-            Geral: <Email endereco={CONTATO.geral} />
-          </li>
-          <li>
-            Imprensa: <Email endereco={CONTATO.imprensa} />
-          </li>
-          <li>
-            Correções: <Email endereco={CONTATO.correcoes} />
-          </li>
+          {c.geral ? (
+            <li>
+              Geral: <Email endereco={c.geral} />
+            </li>
+          ) : null}
+          {c.imprensa ? (
+            <li>
+              Imprensa: <Email endereco={c.imprensa} />
+            </li>
+          ) : null}
+          {c.correcoes ? (
+            <li>
+              Correções: <Email endereco={c.correcoes} />
+            </li>
+          ) : null}
+          {c.privacidade ? (
+            <li>
+              Privacidade e dados pessoais: <Email endereco={c.privacidade} /> (<LinkInterno to="/privacidade">política de privacidade</LinkInterno>)
+            </li>
+          ) : null}
+          {c.carregado && !c.algum ? <li>Os e-mails de contato do Sintonia serão publicados aqui em breve.</li> : null}
           <li>
             Anunciar: veja os formatos em <LinkInterno to="/anuncie">Anuncie no Sintonia</LinkInterno>
           </li>

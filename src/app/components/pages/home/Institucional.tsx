@@ -353,24 +353,27 @@ export function Resumo({ itens }: { itens: { icone: IconName; titulo: string; te
   );
 }
 
-/** Endereço ainda provisório (domínio reservado `.example`, que não recebe e-mail). */
-export const contatoProvisorio = (endereco: string) => /\.example$/i.test(endereco.trim());
-
-/** Contato provisório (o produto ainda não tem endereços definitivos — CHECKLIST-LANCAMENTO A9.1). */
-export const CONTATO = {
-  geral: 'contato@sintonia.example',
-  privacidade: 'privacidade@sintonia.example',
-  imprensa: 'imprensa@sintonia.example',
-  correcoes: 'correcoes@sintonia.example',
-} as const;
-
+/**
+ * E-mail de contato publicado (painel → Comunicação → Contatos públicos; `useContatos` em app/data/contatos.ts). Só
+ * aparece configurado: nunca um endereço provisório — sem configuração, quem usa não renderiza a linha.
+ */
 export function Email({ endereco }: { endereco: string }) {
+  // quebra de linha preferida logo depois do "@" (celular); só quebra no meio de uma parte se ela sozinha não couber
+  const i = endereco.indexOf('@');
   return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
-      <a href={`mailto:${endereco}`} className="toque relative break-all font-mono text-[0.92em] text-fg underline decoration-line/[3] underline-offset-[3px] hover:decoration-brand-fg">
-        {endereco}
-      </a>
-      <span className="text-[12px] text-fg-subtle">(provisório)</span>
-    </span>
+    <a
+      href={`mailto:${endereco}`}
+      className="toque relative font-mono text-[0.92em] text-fg underline decoration-line/[3] underline-offset-[3px] [overflow-wrap:anywhere] hover:decoration-brand-fg"
+    >
+      {i > 0 ? (
+        <>
+          {endereco.slice(0, i + 1)}
+          <wbr />
+          {endereco.slice(i + 1)}
+        </>
+      ) : (
+        endereco
+      )}
+    </a>
   );
 }

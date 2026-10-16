@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { MAX_CODIGO, calcularCenario, codificarCenario, cenarioDoPreset, decodificarCenario, placarCenarioTexto } from '../shared/cenarios';
 
 let ctx: ContextoMeta;
-let fase: 'pre' | 'apurando' = 'pre';
+let fase: 'pre' | 'apurando' | 'encerrada' = 'pre';
 const q = (s = '') => new URLSearchParams(s);
 
 beforeAll(async () => {
@@ -218,5 +218,15 @@ describe('injetarMeta e utilidades', () => {
     });
     expect(chamadas).toEqual(['pres-t1']);
     expect(m.descricao).toMatch(/^Porto Walter \(AC\) · 1º turno \(resultado oficial\): Lula 60,00% · Flávio Bolsonaro 30,00% dos votos válidos\./);
+  });
+});
+
+describe('título depois do fim da apuração', () => {
+  it('/apuracao: "Apuração ao vivo" até o fim; com a fase pública encerrada, "Resultado do 2º turno"', () => {
+    fase = 'apurando';
+    expect(metaDaRota('/apuracao', q(), ctx)?.titulo).toMatch(/^Apuração ao vivo · Presidente/);
+    fase = 'encerrada';
+    expect(metaDaRota('/apuracao', q(), ctx)?.titulo).toMatch(/^Resultado do 2º turno · Presidente/);
+    fase = 'pre';
   });
 });

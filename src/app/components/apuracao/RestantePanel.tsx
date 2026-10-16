@@ -28,7 +28,7 @@ export function RestantePanel({ race, resumo, restante, className }: RestantePan
   const s = cAtras ? corSlot(cAtras.cor) : corSlot('outros');
 
   return (
-    <section aria-label="O que falta apurar" className={cn('rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6', className)}>
+    <section aria-label="O que falta apurar" data-sem-anuncio-fixo className={cn('rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6', className)}>
       <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
         <Icon name="relogio" size={15} />
         O que falta apurar

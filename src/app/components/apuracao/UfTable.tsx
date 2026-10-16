@@ -44,7 +44,8 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
             {r.uf}
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-medium" title={UF_NOMES[r.uf]}>
+            {/* celular: o nome inteiro em até 2 linhas ("Rio Grande do Norte" × "Rio Grande do Sul" nunca viram o mesmo "Rio Grande do…") */}
+            <span className="block font-medium leading-snug max-sm:line-clamp-2 sm:truncate" title={UF_NOMES[r.uf]}>
               {UF_NOMES[r.uf]}
             </span>
             <span className={cn('block', soAbaixoDe[LARGURA.apurado])}>
@@ -92,6 +93,7 @@ export function UfTable({ race, ufs, onSelect, selected, incluirExterior = true,
   ];
   return (
     <DataTable
+      semAnuncioFixo
       rows={rows}
       columns={columns}
       rowKey={(r) => r.uf}

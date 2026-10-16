@@ -138,10 +138,11 @@ function CartaoGov({ uf, race, data, pre }: { uf: UF; race: Race; data: National
 function LinhaGov({ c, pct, apagado }: { c: Candidate; pct: number | null; apagado: boolean }) {
   const s = corSlot(c.cor);
   return (
-    <li className="flex items-center gap-2.5">
+    // nome inteiro em até 2 linhas (nunca um finalista inteiro e o outro com reticências), % alinhado ao topo
+    <li className="flex items-start gap-2.5">
       <CandidateAvatar candidato={c} size="xs" />
-      <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium text-fg">{c.nomeUrna}</span>
-      <span className={cn('num shrink-0 font-display text-[16px] font-semibold tracking-[-0.02em]', apagado || pct === null ? 'text-fg-subtle' : s.text)}>
+      <span className="line-clamp-2 min-w-0 flex-1 break-words text-[13.5px] font-medium leading-tight text-fg">{c.nomeUrna}</span>
+      <span className={cn('num shrink-0 font-display text-[16px] font-semibold leading-tight tracking-[-0.02em]', apagado || pct === null ? 'text-fg-subtle' : s.text)}>
         {pct === null ? '—' : fmtPct(pct)}
       </span>
     </li>

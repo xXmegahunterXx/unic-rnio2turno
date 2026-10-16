@@ -43,11 +43,12 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
             <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand-fg sm:h-10 sm:w-10">
               <Icon name="ao-vivo" size={20} />
             </span>
-            <span className="whitespace-nowrap font-display text-[17px] font-semibold tracking-[-0.02em] text-fg sm:text-[19px]">Apuração ao vivo</span>
+            {/* abaixo de 380 px, um pouco menor: inteiro, sem a pílula da data por cima */}
+            <span className="whitespace-nowrap font-display text-[16px] font-semibold tracking-[-0.02em] text-fg min-[380px]:text-[17px] sm:text-[19px]">Apuração ao vivo</span>
           </span>
           {t1 ? (
             <span className="num inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface-2 px-2.5 text-[12px] font-medium text-fg-muted">
-              <Icon name="relogio" size={13} />
+              <Icon name="relogio" size={13} className="max-[379px]:hidden" />
               25/10 · 17h
             </span>
           ) : fase === 'apurando' ? (

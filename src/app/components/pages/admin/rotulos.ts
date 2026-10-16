@@ -47,7 +47,7 @@ export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: 
   { id: 'controle', rotulo: 'Controle', icone: 'ao-vivo', descricao: 'Relógio, linha do tempo e pré-visualização' },
   { id: 'cenario', rotulo: 'Cenário', icone: 'ajustes', descricao: 'Presets e parâmetros do modelo' },
   { id: 'estados', rotulo: 'Estados', icone: 'mapa', descricao: 'Viés e atraso por UF' },
-  { id: 'comunicacao', rotulo: 'Comunicação', icone: 'alerta', descricao: 'Aviso global e congelamento' },
+  { id: 'comunicacao', rotulo: 'Comunicação', icone: 'alerta', descricao: 'Aviso global, contatos públicos do site e congelamento' },
   { id: 'anuncios', rotulo: 'Anunciantes', icone: 'selo', descricao: 'Anúncios, métricas de entrega e a página Anuncie (só anunciante não político)' },
   { id: 'chat', rotulo: 'Chat ao vivo', icone: 'usuarios', descricao: 'Sala da apuração: abrir e fechar, modo lento, fixada, denúncias e moderação' },
   { id: 'fonte', rotulo: 'Fonte', icone: 'globo', descricao: 'Pré-eleição, simulação ou TSE' },

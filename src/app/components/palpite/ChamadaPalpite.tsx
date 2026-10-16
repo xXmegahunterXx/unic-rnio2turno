@@ -34,10 +34,11 @@ function Ilustracao({ className }: { className?: string }) {
         <div className="absolute inset-x-0 top-1/2 flex h-3 -translate-y-1/2 overflow-hidden rounded-full bg-surface-3">
           <div className="h-full w-1/2 bg-brand/25" />
           <div className="h-full w-1/2 bg-brand-2/20" />
-          <div className="absolute inset-y-0 left-1/2 w-[14%] bg-brand" />
         </div>
-        <span className="absolute left-1/2 top-1/2 h-6 w-0.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-fg/50" />
-        <span className="absolute left-[64%] top-1/2 h-8 w-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-line bg-fg shadow-card" />
+        {/* divisor no MEIO (50/50, como o controle começa): puxado para um lado, a ilustração sugeria um palpite */}
+        <span aria-hidden className="absolute left-[calc(50%-34px)] top-1/2 -translate-y-1/2 text-[15px] leading-none text-fg-subtle">‹</span>
+        <span aria-hidden className="absolute left-[calc(50%+26px)] top-1/2 -translate-y-1/2 text-[15px] leading-none text-fg-subtle">›</span>
+        <span className="absolute left-1/2 top-1/2 h-8 w-[18px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-line bg-fg shadow-card" />
       </div>
       <div className="mt-3 flex items-center gap-2 border-t border-line pt-3 text-[12.5px] font-semibold text-brand-fg">
         <Icon name="check" size={15} />

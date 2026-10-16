@@ -139,6 +139,14 @@ function Linha({
 
 /** Versão da simulação anonimizada: explica por que a comparação não aparece. */
 function ComparacaoOculta({ className }: { className?: string }) {
+  return <AvisoT1Oculto titulo="Desde o 1º turno" className={className} />;
+}
+
+/**
+ * Aviso no lugar de qualquer número OFICIAL do 1º turno ao lado do 2º turno simulado com nomes ocultos: os números de
+ * 4 de outubro identificariam quem é o Candidato A e quem é o B (ComparacaoT1, ComparaTurnos, a seção no 1º turno).
+ */
+export function AvisoT1Oculto({ titulo, className }: { titulo: string; className?: string }) {
   return (
     <section aria-labelledby="comparacao-titulo" className={cn('min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
       <div className="flex items-start gap-3">
@@ -147,7 +155,7 @@ function ComparacaoOculta({ className }: { className?: string }) {
         </span>
         <div className="min-w-0">
           <h2 id="comparacao-titulo" className="font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[19px]">
-            Desde o 1º turno
+            {titulo}
           </h2>
           <p className="mt-1 text-pretty text-[13px] leading-relaxed text-fg-muted">
             Fica oculta na simulação: os números oficiais de 4 de outubro identificariam quem é o Candidato A e quem é o Candidato B ao lado de

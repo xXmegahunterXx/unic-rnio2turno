@@ -8,6 +8,8 @@ import { cn } from '@/app/lib/cn';
 import { ButtonLink } from '@/app/ui/Button';
 import { Placar } from '@/app/components/apuracao/Placar';
 import { ComparaTurnos } from './ComparaTurnos';
+import { useStatus } from '@/app/data/hooks';
+import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 
 export interface MunicipioPainelProps {
   race: Race;
@@ -40,6 +42,7 @@ export function MunicipioPainel({
   tituloPlacar,
   className,
 }: MunicipioPainelProps) {
+  const anonimizado = !!useStatus().data?.anonimizado;
   const sub = (
     <span className="num">
       {m.capital ? 'Capital · ' : ''}
@@ -56,7 +59,9 @@ export function MunicipioPainel({
         subtitulo={tituloPlacar ? undefined : sub}
         simulado={simulado}
       />
-      {race.turno === 2 && raceT1 && municipioT1 ? (
+      {race.turno === 2 && raceT1 && municipioT1 && anonimizado ? (
+        <AvisoT1Oculto titulo="1º turno × 2º turno" />
+      ) : race.turno === 2 && raceT1 && municipioT1 ? (
         <section className="rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
           <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
           <ComparaTurnos race={race} raceT1={raceT1} t2={m} t1={municipioT1} compacto />

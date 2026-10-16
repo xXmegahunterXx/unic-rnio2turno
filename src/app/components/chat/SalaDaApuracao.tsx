@@ -322,7 +322,10 @@ function Folha({ onFechar, centralizada = false }: { onFechar: () => void; centr
 
   // com o teclado aberto, a folha sobe e cabe na parte visível
   // computador estreito: mais baixa (o placar, mais alto que no celular, fica à vista acima com os dois percentuais)
-  const altura = cheia ? 'calc(100dvh - var(--app-header-h, 56px) - 8px)' : centralizada ? 'min(44dvh, 440px)' : 'min(58dvh, 560px)';
+  // celular baixo (≤ 760 px de altura: 360×740, 375×667): a folha de 58% cortava os percentuais do placar ao meio —
+  // a mesma altura da variante centralizada deixa a linha dos % inteira acima da folha (arrastar para cima amplia)
+  const baixa = typeof window !== 'undefined' && window.innerHeight <= 760;
+  const altura = cheia ? 'calc(100dvh - var(--app-header-h, 56px) - 8px)' : centralizada || baixa ? 'min(44dvh, 440px)' : 'min(58dvh, 560px)';
   const estilo = teclado.inset
     ? { bottom: teclado.inset, height: Math.max(260, Math.min(teclado.altura - 8, cheia ? teclado.altura - 8 : teclado.altura * 0.9)) }
     : { bottom: 0, height: altura };

@@ -2,14 +2,16 @@
  * /privacidade — LGPD em linguagem simples: não coletamos as respostas do Teste Cego (opinião política é dado
  * sensível), o que fica no navegador (com botão para apagar), sem cookies de rastreamento, anúncios (contagem
  * agregada de impressões e cliques, sem cookie, IP ou dado pessoal; UTMs nos links patrocinados), medição de audiência
- * própria e agregada (src/server/audiencia.ts), o formulário "Quero anunciar" (src/server/leads.ts), dados técnicos
- * mínimos, direitos e contato (provisório).
+ * própria e agregada (src/server/audiencia.ts), o formulário "Quero anunciar" (src/server/leads.ts), o chat ao vivo,
+ * dados técnicos, quem é o responsável (controlador, encarregado e operadores), direitos e contato. Os e-mails e o
+ * responsável vêm do painel (Comunicação → Contatos públicos); sem configuração, nenhum e-mail aparece.
  */
 import { useState } from 'react';
+import { formatarCnpj } from '@/shared/contatos';
+import { useContatos } from '@/app/data/contatos';
 import { Button } from '@/app/ui/Button';
 import { toast } from '@/app/ui/Toast';
 import {
-  CONTATO,
   Destaque,
   Email,
   Ficha,
@@ -29,7 +31,9 @@ const SUMARIO = [
   { id: 'audiencia', titulo: 'Medição de audiência' },
   { id: 'anuncios', titulo: 'Anúncios' },
   { id: 'anunciar', titulo: 'Formulário “Quero anunciar”' },
+  { id: 'chat', titulo: 'Chat ao vivo' },
   { id: 'tecnicos', titulo: 'Dados técnicos' },
+  { id: 'responsavel', titulo: 'Quem trata os dados' },
   { id: 'direitos', titulo: 'Seus direitos' },
   { id: 'contato', titulo: 'Contato' },
 ];
@@ -59,6 +63,9 @@ function apagarDadosLocais(): number {
 
 export default function PrivacidadePage() {
   const [apagando, setApagando] = useState(false);
+  const c = useContatos();
+  // canal para pedidos sobre dados: o e-mail de privacidade; sem ele, o contato geral (nunca um endereço provisório)
+  const canal = c.privacidade ?? c.geral;
   function apagar() {
     setApagando(true);
     const n = apagarDadosLocais();
@@ -135,6 +142,10 @@ export default function PrivacidadePage() {
             ['Tema claro ou escuro', 'Armazenamento local (localStorage)', 'Até você apagar'],
             ['Preferências de exibição (visão do mapa, ordem das listas)', 'Armazenamento local', 'Até você apagar'],
             ['“Minha seção”, se você salvar a sua na consulta', 'Armazenamento local', 'Até você apagar'],
+            ['Buscas recentes (o estado, a cidade ou a seção que você procurou)', 'Armazenamento local', 'Até você apagar'],
+            ['Seu cenário da calculadora “E se…?”', 'Armazenamento local', 'Até você apagar'],
+            ['Marca de que o resultado de um Teste Cego já foi revelado nesta aba', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
+            ['Horário da última recarga automática depois de uma atualização do site', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
             ['Seu palpite do 2º turno (o percentual e a hora em que você cravou)', 'Armazenamento local', 'Até você apagar'],
             ['Número aleatório que alterna os anúncios entre as visitas (não identifica você e nunca é enviado)', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
             ['Se você fechou a barra de anúncio do celular', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
@@ -259,12 +270,21 @@ export default function PrivacidadePage() {
             </>,
             <>
               <strong>Onde ficam e por quanto tempo.</strong> No servidor do Sintonia, sem o seu IP, com acesso só da equipe pelo painel. Depois de
-              respondido, o pedido é apagado em até 180 dias; sem resposta, em até 1 ano; ou antes, se você pedir.
+              respondido, o pedido é apagado em até 180 dias; sem resposta, em até 1 ano; ou antes, se você pedir. As cópias de segurança do
+              servidor são substituídas a cada hora e guardam o pedido por até 3 dias depois de apagado; cópias guardadas fora do servidor ficam
+              cifradas e são apagadas em até 30 dias.
             </>,
-            <>
-              <strong>Você pode mudar de ideia.</strong> Para corrigir ou apagar os dados, ou retirar o consentimento, escreva para{' '}
-              <Email endereco={CONTATO.privacidade} />.
-            </>,
+            canal ? (
+              <>
+                <strong>Você pode mudar de ideia.</strong> Para corrigir ou apagar os dados, ou retirar o consentimento, escreva para{' '}
+                <Email endereco={canal} />.
+              </>
+            ) : (
+              <>
+                <strong>Você pode mudar de ideia.</strong> Para corrigir ou apagar os dados, ou retirar o consentimento, use o canal de
+                privacidade publicado na seção “Contato”, abaixo.
+              </>
+            ),
           ]}
         />
       </Secao>
@@ -296,8 +316,9 @@ export default function PrivacidadePage() {
             <>
               <strong>Se a lei exigir identificar quem escreveu.</strong> Por padrão nada disso é guardado. Se for preciso cumprir a obrigação legal de
               guardar registros de acesso (Marco Civil da Internet, art. 15; LGPD, art. 7º, II), o Sintonia passa a guardar, de cada mensagem
-              publicada, só o código da mensagem, a data e a hora, o endereço IP e a porta de origem — cifrados com uma chave que fica fora do
-              servidor, por 6 meses, abertos apenas por ordem judicial. Quando isso estiver ligado, as regras da própria sala avisam.
+              publicada, o código da mensagem, a data e a hora, o endereço IP e a porta de origem, o apelido e o texto publicados — cifrados com
+              uma chave que fica fora do servidor, por 6 meses, abertos apenas por ordem judicial. Quando isso estiver ligado, as regras da própria
+              sala avisam.
             </>,
           ]}
         />
@@ -305,21 +326,60 @@ export default function PrivacidadePage() {
 
       <Secao id="tecnicos" titulo="Dados técnicos">
         <p>
-          Como qualquer site, nossos servidores e a rede de distribuição de conteúdo recebem dados técnicos de cada acesso: endereço IP, data e
-          hora, página pedida e tipo de navegador. Eles servem só para entregar o site, medir a carga de forma agregada e proteger contra abuso, e
-          são guardados pelo prazo exigido pelo Marco Civil da Internet (Lei 12.965/2014, art. 15).
+          Como em qualquer site, cada acesso chega com dados técnicos: endereço IP, data e hora, página pedida e tipo de navegador. O Sintonia usa
+          esses dados só no momento, para entregar a página, medir a carga em totais e proteger contra abuso, e{' '}
+          <strong>não grava o endereço IP</strong> de quem acessa (os registros técnicos do servidor não têm IP). A rede de distribuição do
+          site (Cloudflare) e o provedor da hospedagem também recebem esses dados para entregar o site e os tratam conforme as políticas
+          deles.
         </p>
         <Destaque icone="olho-fechado" tom="marca">
-          Esses registros nunca contêm respostas do Teste Cego: elas não passam pelos nossos servidores.
+          Esses dados nunca contêm respostas do Teste Cego: elas não passam pelos nossos servidores.
         </Destaque>
+      </Secao>
+
+      <Secao id="responsavel" titulo="Quem trata os dados">
+        <Lista
+          itens={[
+            c.responsavel ? (
+              <>
+                <strong>Responsável (controlador).</strong> {c.responsavel}
+                {c.cnpj ? (
+                  <>
+                    , CNPJ <span className="num">{formatarCnpj(c.cnpj)}</span>
+                  </>
+                ) : null}
+                , que decide como os dados descritos nesta página são tratados.
+              </>
+            ) : (
+              <>
+                <strong>Responsável (controlador).</strong> A equipe do Sintonia, que decide como os dados descritos nesta página são tratados. A
+                identificação completa será publicada aqui.
+              </>
+            ),
+            canal ? (
+              <>
+                <strong>Canal do encarregado de dados.</strong> Pedidos e dúvidas sobre dados pessoais: <Email endereco={canal} />.
+              </>
+            ) : (
+              <>
+                <strong>Canal do encarregado de dados.</strong> O endereço para pedidos sobre dados pessoais será publicado na seção “Contato”.
+              </>
+            ),
+            <>
+              <strong>Quem ajuda a operar o site.</strong> A Cloudflare (rede de distribuição e proteção do site) e o provedor do servidor onde o
+              Sintonia roda. Eles recebem os dados técnicos de cada acesso para entregar o site, e o servidor guarda o que esta página descreve
+              (pedidos de anunciantes e totais de audiência).
+            </>,
+          ]}
+        />
       </Secao>
 
       <Secao id="direitos" titulo="Seus direitos">
         <p>
           A LGPD garante a você, entre outros, o direito de saber quais dados tratamos, de corrigi-los e de pedir que sejam apagados (art. 18).
-          Como não guardamos dados pessoais seus além dos registros técnicos (e, se você preencheu o formulário “Quero anunciar”, o que enviou
-          nele), quase tudo se resolve no seu próprio aparelho: use o botão “Apagar
-          meus dados” acima ou limpe os dados do site no navegador.
+          Como não guardamos dados pessoais seus (só, se você preencheu o formulário “Quero anunciar”, o que enviou nele, e as mensagens do chat
+          ao vivo, por até 12 horas), quase tudo se resolve no seu próprio aparelho: use o botão “Apagar meus dados” acima ou limpe os dados do
+          site no navegador.
         </p>
         <p>
           Veja também a <LinkInterno to="/metodologia">metodologia</LinkInterno> e a página <LinkInterno to="/sobre">sobre o Sintonia</LinkInterno>.
@@ -327,10 +387,17 @@ export default function PrivacidadePage() {
       </Secao>
 
       <Secao id="contato" titulo="Contato">
-        <p>
-          Dúvidas, pedidos ou reclamações sobre privacidade: <Email endereco={CONTATO.privacidade} />. Respondemos no prazo previsto na LGPD. Você também pode
-          procurar a Autoridade Nacional de Proteção de Dados (ANPD).
-        </p>
+        {canal ? (
+          <p>
+            Dúvidas, pedidos ou reclamações sobre privacidade: <Email endereco={canal} />. Respondemos no prazo previsto na LGPD. Você também pode
+            procurar a Autoridade Nacional de Proteção de Dados (ANPD).
+          </p>
+        ) : (
+          <p>
+            O endereço para dúvidas, pedidos e reclamações sobre privacidade será publicado aqui em breve. Você também pode procurar a Autoridade
+            Nacional de Proteção de Dados (ANPD).
+          </p>
+        )}
         <p className="text-[14px] text-fg-subtle">
           Podemos atualizar esta política; a data no topo indica a versão em vigor. Mudanças relevantes serão destacadas nesta página.
         </p>

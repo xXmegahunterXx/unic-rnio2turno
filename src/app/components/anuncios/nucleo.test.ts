@@ -191,11 +191,53 @@ describe('barra fixa do rodapé: nunca sobre resultado ou candidato', () => {
       'src/app/components/apuracao/BoletimUrna.tsx',
       'src/app/components/pages/cargos/FotoOficial.tsx',
       'src/app/components/pages/cenarios/Placar.tsx',
+      // conferência final: gráfico da corrida (rótulos finais com o % de cada um), participação, 1º × 2º turno, "o que
+      // falta apurar", tabela de estados e mapas coloridos pelo líder
+      'src/app/components/pages/nacional/CorridaPanel.tsx',
+      'src/app/components/apuracao/TimelineChart.tsx',
+      'src/app/components/apuracao/StatsGrid.tsx',
+      'src/app/components/pages/detalhe/ComparaTurnos.tsx',
+      'src/app/components/apuracao/RestantePanel.tsx',
+      'src/app/components/pages/nacional/MapaPanel.tsx',
+      'src/app/components/apuracao/BrazilMap.tsx',
+      'src/app/components/apuracao/UfMap.tsx',
+      'src/app/components/apuracao/BrazilMunicipiosMap.tsx',
+      'src/app/components/apuracao/TileMap.tsx',
     ];
     for (const a of arquivos) expect(readFileSync(a, 'utf8'), a).toContain('data-sem-anuncio-fixo');
+    expect(readFileSync('src/app/components/apuracao/UfTable.tsx', 'utf8')).toContain('semAnuncioFixo');
     // a barra não tem mais cronômetro: só entra depois da 1ª rolagem e com a faixa livre
     const barra = readFileSync('src/app/components/anuncios/BarraRodape.tsx', 'utf8');
     expect(barra).toContain('useFaixaLivre');
     expect(barra).not.toMatch(/setTimeout\(liberar/);
+  });
+});
+
+describe('conferência final: posições e repetições', () => {
+  it('barra do rodapé fora da ficha do candidato e da própria /anuncie (e do Teste, Duelo e /ao-vivo)', async () => {
+    const { rodapePermitido } = await import('./nucleo');
+    for (const p of ['/candidato/280002551544', '/candidato/280002542548/', '/anuncie', '/anuncie/', '/teste', '/duelo/abc', '/ao-vivo']) expect(rodapePermitido(p), p).toBe(false);
+    for (const p of ['/', '/apuracao', '/apuracao/sp', '/governadores', '/palpite', '/sobre']) expect(rodapePermitido(p), p).toBe(true);
+  });
+
+  it('nativo nunca repete o anunciante da barra fixa do rodapé (empilhados na tela): vira "Anuncie aqui" ou nada', () => {
+    const lista = [ad('m', ['topo'], { cota: 'master' }), ad('r', ['rodape', 'nativo'])];
+    for (let i = 0; i < 30; i++) {
+      const e = escolhaDaPagina(lista, `g${i}`);
+      expect(e.rodape?.id).toBe('r');
+      const ids = [1, 2, 3].map((k) => (e.nativo(k) as AnuncioPublico | null)?.id ?? null);
+      expect(ids).not.toContain('r');
+      expect(e.nativo(1)).toBe(CASA);
+      // no desktop (sem a barra), o cartão pode ser dele
+      expect((escolhaDaPagina(lista, `g${i}`, { rodapeNaTela: false }).nativo(1) as AnuncioPublico).id).toBe('r');
+    }
+  });
+
+  it('sala do chat: não repete o anunciante do topo quando há outro (mesmo com o do rodapé evitado)', async () => {
+    const { escolherChat } = await import('./OferecimentoChat');
+    const lista = [ad('cafe', ['topo', 'chat'], { cota: 'master' }), ad('livraria', ['rodape', 'chat'])];
+    for (let i = 0; i < 30; i++) expect(escolherChat(lista, `s${i}`, 'cafe', 'livraria')?.id).toBe('livraria');
+    // um só anunciante de chat: é ele mesmo
+    expect(escolherChat([ad('cafe', ['topo', 'chat'])], 's', 'cafe', undefined)?.id).toBe('cafe');
   });
 });

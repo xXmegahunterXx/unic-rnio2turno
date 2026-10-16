@@ -28,7 +28,7 @@ import {
   resultadoOficial,
   type Armazenamento,
 } from './nucleo';
-import { mancheteResultado, placarDoPalpite, textoMeuPalpite, textoResultadoPalpite, type Finalistas } from './textos';
+import { mancheteResultado, placarDoPalpite, textoMeuPalpite, textoResultadoPalpite, textoSemPalpite, type Finalistas } from './textos';
 
 const mem = (): Armazenamento & { m: Map<string, string> } => {
   const m = new Map<string, string>();
@@ -202,5 +202,16 @@ describe('textos (neutros, ordem da urna, cabem no X)', () => {
     expect(todos).not.toMatch(/vit[óo]ria|vence|ganh|derrot|esmag|lavada|favorito/i);
     expect(placarDoPalpite(F, 500, true)).toBe('50,0% × 50,0%');
     expect(todos).not.toMatch(/\((13|22)\)/);
+  });
+});
+
+describe('sem palpite salvo depois do prazo: o texto segue a fase real', () => {
+  it('votação (0h–17h de 25/10): "começa às 17h"; apurando: "em andamento"; encerrada: "terminou"', () => {
+    expect(textoSemPalpite(true, 'pre').titulo).toBe('A apuração começa às 17h');
+    expect(textoSemPalpite(true, 'pre').texto).toMatch(/17h \(horário de Brasília\), quando termina a votação/);
+    expect(textoSemPalpite(false, 'apurando').titulo).toBe('A apuração do 2º turno está em andamento');
+    expect(textoSemPalpite(false, 'encerrada').titulo).toBe('A apuração do 2º turno terminou');
+    expect(textoSemPalpite(false, 'encerrada').botao).toBe('Ver o resultado');
+    for (const f of ['pre', 'apurando', 'encerrada'] as const) expect(textoSemPalpite(f === 'pre', f).titulo).not.toMatch(/começou/);
   });
 });

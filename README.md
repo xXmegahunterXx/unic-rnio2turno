@@ -65,7 +65,7 @@ ignorados com aviso no log da subida.
 | `SIM_AUTOSTART` | — | `1`: sobe simulando a 20× (se não houver simulação/TSE em curso) · `force`: sempre. Em produção só com `ALLOW_SIMULACAO=1` |
 | `DATA_DIR` | `public/data` (dev) · `dist/data` (produção) | dataset (`meta.json`, `uf/*.json`) |
 | `DIST_DIR` | `dist` | build do app servido em produção |
-| `STATE_DIR` | `.server-state` | estado do admin (`admin.json`, com os anúncios), histórico do TSE (`tse-historico.json`) e métricas agregadas dos anúncios (`anuncios-metricas.json`) |
+| `STATE_DIR` | `.server-state` | estado do admin (`admin.json`, com os anúncios e os contatos públicos), histórico do TSE (`tse-historico.json`), métricas agregadas dos anúncios (`anuncios-metricas.json`), audiência agregada (`audiencia.json`), pedidos de anunciantes (`leads.json`, dados pessoais), redes do Sintonia (`divulgacao.json`), configuração da sala do chat (`chat.json`: aberta, modo lento, fixada) e, se ligado, o registro cifrado do chat (`chat-registro/` + a chave PÚBLICA `*.pem`) |
 | `SERVE_STATIC` | só em produção | `1`/`0` força servir (ou não) o `DIST_DIR` |
 | `FONTS_DIR` | `dist-server/assets/fonts` | fontes TTF das imagens de compartilhamento |
 | `TWITTER_SITE` | — | perfil do X para a meta `twitter:site` dos cartões de link (`@sintonia` ou `https://x.com/sintonia`); inválido = ignorado com aviso no log |
@@ -74,7 +74,8 @@ ignorados com aviso no log da subida.
 | `LOG_FORMAT` | produção: `json` · dev: `texto` | formato do log (JSON = um objeto por linha) |
 | `LOG_AMOSTRA` | `0.01` | fração das requisições "quentes" registradas (`/api/status`, apuração, estáticos). 5xx, 429, lentas (≥ 1 s) e o painel: sempre |
 | `LOG_AMOSTRA_PAGINAS` | `0.1` | fração das páginas (HTML) e imagens OG registradas |
-| `CHAT_REGISTRO_CHAVE` | desligado | caminho de uma chave PÚBLICA RSA (PEM, ≥ 2048 bits): liga o registro cifrado dos envios do chat (id, hora, IP, porta) em `STATE_DIR/chat-registro`, 6 meses, fora do backup. Só com decisão do dono e do advogado (DEPLOY.md, seção 5.1) |
+| `CHAT_REGISTRO_CHAVE` | desligado | caminho de uma chave PÚBLICA RSA (PEM, ≥ 2048 bits): liga o registro cifrado dos envios do chat (id, hora, IP, porta, apelido e texto) em `STATE_DIR/chat-registro`, 6 meses, fora do backup. Chave ilegível: o site sobe, o registro fica desligado e a sala travada fechada. Só com decisão do dono e do advogado (DEPLOY.md, seção 5.1) |
+| `CHAT_ENSAIO` | desligado | `1` só numa cópia de ensaio: em produção, deixa a sala do chat receber mensagens antes de 25/10 (sem ela, a sala só recebe a partir das 17h de 25/10; o bloqueio de 0h–17h de 25/10 vale sempre) |
 | `CHAT_REGISTRO_HEADER_PORTA` | — | cabeçalho com a porta de origem do visitante, quando o proxy a repassa (ex.: `x-porta-cliente`) |
 | `SINTONIA_COMMIT` / `SINTONIA_BUILD_DATE` | `.git` local ou `dev` | versão do build mostrada em `x-sintonia-versao`, `/api/versao`, `/healthz` e no painel (a imagem Docker grava o commit a partir do build-arg `GIT_COMMIT`; `GIT_COMMIT`/`BUILD_DATE` também valem) |
 
@@ -123,7 +124,7 @@ Leve para a máquina: `dist/`, `dist-server/`, `package.json`, `package-lock.jso
   respostas em andamento terminam com `Connection: close` (até `ENCERRAMENTO_SEG`, padrão 8 s; as que sobrarem são
   fechadas), o polling do TSE para e o estado pendente é gravado. Keep-alive de 65 s (maior que o dos balanceadores
   comuns), fila de conexões de 4.096 (rajadas de conexões novas não perdem SYN) e requisição inteira em até 30 s.
-- **Memória**: ~250 MB parado, ~450–570 MB sob carga (cache das imagens OG, respostas comprimidas e estáticos).
+- **Memória**: ~350 MB parado (depois da pré-compressão de `data/` e `geo/`), ~450–600 MB sob carga (cache das imagens OG, respostas comprimidas e estáticos).
 - **Log** (stdout): em produção, **JSON** — um objeto por linha (`{"t":"…","nivel":"info","msg":"…"}`), com as
   requisições como `{"msg":"req","id","metodo","rota","status","ms","amostra"}` (rota sem query; `amostra` = fração
   registrada, para estimar o total). Rotas quentes por amostragem (`LOG_AMOSTRA`, 1%), páginas e imagens a 10%, e
@@ -158,7 +159,7 @@ a **query string** na chave de cache (`?race=`, `?t=`, `&v=`, `?d=`).
 | `POST /api/chat` `{ apelido, texto, token }` · `/api/chat/denuncia` · `/presenca` · `/reacao` | `no-store` | só JSON do próprio site (403/415), corpo ≤ 4 KB; recusas com o motivo (400/403/422; modo lento e limites → 429 + `Retry-After`) |
 | `GET /api/patrocinio/logo?h=<hash>` | `public, max-age=86400, s-maxage=86400, immutable` | LEGADO: logo do `status.patrocinio` (derivado do anúncio master com 'topo'), com o mesmo cabeçalho de segurança das imagens de anúncio |
 | 404 de `/api/apuracao/…` | `public, max-age=30, s-maxage=60` | evita martelar a origem com URLs inexistentes |
-| `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630; `&formato=x\|feed\|story` → 1200×675, 1080×1350, 1080×1920 (cartões do placar com retratos grandes, `src/server/og-placar.ts`); com anúncio de compartilhamento no ar, faixa "Oferecimento" no pé (ARCHITECTURE §11.14) |
+| `GET /api/og/apuracao.png` | `public, max-age=30, s-maxage=30, stale-while-revalidate=60` | PNG 1200×630; `&formato=x\|feed\|story` → 1200×675, 1080×1350, 1080×1920 (cartões do placar com retratos grandes, `src/server/og-placar.ts`); faixa "Oferecimento" no pé só com `OFERECIMENTO_COM_CANDIDATOS` (hoje desligado: a imagem tem candidato — ARCHITECTURE §1.5, §11.14) |
 | `GET /api/og/{municipio,secao,governadores}.png` | ao vivo: como `apuracao.png`; 1º turno oficial (antes da apuração): `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | município, boletim de urna e as disputas de governador do 2º turno (`UFS_GOV_2T`) |
 | `GET /api/og/{candidato,senado,camara,assembleia,curiosidade,cenario}.png` | `public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800` | dado oficial (ou cenário recalculado do `?c=`); o `&v=` das meta tags é a versão do dataset |
 | `GET /api/og/teste.png` | `public, max-age=86400, s-maxage=86400` | cartão do Teste Cego (o código de um Duelo nunca é lido) |
@@ -181,9 +182,11 @@ município). Na fonte `tse`, só Brasil, UF e o mapa por município têm histór
 `STATE_DIR/tse-historico.json`); **município, zona e seção com `?t=` respondem o agora**. Detalhes em
 [`src/tse/README.md`](./src/tse/README.md) §5.1.
 
-**Pessoas agora** (`LiveStatus.pessoasAgora`): clientes distintos estimados nos últimos ~30 s (mapa de bits com
-hash salgado, sem guardar IP), recalculado a cada 5 s e arredondado (< 10 exato; < 1.000 em dezenas; depois
-centenas). Atrás de CDN, conta só quem chega à origem (o `status` tem `s-maxage=1`).
+**Pessoas agora** (`LiveStatus.pessoasAgora`): o maior entre os clientes distintos que chegaram à origem nos últimos
+~30 s (mapa de bits com hash salgado, sem guardar IP) e a presença pelo sinal das páginas (`Audiencia.presencaAgora`,
+janela = intervalo da presença + folga), arredondado (< 10 exato; < 1.000 em dezenas; depois centenas). Atrás de CDN só
+o sinal atravessa a borda; por isso ele entra (sem ele o número público ficava em ~1/3 do real e caía pela metade quando
+o intervalo da presença subia). O corpo do `/api/status` é montado e comprimido no máximo 1×/s por origem e estado.
 
 **Estáticos de dados** (`/data/**`, `/geo/**`, inclusive `secao/`, `locais/`, `perfil/`, `fotos/`, `cargos/`,
 `candidatos/`, `municipios-br.json`, `br-mun.json`): brotli (q10) e gzip (9) calculados uma vez por arquivo e
@@ -226,7 +229,9 @@ segundo, então cada rota é remontada, serializada e comprimida 1×/s; a fonte 
 
 - **Capacidade de um processo: ~7–12 mil req/s** conforme a rota, com p99 < 0,25 s até 500 conexões simultâneas. Com
   um visitante consultando o status a cada ~5 s e o placar a cada ~2,5–8 s, isso é da ordem de **20–30 mil pessoas
-  ao mesmo tempo na origem, sem CDN**. Memória: 250 MB parado, 420–460 MB no pico (limite do contêiner: 1,5 GB).
+  ao mesmo tempo na origem, sem CDN**. Memória: ~350 MB parado, 420–600 MB no pico (limite do contêiner: 1,5 GB). Com
+  anúncios no ar o `/api/status` passa de 1 KB e sai comprimido: desde out/2026 o corpo é montado e comprimido 1×/s
+  (antes, a cada pedido, a vazão dessa rota caía 2–4×; refazer esta tabela com anúncios no ar na próxima medição).
 - **Saturado** (1.000 conexões sempre ocupadas, CPU em 100%), o p99 de algumas rotas sobe para segundos: as conexões
   NOVAS esperam para ser aceitas (um servidor `http` mínimo do Node, "hello world", mostra o mesmo ~6 s neste ambiente).
   É o sinal de que a origem chegou ao teto: a partir daí, **CDN** (a origem só vê `s-maxage` de 1–2 s por URL; ver
@@ -335,8 +340,10 @@ obrigatória de que anunciante e peça não têm conteúdo político-eleitoral. 
 `/api/anuncio/img?h=…` e voltam assim ao salvar (o servidor troca pelo conteúdo). Relatório de entrega com CSV (totais e
 por hora). Métricas: só agregadas por anúncio × formato × hora, sem cookie, sem IP e sem dado pessoal (o visitante é só a
 chave anonimizada do app, usada em memória para descartar repetições); gravadas a cada 60 s e no encerramento em
-`STATE_DIR/anuncios-metricas.json`. Com um anúncio no formato `compartilhamento`, as imagens OG ganham a faixa
-"Oferecimento: <marca>" no pé (o master vence) e a versão da imagem nas meta tags muda com o anunciante.
+`STATE_DIR/anuncios-metricas.json`. Com um anúncio no formato `compartilhamento`, as imagens OG GENÉRICAS (Teste Cego,
+calculadora, capa das curiosidades, convite do Palpite) ganham a faixa "Oferecimento: <marca>" no pé (o master vence) e
+a versão da imagem nas meta tags muda com o anunciante; as imagens com candidato, só com `OFERECIMENTO_COM_CANDIDATOS`.
+A /anuncie tem prévia própria, sem candidato nem anunciante (`/api/og/anuncie.png`).
 
 Na VPS, os mesmos comandos sem navegador: `deploy/painel.sh` (estado, `trocar-agora`, `adiar`, `marcar`, `fonte pre`,
 `aviso`/`alerta`/`sem-aviso`, `tse`, `testar-tse`; recusa a simulação). Com `curl`, em desenvolvimento:

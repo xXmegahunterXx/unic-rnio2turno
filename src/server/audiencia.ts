@@ -393,6 +393,14 @@ export class Audiencia {
     }
   }
 
+  /**
+   * Pessoas com o site aberto agora pelo SINAL das páginas (última amostra de 10 s, arredondada): atravessa a CDN e não
+   * cai pela metade quando o intervalo da presença sobe (a janela acompanha o intervalo). É a "pílula" pública.
+   */
+  get presencaAgora(): number {
+    return this.ultimo.sinal;
+  }
+
   /** Intervalo atual do sinal de presença (s). */
   get intervaloS(): number {
     return this.ultimo.intervaloS;

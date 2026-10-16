@@ -29,14 +29,20 @@ export const LIMITES_LEAD = {
   guardaNaoRespondidoDias: 365,
 } as const;
 
-export const TEXTO_CONSENTIMENTO = 'Concordo que o Sintonia use estes dados só para responder ao meu contato.';
+/** Texto EXATO ao lado da caixa (a v1 guardava só a 1ª frase, e a tela mostrava as duas). */
+export const TEXTO_CONSENTIMENTO =
+  'Concordo que o Sintonia use estes dados só para responder ao meu contato. Nada é usado para outra finalidade nem passado a terceiros.';
 /**
  * Versão do texto de consentimento (vai junto com cada pedido: o ônus da prova do consentimento é do controlador, LGPD
  * art. 8º, § 2º). Mudou o texto? Crie uma versão nova e guarde a antiga em `TEXTOS_CONSENTIMENTO`.
  */
-export const VERSAO_CONSENTIMENTO = '2026-10-v1';
+export const VERSAO_CONSENTIMENTO = '2026-10-v2';
 /** Todos os textos já usados, por versão (o painel mostra o texto exato que a pessoa marcou). */
-export const TEXTOS_CONSENTIMENTO: Readonly<Record<string, string>> = { [VERSAO_CONSENTIMENTO]: TEXTO_CONSENTIMENTO };
+export const TEXTOS_CONSENTIMENTO: Readonly<Record<string, string>> = {
+  // a tela da v1 mostrava também "Nada é usado para outra finalidade nem passado a terceiros." (fora do texto guardado)
+  '2026-10-v1': 'Concordo que o Sintonia use estes dados só para responder ao meu contato.',
+  [VERSAO_CONSENTIMENTO]: TEXTO_CONSENTIMENTO,
+};
 
 export type CampoLead = 'nome' | 'empresa' | 'email' | 'whatsapp' | 'formatos' | 'mensagem' | 'consentimento';
 

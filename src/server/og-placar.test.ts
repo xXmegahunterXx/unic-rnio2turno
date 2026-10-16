@@ -282,3 +282,19 @@ describe('rotas (fonte TSE com o 2º turno forjado)', () => {
     }
   }, 60_000);
 });
+
+describe('/api/og/anuncie.png (prévia da página de vendas)', () => {
+  it('PNG genérico 1200×630 e a /anuncie aponta para ele (sem placar de candidatos)', async () => {
+    const { montar } = await import('./test-helpers');
+    const { metaDaRota } = await import('./meta-tags');
+    const m = await montar();
+    const r = await m.app.request('/api/og/anuncie.png');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toBe('image/png');
+    const b = new Uint8Array(await r.arrayBuffer());
+    const dv = new DataView(b.buffer);
+    expect([dv.getUint32(16), dv.getUint32(20)]).toEqual([1200, 630]);
+    const meta = metaDaRota('/anuncie', new URLSearchParams(), { races: new Map(), nomeMunicipio: () => undefined } as unknown as Parameters<typeof metaDaRota>[2]);
+    expect(meta?.imagem).toBe('/api/og/anuncie.png');
+  });
+});

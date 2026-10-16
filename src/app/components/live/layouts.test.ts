@@ -258,3 +258,13 @@ describe('live vertical (janela em pé: TikTok, Shorts, Kick no celular)', () =>
     expect(vert('canto')).toContain('data-layout="canto"');
   });
 });
+
+describe('barra: a aba "Oferecido por" nunca passa da largura da marca do Sintonia', () => {
+  it('max-w da aba = largura da célula da marca (33u)', () => {
+    const src = readFileSync('src/app/components/live/Layouts.tsx', 'utf8');
+    const aba = /data-aba-anuncio className=\{cn\(PAINEL, '[^']*max-w-\[calc\(var\(--u\)\*(\d+)\)\]/.exec(src);
+    const marca = /flex w-\[calc\(var\(--u\)\*(\d+)\)\] shrink-0 items-center border-r/.exec(src);
+    expect(aba?.[1]).toBeDefined();
+    expect(Number(aba![1])).toBeLessThanOrEqual(Number(marca![1]));
+  });
+});

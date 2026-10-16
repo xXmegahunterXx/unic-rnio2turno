@@ -31,7 +31,7 @@ import { propsPreCarregar } from './prefetch';
 import { ProvedorAnuncios } from '../anuncios/contexto';
 import { FaixaTopo } from '../anuncios/FaixaTopo';
 import { rodapePermitido } from '../anuncios/nucleo';
-import { useIsDesktop, useMediaQuery } from '@/app/lib/useMediaQuery';
+import { useIsDesktop } from '@/app/lib/useMediaQuery';
 import { instalarBarrasMoveis, mostrarTabBar } from '@/app/lib/barrasMoveis';
 
 export function AppShell({ children }: { children?: ReactNode }) {
@@ -155,10 +155,8 @@ function Header() {
   // Página do 1º turno (?race=…-t1) durante a simulação: os números da página são OFICIAIS (a simulação é do 2º turno)
   const paginaT1 = /[?&]race=[a-z-]*-t1(?:&|$)/.test(search);
   const [rolou, setRolou] = useState(false);
-  // Faixa de anúncio do topo: no desktop dentro do cabeçalho fixo (sempre à vista, entra em --app-header-h); no
-  // celular logo abaixo dele, rolando com a página (o formato fixo do celular é a barra do rodapé). Celular deitado
-  // (≥ 768 px de largura, mas ~390 px de altura) também rola: fixa, a faixa somaria 52 px a um cabeçalho de 64 px.
-  const desktop = useMediaQuery('(min-width: 768px) and (min-height: 560px)', true);
+  // Faixa de anúncio do topo: logo abaixo do cabeçalho, FORA do bloco fixo, em todas as larguras — rola com a página.
+  // Presa ao cabeçalho, ela passava colada aos percentuais e às fotos dos candidatos ao rolar (ARCHITECTURE §1.5).
 
   // Expõe a altura do header para elementos "sticky" (ex.: cabeçalho de DataTable).
   useLayoutEffect(() => {
@@ -261,9 +259,8 @@ function Header() {
             }
           />
         ) : null}
-        {desktop ? <FaixaTopo /> : null}
       </div>
-      {!desktop ? <FaixaTopo /> : null}
+      <FaixaTopo />
       <AvisoBanner aviso={status.data?.aviso ?? null} />
     </>
   );

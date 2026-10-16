@@ -63,7 +63,8 @@ export function ChamadaSecao({ className }: { className?: string }) {
 function Numero({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-line bg-surface-2/60 px-3 py-3 sm:px-4">
-      <dd className="num truncate font-display text-[19px] font-semibold leading-none tracking-[-0.02em] text-fg sm:text-[24px]">{valor}</dd>
+      {/* número inteiro (nunca "499.2…"): menor abaixo de 380 px */}
+      <dd className="num whitespace-nowrap font-display text-[16px] font-semibold leading-none tracking-[-0.03em] text-fg min-[380px]:text-[19px] sm:text-[24px]">{valor}</dd>
       <dt className="mt-1.5 text-[11.5px] font-medium text-fg-muted sm:text-[12.5px]">{rotulo}</dt>
     </div>
   );

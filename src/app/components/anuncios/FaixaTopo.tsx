@@ -2,10 +2,10 @@
  * Formato 'topo': faixa logo abaixo do cabeçalho em todas as páginas do AppShell ("Oferecido por" + logo + marca +
  * título + botão). A cota MASTER tem prioridade (escolherAnuncio).
  *
- *  - Desktop (≥ 768 px): dentro do cabeçalho fixo — fica sempre à vista e entra na altura `--app-header-h` (os
- *    elementos "sticky" das páginas descontam a faixa sozinhos).
- *  - Celular: logo abaixo do cabeçalho, rola junto com a página (a barra fixa do celular é o formato 'rodape';
- *    duas peças fixas tomariam a tela). Versão compacta: logo, "Publicidade · marca" e o título INTEIRO em até duas
+ *  - Em todas as larguras: logo abaixo do cabeçalho, ROLA junto com a página (não fica presa ao cabeçalho fixo). Fixa,
+ *    a faixa passava colada aos percentuais, nomes e fotos de candidato ao rolar (ARCHITECTURE §1.5: anúncio nunca
+ *    colado a foto, nome ou número de candidato). A impressão conta na carga, com a faixa no topo.
+ *  - No celular, a barra fixa é o formato 'rodape' (que se recolhe diante de placar e resultado). Versão compacta: logo, "Publicidade · marca" e o título INTEIRO em até duas
  *    linhas (o anunciante escreve até 60 caracteres); abaixo de 400 px o botão vira só a seta (o texto do botão segue
  *    no rótulo do link), para sobrar espaço para o título.
  *  - Altura reservada antes de o status chegar (sem pulo de layout); sem anúncio no topo, a faixa não aparece.

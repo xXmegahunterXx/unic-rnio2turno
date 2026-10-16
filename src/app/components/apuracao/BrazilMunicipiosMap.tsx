@@ -634,7 +634,7 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
     : '';
 
   return (
-    <div ref={boxRef} className={cn('relative w-full select-none', className)} data-mapa-municipios="">
+    <div ref={boxRef} className={cn('relative w-full select-none', className)} data-mapa-municipios="" data-sem-anuncio-fixo>
       <p id={`${uid}-dica`} className="sr-only">
         {`Mapa com ${fmtInt(ordem?.ordem.length ?? 5571)} municípios, modo ${modoInfo?.label ?? modo}. ${resumoSr}. `}
         Use a busca para encontrar um município; mais e menos ampliam, zero volta ao Brasil inteiro.

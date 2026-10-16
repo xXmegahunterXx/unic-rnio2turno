@@ -344,7 +344,7 @@ export function BrazilMap({
   }
 
   return (
-    <div ref={boxRef} className={cn('relative w-full select-none', className)}>
+    <div ref={boxRef} data-sem-anuncio-fixo className={cn('relative w-full select-none', className)}>
       <p id={`${uid}-dica`} className="sr-only">
         Use as setas para passar de um estado a outro e Enter para abrir.
       </p>

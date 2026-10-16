@@ -70,13 +70,16 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
       firstDir: 'asc',
       cell: (z) => (
         <span className="block min-w-0">
-          <span className="flex min-w-0 items-baseline gap-2">
+          <span className="flex min-w-0 flex-wrap items-baseline gap-x-2">
             <span className="font-mono text-[13px] font-semibold">{fmtZona(z.zona)}</span>
-            <span className="num truncate text-[11.5px] text-fg-muted">{fmtInt(z.secoes)} seções</span>
+            {/* zona sem o arquivo do TSE ainda (resumo vazio): nunca "0 seções · 0%" ao lado de um município apurado */}
+            <span className="num whitespace-nowrap text-[11.5px] text-fg-muted">{z.secoes > 0 ? `${fmtInt(z.secoes)} seções` : 'aguardando o TSE'}</span>
           </span>
-          <span className={cn('mt-1 block', soAbaixoDe[LARGURA.apurado])}>
-            <ApuradoCell t={z} compact />
-          </span>
+          {z.secoes > 0 ? (
+            <span className={cn('mt-1 block', soAbaixoDe[LARGURA.apurado])}>
+              <ApuradoCell t={z} compact />
+            </span>
+          ) : null}
         </span>
       ),
     },
@@ -87,7 +90,7 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
       hideBelowWidth: LARGURA.apurado,
       width: W.apuradoSemBarra,
       sortValue: (z) => pctTotalizadas(z),
-      cell: (z) => <ApuradoCell t={z} bar={false} />,
+      cell: (z) => (z.secoes > 0 ? <ApuradoCell t={z} bar={false} /> : <span className="text-fg-subtle">—</span>),
     },
     {
       key: 'a',
@@ -172,7 +175,7 @@ function SemZona({ zonas, onZona }: { zonas: ZonaResumo[]; onZona: (z: number) =
         onChange={(e) => e.target.value && onZona(Number(e.target.value))}
         options={[
           { value: '', label: 'Escolher zona…' },
-          ...zonas.map((z) => ({ value: String(z.zona), label: `Zona ${fmtZona(z.zona)} · ${fmtInt(z.secoes)} seções` })),
+          ...zonas.map((z) => ({ value: String(z.zona), label: `Zona ${fmtZona(z.zona)} · ${z.secoes > 0 ? `${fmtInt(z.secoes)} seções` : 'aguardando o TSE'}` })),
         ]}
         wrapperClassName="mt-5 w-full max-w-[260px]"
       />

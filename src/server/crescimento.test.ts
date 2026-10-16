@@ -180,3 +180,14 @@ describe('formulário "Quero anunciar" em produção: abre só com e-mail de pri
     expect(m.crescimento.leads.paraAdmin().leads).toHaveLength(1);
   });
 });
+
+describe('"pessoas agora" público (conferência final)', () => {
+  it('usa a presença pelo sinal das páginas (atravessa a CDN): 30 redes com a página aberta → ~30 no /api/status', async () => {
+    const m = await montar({ env: { TRUST_PROXY: '1' } });
+    for (let i = 0; i < 30; i++) await sinal(m, { p: 1, g: 'apuracao' }, { 'x-real-ip': `200.10.${i}.7` });
+    m.crescimento.audiencia.amostrar();
+    m.relogio.t += 1500; // o corpo do status é montado no máximo 1×/s
+    const s = (await (await m.app.request('/api/status')).json()) as { pessoasAgora: number };
+    expect(s.pessoasAgora).toBeGreaterThanOrEqual(30);
+  });
+});

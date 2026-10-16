@@ -21,7 +21,8 @@ export function Breadcrumbs({ items, className }: { items: Crumb[]; className?: 
     el.scrollLeft = el.scrollWidth;
     setCortado(el.scrollLeft > 1);
   }, [items]);
-  const fade = 'linear-gradient(90deg, transparent, black 28px)';
+  // degradê largo: a palavra cortada no começo some de vez (nunca se lê "rasil" no lugar de "Brasil")
+  const fade = 'linear-gradient(90deg, transparent, transparent 10px, black 48px)';
   return (
     <nav
       ref={ref}

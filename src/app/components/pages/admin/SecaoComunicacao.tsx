@@ -1,6 +1,7 @@
 /**
  * Seção "Comunicação": aviso global (faixa no topo de todas as páginas públicas, comando `aviso`) com prévia
- * fiel ao AppShell, e "Congelar dados" (comando `congelar`), que simula instabilidade do TSE.
+ * fiel ao AppShell, os contatos públicos do site (comando `contatos`, ContatosPublicos.tsx) e "Congelar dados"
+ * (comando `congelar`), que simula instabilidade do TSE.
  */
 import { useEffect, useState } from 'react';
 import type { Aviso } from '@/shared/types';
@@ -11,6 +12,7 @@ import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
 import { Badge, Button, Icon, Segmented, Toggle } from '@/app/ui';
 import { useAdmin } from './dados';
 import { AreaTexto, CabecalhoSecao, Callout, Painel, Rotulo } from './kit';
+import { ContatosPublicosPainel } from './ContatosPublicos';
 import { fmtDuracao, relogioAgora } from './rotulos';
 import { useNow } from '@/app/lib/useNow';
 
@@ -156,6 +158,8 @@ export function SecaoComunicacao() {
           ) : null}
         </Painel>
       </div>
+
+      <ContatosPublicosPainel className="mt-4 lg:mt-5" />
 
       <Painel
         className="mt-4 lg:mt-5"

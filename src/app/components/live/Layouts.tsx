@@ -270,7 +270,7 @@ function RodapeLive({ q }: { q: QuadroLive }) {
     <footer className={cn(PAINEL, 'flex shrink-0 items-center gap-[calc(var(--u)*1.8)] px-[calc(var(--u)*2)] py-[calc(var(--u)*1.2)]')}>
       <QrLive url={q.urlQr} className="h-[calc(var(--u)*7)] w-[calc(var(--u)*7)]" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Estado, cidade e seção por seção</div>
+        <div className="truncate text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">Estado por estado, cidade por cidade, seção por seção</div>
         <div className="mt-[calc(var(--u)*0.4)] whitespace-nowrap font-display text-[length:calc(var(--u)*3.2)] font-semibold leading-none tracking-[-0.02em] text-fg">{q.dominio}</div>
       </div>
       <div className="shrink-0 text-right text-[length:calc(var(--u)*1.5)] leading-snug text-fg-muted">
@@ -290,10 +290,11 @@ function LayoutBarra({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
   const topo = opcoes.posicao === 'topo';
   const fin = finalistas(q.race);
   const eleito = eleitoDe(q);
-  // a aba do anúncio fica presa ao bloco da marca do Sintonia (à esquerda), do lado de fora da barra
+  // a aba do anúncio fica presa ao bloco da marca do Sintonia (à esquerda), do lado de fora da barra, e NUNCA passa da
+  // largura dele (33u): mais larga, encostava na foto do 1º candidato (ARCHITECTURE §1.5)
   const aba = anuncio ? (
     <div className={cn('flex', topo ? 'mt-[calc(var(--u)*0.8)]' : 'mb-[calc(var(--u)*0.8)]')}>
-      <div className={cn(PAINEL, 'flex max-w-[calc(var(--u)*56)] items-center rounded-full px-[calc(var(--u)*1.6)] py-[calc(var(--u)*0.7)]')}>
+      <div data-aba-anuncio className={cn(PAINEL, 'flex max-w-[calc(var(--u)*33)] items-center rounded-[calc(var(--u)*1.6)] px-[calc(var(--u)*1.4)] py-[calc(var(--u)*0.7)]')}>
         <OferecimentoLivePeca anuncio={anuncio} variante="aba" previa={previa} vista={vista} />
       </div>
     </div>

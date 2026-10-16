@@ -14,7 +14,20 @@ const preCarregarLembrete = () => void import('./DialogoLembrete');
 /** O lembrete só faz sentido antes do início REAL da apuração (relógio de parede). */
 export const lembreteDisponivel = (agora = Date.now()) => agora < INICIO_APURACAO;
 
-export function BotaoLembrete({ variant = 'outline', size = 'md', className, label = 'Lembrar da apuração' }: { variant?: ButtonVariant; size?: ButtonSize; className?: string; label?: string }) {
+export function BotaoLembrete({
+  variant = 'outline',
+  size = 'md',
+  className,
+  label = 'Lembrar da apuração',
+  labelCurto,
+}: {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  className?: string;
+  label?: string;
+  /** rótulo abaixo de 380 px (o botão divide a linha com outro) */
+  labelCurto?: string;
+}) {
   const [aberto, setAberto] = useState(false);
   const [montado, setMontado] = useState(false);
   return (
@@ -25,6 +38,7 @@ export function BotaoLembrete({ variant = 'outline', size = 'md', className, lab
         icon="calendario"
         className={className}
         aria-haspopup="dialog"
+        aria-label={labelCurto ? label : undefined}
         onPointerEnter={preCarregarLembrete}
         onFocus={preCarregarLembrete}
         onClick={() => {
@@ -32,7 +46,14 @@ export function BotaoLembrete({ variant = 'outline', size = 'md', className, lab
           setAberto(true);
         }}
       >
-        {label}
+        {labelCurto ? (
+          <>
+            <span className="max-[379px]:hidden">{label}</span>
+            <span className="min-[380px]:hidden">{labelCurto}</span>
+          </>
+        ) : (
+          label
+        )}
       </Button>
       {montado ? (
         <Suspense fallback={null}>

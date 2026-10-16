@@ -15,6 +15,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { AVISO_REGISTRO_CHAT, EMOJI_REACAO, LIMITES_CHAT, REACOES, REGRAS_CHAT, REGRAS_CHAT_CURTA, ROTULO_REACAO, avaliarApelido, type MensagemChat, type ReacaoId } from '@/shared/chat';
 import { fmtHora } from '@/shared/format';
+import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
@@ -54,6 +55,9 @@ export function Sala({
   className?: string;
 }) {
   const s = useSala('tela');
+  // /ao-vivo em tela pequena (celular, ou altura ≤ 800): o mesmo pé compacto da folha — campo sempre à vista, apelido
+  // pedido no envio, regras numa linha e fixada em 1 linha — para sobrarem mensagens à vista (eram 1–2 em 360×740)
+  const compactaPagina = useMediaQuery('(max-width: 639px), (max-height: 800px)') && variante === 'pagina';
   const pagina = variante === 'pagina';
   const folha = variante === 'folha';
   return (
@@ -64,10 +68,10 @@ export function Sala({
       ) : (
         <>
           {s.pub?.aberta && !folha ? <OferecimentoChat compacta={variante !== 'pagina'} /> : null}
-          {s.pub?.fixada ? <Fixada texto={s.pub.fixada.texto} variante={variante} /> : null}
+          {s.pub?.fixada ? <Fixada texto={s.pub.fixada.texto} variante={variante} umaLinha={compactaPagina} /> : null}
           <Lista s={s} pagina={pagina} />
           {s.pub?.aberta && folha ? <OferecimentoChat compacta noPe /> : null}
-          <Rodape s={s} variante={variante} />
+          <Rodape s={s} variante={variante} compacta={compactaPagina} />
         </>
       )}
     </section>
@@ -126,9 +130,9 @@ function Cabecalho({ s, variante, acoes }: { s: EstadoSala; variante: VarianteSa
 }
 
 /** Mensagem fixada pela moderação (na folha do celular, recolhida em 1 linha; toque abre). */
-function Fixada({ texto, variante }: { texto: string; variante: VarianteSala }) {
+function Fixada({ texto, variante, umaLinha }: { texto: string; variante: VarianteSala; umaLinha?: boolean }) {
   const [aberta, setAberta] = useState(false);
-  const folha = variante === 'folha';
+  const folha = variante === 'folha' || !!umaLinha;
   const conteudo = (
     <>
       <IconeAlfinete className="mt-0.5 text-brand-fg" />
@@ -138,7 +142,7 @@ function Fixada({ texto, variante }: { texto: string; variante: VarianteSala }) 
       </p>
     </>
   );
-  const classe = cn('flex w-full shrink-0 gap-2 border-b border-line bg-brand/[0.07] text-[13px] leading-snug text-fg', variante === 'pagina' ? 'px-5 py-2.5' : folha ? 'px-4 py-2' : 'px-4 py-2.5');
+  const classe = cn('flex w-full shrink-0 gap-2 border-b border-line bg-brand/[0.07] text-[13px] leading-snug text-fg', folha ? 'px-4 py-2' : variante === 'pagina' ? 'px-5 py-2.5' : 'px-4 py-2.5');
   if (!folha) return <div className={classe}>{conteudo}</div>;
   return (
     <button type="button" onClick={() => setAberta((a) => !a)} aria-expanded={aberta} className={classe}>
@@ -192,6 +196,19 @@ function Lista({ s, pagina }: { s: EstadoSala; pagina: boolean }) {
       setNovasAbaixo((n) => n + (idx >= 0 ? total - 1 - idx : 1));
     }
   }, [ultimaId, total, s.mensagens, s.minhas, irAoFim]);
+
+  // a lista muda de tamanho sem mensagem nova (a linha "Modo lento…" do rodapé aparece depois do envio, o teclado abre,
+  // a fixada expande): quem estava no fim continua vendo a última mensagem inteira, sem ficar 20 px sob o anúncio
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (noFim.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [total > 0]);
 
   const aoRolar = () => {
     const el = ref.current;
@@ -456,10 +473,10 @@ function useContagem(): [number, (s: number) => void] {
   }];
 }
 
-function Rodape({ s, variante }: { s: EstadoSala; variante: VarianteSala }) {
+function Rodape({ s, variante, compacta }: { s: EstadoSala; variante: VarianteSala; compacta?: boolean }) {
   const pagina = variante === 'pagina';
   const aberta = !!s.pub?.aberta;
-  if (variante === 'folha') return <RodapeFolha s={s} aberta={aberta} />;
+  if (variante === 'folha' || compacta) return <RodapeFolha s={s} aberta={aberta} semTelaCheia={pagina} />;
   return (
     <div className={cn('shrink-0 border-t border-line bg-surface', pagina ? 'px-5 pb-4 pt-3' : 'px-3 pb-[max(0.625rem,env(safe-area-inset-bottom))] pt-2')}>
       {aberta ? <Compositor s={s} lentoS={s.pub?.lentoS ?? LIMITES_CHAT.lento.padrao} /> : null}
@@ -480,21 +497,21 @@ function Rodape({ s, variante }: { s: EstadoSala; variante: VarianteSala }) {
 }
 
 /** Pé da folha do celular: campo de mensagem e, numa linha só, reações + "Regras da sala" + tela cheia. */
-function RodapeFolha({ s, aberta }: { s: EstadoSala; aberta: boolean }) {
+function RodapeFolha({ s, aberta, semTelaCheia }: { s: EstadoSala; aberta: boolean; semTelaCheia?: boolean }) {
   const [trocar, setTrocar] = useState(0);
   return (
     <div className="relative shrink-0 border-t border-line bg-surface px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
       {aberta ? <Compositor s={s} lentoS={s.pub?.lentoS ?? LIMITES_CHAT.lento.padrao} compacto trocarApelido={trocar} /> : null}
       <div className={cn('flex items-center gap-2', aberta ? 'mt-1.5' : '')}>
         {aberta ? <Reacoes s={s} compacta /> : null}
-        <RegrasCompactas registro={!!s.pub?.registro} onTrocarApelido={aberta ? () => setTrocar((n) => n + 1) : undefined} />
+        <RegrasCompactas registro={!!s.pub?.registro} onTrocarApelido={aberta ? () => setTrocar((n) => n + 1) : undefined} semTelaCheia={semTelaCheia} />
       </div>
     </div>
   );
 }
 
 /** "Regras da sala" numa linha (folha do celular): toque abre a lista inteira (e "Trocar apelido"); e a tela cheia. */
-function RegrasCompactas({ onTrocarApelido, registro }: { onTrocarApelido?: () => void; registro?: boolean }) {
+function RegrasCompactas({ onTrocarApelido, registro, semTelaCheia }: { onTrocarApelido?: () => void; registro?: boolean; semTelaCheia?: boolean }) {
   const [aberta, setAberta] = useState(false);
   const id = useId();
   return (
@@ -508,9 +525,11 @@ function RegrasCompactas({ onTrocarApelido, registro }: { onTrocarApelido?: () =
       >
         Regras da sala
       </button>
-      <Link to="/ao-vivo" className="toque relative shrink-0 font-medium text-fg-muted underline decoration-line underline-offset-2 hover:text-fg">
-        Tela cheia
-      </Link>
+      {semTelaCheia ? null : (
+        <Link to="/ao-vivo" className="toque relative shrink-0 font-medium text-fg-muted underline decoration-line underline-offset-2 hover:text-fg">
+          Tela cheia
+        </Link>
+      )}
       {aberta ? (
         <div id={id} role="note" className="absolute inset-x-3 bottom-[calc(100%+6px)] z-10 rounded-2xl border border-line bg-surface p-3.5 text-[12.5px] leading-snug text-fg-muted shadow-card">
           <ul className="list-disc space-y-1 pl-4">

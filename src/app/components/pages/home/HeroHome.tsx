@@ -49,9 +49,10 @@ export function HeroHome({ status, recebidoEm, race, raceT1, resumo, anonimizado
   const lembrete = lembreteDisponivel();
 
   const acoes = (
-    <div className="flex gap-2.5">
-      {lembrete ? <BotaoLembrete className="flex-1 lg:flex-none" /> : null}
-      <BotaoCompartilharSite className="flex-1 lg:flex-none" label={lembrete ? 'Compartilhar' : 'Compartilhar o Sintonia'} />
+    // grade de 2 colunas que encolhe (min-w-0): em 360 px os dois botões cabem na largura, sem passar da borda
+    <div className={lembrete ? 'grid grid-cols-2 gap-2.5 lg:flex' : 'flex gap-2.5'}>
+      {lembrete ? <BotaoLembrete labelCurto="Lembrete" className="min-w-0 flex-1 lg:flex-none" /> : null}
+      <BotaoCompartilharSite className="min-w-0 flex-1 lg:flex-none" label={lembrete ? 'Compartilhar' : 'Compartilhar o Sintonia'} />
     </div>
   );
 

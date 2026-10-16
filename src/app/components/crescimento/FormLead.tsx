@@ -5,9 +5,10 @@
  * "Interessados". Contra robôs: campo-isca escondido (`site`) e tempo de preenchimento (o envio espera, se preciso, até
  * o mínimo — uma pessoa rápida nunca perde o pedido). No build demo não há servidor: o formulário aparece, sem enviar.
  *
- * Em PRODUÇÃO, enquanto o e-mail de privacidade for o provisório (`CONTATO.privacidade` em `.example`), o formulário não
- * abre: a pessoa precisa de um canal que funcione para corrigir/apagar os dados e retirar o consentimento (LGPD, art. 8º,
- * § 5º, e art. 18). Trocar o e-mail (CHECKLIST-LANCAMENTO A9.1) libera o formulário no próximo build.
+ * Em PRODUÇÃO, enquanto não houver e-mail de privacidade configurado no painel (Comunicação → Contatos públicos;
+ * `LiveStatus.contatos.privacidade`), o formulário não abre: a pessoa precisa de um canal que funcione para corrigir/apagar
+ * os dados e retirar o consentimento (LGPD, art. 8º, § 5º, e art. 18). O servidor aplica a mesma regra (503). Abre sozinho
+ * quando o e-mail é salvo no painel — sem novo build.
  */
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -17,7 +18,7 @@ import { fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Button } from '@/app/ui/Button';
 import { Icon } from '@/app/ui/Icon';
-import { CONTATO, contatoProvisorio } from '@/app/components/pages/home/Institucional';
+import { useContatos } from '@/app/data/contatos';
 
 /** Rótulos curtos dos formatos (chips). */
 const CURTO: Record<FormatoAnuncio, string> = {
@@ -49,11 +50,14 @@ const VAZIO: Valores = { nome: '', empresa: '', email: '', whatsapp: '', mensage
 
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Produção com o canal de privacidade provisório: sem formulário (ver o cabeçalho). Em dev e no demo, aparece. */
-export const FORMULARIO_BLOQUEADO = import.meta.env.PROD && !__DEMO__ && contatoProvisorio(CONTATO.privacidade);
+/** Produção sem e-mail de privacidade no painel: sem formulário (ver o cabeçalho). Em dev e no demo, aparece. */
+const EXIGE_CANAL_PRIVACIDADE = import.meta.env.PROD && !__DEMO__;
 
-export function FormLead({ className }: { className?: string }) {
-  if (FORMULARIO_BLOQUEADO) {
+export function FormLead({ className, temOutroCanal }: { className?: string; temOutroCanal?: boolean }) {
+  const contatos = useContatos();
+  // enquanto o status não chega, nada (evita piscar "abre em breve" para quem vai ver o formulário)
+  if (EXIGE_CANAL_PRIVACIDADE && !contatos.carregado) return <div className={cn('min-h-[420px]', className)} aria-busy="true" />;
+  if (EXIGE_CANAL_PRIVACIDADE && !contatos.privacidade) {
     return (
       <div role="note" className={cn('flex flex-col items-start gap-3 rounded-3xl border border-line bg-surface p-6 shadow-card sm:p-8', className)}>
         <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-surface-3 text-fg-muted">
@@ -61,8 +65,9 @@ export function FormLead({ className }: { className?: string }) {
         </span>
         <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em] text-fg">O formulário abre em breve</h3>
         <p className="max-w-[36rem] text-pretty text-[15px] leading-relaxed text-fg-muted">
-          Ele volta assim que o canal de privacidade do Sintonia estiver no ar. Enquanto isso, fale com a gente pelo WhatsApp ou pelo e-mail desta
-          página.
+          {temOutroCanal
+            ? 'Ele abre assim que o canal de privacidade do Sintonia estiver no ar. Enquanto isso, fale com a gente pelos contatos ao lado.'
+            : 'Ele abre assim que o canal de privacidade do Sintonia estiver no ar.'}
         </p>
       </div>
     );
@@ -306,7 +311,7 @@ function FormLeadAberto({ className }: { className?: string }) {
           className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
         />
         <span>
-          <span className="text-fg">{TEXTO_CONSENTIMENTO}</span> Nada é usado para outra finalidade nem passado a terceiros.{' '}
+          <span className="text-fg">{TEXTO_CONSENTIMENTO}</span>{' '}
           <Link to="/privacidade#anunciar" className="font-medium text-fg underline decoration-line underline-offset-[3px] hover:decoration-brand-fg">
             Privacidade
           </Link>

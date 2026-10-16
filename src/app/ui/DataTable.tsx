@@ -73,6 +73,8 @@ export interface DataTableProps<R> {
   /** Legenda (visível só para leitores de tela). */
   caption?: string;
   empty?: ReactNode;
+  /** tabela com números de candidato: a barra de anúncio do rodapé e a pílula do chat não ficam por cima */
+  semAnuncioFixo?: boolean;
   className?: string;
 }
 
@@ -118,6 +120,7 @@ export function DataTable<R>({
   caption,
   empty,
   className,
+  semAnuncioFixo,
 }: DataTableProps<R>) {
   const [sortLocal, setSortLocal] = useState<SortState | null>(initialSort ?? null);
   const sort = sortCtrl !== undefined ? sortCtrl : sortLocal;
@@ -177,7 +180,7 @@ export function DataTable<R>({
   const largura = (c: Column<R>) => (c.grow ? undefined : (c.width ?? (fixo ? 'w-20' : undefined)));
   return (
     // Contêiner de consulta (container queries): colunas e células se adaptam à largura da TABELA.
-    <div className={cn('w-full [container-type:inline-size]', className)}>
+    <div data-sem-anuncio-fixo={semAnuncioFixo ? '' : undefined} className={cn('w-full [container-type:inline-size]', className)}>
       <div
         // `relative` na rolagem interna: elementos absolutos das células (ex.: textos sr-only) ficam contidos no
         // rolador; sem isso escapam para o ancestral posicionado e esticam a página além do rodapé.

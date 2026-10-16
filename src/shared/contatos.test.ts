@@ -29,6 +29,10 @@ describe('contatos públicos (painel → Comunicação)', () => {
 
   it('efetivos: o geral cai no e-mail da /anuncie; privacidade e correções não caem em outro; nunca .example', () => {
     expect(emailProvisorio('contato@sintonia.example')).toBe(true);
+    expect(emailProvisorio('contato@example.com')).toBe(true);
+    expect(emailProvisorio('a@mail.example.org')).toBe(true);
+    expect(emailProvisorio('contato@meuexample.com')).toBe(false);
+    expect(emailProvisorio('contato@sintonia2026.com.br')).toBe(false);
     const nada = contatosEfetivos(null, null);
     expect(nada).toMatchObject({ geral: null, privacidade: null, algum: false });
     const soAnuncie = contatosEfetivos(null, { email: 'comercial@empresa.com.br' });

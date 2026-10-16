@@ -45,7 +45,11 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
    "Oferecimento: <marca>" numa faixa própria no pé — uma chave só, `OFERECIMENTO_COM_CANDIDATOS` em
    `src/shared/oferecimento.ts` (servidor OG, ShareCard do app, cartões do palpite e os textos de /anuncie e /sobre a
    seguem). Ligar é decisão do dono com o advogado: a imagem circula sem o site em volta, com foto e número de candidato.
-   Métricas de anúncio só agregadas, sem cookie, sem IP e sem dado pessoal (§10.2, item 10).
+   Métricas de anúncio só agregadas, sem cookie, sem IP e sem dado pessoal (§10.2, item 10). Nada de peça FIXA na tela
+   (presa ao cabeçalho ou ao rodapé) passando por cima ou colada a resultado ao rolar: a faixa do topo rola com a página
+   em todas as larguras, e a barra do rodapé (celular) e a pílula do chat se recolhem diante de qualquer bloco
+   `[data-sem-anuncio-fixo]` (placar, gráfico da corrida, participação, 1º × 2º turno, mapas, tabela de estados, ficha
+   do candidato inteira, que nem tem a barra).
 6. **Fonte.** Dados reais vêm do TSE (resultados.tse.jus.br) e do IBGE (malhas). Cite as fontes na
    página `/metodologia`.
 
@@ -717,7 +721,13 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   Jair, os vices pelo nome completo, Janja/Michelle…), partido, 13/22 (também por extenso) ou nome reservado (moderador, TSE, STF, tribunal,
   juiz, ministro, Justiça Eleitoral, Sintonia…, também com leet e espaços). Texto 1–140.
 - **Servidor** (`src/server/chat.ts`, `SalaChat` + `registrarChatPublico`/`registrarChatAdmin`, 2 linhas em `app.ts`):
-  FECHADA por padrão; buffer das últimas 300 (no máximo 12 h), 60 no GET; visitante = número de 53 bits do hash
+  FECHADA por padrão; a CONFIGURAÇÃO (aberta, modo lento, fixada) fica em `STATE_DIR/chat.json` e volta igual depois
+  de um reinício (update, vigia, VPS); mensagens, silenciados e limites são só da memória. Em produção a sala só recebe
+  mensagens a partir das 17h de 25/10 (antes de 25/10 também, salvo `CHAT_ENSAIO=1`; de 0h às 17h de 25/10, sempre):
+  aberta antes, fica "abre às 17h". `deploy/painel.sh chat-*` abre, fecha, limpa e mostra a sala pelo terminal.
+  Duplicadas: a chave ignora caixa, acento, pontuação e letras repetidas, mas números e emojis CONTAM ("SP com 45%" ≠
+  "SP com 80%"); a regra "a mesma mensagem de muitas pessoas" só vale para texto com ≥ 4 letras. Buffer das últimas 300
+  (no máximo 12 h), 60 no GET; visitante = número de 53 bits do hash
   (`clienteDe` + token aleatório do navegador), rede = só `clienteDe`. Limites: modo lento (padrão 10 s, 3–300),
   30/hora, 20 tentativas/min por visitante e 60 por rede (trocar o token não multiplica), 12 mensagens publicadas/min por
   rede, autores novos (1ª mensagem há < 10 min) da mesma rede dividem um modo lento e no máximo 8 autores novos por rede
@@ -800,8 +810,14 @@ pedidos de anunciantes. Contratos em `src/shared/audiencia.ts` e `src/shared/lea
   Cada pedido guarda a prova do consentimento (`consentimento: { versao, em }`, `VERSAO_CONSENTIMENTO` e o texto em
   `TEXTOS_CONSENTIMENTO`). `leads.json` (permissão 600, sem IP, no máximo 2.000; cheio, sai o respondido mais antigo;
   respondidos saem depois de 180 dias e os sem resposta depois de 1 ano). Em produção o formulário fica FECHADO ("abre
-  em breve") enquanto o contato de privacidade for o provisório `.example` (`contatoProvisorio`): sem canal real para o
-  titular, não se coleta. Log: só "novo pedido".
+  em breve") — no app E no servidor (`POST /api/anuncie/lead` → 503) — enquanto não houver e-mail de PRIVACIDADE em
+  *Painel → Comunicação → Contatos públicos*: sem canal real para o titular, não se coleta. Log: só "novo pedido".
+- **Contatos públicos** (`src/shared/contatos.ts`, comando `contatos`, `LiveStatus.contatos` e `AdminState.contatos`
+  opcionais): e-mails geral, de privacidade (encarregado), de imprensa e de correções, e o responsável pelo site (nome ou
+  razão social; CNPJ opcional, com dígitos verificadores). Validados no painel e no servidor (domínio reservado, como
+  `.example`, é recusado). Sem configuração, nenhuma linha de e-mail aparece; o geral cai no e-mail da /anuncie
+  (`contatosEfetivos`). Usados em /sobre, /privacidade (controlador e canal do encarregado), /metodologia (correções;
+  sem ele, o geral) e, sem contato próprio da /anuncie, em /anuncie e /streamers.
   **Painel → Interessados** (`SecaoInteressados.tsx`): lista, responder por e-mail/WhatsApp com mensagem pronta,
   marcar respondido, apagar, CSV com `csvCampo`/`csvTexto` (neutraliza fórmula também depois de vírgula, ponto e vírgula,
   tab ou quebra de linha; colunas de consentimento e quarentena), selo com o número de não respondidos no menu.
@@ -892,7 +908,7 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
                         │  rede interna do Docker (porta do app não publicada)
                         ▼
                app: 1 processo Node 22 (dist/ + dist-server/main.js): SPA, API, motor, adaptador do TSE, imagens OG
-                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json + audiencia.json + leads.json + divulgacao.json
+                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json + audiencia.json + leads.json + divulgacao.json + chat.json [+ chat-registro/ e a chave pública, se ligado]
 ```
 
 - **Imagem** (`Dockerfile`): multi-stage em `node:22-bookworm-slim` (glibc, por causa do binário do resvg); a final leva
