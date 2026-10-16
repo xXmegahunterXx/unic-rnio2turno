@@ -6,7 +6,13 @@ import {
   HASHTAGS,
   LIMITE_TEXTO,
   PREFIXO_SIMULACAO,
+  SUFIXO_LINK,
   comPrefixoSimulacao,
+  comSufixoLink,
+  sufixoDoCaminho,
+  textoPostarAudiencia,
+  textoPostarEvento,
+  tituloResultadoDefinido,
   limitarTexto,
   placarEmTexto,
   textoCandidato,
@@ -191,5 +197,62 @@ describe('outros cartões', () => {
     const t = textoPlacar(ANON, f35.nacional.resumo, { simulado: true });
     const u = new URL(xIntentUrl(t, 'https://sintonia.app/apuracao', [...HASHTAGS.apuracao]));
     expect(u.searchParams.get('text')).toBe(t);
+  });
+});
+
+describe('sufixo neutro do link (I20)', () => {
+  it('"Acompanhe seção por seção:" só nas páginas de apuração', () => {
+    expect(SUFIXO_LINK).not.toMatch(PROIBIDAS);
+    expect(sufixoDoCaminho('/apuracao')).toBe(SUFIXO_LINK);
+    expect(sufixoDoCaminho('/apuracao/sp/71072?race=pres')).toBe(SUFIXO_LINK);
+    expect(sufixoDoCaminho('/apuracao?race=gov-df')).toBe(SUFIXO_LINK);
+    for (const c of ['/teste', '/curiosidades', '/', '/apuracaox', '/palpite', '/candidato/1']) expect(sufixoDoCaminho(c), c).toBeNull();
+  });
+  it('vai em linha própria, sem repetir quando o texto já chama para "seção por seção"', () => {
+    const t = textoPlacar(ANON, f35.nacional.resumo, { simulado: true });
+    expect(comSufixoLink(t, SUFIXO_LINK)).toBe(`${t}\n${SUFIXO_LINK}`);
+    const vazio = textoPlacar(ANON, f0.nacional.resumo, { simulado: true });
+    expect(vazio).toMatch(/seção por seção/);
+    expect(comSufixoLink(vazio, SUFIXO_LINK)).toBe(vazio);
+    expect(comSufixoLink(' x ', null)).toBe('x');
+  });
+});
+
+describe('título do resultado definido (EleitoBanner)', () => {
+  it('sem "vitória" e sem flexão de gênero para governador; presidente mantém "eleito"', () => {
+    const gov = { cargo: 'Governador' as const };
+    for (const enc of [true, false]) {
+      const t = tituloResultadoDefinido(gov, 'Fulana de Tal', enc);
+      expect(t).not.toMatch(PROIBIDAS);
+      expect(t).not.toMatch(/eleit[oa]|vence/i);
+      expect(t).toContain('Fulana de Tal');
+    }
+    expect(tituloResultadoDefinido(gov, 'X', false)).toBe('Resultado matematicamente definido para X');
+    expect(tituloResultadoDefinido(gov, 'X', true)).toBe('Resultado definido para X, com 100% das seções');
+    expect(tituloResultadoDefinido({ cargo: 'Presidente' }, 'Y', true)).toBe('Y é eleito presidente');
+    expect(tituloResultadoDefinido({ cargo: 'Presidente' }, 'Y', false)).toBe('Y está matematicamente eleito presidente');
+    expect(tituloResultadoDefinido({ cargo: 'Presidente' }, 'Y', false)).not.toMatch(PROIBIDAS);
+  });
+});
+
+describe('textos da aba "Postar" (I26)', () => {
+  it('evento ao vivo: hora + título neutro + chamada, prefixo de simulação, ≤ 220', () => {
+    expect(f35.nacional.eventos.length).toBeGreaterThan(0);
+    for (const ev of f35.nacional.eventos.slice(0, 20)) {
+      const t = textoPostarEvento(ev, true);
+      conferir(t);
+      expect(t.startsWith(PREFIXO_SIMULACAO)).toBe(true);
+      expect(t).toContain('Apuração ao vivo, seção por seção.');
+    }
+    const longo = textoPostarEvento({ t: Date.UTC(2026, 9, 25, 21, 47), titulo: 'palavra '.repeat(60) });
+    conferir(longo);
+  });
+  it('audiência: só o marco arredondado, sem candidato', () => {
+    expect(textoPostarAudiencia(50_000)).toBe('Mais de 50 mil pessoas acompanham a apuração no Sintonia agora. Ao vivo, seção por seção.');
+    for (const m of [10_000, 50_000, 100_000]) {
+      const t = textoPostarAudiencia(m);
+      conferir(t);
+      expect(t).not.toMatch(/Lula|Bolsonaro|Candidato|PT|PL/);
+    }
   });
 });

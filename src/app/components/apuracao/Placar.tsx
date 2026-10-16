@@ -11,6 +11,7 @@
  * Fotos oficiais (useFotosRace): aparecem nas três variantes quando a corrida não está anonimizada e os dois
  * finalistas têm foto; senão, monograma para os dois. Mesmo tamanho e moldura para os dois lados.
  * No hero/default o nome leva à ficha do candidato (/candidato/:sqcand) quando há `sqcand` (nunca anonimizado).
+ * No pé do hero/default, o carimbo do print (`CarimboPrint`, I10): domínio · % apurado · hora DESTE resumo.
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -23,6 +24,7 @@ import { Badge, toneFromCor } from '@/app/ui/Badge';
 import { Icon } from '@/app/ui/Icon';
 import { NumberRoll } from '@/app/ui/NumberRoll';
 import { ApuracaoProgress } from './ApuracaoProgress';
+import { CarimboPrint } from './CarimboPrint';
 import { CandidateAvatar } from './CandidateAvatar';
 import { useFotosRace } from './fotos';
 import { SimulationRibbon } from './SimulationRibbon';
@@ -53,6 +55,11 @@ export interface PlacarProps {
    * principal da página. Cartões compactos em grade NÃO devem anunciar (vários ao mesmo tempo viram ruído).
    */
   live?: boolean;
+  /**
+   * Carimbo do print no pé (hero/default; padrão sim): "sintonia2026.com.br · 63,21% apurado · 18:47:12 (Brasília)",
+   * do mesmo resumo exibido. O cartão compacto não tem.
+   */
+  carimbo?: boolean;
   className?: string;
 }
 
@@ -142,6 +149,7 @@ function PlacarDuelo({
   simulado,
   actions,
   live,
+  carimbo = true,
   className,
 }: PlacarProps) {
   const hero = variant === 'hero';
@@ -226,6 +234,8 @@ function PlacarDuelo({
             <ApuracaoProgress resumo={resumo} variant={hero ? 'default' : 'compact'} />
           </div>
         ) : null}
+
+        {carimbo ? <CarimboPrint resumo={resumo} simulado={simulado} turno={race.turno} onde="placar" className={hero ? 'mt-4 sm:mt-5' : 'mt-3.5'} /> : null}
       </div>
     </section>
   );

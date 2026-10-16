@@ -8,6 +8,9 @@
  *   fase de captura para não cair no tooltip "toque duplo" do componente de mapa).
  * - Memoizado: só re-renderiza quando os dados das UFs (referência estável do React Query, que faz
  *   structural sharing) ou o modo mudam — não a cada poll do status.
+ * - Carimbo do print (I10) no canto inferior do quadro, nas três formas do mapa: % apurado e hora do RESUMO NACIONAL
+ *   do mesmo snapshot (`resumo`), nunca a soma dos estados (que diverge do placar quando o arquivo nacional do TSE
+ *   atrasa) nem o relógio do aparelho. Sem `resumo` no 2º turno, sem carimbo.
  */
 import { lazy, memo, Suspense, useCallback, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -31,6 +34,7 @@ import { MapLegend } from '@/app/components/apuracao/MapLegend';
 import { MapModeSwitch } from '@/app/components/apuracao/MapModeSwitch';
 import { Placar } from '@/app/components/apuracao/Placar';
 import { EmptyState } from '@/app/components/apuracao/States';
+import { CarimboPrint, type ResumoCarimbo } from '@/app/components/apuracao/CarimboPrint';
 import type { MapMode } from '@/app/components/apuracao/mapModes';
 import { linkUf, qsRace, semT1 } from './fase';
 
@@ -73,10 +77,12 @@ export interface MapaPanelProps {
   anonimizado?: boolean;
   /** "Reveja a noite": instante exibido (undefined = ao vivo) — vale também para o mapa por município e os links. */
   t?: number;
+  /** Resumo NACIONAL do mesmo snapshot do placar (carimbo do print: % apurado e hora). */
+  resumo?: ResumoCarimbo;
   className?: string;
 }
 
-export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, raceT1, raceLink, simulado, anonimizado, t, className }: MapaPanelProps) {
+export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, raceT1, raceLink, simulado, anonimizado, t, resumo, className }: MapaPanelProps) {
   const navigate = useNavigate();
   const t1 = race.turno === 1;
   const modos = t1 ? MODOS_1T : primeiroTurno ? MODOS_2T : MODOS_2T_SEM_T1;
@@ -146,6 +152,14 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
     return { comVotos, encerradas, total };
   }, [ufs]);
 
+  // 1º turno: o carimbo não usa número nenhum ("resultado oficial"), então não depende do resumo.
+  // Elemento estável entre renderizações (o mapa por município é memoizado).
+  const resumoCarimbo = resumo ?? (t1 ? RESUMO_VAZIO : undefined);
+  const carimbo = useMemo(
+    () => (resumoCarimbo ? <CarimboPrint resumo={resumoCarimbo} simulado={simulado} turno={race.turno} instante={t} onde="mapa" /> : null),
+    [resumoCarimbo, simulado, race.turno, t],
+  );
+
   const props = {
     ufs,
     race,
@@ -199,7 +213,11 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
         onClickCapture={onClickCapture}
       >
         {vista === 'mapa' ? (
-          <BrazilMap {...props} onSelect={abrirUf} ariaLabel={`Mapa do Brasil por estado · ${race.titulo}`} />
+          <>
+            <BrazilMap {...props} onSelect={abrirUf} ariaLabel={`Mapa do Brasil por estado · ${race.titulo}`} />
+            {/* sudoeste do mapa (vazio): dentro do quadro, longe de RS e das caixas do Nordeste */}
+            {carimbo ? <div className="pointer-events-none absolute bottom-3 left-3 z-[5] max-w-[calc(100%-1.5rem)] sm:left-5">{carimbo}</div> : null}
+          </>
         ) : vista === 'municipios' ? (
           <Suspense fallback={<div className="aspect-square w-full animate-pulse rounded-xl bg-surface-2" aria-busy="true" />}>
             <BrazilMunicipiosMap
@@ -209,11 +227,12 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
               primeiroTurno={modo === 'variacao' ? brMunT1.data : undefined}
               onSelect={abrirMunicipio}
               rotuloAcao={(m) => `Ver ${m.nome}`}
+              carimbo={carimbo}
               ariaLabel={`Mapa do Brasil por município · ${race.titulo}`}
             />
           </Suspense>
         ) : (
-          <TileMap {...props} onSelect={abrirUf} ariaLabel={`Cartograma dos estados · ${race.titulo}`} />
+          <TileMap {...props} onSelect={abrirUf} carimbo={carimbo} ariaLabel={`Cartograma dos estados · ${race.titulo}`} />
         )}
       </div>
 
@@ -252,6 +271,9 @@ export const MapaPanel = memo(function MapaPanel({ race, ufs, primeiroTurno, rac
     </section>
   );
 });
+
+/** 1º turno: o carimbo diz "resultado oficial", sem número — não precisa do resumo. */
+const RESUMO_VAZIO: ResumoCarimbo = { secoes: 0, secoesTotalizadas: 0, ultimaAtualizacao: null };
 
 const OPCOES_VISTA = [
   { value: 'mapa' as const, label: 'Estados', icon: 'mapa' as const, ariaLabel: 'Mapa por estado' },

@@ -4,9 +4,11 @@
  *    linhas dobradas em 75 octetos (sem partir caractere UTF-8) e um alarme 15 min antes;
  *  - `googleAgendaUrl(...)` / `outlookAgendaUrl(...)`: links "adicionar evento" das agendas web;
  *  - `icsDataUrl(...)`: `data:text/calendar` — no iPhone abre direto o "Adicionar à agenda"; no Android baixa o arquivo.
+ * O link do evento leva `utm_source=agenda` (I08: a medição de audiência mostra quem voltou pelo lembrete).
  * Puro (testado em agenda.test.ts).
  */
 import { INICIO_APURACAO } from '@/shared/constants';
+import { urlCompartilhada } from '@/app/lib/share';
 
 export interface EventoAgenda {
   /** Identificador estável (o mesmo evento não duplica ao importar de novo). */
@@ -25,7 +27,7 @@ export interface EventoAgenda {
 /** Duração do evento "apuração": 17h às 20h de Brasília (a maior parte das seções chega nesse intervalo). */
 export const FIM_EVENTO_APURACAO = INICIO_APURACAO + 3 * 60 * 60 * 1000;
 
-/** O evento padrão do Sintonia: domingo, 25/10/2026, 17h (Brasília). */
+/** O evento padrão do Sintonia: domingo, 25/10/2026, 17h (Brasília). O link ganha `utm_source=agenda`. */
 export function eventoApuracao(url?: string): EventoAgenda {
   return {
     uid: 'apuracao-2turno-2026@sintonia',
@@ -34,7 +36,7 @@ export function eventoApuracao(url?: string): EventoAgenda {
       'A divulgação dos resultados do 2º turno começa às 17h (horário de Brasília). Acompanhe a apuração ao vivo, do Brasil inteiro até a sua seção, no Sintonia.',
     inicio: INICIO_APURACAO,
     fim: FIM_EVENTO_APURACAO,
-    url,
+    url: url ? urlCompartilhada(url, 'agenda') : undefined,
     alarmeMin: 15,
   };
 }

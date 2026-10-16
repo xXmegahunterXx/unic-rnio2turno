@@ -184,6 +184,32 @@ describe('deploy/cloudflare.mjs', () => {
     expect(b.saida).toContain('NÃO passa pela Cloudflare');
   });
 
+  it('regras feitas pelo celular (sem a ref do script, mesmo nome e conteúdo) passam no --conferir; --aplicar as troca', async () => {
+    expect((await rodar(['--aplicar'])).codigo).toBe(0);
+    const tirarRef = (r: Regra) => {
+      const { ref: _ref, ...resto } = r;
+      return { ...resto, ref: r.id, id: r.id } as Regra; // a Cloudflare dá ref = id a quem não tem
+    };
+    cf.estado.rulesets[FASE].rules = regrasCache().map(tirarRef);
+    const redir = cf.estado.rulesets.http_request_dynamic_redirect;
+    redir.rules = redir.rules.map((r) => ({ ...tirarRef(r), description: 'www para o domínio' }));
+    const c = await rodar(['--conferir']);
+    expect(c.codigo, c.saida).toBe(0);
+    expect(c.saida).toContain('(feita pelo painel, igual à do script)');
+    expect(c.saida).toContain('Regra www → domínio (301) (feita pelo painel)');
+    // fora de ordem: reprova
+    const [r1, r2, r3, r4] = regrasCache();
+    cf.estado.rulesets[FASE].rules = [r2, r1, r3, r4];
+    const f = await rodar(['--conferir']);
+    expect(f.codigo).toBe(1);
+    expect(f.saida).toContain('fora de ordem');
+    // --aplicar troca as do painel pelas do script, na ordem
+    const a = await rodar(['--aplicar']);
+    expect(a.codigo, a.saida).toBe(0);
+    expect(a.saida).toContain('substituir a regra feita à mão');
+    expect(regrasCache().map((x) => x.ref)).toEqual(REFS);
+  });
+
   it('chave sem uma permissão: os outros passos seguem, a saída diz qual faltou e o código é 1', async () => {
     cf.estado.negar = ['PATCH /zones/0123456789abcdef0123456789abcdef/managed_headers'];
     const r = await rodar(['--aplicar']);

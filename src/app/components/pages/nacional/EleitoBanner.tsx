@@ -1,6 +1,7 @@
 /**
  * Selo grande de resultado definido (substitui o painel "O que falta apurar" quando há eleito).
- * Texto neutro e sem flexão de gênero no caso de Governador (há candidatas).
+ * Texto neutro e sem flexão de gênero no caso de Governador (há candidatas): o título vem do gerador neutro
+ * (`tituloResultadoDefinido`, share/textos.ts) — sem "vitória", testado contra a lista de palavras proibidas.
  */
 import type { Race, Restante, Summary } from '@/shared/types';
 import { pctTotalizadas, pctValidos } from '@/shared/calc';
@@ -10,6 +11,7 @@ import { corSlot } from '@/app/lib/raceUi';
 import { Icon } from '@/app/ui/Icon';
 import { CandidateAvatar } from '@/app/components/apuracao/CandidateAvatar';
 import { useFotosRace } from '@/app/components/apuracao/fotos';
+import { tituloResultadoDefinido } from '@/app/components/share/textos';
 
 export function EleitoBanner({ race, resumo, restante, className }: { race: Race; resumo: Summary; restante: Restante; className?: string }) {
   const fotos = useFotosRace(race);
@@ -19,10 +21,7 @@ export function EleitoBanner({ race, resumo, restante, className }: { race: Race
   const s = corSlot(c.cor);
   const encerrada = resumo.status === 'encerrada';
   const dif = Math.abs((resumo.votos[0] ?? 0) - (resumo.votos[1] ?? 0));
-  const presidente = race.cargo === 'Presidente';
-  const titulo = presidente
-    ? `${c.nomeUrna} ${encerrada ? 'é eleito' : 'está matematicamente eleito'} presidente`
-    : `Vitória de ${c.nomeUrna} ${encerrada ? 'confirmada' : 'matematicamente definida'}`;
+  const titulo = tituloResultadoDefinido(race, c.nomeUrna, encerrada);
 
   return (
     <section

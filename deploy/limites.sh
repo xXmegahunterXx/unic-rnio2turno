@@ -48,7 +48,7 @@ em_vigor() {
   local n s p
   read -r n s p <<<"$(docker inspect -f '{{.HostConfig.NanoCpus}} {{.HostConfig.CpuShares}} {{if .HostConfig.PidsLimit}}{{.HostConfig.PidsLimit}}{{else}}0{{end}}' "$1" 2>/dev/null || echo '0 0 0')"
   if [[ $n =~ ^[0-9]+$ && $n -gt 0 ]]; then n="$(awk -v n="$n" 'BEGIN { printf "%g", n / 1e9 }')"; else n='sem limite'; fi
-  [[ $s =~ ^[0-9]+$ && $s -gt 0 ]] || s='1024 (padrão)'
+  [[ $s =~ ^[0-9]+$ && $s -gt 0 && $s -ne 1024 ]] || s='1024 (padrão)'
   [[ $p =~ ^[0-9]+$ && $p -gt 0 ]] || p='sem limite'
   printf 'CPU %s · peso %s · processos %s' "$n" "$s" "$p"
 }

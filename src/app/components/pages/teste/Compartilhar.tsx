@@ -2,7 +2,8 @@
  * Compartilhar do Teste Cego (o motor viral do site), sem ferir a LGPD nem a neutralidade. Tudo acontece no aparelho:
  * a imagem é gerada no navegador (kit `@/app/components/share`) e nenhuma resposta vai a servidor.
  *
- *  - `PainelCompartilhar` — "Compartilhe no X": a pessoa ESCOLHE a versão.
+ *  - `PainelCompartilhar` — "Compartilhe": a pessoa ESCOLHE a versão. No celular o WhatsApp vem primeiro (I20); no
+ *    computador, o X. Os links levam a origem (`utm_source`, I08) — nunca o resultado.
  *      · "Desafio" (padrão): não diz o resultado; convida a fazer o teste. Link: /teste.
  *      · "Meu resultado" (opt-in explícito, com aviso): a sintonia com cada candidato. Link: /teste (nunca o resultado).
  *  - `PainelDuelo` — "Desafie alguém": o link leva as respostas de quem convida DEPOIS DO "#" (o navegador não envia essa
@@ -18,7 +19,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AFIRMACOES, type ResultadoSintonia } from '@/app/content/afirmacoes';
 import type { Candidate } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
-import { compartilharLink, copiarTexto, textoComLink, urlAbsoluta, whatsappUrl, xIntentUrl } from '@/app/lib/share';
+import { compartilharLink, copiarTexto, prefereWhatsapp, textoComLink, urlAbsoluta, urlCompartilhada, whatsappUrl, xIntentUrl } from '@/app/lib/share';
 import { buttonClasses } from '@/app/ui/Button';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import { Segmented } from '@/app/ui/Segmented';
@@ -77,8 +78,20 @@ function TextoPost({ texto, url }: { texto: string; url: string }) {
   );
 }
 
-/** "Postar no X" (link real da intenção do X). */
-function LinkX({ href, desabilitado, className, children = 'Postar no X' }: { href: string; desabilitado?: boolean; className?: string; children?: ReactNode }) {
+/** "Postar no X" (link real da intenção do X). `secundario`: no celular, o X fica atrás do WhatsApp. */
+function LinkX({
+  href,
+  desabilitado,
+  secundario,
+  className,
+  children = 'Postar no X',
+}: {
+  href: string;
+  desabilitado?: boolean;
+  secundario?: boolean;
+  className?: string;
+  children?: ReactNode;
+}) {
   return (
     <a
       href={desabilitado ? undefined : href}
@@ -86,10 +99,31 @@ function LinkX({ href, desabilitado, className, children = 'Postar no X' }: { hr
       rel="noopener noreferrer"
       aria-disabled={desabilitado || undefined}
       onClick={desabilitado ? (e) => e.preventDefault() : undefined}
-      className={cn(buttonClasses({ size: 'lg' }), CLASSE_BOTAO_X, 'px-3', desabilitado && 'pointer-events-none opacity-45', className)}
+      className={cn(
+        secundario ? buttonClasses({ variant: 'secondary', size: 'lg' }) : cn(buttonClasses({ size: 'lg' }), CLASSE_BOTAO_X),
+        'px-3',
+        desabilitado && 'pointer-events-none opacity-45',
+        className,
+      )}
       data-acao="postar-x"
     >
       <LogoX size={17} />
+      {children}
+    </a>
+  );
+}
+
+/** "WhatsApp" (link real do wa.me). `principal`: no celular, é o primeiro botão. */
+function LinkWhatsapp({ href, principal, className, children = 'WhatsApp' }: { href: string; principal?: boolean; className?: string; children?: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(buttonClasses({ variant: principal ? 'primary' : 'secondary', size: 'lg' }), 'px-3', className)}
+      data-acao="whatsapp"
+    >
+      <Icon name="whatsapp" size={19} />
       {children}
     </a>
   );
@@ -116,6 +150,7 @@ export function PainelCompartilhar({ resultado, candidatos, fotos, n, rapido, ca
   const idT = useId();
   const caminho = '/teste';
   const url = urlAbsoluta(caminho);
+  const celular = useMemo(() => prefereWhatsapp(), []);
   const texto = modo === 'desafio' ? textoDesafio(N) : textoMeuResultado(candidatos, resultado, rapido);
   const cartao = useMemo(
     () =>
@@ -129,7 +164,7 @@ export function PainelCompartilhar({ resultado, candidatos, fotos, n, rapido, ca
     <Painel
       id={idT}
       icone="compartilhar"
-      titulo="Compartilhe no X"
+      titulo="Compartilhe"
       descricao="A imagem é gerada aqui no seu aparelho. Você escolhe se ela mostra o seu resultado."
       className={className}
     >
@@ -173,8 +208,10 @@ export function PainelCompartilhar({ resultado, candidatos, fotos, n, rapido, ca
       </div>
       <TextoPost texto={texto} url={url} />
 
+      {/* celular: WhatsApp primeiro, X ao lado e a imagem embaixo; computador: X e imagem, WhatsApp embaixo */}
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <LinkX href={xIntentUrl(texto, url, HASHTAGS_TESTE)} />
+        {celular ? <LinkWhatsapp href={whatsappUrl(texto, urlCompartilhada(url, 'whatsapp'))} principal /> : null}
+        <LinkX href={xIntentUrl(texto, urlCompartilhada(url, 'x'), HASHTAGS_TESTE)} secundario={celular} />
         <BotaoCompartilhar
           key={modo}
           titulo={modo === 'desafio' ? 'Compartilhar desafio' : 'Compartilhar meu resultado'}
@@ -187,10 +224,11 @@ export function PainelCompartilhar({ resultado, candidatos, fotos, n, rapido, ca
           carregando={modo === 'resultado' && carregando}
           label="Imagem e mais"
           icone="download"
-          variant="primary"
+          variant={celular ? 'secondary' : 'primary'}
           size="lg"
-          className="px-3"
+          className={cn('px-3', celular && 'col-span-2')}
         />
+        {!celular ? <LinkWhatsapp href={whatsappUrl(texto, urlCompartilhada(url, 'whatsapp'))} className="col-span-2" /> : null}
       </div>
     </Painel>
   );
@@ -221,7 +259,7 @@ export function PainelDuelo({ seed, respostas, importantes, n, titulo = 'Duelo: 
     if (r === 'bloqueado' || r === 'indisponivel') await copiar();
   }
   async function copiar() {
-    const ok = await copiarTexto(url);
+    const ok = await copiarTexto(urlCompartilhada(url, 'copiar'));
     toast(ok ? 'Link do desafio copiado' : 'Não foi possível copiar', { tone: ok ? 'ok' : 'alert', icon: ok ? 'link' : undefined });
   }
 
@@ -260,11 +298,11 @@ export function PainelDuelo({ seed, respostas, importantes, n, titulo = 'Duelo: 
       </div>
 
       <div className={cn('mt-4 grid grid-cols-2 gap-2 transition-opacity', !ciente && 'opacity-90')}>
-        <LinkX href={xIntentUrl(texto, url, HASHTAGS_TESTE)} desabilitado={!ciente}>
+        <LinkX href={xIntentUrl(texto, urlCompartilhada(url, 'x'), HASHTAGS_TESTE)} desabilitado={!ciente}>
           Desafiar no X
         </LinkX>
         <a
-          href={ciente ? whatsappUrl(texto, url) : undefined}
+          href={ciente ? whatsappUrl(texto, urlCompartilhada(url, 'whatsapp')) : undefined}
           target="_blank"
           rel="noopener noreferrer"
           aria-disabled={!ciente || undefined}
@@ -337,7 +375,7 @@ export function PainelResultadoDuelo({ comp, className }: { comp: ComparacaoDuel
       </Previa>
       <TextoPost texto={texto} url={url} />
       <div className="mt-4 grid grid-cols-2 gap-2">
-        <LinkX href={xIntentUrl(texto, url, HASHTAGS_TESTE)} />
+        <LinkX href={xIntentUrl(texto, urlCompartilhada(url, 'x'), HASHTAGS_TESTE)} />
         <BotaoCompartilhar
           titulo="Compartilhar o placar do duelo"
           descricao="Só o placar entre vocês dois. Imagem gerada no seu aparelho."

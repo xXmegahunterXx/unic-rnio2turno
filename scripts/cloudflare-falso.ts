@@ -181,7 +181,19 @@ export function criarCloudflareFalso(op: OpcoesFalso = {}) {
   /** cópia guardada na borda falsa: chave → instante */
   const copias = new Map<string, number>();
 
-  const regraLigada = (fase: string, ref: string) => !!estado.rulesets[fase]?.rules.some((r) => r.ref === ref && r.enabled !== false);
+  /** nomes das regras do Sintonia: as feitas pelo painel (§5.2 do DEPLOY) não têm a ref do script, só o nome */
+  const NOMES: Record<string, string> = {
+    sintonia_api: 'Sintonia: API pública e dados',
+    sintonia_nunca: 'Sintonia: nunca guardar',
+    sintonia_sem_query: 'Sintonia: sem query',
+    sintonia_html: 'Sintonia: páginas (HTML, só com a chave html-borda)',
+  };
+  const regraLigada = (fase: string, ref: string) =>
+    !!estado.rulesets[fase]?.rules.some(
+      (r) =>
+        r.enabled !== false &&
+        (r.ref === ref || (NOMES[ref] && r.description === NOMES[ref]) || (ref === 'sintonia_www' && r.expression.includes(`"www.${dominio}"`))),
+    );
 
   function api(metodo: string, caminho: string, corpo: Json | null, auth: string | undefined) {
     if (auth !== `Bearer ${token}`) return erro(401, 10000, 'Authentication error');

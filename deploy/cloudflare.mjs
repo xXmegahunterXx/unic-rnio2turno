@@ -408,23 +408,33 @@ async function desligar(zona) {
 }
 
 async function conferirZona(zona, dominio) {
+  const mesmoNome = (r, d) => (r.description ?? '').trim().toLowerCase() === d.description.toLowerCase();
   await passo('Regras de cache', async () => {
     const regras = (await entrypoint(zona.id, FASE_CACHE)).rules ?? [];
+    const posicoes = [];
+    let manuais = 0;
     for (const d of REGRAS_CACHE) {
-      const a = regras.find((r) => r.ref === d.ref);
-      if (!a) falha(`Regra "${d.description}": AUSENTE (rode --aplicar)`);
+      // a do script (ref sintonia_*) ou, feita pelo celular (§5.2), a de mesmo nome
+      let a = regras.find((r) => r.ref === d.ref);
+      if (!a && (a = regras.find((r) => !ehNossa(r) && mesmoNome(r, d)))) manuais++;
+      if (a) posicoes.push(regras.indexOf(a));
+      if (!a) falha(`Regra "${d.description}": AUSENTE (rode --aplicar, ou DEPLOY §5.2 passo 6)`);
       else if (a.enabled === false) falha(`Regra "${d.description}": DESLIGADA (--aplicar religa)`);
-      else if (!regraIgual(a, d)) falha(`Regra "${d.description}": diferente da esperada (rode --aplicar)`);
-      else ok(`Regra "${d.description}"`);
+      else if (!regraIgual(a, d)) falha(`Regra "${d.description}": diferente da esperada (rode --aplicar; expressões no DEPLOY §5.3)`);
+      else ok(`Regra "${d.description}"${ehNossa(a) ? '' : ' (feita pelo painel, igual à do script)'}`);
     }
-    const plano = planejarRegras(regras, REGRAS_CACHE);
-    if (plano.mudancas.includes(REORDENAR)) falha('Regras de cache fora de ordem (rode --aplicar)');
-    if (plano.antigas) falha(`${plano.antigas} regra(s) "Sintonia…" feitas à mão ainda na zona (duplicam as nossas; --aplicar substitui)`);
-    if (plano.outras) aviso(`${plano.outras} regra(s) de cache de outro dono na zona (confira se não guardam o que a regra 2 proíbe)`);
+    if (posicoes.some((p, i) => i > 0 && p < posicoes[i - 1])) falha('Regras de cache do Sintonia fora de ordem (têm de ser 1, 2, 3, 4; --aplicar arruma)');
+    const sobra = regras.filter((r) => ehAntigaManual(r) && !REGRAS_CACHE.some((d) => mesmoNome(r, d))).length;
+    if (sobra) falha(`${sobra} regra(s) "Sintonia…" antigas, feitas à mão, ainda na zona (duplicam as nossas; --aplicar substitui)`);
+    if (manuais) fraco(`${manuais} regra(s) feitas pelo painel; um --aplicar as troca pelas do script (iguais), sem mudar nada na borda`);
+    const outras = regras.filter((r) => !ehNossa(r) && !ehAntigaManual(r)).length;
+    if (outras) aviso(`${outras} regra(s) de cache de outro dono na zona (confira se não guardam o que a regra 2 proíbe)`);
   });
   await passo('Redirecionamento do www', async () => {
-    const a = ((await entrypoint(zona.id, FASE_REDIR)).rules ?? []).find((r) => r.ref === 'sintonia_www');
-    if (a && regraIgual(a, regraWww(dominio))) ok('Regra www → domínio (301)');
+    const w = regraWww(dominio);
+    const lista = (await entrypoint(zona.id, FASE_REDIR)).rules ?? [];
+    const a = lista.find((r) => r.ref === w.ref) ?? lista.find((r) => regraIgual({ ...r, description: w.description }, w));
+    if (a && regraIgual({ ...a, description: w.description }, w)) ok(`Regra www → domínio (301)${a.ref === w.ref ? '' : ' (feita pelo painel)'}`);
     else falha(`Regra www → domínio (301): ${a ? (a.enabled === false ? 'desligada' : 'diferente') : 'ausente'}`);
   });
   await passo('DNS', async () => {
@@ -712,7 +722,7 @@ export async function principal(argv) {
     console.log(c(31, `\n${FALHAS} problema(s). ${a.acao === 'aplicar' ? 'O que falhou pode ser feito pelo celular: DEPLOY.md §5.2.' : ''}`.trimEnd()));
     return 1;
   }
-  console.log(c(32, '\nTudo certo.'));
+  console.log(c(32, a.simular ? '\nSimulação terminada: nada foi gravado (sem --simular, o --aplicar faz o que está acima).' : '\nTudo certo.'));
   return 0;
 }
 

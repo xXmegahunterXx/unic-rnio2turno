@@ -32,6 +32,7 @@ import { parseViewBox, useGeo, type ViewBox } from './geo';
 import { useMapZoom, type View } from './MapZoom';
 import { useClickOutside, useElementSize, prefersReducedMotion } from './MapHooks';
 import { MAP_MODES, pctsMunBr, rotuloApurado, valorMunBr, type MapMode } from './mapModes';
+import { CLASSE_CANTO_CARIMBO } from './CarimboPrint';
 
 // =============================================================================================
 // Preparo da geometria (uma vez por sessão)
@@ -246,6 +247,8 @@ export interface BrazilMunicipiosMapProps {
   busca?: boolean;
   /** Recebe os tempos medidos (ms). */
   onMedida?: (m: { preparo: number; preenchimento: number; divisas: number }) => void;
+  /** Carimbo do print (I10, `<CarimboPrint onde="mapa" …/>`), no canto inferior esquerdo do quadro (sudoeste vazio). */
+  carimbo?: ReactNode;
   ariaLabel?: string;
   className?: string;
 }
@@ -271,6 +274,7 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
   estatico,
   busca = true,
   onMedida,
+  carimbo,
   ariaLabel,
   className,
 }: BrazilMunicipiosMapProps) {
@@ -699,6 +703,8 @@ export const BrazilMunicipiosMap = memo(function BrazilMunicipiosMap({
               <span className="glass rounded-full border border-line px-3 py-1.5 text-[12.5px] text-fg">{zoom.dica}</span>
             </div>
           ) : null}
+
+          {carimbo && !carregando ? <div className={CLASSE_CANTO_CARIMBO}>{carimbo}</div> : null}
 
           {!estatico && !carregando ? (
             <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1.5">

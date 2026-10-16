@@ -42,7 +42,7 @@ describe('gerarIcs', () => {
     expect(ics).toContain('UID:apuracao-2turno-2026@sintonia');
     expect(ics).toContain('SUMMARY:Apuração do 2º turno ao vivo');
     expect(ics).toContain('TRIGGER:-PT15M');
-    expect(ics).toContain(`URL:${URL_SITE}`);
+    expect(ics).toContain(`URL:${URL_SITE}?utm_source=agenda`);
     // linhas ≤ 75 octetos
     for (const l of ics.split('\r\n')) expect(new TextEncoder().encode(l).length).toBeLessThanOrEqual(75);
   });
@@ -66,12 +66,21 @@ describe('links das agendas web', () => {
     expect(u.searchParams.get('action')).toBe('TEMPLATE');
     expect(u.searchParams.get('dates')).toBe('20261025T200000Z/20261025T230000Z');
     expect(u.searchParams.get('ctz')).toBe('America/Sao_Paulo');
-    expect(u.searchParams.get('details')).toContain(URL_SITE);
+    expect(u.searchParams.get('details')).toContain(`${URL_SITE}?utm_source=agenda`);
     expect(u.searchParams.get('text')).toBe('Apuração do 2º turno ao vivo');
   });
   it('Outlook com início e fim ISO', () => {
     const u = new URL(outlookAgendaUrl(eventoApuracao(URL_SITE)));
     expect(u.searchParams.get('startdt')).toBe('2026-10-25T20:00:00.000Z');
     expect(u.searchParams.get('enddt')).toBe('2026-10-25T23:00:00.000Z');
+  });
+});
+
+describe('origem do link (I08)', () => {
+  it('o link do evento leva utm_source=agenda, sem hora e sem repetir', () => {
+    expect(eventoApuracao(URL_SITE).url).toBe(`${URL_SITE}?utm_source=agenda`);
+    expect(eventoApuracao(`${URL_SITE}?utm_source=agenda`).url).toBe(`${URL_SITE}?utm_source=agenda`);
+    expect(eventoApuracao('https://sintonia.app/palpite?h=1845').url).toBe('https://sintonia.app/palpite?utm_source=agenda');
+    expect(eventoApuracao().url).toBeUndefined();
   });
 });

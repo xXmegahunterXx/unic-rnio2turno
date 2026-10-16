@@ -7,6 +7,8 @@
  * modal com a imagem ("toque e segure para salvar"). O mesmo vale dentro de um iframe de outra origem (`emIframe`).
  */
 
+import { BRT_OFFSET_MS } from '@/shared/constants';
+
 export interface ShareInput {
   titulo?: string;
   texto: string;
@@ -102,10 +104,92 @@ export function siteExibicao(): string {
   return hostBonito(h) ? h.replace(/^www\./, '') : '';
 }
 
+// =============================================================================================
+// Links rastreáveis (I08)
+// =============================================================================================
+
+/**
+ * De onde veio um link compartilhado (`utm_source`). Só o canal — nunca quem compartilhou, nunca o conteúdo.
+ * O servidor de audiência agrupa `whatsapp`, `x` e `telegram` nas famílias conhecidas; os demais aparecem como
+ * "utm:<canal>" (`origemDoUtm`, `src/shared/audiencia.ts`).
+ */
+export const CANAIS_COMPARTILHAMENTO = [
+  'whatsapp',
+  'x',
+  'telegram',
+  'copiar',
+  'story',
+  'agenda',
+  'embed',
+  'tv',
+  'live',
+  'sintonia',
+] as const;
+export type CanalCompartilhamento = (typeof CANAIS_COMPARTILHAMENTO)[number];
+
+/** Canais em que o link leva a hora (`h=HHMM`), para o X e o Telegram não reaproveitarem o cartão de prévia velho. */
+const CANAIS_COM_HORA: readonly CanalCompartilhamento[] = ['x', 'telegram'];
+
+/** Passo do carimbo de hora: 5 min (no máximo 12 cartões de prévia diferentes por hora, por página). */
+const PASSO_HORA_MS = 5 * 60_000;
+
+/** "HHMM" de Brasília (UTC−3, sem horário de verão) arredondado para baixo a 5 min. Puro (testado). */
+export function horaCompartilhada(agora: number): string {
+  const brt = Math.floor((agora + BRT_OFFSET_MS) / PASSO_HORA_MS) * PASSO_HORA_MS;
+  const d = new Date(brt);
+  return `${String(d.getUTCHours()).padStart(2, '0')}${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+/**
+ * Link compartilhado com a origem (`utm_source=<canal>`) e, para X e Telegram, a hora (`h=HHMM`, Brasília, a cada
+ * 5 min) quando `agora` é passado — passe `agora` (relógio do servidor, `wallNow`) SÓ durante a apuração. "Copiar
+ * link" e os demais canais saem sem `h` (um `h` velho da URL atual é retirado). Os parâmetros vão antes do `#` (o
+ * código do Duelo/palpite depois do `#` fica intacto; o HashRouter do demo ignora a busca de fora). Aceita URL
+ * absoluta ou rota ("/apuracao?race=pres"); qualquer outra coisa volta sem mudança. `h` e `utm_*` ficam fora do
+ * canônico e da chave da imagem OG (frente E). Puro (testado).
+ */
+export function urlCompartilhada(url: string, canal: CanalCompartilhamento, agora?: number): string {
+  const absoluta = /^https?:\/\//i.test(url);
+  if (!absoluta && !url.startsWith('/')) return url;
+  let u: URL;
+  try {
+    u = new URL(url, 'https://base.invalido');
+  } catch {
+    return url;
+  }
+  u.searchParams.set('utm_source', canal);
+  if (CANAIS_COM_HORA.includes(canal) && typeof agora === 'number' && Number.isFinite(agora) && agora > 0) {
+    u.searchParams.set('h', horaCompartilhada(agora));
+  } else {
+    u.searchParams.delete('h');
+  }
+  return absoluta ? u.toString() : `${u.pathname}${u.search}${u.hash}`;
+}
+
 /** Link do WhatsApp com o texto (e a URL) pré-preenchidos. */
 export function whatsappUrl(texto: string, url?: string): string {
   const msg = url ? `${texto}\n${url}` : texto;
   return `https://wa.me/?text=${encodeURIComponent(msg)}`;
+}
+
+/** Link "compartilhar no Telegram" (`t.me/share/url`), com texto e URL à parte. */
+export function telegramUrl(texto: string, url: string): string {
+  return `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(texto)}`;
+}
+
+/**
+ * Celular (I20, "WhatsApp primeiro"): tela de toque ou userAgent móvel (Android, iPhone/iPad/iPod, "Mobile", inclusive
+ * os navegadores embutidos do Instagram e do WhatsApp). Puro (testado).
+ */
+export function ehCelular(ua: string, toque = false): boolean {
+  if (toque) return true;
+  return /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(ua || '');
+}
+
+/** No celular, o WhatsApp é o botão principal do compartilhar; no computador, o X (I20). */
+export function prefereWhatsapp(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return ehCelular(navigator.userAgent || '', telaDeToque());
 }
 
 export function abrirWhatsapp(texto: string, url?: string) {

@@ -1,8 +1,16 @@
 /**
  * Sheet de compartilhamento do kit: prévia do cartão escalada, seletor de formato e as ações
- *  - "Postar no X" (intenção com texto + link + hashtags; link de verdade, funciona no app do X e em iframes);
- *  - "Compartilhar…" (Web Share com o PNG quando o navegador aceita arquivo; senão texto + link);
- *  - "WhatsApp", "Baixar imagem" (PNG), "Copiar link", "Copiar texto".
+ *  - computador: "Postar no X" (intenção com texto + link + hashtags; link de verdade, funciona no app do X e em iframes),
+ *    "Compartilhar…" (Web Share com o PNG quando o navegador aceita arquivo; senão texto + link), "WhatsApp",
+ *    "Baixar imagem" (PNG), "Copiar link", "Copiar texto";
+ *  - celular (I20, `prefereWhatsapp`): "Enviar no WhatsApp" é o principal — Web Share com o PNG e o texto quando o
+ *    navegador aceita arquivo, senão o wa.me —, "Status / Stories" (troca para o 9:16 e, pronto, abre o Web Share com
+ *    ele) e "Postar no X" como secundários; Telegram, Salvar, Copiar link e Copiar texto embaixo.
+ *  - Links rastreáveis (I08, `urlCompartilhada`): cada canal leva o seu `utm_source` (whatsapp, x, telegram, copiar,
+ *    story); X e Telegram, durante a apuração, também `h=HHMM` (relógio do servidor do status em cache, a cada 5 min),
+ *    para o cartão de prévia não sair velho. Na apuração, WhatsApp/Telegram/Status terminam com "Acompanhe seção por
+ *    seção:" antes do link (`sufixoDoCaminho`).
+ *  - Depois de "Copiado", aparece o "Siga o Sintonia" (some sem redes configuradas).
  *
  * No navegador embutido (X, Instagram, Facebook, TikTok, LinkedIn, WebViews) e dentro de iframes, o download vira um
  * modal com a imagem para "tocar e segurar" (WebViews costumam bloquear downloads em silêncio).
@@ -12,6 +20,8 @@
  * Os dados ficam "congelados" do momento em que o sheet abriu (texto e imagem sempre batem).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import type { LiveStatus } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
 import {
   NOME_APP_EMBUTIDO,
@@ -27,9 +37,12 @@ import {
   pesoPostX,
   podeCompartilharArquivo,
   podeCompartilharNativo,
+  prefereWhatsapp,
   telaDeToque,
+  telegramUrl,
   textoComLink,
   urlAbsoluta,
+  urlCompartilhada,
   whatsappUrl,
   xIntentUrl,
   LIMITE_X,
@@ -43,7 +56,8 @@ import { Spinner } from '@/app/ui/Button';
 import { toast } from '@/app/ui/Toast';
 import { PreviaCartao } from './PreviaCartao';
 import { gerarPngCartao } from './png';
-import { comPrefixoSimulacao } from './textos';
+import { comPrefixoSimulacao, comSufixoLink, sufixoDoCaminho } from './textos';
+import { SigaSintonia } from '@/app/components/crescimento/SigaSintonia';
 import { DIMENSOES_CARTAO, FORMATOS_PADRAO, type ConteudoCompartilhavel, type FormatoCartao } from './tipos';
 
 export interface CompartilharSheetProps extends ConteudoCompartilhavel {
@@ -68,6 +82,34 @@ interface Imagem {
   blob: Blob;
   file: File;
   versao: number;
+}
+
+/** Logo do Telegram (avião de papel), para o atalho do celular. */
+function LogoTelegram({ size = 18, className }: { size?: number; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden className={cn('shrink-0', className)} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round">
+      <path d="M21 4.5 3.6 11.3c-.8.3-.8 1.4 0 1.7l4.2 1.5 1.6 5c.2.7 1.1.9 1.6.4l2.4-2.3 4.3 3.1c.6.4 1.4.1 1.6-.6L22 5.6c.2-.8-.5-1.4-1-1.1Z" />
+      <path d="m7.8 14.5 9.7-6.6-6.9 7.5" />
+    </svg>
+  );
+}
+
+/**
+ * Hora do servidor para o `h=` dos links (I08), lida do status JÁ em cache (sem consulta nova nem assinatura): só durante
+ * a apuração; fora dela, undefined (o link sai sem hora).
+ */
+function agoraDaApuracao(status: LiveStatus | undefined, recebidoEm: number | undefined): number | undefined {
+  if (!status || status.fase !== 'apurando' || !recebidoEm) return undefined;
+  return status.wallNow + Math.max(0, Date.now() - recebidoEm);
+}
+
+/** Este navegador aceita compartilhar um PNG pelo Web Share (teste com um arquivo de 1 byte). */
+function aceitaArquivoPng(): boolean {
+  try {
+    return podeCompartilharArquivo(new File([new Uint8Array([0])], 'sintonia.png', { type: 'image/png' }));
+  } catch {
+    return false;
+  }
 }
 
 /** Classes do botão "Postar no X" (preto no claro, branco no escuro, como a marca). */
@@ -104,8 +146,17 @@ export function CompartilharSheet({
   const versao = useRef(0);
   const emCurso = useRef<{ formato: FormatoCartao; versao: number; p: Promise<Imagem> } | null>(null);
 
+  const qc = useQueryClient();
+  const [copiou, setCopiou] = useState(false);
   const ambiente = useMemo(
-    () => ({ embutido: navegadorEmbutido(), iframe: emIframe(), nativo: podeCompartilharNativo(), toque: telaDeToque() }),
+    () => ({
+      embutido: navegadorEmbutido(),
+      iframe: emIframe(),
+      nativo: podeCompartilharNativo(),
+      toque: telaDeToque(),
+      celular: prefereWhatsapp(),
+      arquivo: aceitaArquivoPng(),
+    }),
     [],
   );
 
@@ -116,7 +167,18 @@ export function CompartilharSheet({
       const t = comPrefixoSimulacao(texto, simulado);
       const tags = normalizarHashtags(hashtags);
       const url = urlAbsoluta(caminho);
-      return { texto: t, tags, url, el: cartao ? cartao(formato) : null };
+      const agora = agoraDaApuracao(qc.getQueryData<LiveStatus>(['status']), qc.getQueryState(['status'])?.dataUpdatedAt);
+      // um link por canal (I08); o `url` puro é o do Web Share genérico e o que aparece na caixa do texto
+      const links = {
+        x: urlCompartilhada(url, 'x', agora),
+        whatsapp: urlCompartilhada(url, 'whatsapp'),
+        telegram: urlCompartilhada(url, 'telegram', agora),
+        copiar: urlCompartilhada(url, 'copiar'),
+        story: urlCompartilhada(url, 'story'),
+      };
+      // WhatsApp, Telegram e Status: texto + "Acompanhe seção por seção:" (só na apuração), sem hashtags
+      const mensagem = comSufixoLink(t, sufixoDoCaminho(caminho));
+      return { texto: t, tags, url, links, mensagem, el: cartao ? cartao(formato) : null };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [aberto, formato, carregando],
@@ -129,6 +191,7 @@ export function CompartilharSheet({
     emCurso.current = null;
     setEstado('ocioso');
     setTalvezNaoBaixou(false);
+    setCopiou(false);
   }, [aberto]);
 
   const valida = (): Imagem | null => {
@@ -238,6 +301,32 @@ export function CompartilharSheet({
     void comImagem('img', (img) => compartilharImagem(img));
   }
 
+  /** Celular: "Enviar no WhatsApp" com o PNG e o texto (Web Share); recusado → a imagem para salvar (com o wa.me no rodapé). */
+  function onWhatsappArquivo() {
+    void comImagem('img', async (img) => {
+      if (!snap) return;
+      const r = await compartilharArquivo(img.file, { titulo: 'Sintonia', texto: `${snap.mensagem}\n${snap.links.whatsapp}` });
+      if (r === 'bloqueado' || r === 'indisponivel') await abrirModal(img);
+    });
+  }
+
+  /**
+   * "Status / Stories": 1º toque troca para o 9:16 (a imagem é preparada em segundo plano); com ela pronta, abre o Web Share
+   * com o PNG (o Safari só aceita dentro do toque). Sem Web Share de arquivo, a imagem para salvar e postar à mão.
+   */
+  function onStatus() {
+    if (formato !== 'story') {
+      setFormato('story');
+      return;
+    }
+    void comImagem('img', async (img) => {
+      if (!snap) return;
+      if (!podeCompartilharArquivo(img.file)) return void abrirModal(img);
+      const r = await compartilharArquivo(img.file, { titulo: 'Sintonia', texto: `${snap.mensagem}\n${snap.links.story}` });
+      if (r === 'bloqueado' || r === 'indisponivel') await abrirModal(img);
+    });
+  }
+
   function onBaixar() {
     void comImagem('png', async (img) => {
       if (ambiente.embutido || ambiente.iframe) {
@@ -252,17 +341,23 @@ export function CompartilharSheet({
 
   async function copiar(o: 'link' | 'texto' | 'tudo') {
     if (!snap) return;
-    const ok = o === 'link' ? await copiarLink(snap.url) : await copiarTexto(textoComLink(snap.texto, snap.url, snap.tags));
+    const link = snap.links.copiar;
+    const ok = o === 'link' ? await copiarLink(link) : await copiarTexto(textoComLink(snap.texto, link, snap.tags));
     toast(ok ? (o === 'link' ? 'Link copiado' : 'Texto e link copiados') : 'Não foi possível copiar', {
       tone: ok ? 'ok' : 'alert',
       icon: ok ? (o === 'link' ? 'link' : 'copiar') : undefined,
     });
+    if (ok) setCopiou(true);
   }
 
-  const xUrl = snap ? xIntentUrl(snap.texto, snap.url, snap.tags) : '#';
-  const zapUrl = snap ? whatsappUrl(snap.texto, snap.url) : '#';
+  const xUrl = snap ? xIntentUrl(snap.texto, snap.links.x, snap.tags) : '#';
+  const zapUrl = snap ? whatsappUrl(snap.mensagem, snap.links.whatsapp) : '#';
+  const tgUrl = snap ? telegramUrl(snap.mensagem, snap.links.telegram) : '#';
   const peso = snap ? pesoPostX(snap.texto, snap.tags, true) : 0;
   const temImagem = !!snap?.el;
+  const celular = ambiente.celular;
+  const temStory = temImagem && formatos.includes('story');
+  const zapComArquivo = temImagem && ambiente.arquivo;
   const app = ambiente.embutido ? NOME_APP_EMBUTIDO[ambiente.embutido] : null;
   const salvarRotulo = ambiente.embutido || ambiente.iframe ? 'Salvar imagem' : 'Baixar imagem';
 
@@ -272,40 +367,90 @@ export function CompartilharSheet({
         open={aberto}
         onClose={onFechar}
         title={titulo}
-        description={descricao ?? (temImagem ? 'Imagem, texto e link prontos para o X, o WhatsApp e o Instagram.' : 'Texto e link prontos para postar.')}
+        description={
+          descricao ??
+          (temImagem
+            ? celular
+              ? 'Imagem, texto e link prontos para o WhatsApp, o Status e o X.'
+              : 'Imagem, texto e link prontos para o X, o WhatsApp e o Instagram.'
+            : 'Texto e link prontos para postar.')
+        }
         width="md"
         footer={
-          <div className="space-y-2 pb-1">
-            <div className="grid grid-cols-2 gap-2">
-              <a
-                href={xUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(buttonClasses({ size: 'lg' }), CLASSE_BOTAO_X, 'px-3')}
-                data-acao="postar-x"
-              >
-                <LogoX size={17} />
-                Postar no X
-              </a>
-              {ambiente.nativo || !temImagem ? (
-                <Button variant="primary" size="lg" icon="compartilhar" loading={ocupado === 'img'} onClick={onCompartilhar} className="px-3" data-acao="compartilhar">
-                  Compartilhar…
+          celular ? (
+            // Celular (I20): WhatsApp primeiro; Status/Stories e X como secundários.
+            <div className="space-y-2 pb-1">
+              {zapComArquivo ? (
+                <Button variant="primary" size="lg" block icon="whatsapp" loading={ocupado === 'img' && formato !== 'story'} onClick={onWhatsappArquivo} data-acao="whatsapp-principal">
+                  Enviar no WhatsApp
                 </Button>
               ) : (
-                <Button variant="primary" size="lg" icon="download" loading={ocupado === 'png'} onClick={onBaixar} className="px-3" data-acao="baixar-principal">
-                  {salvarRotulo}
-                </Button>
+                <a href={zapUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClasses({ variant: 'primary', size: 'lg', block: true }))} data-acao="whatsapp-principal">
+                  <Icon name="whatsapp" size={19} />
+                  Enviar no WhatsApp
+                </a>
               )}
+              <div className={cn('grid gap-2', temStory ? 'grid-cols-2' : 'grid-cols-1')}>
+                {temStory ? (
+                  <Button
+                    variant="secondary"
+                    size="lg"
+                    icon={formato === 'story' ? 'compartilhar' : 'grade'}
+                    loading={formato === 'story' && (ocupado === 'img' || estado === 'gerando')}
+                    onClick={onStatus}
+                    className="px-3"
+                    data-acao="status"
+                  >
+                    {formato === 'story' ? 'Enviar ao Status' : 'Status / Stories'}
+                  </Button>
+                ) : null}
+                <a href={xUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClasses({ variant: 'secondary', size: 'lg' }), 'px-3')} data-acao="postar-x">
+                  <LogoX size={16} />
+                  Postar no X
+                </a>
+              </div>
+              <div className={cn('grid gap-1.5', temImagem ? 'grid-cols-4' : 'grid-cols-3')}>
+                <AcaoLink href={tgUrl} label="Telegram" acao="telegram" icone={<LogoTelegram size={18} />} />
+                {temImagem ? (
+                  <AcaoBotao icon="download" label={ambiente.embutido || ambiente.iframe ? 'Salvar' : 'Baixar'} onClick={onBaixar} carregando={ocupado === 'png'} acao="baixar" />
+                ) : null}
+                <AcaoBotao icon="link" label="Copiar link" onClick={() => copiar('link')} acao="copiar-link" />
+                <AcaoBotao icon="copiar" label="Copiar texto" onClick={() => copiar('texto')} acao="copiar-texto" />
+              </div>
             </div>
-            <div className={cn('grid gap-1.5', temImagem ? 'grid-cols-4' : 'grid-cols-3')}>
-              <AcaoLink href={zapUrl} icon="whatsapp" label="WhatsApp" />
-              {temImagem ? (
-                <AcaoBotao icon="download" label={ambiente.embutido || ambiente.iframe ? 'Salvar' : 'Baixar'} onClick={onBaixar} carregando={ocupado === 'png'} acao="baixar" />
-              ) : null}
-              <AcaoBotao icon="link" label="Copiar link" onClick={() => copiar('link')} acao="copiar-link" />
-              <AcaoBotao icon="copiar" label="Copiar texto" onClick={() => copiar('texto')} acao="copiar-texto" />
+          ) : (
+            <div className="space-y-2 pb-1">
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={xUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(buttonClasses({ size: 'lg' }), CLASSE_BOTAO_X, 'px-3')}
+                  data-acao="postar-x"
+                >
+                  <LogoX size={17} />
+                  Postar no X
+                </a>
+                {ambiente.nativo || !temImagem ? (
+                  <Button variant="primary" size="lg" icon="compartilhar" loading={ocupado === 'img'} onClick={onCompartilhar} className="px-3" data-acao="compartilhar">
+                    Compartilhar…
+                  </Button>
+                ) : (
+                  <Button variant="primary" size="lg" icon="download" loading={ocupado === 'png'} onClick={onBaixar} className="px-3" data-acao="baixar-principal">
+                    {salvarRotulo}
+                  </Button>
+                )}
+              </div>
+              <div className={cn('grid gap-1.5', temImagem ? 'grid-cols-4' : 'grid-cols-3')}>
+                <AcaoLink href={zapUrl} icon="whatsapp" label="WhatsApp" acao="whatsapp" />
+                {temImagem ? (
+                  <AcaoBotao icon="download" label={ambiente.embutido || ambiente.iframe ? 'Salvar' : 'Baixar'} onClick={onBaixar} carregando={ocupado === 'png'} acao="baixar" />
+                ) : null}
+                <AcaoBotao icon="link" label="Copiar link" onClick={() => copiar('link')} acao="copiar-link" />
+                <AcaoBotao icon="copiar" label="Copiar texto" onClick={() => copiar('texto')} acao="copiar-texto" />
+              </div>
             </div>
-          </div>
+          )
         }
       >
         {app ? (
@@ -389,6 +534,8 @@ export function CompartilharSheet({
           </p>
           <p className="mt-1 truncate text-[12.5px] text-fg-muted">{snap?.url}</p>
         </div>
+        {/* depois de "Copiado": quem copia o link é quem volta — "Siga o Sintonia" (some sem redes configuradas) */}
+        {copiou ? <SigaSintonia variante="rodape" className="mt-4 rounded-xl border border-line px-3.5 py-3" /> : null}
         {temImagem ? (
           <p className="mt-2.5 flex items-start gap-1.5 text-[12px] leading-snug text-fg-subtle">
             <Icon name="info" size={13} className="mt-px shrink-0" />
@@ -417,10 +564,17 @@ export function CompartilharSheet({
                 Compartilhar
               </Button>
             ) : null}
-            <a href={xUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClasses({ size: 'sm' }), CLASSE_BOTAO_X)}>
-              <LogoX size={14} />
-              Postar no X
-            </a>
+            {celular ? (
+              <a href={zapUrl} target="_blank" rel="noopener noreferrer" className={buttonClasses({ variant: 'primary', size: 'sm' })}>
+                <Icon name="whatsapp" size={15} />
+                WhatsApp
+              </a>
+            ) : (
+              <a href={xUrl} target="_blank" rel="noopener noreferrer" className={cn(buttonClasses({ size: 'sm' }), CLASSE_BOTAO_X)}>
+                <LogoX size={14} />
+                Postar no X
+              </a>
+            )}
           </>
         }
       >
@@ -452,11 +606,11 @@ const TILE =
   'flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-[11.5px] font-medium leading-tight text-fg-muted transition-colors ' +
   'hover:bg-surface-2 hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand active:scale-[0.97] disabled:opacity-50';
 
-function AcaoLink({ href, icon, label }: { href: string; icon: IconName; label: string }) {
+function AcaoLink({ href, icon, icone, label, acao }: { href: string; icon?: IconName; icone?: ReactNode; label: string; acao?: string }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={TILE} data-acao="whatsapp">
+    <a href={href} target="_blank" rel="noopener noreferrer" className={TILE} data-acao={acao}>
       <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface-3 text-fg">
-        <Icon name={icon} size={18} />
+        {icone ?? (icon ? <Icon name={icon} size={18} /> : null)}
       </span>
       <span className="w-full truncate text-center">{label}</span>
     </a>

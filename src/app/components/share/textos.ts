@@ -9,7 +9,7 @@
 import type { FeedEvent, Race, Tally, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
-import { fmtHora, fmtInt, fmtLista, fmtPP, fmtPct } from '@/shared/format';
+import { fmtCompact, fmtHora, fmtInt, fmtLista, fmtPP, fmtPct } from '@/shared/format';
 import { nEstadosGov } from '@/shared/gov2t';
 import { emUf } from '@/engine/events';
 import { pesoTextoX } from '@/app/lib/share';
@@ -39,6 +39,24 @@ export function comPrefixoSimulacao(texto: string, simulado?: boolean): string {
   const t = texto.trim();
   if (!simulado || t.startsWith(PREFIXO_SIMULACAO.trim())) return t;
   return `${PREFIXO_SIMULACAO}${t}`;
+}
+
+/**
+ * Sufixo neutro antes do link nas mensagens de WhatsApp, Telegram e Status (I20): a mensagem termina chamando para a
+ * apuração, sem adjetivo nem nome. Só para páginas de apuração (`sufixoDoCaminho`).
+ */
+export const SUFIXO_LINK = 'Acompanhe seção por seção:';
+
+/** Sufixo das mensagens para uma rota do app: só na apuração ('/apuracao…'); nas demais, nenhum. Puro. */
+export function sufixoDoCaminho(caminho: string): string | null {
+  return /^\/apuracao(?:[/?#]|$)/.test(caminho) ? SUFIXO_LINK : null;
+}
+
+/** Texto + sufixo (em linha própria), sem repetir "seção por seção" quando o texto já chama para isso. Puro. */
+export function comSufixoLink(texto: string, sufixo: string | null): string {
+  const t = texto.trim();
+  if (!sufixo || /seção por seção/i.test(t)) return t;
+  return `${t}\n${sufixo}`;
 }
 
 /** Corta no limite (peso do X) na última palavra inteira, com "…". */
@@ -126,6 +144,30 @@ export function textoInstante(
     `Às ${hora}, com ${fmtPct(pctTotalizadas(resumo))} das seções: ${placarEmTexto(race, resumo)} · ${race.cargo} · ${local}. Reveja a apuração naquele instante.`,
     opts.simulado,
   );
+}
+
+/**
+ * Título do selo de resultado definido (EleitoBanner). Presidente: "X é eleito presidente" / "X está matematicamente
+ * eleito presidente" (os dois finalistas de 2026 são homens). Governador: sem flexão de gênero e sem "vitória" — o mesmo
+ * padrão de `textoPlacar` ("Resultado matematicamente definido para X"). Puro (testado contra a lista de palavras proibidas).
+ */
+export function tituloResultadoDefinido(race: Pick<Race, 'cargo'>, nome: string, encerrada: boolean): string {
+  if (race.cargo === 'Presidente') return `${nome} ${encerrada ? 'é eleito' : 'está matematicamente eleito'} presidente`;
+  return encerrada ? `Resultado definido para ${nome}, com 100% das seções` : `Resultado matematicamente definido para ${nome}`;
+}
+
+/**
+ * Texto do cartão "Postar" do painel (I26) para um evento do feed AO VIVO: hora + título do evento (já neutro e
+ * anonimizado quando preciso) + chamada. ≤ 220 de peso, "[SIMULAÇÃO]" quando simulado. Puro.
+ */
+export function textoPostarEvento(evento: Pick<FeedEvent, 't' | 'titulo'>, simulado?: boolean): string {
+  const titulo = evento.titulo.replace(/[.\s]+$/, '');
+  return finalizar(`${fmtHora(evento.t)} · ${titulo}. Apuração ao vivo, seção por seção.`, simulado);
+}
+
+/** Texto do cartão "Postar" para um marco de audiência (I26): só a contagem arredondada ao marco, sem candidato. Puro. */
+export function textoPostarAudiencia(marco: number): string {
+  return finalizar(`Mais de ${fmtCompact(marco)} pessoas acompanham a apuração no Sintonia agora. Ao vivo, seção por seção.`);
 }
 
 /** Evento do feed ("momento" da noite). O título do evento já é neutro (e anonimizado quando preciso). */

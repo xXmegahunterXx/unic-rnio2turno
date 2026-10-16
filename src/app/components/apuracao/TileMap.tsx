@@ -3,7 +3,7 @@
  * geografia do Brasil. Todas as UFs têm o mesmo tamanho → ótimo no celular para os estados pequenos.
  * Mesmos modos e props do BrazilMap. Cada bloco é um <button> (teclado e leitor de tela de graça).
  */
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { Race, Summary, Tally, UF } from '@/shared/types';
 import { REGIAO_NOMES, UF_NOMES, UF_REGIAO } from '@/shared/constants';
@@ -63,6 +63,11 @@ export interface TileMapProps {
   /** Valor do modo abaixo da sigla. Padrão: sim. */
   valores?: boolean;
   rotuloAcao?: (uf: UF) => string;
+  /**
+   * Carimbo do print (I10, `<CarimboPrint onde="mapa" …/>`): vai na área sem blocos do canto de baixo (colunas 2 a 4 das
+   * duas últimas linhas, entre RS/SC e o Exterior), sem cobrir estado nenhum.
+   */
+  carimbo?: ReactNode;
   className?: string;
   ariaLabel?: string;
 }
@@ -77,6 +82,7 @@ export function TileMap({
   exterior,
   valores = true,
   rotuloAcao,
+  carimbo,
   className,
   ariaLabel,
 }: TileMapProps) {
@@ -268,6 +274,15 @@ export function TileMap({
               );
             })
           : null}
+        {carimbo && tile > 0 ? (
+          // área livre da grade: colunas 2–4 das linhas 6–7 (TILE_LAYOUT), encostada embaixo
+          <div
+            className="pointer-events-none absolute z-[5] flex items-end"
+            style={{ left: 2 * (tile + gap), bottom: 0, width: 3 * tile + 2 * gap, height: 2 * tile + gap }}
+          >
+            {carimbo}
+          </div>
+        ) : null}
       </div>
 
       {tip ? (

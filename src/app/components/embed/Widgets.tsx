@@ -3,7 +3,8 @@
  * Leves: sem o cabeçalho do site; só os hooks de dados (que já se atualizam sozinhos) e componentes de apuração.
  *
  * Regras: candidatos via `useRace` (anônimos na simulação, sem foto), ordem da urna, cores por slot; selo
- * SIMULAÇÃO e "dados fictícios" sempre que houver número simulado; link "via Sintonia ↗" em nova aba.
+ * SIMULAÇÃO e "dados fictícios" sempre que houver número simulado; link "via Sintonia ↗" em nova aba (com
+ * `utm_source=embed`, I08: a audiência mostra quem chegou pelos sites que incorporam).
  * Antes das 17h de 25/10: contagem regressiva + quem disputa + o 1º turno OFICIAL (mapa e cidades).
  */
 import type { ReactNode } from 'react';
@@ -14,7 +15,7 @@ import { fmtHora, fmtInt, fmtPct } from '@/shared/format';
 import { useAnonimizado, useNacional, useRace, useStatus, useUf } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
-import { abrirExterno, urlAbsoluta } from '@/app/lib/share';
+import { abrirExterno, urlAbsoluta, urlCompartilhada } from '@/app/lib/share';
 import { Countdown } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
@@ -54,7 +55,7 @@ function Moldura({
   children: ReactNode;
   className?: string;
 }) {
-  const link = urlAbsoluta(caminhoPaginaCompleta(opcoes));
+  const link = urlCompartilhada(urlAbsoluta(caminhoPaginaCompleta(opcoes)), 'embed');
   return (
     <div className={cn('flex w-full flex-col bg-surface text-fg', className)}>
       <header className="flex items-center justify-between gap-3 px-4 pt-3.5">
@@ -296,7 +297,7 @@ function WidgetMapa({ opcoes, className }: { opcoes: OpcoesEmbed; className?: st
               ufs={data.ufs}
               race={race}
               valores={false}
-              onSelect={(uf: UFBr) => abrirExterno(urlAbsoluta(`/apuracao/${uf.toLowerCase()}${t1 ? '?race=pres-t1' : ''}`))}
+              onSelect={(uf: UFBr) => abrirExterno(urlCompartilhada(urlAbsoluta(`/apuracao/${uf.toLowerCase()}${t1 ? '?race=pres-t1' : ''}`), 'embed'))}
               rotuloAcao={(uf) => `Abrir ${uf} no Sintonia`}
               ariaLabel={t1 ? 'Mais votado em cada estado no 1º turno' : 'Quem está à frente em cada estado'}
             />
