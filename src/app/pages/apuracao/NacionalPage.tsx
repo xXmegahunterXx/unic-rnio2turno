@@ -33,6 +33,7 @@ import { EmptyState, ErrorState } from '@/app/components/apuracao/States';
 import { LinkModoTv, Topo, SeloAnonimo, SeloFase } from '@/app/components/pages/nacional/Topo';
 import { LinhaDoTempo, comInstante, useInstanteParam } from '@/app/components/apuracao/LinhaDoTempo';
 import { PessoasAgora } from '@/app/components/apuracao/PessoasAgora';
+import { ChamadaChat } from '@/app/components/chat/ChamadaChat';
 import { AnuncioNativo } from '@/app/components/anuncios/AnuncioNativo';
 import { PreHero } from '@/app/components/pages/nacional/PreHero';
 import { MapaPanel } from '@/app/components/pages/nacional/MapaPanel';
@@ -170,6 +171,7 @@ export default function NacionalPage() {
           <>
             <SeloFase status={status} resumo={resumo} t1={t1} revendo={t} race={raceId} instante={data.simNow} />
             {!t ? <PessoasAgora status={status} /> : null}
+            {!t && !t1 ? <ChamadaChat /> : null}
             {anonimizado ? <SeloAnonimo /> : null}
           </>
         }

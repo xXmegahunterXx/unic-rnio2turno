@@ -30,6 +30,7 @@ const ROTAS: [teste: (p: string) => boolean, carregar: Carregador][] = [
   [(p) => p === '/tv', () => import('@/app/pages/tv/TvPage')],
   [(p) => p === '/streamers', () => import('@/app/pages/streamers/StreamersPage')],
   [(p) => p === '/palpite', () => import('@/app/pages/palpite/PalpitePage')],
+  [(p) => p === '/ao-vivo', () => import('@/app/pages/chat/AoVivoPage')],
 ];
 
 const pedidos = new Set<string>();

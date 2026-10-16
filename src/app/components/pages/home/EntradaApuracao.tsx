@@ -197,7 +197,8 @@ function PlacarEstados({ race, ufs }: { race: Race; ufs: Partial<Record<UF, Summ
           return (
             <li key={c.numero} className="flex items-center gap-3 rounded-2xl border border-line bg-surface-2/50 px-3 py-2.5">
               <CandidateAvatar candidato={c} size="sm" />
-              <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold text-fg">{c.nomeUrna}</span>
+              {/* nome inteiro em até 2 linhas (cortar só o nome mais longo seria assimétrico) */}
+              <span className="line-clamp-2 min-w-0 flex-1 break-words text-[14.5px] font-semibold leading-tight text-fg">{c.nomeUrna}</span>
               <span className={cn('num font-display text-[26px] font-semibold leading-none tracking-[-0.03em]', s.textDisplay)}>{fmtInt(n)}</span>
             </li>
           );

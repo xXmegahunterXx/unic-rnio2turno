@@ -278,7 +278,8 @@ function WidgetMapa({ opcoes, className }: { opcoes: OpcoesEmbed; className?: st
               return (
                 <li key={c.numero} className="flex min-w-0 items-center gap-2 rounded-xl border border-line bg-surface-2/60 px-2.5 py-2">
                   <span aria-hidden className={cn('h-3 w-3 shrink-0 rounded-[4px]', corSlot(c.cor).bg)} />
-                  <span className="min-w-0 flex-1 truncate text-[13px] font-semibold">{c.nomeUrna}</span>
+                  {/* nome inteiro em até 2 linhas (cortar só o nome mais longo seria assimétrico) */}
+                  <span className="line-clamp-2 min-w-0 flex-1 break-words text-[13px] font-semibold leading-tight">{c.nomeUrna}</span>
                   <span className={cn('num font-display text-[20px] font-semibold leading-none', corSlot(c.cor).text)}>{fmtInt(cont.get(i) ?? 0)}</span>
                 </li>
               );

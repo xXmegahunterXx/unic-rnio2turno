@@ -324,7 +324,8 @@ function LadoDuelo({
           !semVotos && !l.lider && resumo.lider !== null && 'opacity-[0.88]',
         )}
       />
-      <div className="num mt-2 text-[13px] text-fg-muted sm:text-[15px]">
+      {/* data-placar-votos: a folha do chat no celular mede daqui para deixar a linha dos % inteira acima dela */}
+      <div data-placar-votos className="num mt-2 text-[13px] text-fg-muted sm:text-[15px]">
         <NumberRoll value={l.votos} className="font-semibold text-fg" /> <span>votos</span>
       </div>
       {vice && l.c.vice ? (
@@ -386,12 +387,13 @@ function PlacarCompacto({ race, resumo, titulo, subtitulo, to, onClick, showProg
             <li key={l.i} className="flex items-center gap-3">
               <CandidateAvatar candidato={l.c} foto={fotos[l.i]} size={fotos[l.i] ? 'md' : 'sm'} eleito={l.eleito} className={fotos[l.i] ? '!h-10 !w-10' : undefined} />
               <div className="min-w-0 flex-1">
-                <div className={cn('truncate text-[14.5px] leading-tight', l.lider && !semVotos ? 'font-semibold text-fg' : 'font-medium text-fg')}>
+                {/* nome inteiro em até 2 linhas e partido inteiro (quebra a linha antes de cortar): cortar só o nome ou a
+                    sigla mais longos seria assimétrico entre os dois */}
+                <div className={cn('line-clamp-2 break-words text-[14.5px] leading-tight', l.lider && !semVotos ? 'font-semibold text-fg' : 'font-medium text-fg')}>
                   {l.c.nomeUrna}
                 </div>
-                {/* O partido trunca; o número de votos nunca é cortado. */}
-                <div className="num mt-0.5 flex min-w-0 text-[12px] text-fg-muted">
-                  <span className="min-w-0 truncate">{l.c.partido}</span>
+                <div className="num mt-0.5 flex min-w-0 flex-wrap text-[12px] text-fg-muted">
+                  <span className="shrink-0">{l.c.partido}</span>
                   <span className="shrink-0 whitespace-pre"> · {fmtInt(l.votos)} votos</span>
                 </div>
               </div>

@@ -124,7 +124,8 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
                   className={cn('hidden min-[420px]:inline-flex', fotos[i] && '!h-10 !w-10')}
                 />
                 <div className="min-w-0 flex-1">
-                  <div className={cn('line-clamp-2 text-[14.5px] leading-tight text-fg', lider ? 'font-semibold' : 'font-medium')}>{c.nomeUrna}</div>
+                  {/* até 3 linhas: em 768 px a coluna é estreita e "Professora Maria do Socorro…" pede 3 */}
+                  <div className={cn('line-clamp-3 break-words text-[14.5px] leading-tight text-fg', lider ? 'font-semibold' : 'font-medium')}>{c.nomeUrna}</div>
                   {/* sigla nunca cortada (REPUBLICANOS × PP): sem espaço, os votos descem para a linha de baixo */}
                   <div className="num mt-0.5 flex min-w-0 flex-wrap text-[12px] text-fg-muted">
                     <span className="shrink-0">{c.partido}</span>

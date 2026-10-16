@@ -28,6 +28,7 @@ import { StatsGrid } from '@/app/components/apuracao/StatsGrid';
 import { RestantePanel } from '@/app/components/apuracao/RestantePanel';
 import { RaceSwitcher } from '@/app/components/apuracao/RaceSwitcher';
 import { ShareButton } from '@/app/components/apuracao/ShareCard';
+import { ChamadaChat } from '@/app/components/chat/ChamadaChat';
 import { UfMap } from '@/app/components/apuracao/UfMap';
 import { MapLegend } from '@/app/components/apuracao/MapLegend';
 import { MapModeSwitch } from '@/app/components/apuracao/MapModeSwitch';
@@ -53,6 +54,7 @@ import { PanoramaMunicipios } from '@/app/components/pages/detalhe/PanoramaMunic
 import { Destaques } from '@/app/components/pages/detalhe/Destaques';
 import { MunicipioPainel } from '@/app/components/pages/detalhe/MunicipioPainel';
 import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
+import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 import { DesdePrimeiroTurno } from '@/app/components/apuracao/DesdePrimeiroTurno';
 import { ExteriorTabela, usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
 import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
@@ -216,10 +218,13 @@ export default function UfPage() {
   // Ao lado do placar (desktop) ou depois do mapa (celular): o que falta, 1º × 2º turno ou a participação no 1º turno.
   const lateral = restanteVisivel ? (
     <RestantePanel race={race} resumo={r} restante={snap.restante} className="h-full" />
+  ) : !t1 && raceT1 && snapT1 && statusQ.data?.anonimizado ? (
+    // simulação com nomes ocultos: só o aviso, no lugar do cartão inteiro (sem título duplicado nem cartão dentro de cartão)
+    <AvisoT1Oculto titulo="1º turno × 2º turno" className="h-full" />
   ) : !t1 && raceT1 && snapT1 ? (
     <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
       <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
-      <ComparaTurnos race={race} raceT1={raceT1} t2={r} t1={snapT1.resumo} compacto anonimizado={!!statusQ.data?.anonimizado} />
+      <ComparaTurnos race={race} raceT1={raceT1} t2={r} t1={snapT1.resumo} compacto />
     </section>
   ) : (
     <ParticipacaoCartao t={r} titulo="Participação no 1º turno" className="h-full" />
@@ -270,6 +275,7 @@ export default function UfPage() {
         actions={
           <>
             {ctx.anonimizado ? <NomesOcultos /> : null}
+            {!t1 && !t ? <ChamadaChat className="h-8 rounded-[10px] lg:hidden" /> : null}
             <ShareButton race={race} resumo={resumoPlacar} simulado={simulado} local={exterior ? 'Exterior' : nomeUf} size="sm" />
           </>
         }

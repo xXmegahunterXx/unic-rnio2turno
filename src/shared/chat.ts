@@ -328,10 +328,8 @@ const PROPAGANDA: readonly RegExp[] = [
   /\b(vote|votem|votar|digite|digitem|aperte|apertem|tecle|teclem|confirma|confirme|confirmem)\s+((no|na|o|a|em)\s+)?\d{1,5}\b/,
   /\b\d{2,5}\s+(e\s+)?confirm(a|e|ar|em|ado)\b/,
   /\b(eh|so da|so pode ser|fecha com|fechado com|vamos de|vamo de|bora de|vai de)\s+(13|22|treze|vinte e dois|lula|flavio|bolsonaro|pt|pl)\b/,
-  // "e" sem acento: depois de tirar o acento, a conjunção ("Lula e Flávio empatados", "seção 22 e 13") é igual ao verbo
-  // ("é 13"). Só vale como verbo quando NÃO vem logo depois de nome/número de candidato ou de outro número; "é"
-  // acentuado no texto original é conferido à parte (temPropaganda). "Lula e 13" / "PL e 22" = nome + "é" + número.
-  /(?<!\b(\d+|lula|flavio|bolsonaro|pt|pl|treze|dois)\s)\be\s+(13|22|treze|vinte e dois|lula|flavio|bolsonaro|pt|pl)\b/,
+  // "e" SEM acento + nome/número: conferido à parte (temEVerboSemAcento), porque a conjunção e o verbo ficam iguais.
+  // "Lula e 13" / "PL e 22" = nome + "é" + número.
   /\b(lula|flavio|bolsonaro|pt|pl)\s+e\s+(13|22|treze|vinte e dois)\b/,
   /\b(lula|flavio|bolsonaro|pt|pl)\s*(13|22)\b|\b(13|22)\s*(lula|flavio|bolsonaro|pt|pl)\b/,
   /\bfora\s+(lula|flavio|bolsonaro|pt|pl|petistas?|bolsonaristas?|lulistas?|flavistas?)\b/,
@@ -563,6 +561,54 @@ const RE_REACAO_ENQUETE = new RegExp(
   'iu',
 );
 
+/**
+ * Leitura com a pontuação preservada (para saber se o nome "fecha a frase"): sem acento, minúsculas, leet só dentro de
+ * palavras ("1ula" → "lula"), emoji e símbolos viram espaço.
+ */
+const leituraPontuada = (s: string) =>
+  ` ${semAcento(s)
+    .replace(/[a-z0-9@$€¢£|]+/g, (p) => (/[a-z]/.test(p) ? p.replace(/[0134578@$|€¢£]/g, (c) => LEET[c] ?? c) : p))
+    .replace(/[^a-z0-9!?.,;:…\s]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()} `;
+
+const RE_E_SEM_ACENTO = /(^|[^a-z0-9])e\s+(13|22|treze|vinte e dois|lula|flavio|bolsonaro|pt|pl)(?![a-z0-9])/g;
+/** Lado de cada nome/número (para a exceção simétrica "Nordeste e Lula, Sul e Flávio"). */
+const LADO_E: Record<string, 'a' | 'b'> = { '13': 'a', treze: 'a', lula: 'a', pt: 'a', '22': 'b', 'vinte e dois': 'b', flavio: 'b', bolsonaro: 'b', pl: 'b' };
+/** Antes do "e": nome/número de candidato ou outro número → conjunção ("Lula e Flávio", "seção 22 e 13", "50,2 e Flávio"). */
+const RE_ANTES_CONJUNCAO = /(\d|\b(lula|flavio|bolsonaro|pt|pl|treze|dois))$/;
+/** Advérbios e expressões que fazem do "e" o verbo ("agora e Lula", "meu voto e 22", "vai ser Flávio"). */
+const RE_ANTES_VERBO = /(^|\s)(agora|ja|so|sempre|hoje|aqui|sera|vai ser|tem que ser|voto|escolha|o cara)$/;
+/** Depois do nome: verbo ou expressão de placar → descrição ("agora e Lula na frente", "e Flávio passou"). */
+const RE_DEPOIS_DESCRICAO =
+  /^\s*(na frente|a frente|lidera\w*|passa\w*|virou|vira|sobe|subiu|cai|caiu|ganha\w*|perde\w*|empata\w*|abre|abriu|tem|com)\b/;
+/** Número de urna usado como quantidade ("SP e 13 mil votos de diferença", "e 22,5%"). */
+const RE_DEPOIS_QUANTIDADE = /^\s*([.,]\d|mil\b|milh|por cento|pontos?\b|votos?\b|secoes?\b|urnas?\b|p\s?p\b|\d)/;
+
+/**
+ * "e" sem acento + nome/número de candidato lido como o verbo "é" ("e Lula!", "agora e 13", "Nordeste e PT"). Depois de
+ * tirar o acento, a conjunção ("Virou e Lula passou", "Janja e Lula votaram cedo") fica igual ao verbo; por isso só conta
+ * como verbo quando o nome FECHA a frase (fim, pontuação) ou vem depois de advérbio típico sem descrição de placar em
+ * seguida. Com verbo depois ("e Lula subiu") é conjunção. Se os DOIS lados aparecem assim ("Nordeste e Lula, Sul e
+ * Flávio"), é descrição simétrica. O "é" acentuado continua barrado sempre (RE_E_VERBO).
+ */
+function temEVerboSemAcento(texto: string): boolean {
+  const l = leituraPontuada(texto);
+  const lados = new Set<'a' | 'b'>();
+  for (const m of l.matchAll(RE_E_SEM_ACENTO)) {
+    const ini = (m.index ?? 0) + m[1].length;
+    const antes = l.slice(0, ini).trimEnd();
+    const depois = l.slice((m.index ?? 0) + m[0].length);
+    const cand = m[2].replace(/\s+/g, ' ');
+    if (RE_ANTES_CONJUNCAO.test(antes)) continue;
+    if (/^\d/.test(cand) && RE_DEPOIS_QUANTIDADE.test(depois)) continue;
+    const fecha = /^\s*([!?.,;:…]|$)/.test(depois);
+    const adverbio = RE_ANTES_VERBO.test(antes) && !RE_DEPOIS_DESCRICAO.test(depois);
+    if (fecha || adverbio) lados.add(LADO_E[cand] ?? 'a');
+  }
+  return lados.size === 1;
+}
+
 /** "é" acentuado (verbo) + nome/número de candidato, no texto original (minúsculas, com acento). */
 const RE_E_VERBO = /(^|[^\p{L}\d])(é|eh)\s+(13|22|treze|vinte e dois|lula|fl[aá]vio|bolsonaro|pt|pl)(?![\p{L}\d])/u;
 
@@ -572,6 +618,7 @@ export function temPropaganda(texto: string): boolean {
   if (RE_HASHTAG_CAMPANHA.test(texto) || RE_HASHTAG_CAMPANHA.test(latim) || RE_REACAO_ENQUETE.test(texto) || RE_REACAO_ENQUETE.test(latim)) return true;
   // "é" ACENTUADO (verbo) antes de nome/número de candidato: "Lula é 13", "agora é Flávio" — no texto original
   if (RE_E_VERBO.test(latim)) return true;
+  if (temEVerboSemAcento(texto)) return true;
   const leituras = [normalizarSemLeet(texto), normalizarLeetMisto(texto)];
   return leituras.some((n) => PROPAGANDA.some((re) => re.test(n) || re.test(juntarLetrasSoltas(n))));
 }

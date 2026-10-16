@@ -64,8 +64,9 @@ function apagarDadosLocais(): number {
 export default function PrivacidadePage() {
   const [apagando, setApagando] = useState(false);
   const c = useContatos();
-  // canal para pedidos sobre dados: o e-mail de privacidade; sem ele, o contato geral (nunca um endereço provisório)
-  const canal = c.privacidade ?? c.geral;
+  // canal para pedidos sobre dados: SÓ o e-mail de privacidade configurado no painel. O geral pode ser o comercial da
+  // /anuncie, que ninguém trata como canal da LGPD: sem e-mail de privacidade, a página diz que ele será publicado.
+  const canal = c.privacidade;
   function apagar() {
     setApagando(true);
     const n = apagarDadosLocais();
@@ -306,8 +307,8 @@ export default function PrivacidadePage() {
             </>,
             <>
               <strong>Sem IP.</strong> Para limitar abusos (modo lento, limite por hora, denúncias de pessoas diferentes), o servidor usa, só em
-              memória, um código anônimo derivado da conexão e do código do navegador. O endereço IP não é guardado e o texto das mensagens não vai
-              para os registros técnicos.
+              memória, um código anônimo derivado da conexão e do código do navegador. O endereço IP não é guardado (salvo no registro descrito
+              no último item, se estiver ligado) e o texto das mensagens não vai para os registros técnicos.
             </>,
             <>
               <strong>Sem enquete.</strong> As reações (🔥 😮 👏 👀) são contadas só no total do último minuto, sem relação com candidato (o site mostra
@@ -377,9 +378,9 @@ export default function PrivacidadePage() {
       <Secao id="direitos" titulo="Seus direitos">
         <p>
           A LGPD garante a você, entre outros, o direito de saber quais dados tratamos, de corrigi-los e de pedir que sejam apagados (art. 18).
-          Como não guardamos dados pessoais seus (só, se você preencheu o formulário “Quero anunciar”, o que enviou nele, e as mensagens do chat
-          ao vivo, por até 12 horas), quase tudo se resolve no seu próprio aparelho: use o botão “Apagar meus dados” acima ou limpe os dados do
-          site no navegador.
+          Além do que você enviou no formulário “Quero anunciar” (se preencheu) e das mensagens do chat ao vivo (até 12 horas na memória do
+          servidor, ou 6 meses cifradas se o registro descrito em “Chat ao vivo” estiver ligado), não guardamos dados pessoais seus: quase tudo
+          se resolve no seu próprio aparelho. Use o botão “Apagar meus dados” acima ou limpe os dados do site no navegador.
         </p>
         <p>
           Veja também a <LinkInterno to="/metodologia">metodologia</LinkInterno> e a página <LinkInterno to="/sobre">sobre o Sintonia</LinkInterno>.

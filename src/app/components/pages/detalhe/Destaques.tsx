@@ -295,7 +295,8 @@ function Comparecimentos({ municipios, para }: { municipios: MunicipioResumo[]; 
 
 function Cartao({ icon, titulo, subtitulo, children }: { icon: IconName; titulo: string; subtitulo?: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
+    // números por município: a pílula do chat e a barra do rodapé nunca ficam por cima (faixaLivre)
+    <section data-sem-anuncio-fixo className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
       <header className="mb-2 flex items-start gap-2.5">
         <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-fg-muted">
           <Icon name={icon} size={16} />

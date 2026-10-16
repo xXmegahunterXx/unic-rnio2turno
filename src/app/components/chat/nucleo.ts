@@ -134,3 +134,15 @@ export function modoPainelDesktop(larguraJanela: number, pagina: PaginaSala): 'd
   if (larguraJanela >= 1360 + LARGURA_PAINEL + 40) return 'doca';
   return 'gaveta';
 }
+
+/**
+ * Altura da folha no celular: do fim da linha dos % do placar até o pé da tela, entre um mínimo que ainda mostra
+ * algumas mensagens e o máximo de sempre (58% da altura, até 560 px). Sem placar na tela: a altura de sempre.
+ */
+export function alturaFolhaCelular(janela: number, limitePct: number | null): number {
+  const max = Math.min(Math.round(janela * 0.58), 560);
+  // 360×740 e 375×667: ~300 px é o que cabe sem cortar os % (lista com 2+ mensagens); abaixo disso, a lista some
+  const min = Math.min(max, 300);
+  if (limitePct === null || !Number.isFinite(limitePct)) return max;
+  return Math.round(Math.min(max, Math.max(min, janela - limitePct)));
+}

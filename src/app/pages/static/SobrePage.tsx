@@ -87,6 +87,7 @@ export default function SobrePage() {
             <>
               <strong>Não exibimos propaganda política.</strong> Os espaços de anúncio aceitam apenas anunciantes não políticos, sempre
               identificados como publicidade e separados dos resultados: nunca dentro do placar nem ao lado de foto, nome ou número de candidato.
+              No Modo TV e na live dos streamers, o anunciante fica na barra do Sintonia, separado do placar por ela.
               {OFERECIMENTO_COM_CANDIDATOS
                 ? ' Nas imagens de compartilhamento do placar e do Palpite, o anunciante aparece só numa faixa de texto “Oferecimento” no pé, abaixo da marca do Sintonia.'
                 : null}
@@ -118,7 +119,8 @@ export default function SobrePage() {
                 , CNPJ <span className="num">{formatarCnpj(c.cnpj)}</span>
               </>
             ) : null}
-            .
+            {/* ponto final só se o nome não terminar em ponto ("Ltda.") */}
+            {c.cnpj || !c.responsavel.endsWith('.') ? '.' : null}
           </p>
         ) : null}
         <ul className="space-y-2.5">

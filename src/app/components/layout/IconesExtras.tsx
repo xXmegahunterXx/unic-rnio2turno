@@ -25,6 +25,12 @@ const EXTRAS: Record<IconeExtra, React.ReactNode> = {
       <path d="m3.75 6.75 8.25 6 8.25-6" />
     </>
   ),
+  chat: (
+    <>
+      <path d="M20 12.2c0 3.9-3.6 7-8 7-1.1 0-2.2-.2-3.1-.6L4.5 20l1.2-3.4C4.6 15.4 4 13.9 4 12.2c0-3.9 3.6-7 8-7s8 3.1 8 7Z" />
+      <path d="M8.6 12.3h.01M12 12.3h.01M15.4 12.3h.01" strokeWidth={2.4} />
+    </>
+  ),
 };
 
 export function IconeQualquer({ name, size = 20, className }: { name: IconName | IconeExtra; size?: number; className?: string }) {

@@ -90,6 +90,8 @@ export function MunicipioTable({ race, municipios, onSelect, pageSize = 20, sear
         rows={rows}
         columns={columns}
         rowKey={(m) => m.cod}
+        // resultado por município: a pílula do chat e a barra do rodapé nunca ficam por cima (faixaLivre)
+        semAnuncioFixo
         onRowClick={onSelect}
         rowLabel={(m) => `Abrir ${m.nome}`}
         rowClassName={(m) => (m.capital ? 'bg-brand/[0.05]' : undefined)}

@@ -66,7 +66,7 @@ export function FormLead({ className, temOutroCanal }: { className?: string; tem
         <h3 className="font-display text-[20px] font-semibold tracking-[-0.02em] text-fg">O formulário abre em breve</h3>
         <p className="max-w-[36rem] text-pretty text-[15px] leading-relaxed text-fg-muted">
           {temOutroCanal
-            ? 'Ele abre assim que o canal de privacidade do Sintonia estiver no ar. Enquanto isso, fale com a gente pelos contatos ao lado.'
+            ? 'Ele abre assim que o canal de privacidade do Sintonia estiver no ar. Enquanto isso, fale com a gente pelos contatos desta página.'
             : 'Ele abre assim que o canal de privacidade do Sintonia estiver no ar.'}
         </p>
       </div>

@@ -5,7 +5,7 @@
  * Sem e-mail de privacidade, o formulário "Quero anunciar" fica fechado em produção.
  */
 import { useEffect, useState } from 'react';
-import { CAMPOS_EMAIL, contatosEfetivos, formatarCnpj, validaContatosPublicos, type CampoEmail, type ContatosPublicos } from '@/shared/contatos';
+import { CAMPOS_EMAIL, CONTATOS_LIMITES, contatosEfetivos, formatarCnpj, validaContatosPublicos, type CampoEmail, type ContatosPublicos } from '@/shared/contatos';
 import { cn } from '@/app/lib/cn';
 import { Badge, Button, Icon } from '@/app/ui';
 import { useAdmin } from './dados';
@@ -82,6 +82,7 @@ export function ContatosPublicosPainel({ className }: { className?: string }) {
               key={k}
               rotulo={ROTULO[k].rotulo}
               type="email"
+              maxLength={CONTATOS_LIMITES.email}
               inputMode="email"
               autoCapitalize="none"
               autoComplete="off"
@@ -97,7 +98,7 @@ export function ContatosPublicosPainel({ className }: { className?: string }) {
           <Campo
             rotulo="Responsável pelo site (nome ou razão social)"
             value={r.responsavel}
-            maxLength={140}
+            maxLength={CONTATOS_LIMITES.responsavel}
             placeholder="Ex.: Fulana de Tal ou Empresa Exemplo Ltda."
             onChange={muda('responsavel')}
             dica="Opcional. Identifica o controlador dos dados em /privacidade e em /sobre."
@@ -106,7 +107,7 @@ export function ContatosPublicosPainel({ className }: { className?: string }) {
         </div>
 
         <ul className="grid grid-cols-1 gap-2 rounded-2xl border border-line bg-surface-2/60 p-4 text-[13px] leading-snug text-fg-muted sm:grid-cols-2">
-          <Situacao ok={!!efetivos.privacidade} texto={efetivos.privacidade ? 'Canal de privacidade publicado' : 'Sem canal de privacidade: “Quero anunciar” fechado'} />
+          <Situacao ok={!!efetivos.privacidade} texto={efetivos.privacidade ? 'Canal de privacidade publicado' : 'Sem canal de privacidade: /privacidade sem canal e “Quero anunciar” fechado'} />
           <Situacao
             ok={!!efetivos.geral}
             texto={efetivos.geral ? (atual?.geral ? 'Contato geral publicado' : 'Contato geral: usando o e-mail da página Anuncie') : 'Sem contato geral'}

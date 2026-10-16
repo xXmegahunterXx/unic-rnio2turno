@@ -6,7 +6,7 @@ import type { IconName } from '@/app/ui/Icon';
 import { nEstadosGov } from '@/shared/gov2t';
 
 /** Ícones extras do menu "Mais" (desenhados em layout/IconesExtras.tsx). */
-export type IconeExtra = 'tv' | 'codigo' | 'megafone' | 'carta';
+export type IconeExtra = 'tv' | 'codigo' | 'megafone' | 'carta' | 'chat';
 
 export interface ItemMais {
   /** Rota (react-router) ou ação ('incorporar' | 'compartilhar'). */
@@ -29,6 +29,7 @@ export const MAIS: GrupoMais[] = [
     titulo: 'Explore',
     itens: [
       { to: '/curiosidades', label: 'Curiosidades', desc: 'Recordes e fatos do 1º turno', icon: 'grafico', match: (p) => p.startsWith('/curiosidades') },
+      { to: '/ao-vivo', label: 'Chat ao vivo', desc: 'Sala da apuração, moderada (abre às 17h de 25/10)', icon: 'chat', match: (p) => p.startsWith('/ao-vivo') },
       { to: '/palpite', label: 'Palpite do 2º turno', desc: 'Crave o % de cada um até as 17h de 25/10', icon: 'relogio', match: (p) => p.startsWith('/palpite') },
       { to: '/cenarios', label: 'E se…? Monte seu cenário', desc: 'Calculadora do 2º turno, não é previsão', icon: 'troca', match: (p) => p.startsWith('/cenarios') },
       { to: '/governadores', label: 'Governadores', desc: `2º turno em ${nEstadosGov()}`, icon: 'grade', match: (p) => p.startsWith('/governadores') },

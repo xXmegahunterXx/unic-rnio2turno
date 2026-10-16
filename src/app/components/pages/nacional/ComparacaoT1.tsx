@@ -5,7 +5,7 @@
  * Com a simulação anonimizada ("Candidato A/B") o bloco não mostra os números do 1º turno: eles são
  * oficiais e públicos, e bastariam para identificar quem é A e quem é B ao lado de números fictícios.
  */
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import type { Race, Summary } from '@/shared/types';
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtCompact, fmtInt, fmtPct, fmtPP } from '@/shared/format';
@@ -147,14 +147,16 @@ function ComparacaoOculta({ className }: { className?: string }) {
  * 4 de outubro identificariam quem é o Candidato A e quem é o B (ComparacaoT1, ComparaTurnos, a seção no 1º turno).
  */
 export function AvisoT1Oculto({ titulo, className }: { titulo: string; className?: string }) {
+  // id próprio por instância (a UF mostra o aviso na lateral e no celular; dois ids iguais quebram o aria-labelledby)
+  const idTitulo = useId();
   return (
-    <section aria-labelledby="comparacao-titulo" className={cn('min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
+    <section aria-labelledby={idTitulo} className={cn('min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}>
       <div className="flex items-start gap-3">
         <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-fg-muted">
           <Icon name="olho-fechado" size={18} />
         </span>
         <div className="min-w-0">
-          <h2 id="comparacao-titulo" className="font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[19px]">
+          <h2 id={idTitulo} className="font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[19px]">
             {titulo}
           </h2>
           <p className="mt-1 text-pretty text-[13px] leading-relaxed text-fg-muted">

@@ -151,10 +151,11 @@ export function ParticipacaoComparada({
             <th scope="col" className="px-3 py-2 font-semibold">
               <span className="sr-only">Indicador</span>
             </th>
-            <th scope="col" className="px-3 py-2 text-right font-semibold text-fg">
+            <th scope="col" className="px-3 py-2 text-right align-bottom font-semibold leading-tight text-fg">
               {rotuloSecao}
             </th>
-            <th scope="col" className="truncate px-3 py-2 text-right font-semibold" title={rotuloBase}>
+            {/* nome do município inteiro, quebrando a linha ("São Paulo" virava "SÃO PA…" em 360 px) */}
+            <th scope="col" className="break-words px-3 py-2 text-right align-bottom font-semibold leading-tight" title={rotuloBase}>
               {rotuloBase}
             </th>
           </tr>

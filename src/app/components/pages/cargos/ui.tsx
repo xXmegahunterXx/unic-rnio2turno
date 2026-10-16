@@ -20,11 +20,14 @@ export function Amostra({ sigla, className }: { sigla: string; className?: strin
 /** "■ PL" — identidade nunca só pela cor. */
 export function PartidoChip({ sigla, numero, className }: { sigla: string; numero?: number; className?: string }) {
   return (
-    <span className={cn('inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-[12.5px] text-fg-muted', className)}>
-      <Amostra sigla={sigla} />
-      {/* A sigla cede espaço (REPUBLICANOS em colunas estreitas); o número nunca é cortado. */}
-      <span className="min-w-0 truncate font-medium text-fg" title={sigla}>
-        {sigla}
+    <span className={cn('inline-flex min-w-0 max-w-full flex-wrap items-center gap-x-1.5 whitespace-nowrap text-[12.5px] text-fg-muted', className)}>
+      {/* Coluna estreita: o número desce para a linha de baixo antes de a sigla ser cortada (REPUBLICANOS inteiro); só
+          uma sigla mais larga que a coluna inteira ainda cede espaço. O número nunca é cortado. */}
+      <span className="inline-flex min-w-0 max-w-full items-center gap-1.5">
+        <Amostra sigla={sigla} />
+        <span className="min-w-0 truncate font-medium text-fg" title={sigla}>
+          {sigla}
+        </span>
       </span>
       {numero !== undefined ? <span className="num shrink-0 text-fg-muted">· {numero}</span> : null}
     </span>

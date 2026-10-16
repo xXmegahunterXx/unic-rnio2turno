@@ -116,6 +116,22 @@ describe('chat: neutralidade (os dois lados têm o mesmo tratamento)', () => {
     ['Bolsonaro e Lula empatados', 'Lula e Bolsonaro empatados', 'ok'],
     ['Fila na seção 22 e 13', 'Fila na seção 13 e 22', 'ok'],
     ['#plantão da apuração', 'Boa noite #ptbr', 'ok'],
+    // "e" sem acento seguido de verbo ou de outra palavra é conjunção (conferência final)
+    ['Virou e Lula passou', 'Virou e Flávio passou', 'ok'],
+    ['Tá empatado e Lula subiu', 'Tá empatado e Flávio subiu', 'ok'],
+    ['Janja e Lula votaram cedo', 'Michelle e Bolsonaro votaram cedo', 'ok'],
+    ['Alckmin e Lula na foto', 'Michelle e Flávio na foto', 'ok'],
+    ['Nordeste e Lula, Sul e Flávio', 'Sul e Flávio, Nordeste e Lula', 'ok'],
+    ['SP e 13 mil votos de diferença', 'MG e 22 mil votos de diferença', 'ok'],
+    ['agora e Lula na frente', 'agora e Flávio na frente', 'ok'],
+    ['Empate técnico entre PT e PL', 'Empate técnico entre PL e PT', 'ok'],
+    // "e" sem acento que só pode ser o verbo: o nome fecha a frase ou vem depois de advérbio
+    ['e Lula!', 'e Flávio!', 'propaganda'],
+    ['agora e 13', 'agora e 22', 'propaganda'],
+    ['meu voto e Lula', 'meu voto e Flávio', 'propaganda'],
+    ['Lula e 13', 'Flávio e 22', 'propaganda'],
+    ['agora e Lula, nunca Flávio', 'agora e Flávio, nunca Lula', 'propaganda'],
+    ['é Lula', 'é Flávio', 'propaganda'],
   ];
   it.each(pares)('%s × %s', (a, b, m) => {
     expect(motivo(a)).toBe(m);

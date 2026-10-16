@@ -42,6 +42,7 @@ import { PreApuracaoAviso, PrimeiroTurnoAviso } from '@/app/components/pages/det
 import { NaoEncontrado } from '@/app/components/pages/detalhe/NaoEncontrado';
 import { EsqueletoMunicipio } from '@/app/components/pages/detalhe/Esqueletos';
 import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
+import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 import { ZonasExplorer } from '@/app/components/pages/detalhe/ZonasExplorer';
 import { usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
@@ -151,7 +152,10 @@ export default function MunicipioPage() {
   // "Minha cidade no 1º turno" (resultado oficial): imagem e texto prontos para postar.
   const caminhoMun = `/apuracao/${uf.toLowerCase()}/${snap.cod}?race=${ctx.idT1}`;
   const compara =
-    !t1 && ctx.raceT1 && snap.primeiroTurno ? (
+    !t1 && ctx.raceT1 && snap.primeiroTurno && statusQ.data?.anonimizado ? (
+      // simulação com nomes ocultos: só o aviso, no lugar do cartão (sem subtítulo nem botão de compartilhar o 1º turno)
+      <AvisoT1Oculto titulo="1º turno × 2º turno" className="h-full" />
+    ) : !t1 && ctx.raceT1 && snap.primeiroTurno ? (
       <section className="h-full rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
         <div className="mb-1 flex items-start justify-between gap-2">
           <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-fg-muted">1º turno × 2º turno</h3>
@@ -168,7 +172,7 @@ export default function MunicipioPage() {
           />
         </div>
         <p className="mb-4 text-[12.5px] text-fg-muted">% dos votos válidos {emMun(snap.nome)}</p>
-        <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto anonimizado={!!statusQ.data?.anonimizado} />
+        <ComparaTurnos race={race} raceT1={ctx.raceT1} t2={r} t1={snap.primeiroTurno} compacto />
       </section>
     ) : null;
 

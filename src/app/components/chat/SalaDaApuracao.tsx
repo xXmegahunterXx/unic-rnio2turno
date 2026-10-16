@@ -10,7 +10,7 @@
  *  - Celular/tablet: botão flutuante "Chat ao vivo" (com contador) acima da tab bar e da barra de anúncio do rodapé.
  *    Nunca por cima de placar/resultado: com um bloco `data-sem-anuncio-fixo` na faixa de baixo da tela (faixaLivre),
  *    ele recolhe para uma alça estreita na borda (na margem, fora dos números). Abre uma folha inferior NÃO modal de
- *    ~56% da altura: se o placar está na tela, a página rola para ele ficar logo abaixo do cabeçalho, à vista acima da
+ *    altura medida: se o placar está na tela, a página rola para ele ficar logo abaixo do cabeçalho, à vista acima da
  *    folha. A folha leva `data-sem-anuncio-fixo` (a barra de anúncio do rodapé some enquanto ela está aberta).
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -22,8 +22,9 @@ import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
 import { useFaixaLivre } from '@/app/components/anuncios/faixaLivre';
-import { LARGURA_PAINEL, modoPainelDesktop, paginaDaSala, type PaginaSala } from './nucleo';
+import { LARGURA_PAINEL, alturaFolhaCelular, modoPainelDesktop, paginaDaSala, type PaginaSala } from './nucleo';
 import { IconeChat, Sala } from './Sala';
+import { aoPedirAbrirChat, avisarChatDisponivel } from './chamada';
 import { useSala } from './sala';
 
 const CHAVE_PAINEL = 'sintonia:chat-painel';
@@ -120,6 +121,12 @@ function SalaDesktop({ pagina }: { pagina: PaginaSala }) {
     setAberto(false);
     gravarPainel(false);
   }, []);
+  // chamada "Chat ao vivo" da 1ª dobra (chamada.ts): aparece com a sala aberta e abre o painel
+  useEffect(() => {
+    avisarChatDisponivel(disponivel);
+    return () => avisarChatDisponivel(false);
+  }, [disponivel]);
+  useEffect(() => aoPedirAbrirChat(abrir), [abrir]);
 
   // doca: a página ganha espaço à direita (AppShell: main e rodapé usam --sala-lateral)
   const doca = aberto && modo === 'doca';
@@ -224,29 +231,53 @@ function useTeclado(ativo: boolean): { inset: number; altura: number } {
   return v;
 }
 
-/** Com o placar na tela, rola para ele ficar logo abaixo do cabeçalho (à vista acima da folha). */
-function mostrarPlacarAcima() {
-  const el = document.querySelector<HTMLElement>('#conteudo [data-sem-anuncio-fixo]');
-  if (!el) return;
+/**
+ * Com o placar na tela, rola para ele ficar logo abaixo do cabeçalho (à vista acima da folha). Devolve onde a linha dos
+ * percentuais do placar TERMINA depois da rolagem (px do topo da janela), para a folha começar logo abaixo dela; null
+ * sem placar na tela.
+ */
+function mostrarPlacarAcima(): number | null {
+  const el =
+    document.querySelector<HTMLElement>('#conteudo section[aria-label^="Placar"][data-sem-anuncio-fixo]') ??
+    document.querySelector<HTMLElement>('#conteudo [data-sem-anuncio-fixo]');
+  if (!el) return null;
   const r = el.getBoundingClientRect();
-  if (r.bottom <= 0 || r.top >= window.innerHeight) return; // fora da tela: não mexe na leitura
+  if (r.bottom <= 0 || r.top >= window.innerHeight) return null; // fora da tela: não mexe na leitura
   const cab = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--app-header-h')) || 56;
-  const alvo = window.scrollY + r.top - cab - 8;
-  if (Math.abs(r.top - cab - 8) < 24) return;
-  window.scrollTo({ top: Math.max(0, alvo), behavior: 'smooth' });
+  let delta = r.top - cab - 8;
+  if (Math.abs(delta) < 24) delta = 0;
+  else {
+    const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    const alvo = Math.min(max, Math.max(0, window.scrollY + delta));
+    delta = alvo - window.scrollY;
+    window.scrollTo({ top: alvo, behavior: 'smooth' });
+  }
+  // a linha "N votos" vem 8 px abaixo dos percentuais: a folha começa 2 px acima dela (os % ficam inteiros)
+  const votos = el.querySelector<HTMLElement>('[data-placar-votos]');
+  if (!votos) return null;
+  return votos.getBoundingClientRect().top - delta - 2;
 }
 
 function SalaCelular({ pathname }: { pathname: string }) {
   const [aberto, setAberto] = useState(false);
+  const [altura, setAltura] = useState<number | null>(null);
   const s = useSala(aberto ? null : 'fundo');
   const disponivel = s.indisponivel || !!s.pub?.aberta;
   const livre = useFaixaLivre(disponivel && !aberto, pathname);
   const reduzir = useReducedMotion();
 
-  const abrir = () => {
-    mostrarPlacarAcima();
+  const abrir = useCallback(() => {
+    const limite = mostrarPlacarAcima();
+    setAltura(alturaFolhaCelular(window.innerHeight, limite));
     setAberto(true);
-  };
+  }, []);
+  // chamada "Chat ao vivo" da 1ª dobra (chamada.ts): a alça da borda é discreta; a chamada no topo da página é a porta
+  // visível para a sala no celular
+  useEffect(() => {
+    avisarChatDisponivel(disponivel);
+    return () => avisarChatDisponivel(false);
+  }, [disponivel]);
+  useEffect(() => aoPedirAbrirChat(abrir), [abrir]);
 
   if (!disponivel && !aberto) return null;
   return (
@@ -281,22 +312,29 @@ function SalaCelular({ pathname }: { pathname: string }) {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.15 }}
               aria-label={`Abrir o chat ao vivo${s.novas ? ` (${s.novas} mensagens novas)` : ''}`}
-              // alça de 14 px: cabe na margem de 16 px da página, sem encostar no cartão do placar (a área de toque é maior)
-              className="segue-tab toque fixed bottom-[calc(72px+var(--anuncio-rodape-h,0px)+env(safe-area-inset-bottom))] right-0 z-40 inline-flex h-12 w-3.5 items-center justify-center rounded-l-lg border border-r-0 border-line bg-surface text-brand-fg shadow-[0_8px_24px_-10px_rgb(0_0_0/0.5)] lg:hidden [html[data-teclado]_&]:hidden"
+              // alça de 14 px: cabe na margem de 16 px da página, sem encostar no cartão do placar (a área de toque é maior);
+              // com o rótulo vertical "Chat" para ser reconhecível
+              className="segue-tab toque fixed bottom-[calc(72px+var(--anuncio-rodape-h,0px)+env(safe-area-inset-bottom))] right-0 z-40 inline-flex h-[68px] w-3.5 flex-col items-center justify-center gap-1 rounded-l-lg border border-r-0 border-line bg-surface text-brand-fg shadow-[0_8px_24px_-10px_rgb(0_0_0/0.5)] lg:hidden [html[data-teclado]_&]:hidden"
             >
-              <span aria-hidden className="h-6 w-[3px] rounded-full bg-brand/70" />
+              <span aria-hidden className="rotate-180 text-[10px] font-bold leading-none tracking-[0.04em] [writing-mode:vertical-rl]">
+                Chat
+              </span>
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
               {s.novas > 0 ? <span aria-hidden className="absolute -left-1 -top-1 h-2.5 w-2.5 rounded-full bg-brand ring-2 ring-surface" /> : null}
             </motion.button>
           )
         ) : null}
       </AnimatePresence>
-      <AnimatePresence>{aberto ? <Folha key="folha" onFechar={() => setAberto(false)} /> : null}</AnimatePresence>
+      <AnimatePresence>{aberto ? <Folha key="folha" alturaCelular={altura} onFechar={() => setAberto(false)} /> : null}</AnimatePresence>
     </>
   );
 }
 
-/** Folha inferior NÃO modal. `centralizada`: no computador estreito (1024–1199), com largura limitada e no centro. */
-function Folha({ onFechar, centralizada = false }: { onFechar: () => void; centralizada?: boolean }) {
+/**
+ * Folha inferior NÃO modal. `centralizada`: no computador estreito (1024–1199), com largura limitada e no centro.
+ * `alturaCelular`: altura medida na abertura (do fim dos % do placar ao pé da tela — alturaFolhaCelular).
+ */
+function Folha({ onFechar, centralizada = false, alturaCelular = null }: { onFechar: () => void; centralizada?: boolean; alturaCelular?: number | null }) {
   const [cheia, setCheia] = useState(false);
   const drag = useDragControls();
   const reduzir = useReducedMotion();
@@ -322,10 +360,15 @@ function Folha({ onFechar, centralizada = false }: { onFechar: () => void; centr
 
   // com o teclado aberto, a folha sobe e cabe na parte visível
   // computador estreito: mais baixa (o placar, mais alto que no celular, fica à vista acima com os dois percentuais)
-  // celular baixo (≤ 760 px de altura: 360×740, 375×667): a folha de 58% cortava os percentuais do placar ao meio —
-  // a mesma altura da variante centralizada deixa a linha dos % inteira acima da folha (arrastar para cima amplia)
-  const baixa = typeof window !== 'undefined' && window.innerHeight <= 760;
-  const altura = cheia ? 'calc(100dvh - var(--app-header-h, 56px) - 8px)' : centralizada || baixa ? 'min(44dvh, 440px)' : 'min(58dvh, 560px)';
+  // celular: começa logo abaixo da linha dos % do placar (medida ao abrir), com a lista o mais alta possível — no celular
+  // baixo (360×740, 375×667) a altura fixa de 44% deixava a lista sem nenhuma mensagem inteira (arrastar para cima amplia)
+  const altura = cheia
+    ? 'calc(100dvh - var(--app-header-h, 56px) - 8px)'
+    : centralizada
+      ? 'min(44dvh, 440px)'
+      : alturaCelular
+        ? `${alturaCelular}px`
+        : 'min(58dvh, 560px)';
   const estilo = teclado.inset
     ? { bottom: teclado.inset, height: Math.max(260, Math.min(teclado.altura - 8, cheia ? teclado.altura - 8 : teclado.altura * 0.9)) }
     : { bottom: 0, height: altura };

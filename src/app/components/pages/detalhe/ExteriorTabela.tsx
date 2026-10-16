@@ -251,6 +251,7 @@ export function ExteriorTabela({ race, municipios, paises, onSelect }: ExteriorT
           rows={cidades}
           columns={colsCidade}
           rowKey={(m) => m.cod}
+          semAnuncioFixo
           onRowClick={onSelect}
           rowLabel={(m) => `Abrir ${m.nome}`}
           initialSort={{ key: 'eleitorado', dir: 'desc' }}
@@ -265,6 +266,7 @@ export function ExteriorTabela({ race, municipios, paises, onSelect }: ExteriorT
           rows={paisesFiltrados}
           columns={colsPais}
           rowKey={(p) => p.pais}
+          semAnuncioFixo
           onRowClick={(p) => {
             setQ(p.pais);
             setVisao('cidades');
