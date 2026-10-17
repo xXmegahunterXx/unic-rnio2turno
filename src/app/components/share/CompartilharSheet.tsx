@@ -20,6 +20,9 @@
  * O PNG é gerado em segundo plano assim que o sheet abre (e refeito se o cartão mudar): na hora do toque o arquivo já
  * existe e o `navigator.share` sai dentro do gesto do usuário — o Safari recusa o compartilhamento se houver espera.
  * Os dados ficam "congelados" do momento em que o sheet abriu (texto e imagem sempre batem).
+ *
+ * Dia da votação (0h–17h de 25/10, pelo relógio do SERVIDOR do status em cache): conteúdo com candidato (sem a marca
+ * `generico`) sai como o convite da apuração — só texto e link, sem imagem, nome, número ou percentual (`trocaPeloConvite`).
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -58,7 +61,7 @@ import { Spinner } from '@/app/ui/Button';
 import { toast } from '@/app/ui/Toast';
 import { PreviaCartao } from './PreviaCartao';
 import { gerarPngCartao } from './png';
-import { comPrefixoSimulacao, comSufixoLink, sufixoDoCaminho } from './textos';
+import { DESCRICAO_DIA_VOTACAO, HASHTAGS, TEXTO_DIA_VOTACAO, comPrefixoSimulacao, comSufixoLink, sufixoDoCaminho, trocaPeloConvite } from './textos';
 import { DIMENSOES_CARTAO, FORMATOS_PADRAO, type ConteudoCompartilhavel, type FormatoCartao } from './tipos';
 
 /** "Siga o Sintonia" só depois de "Copiado": chunk próprio, fora do JS inicial das páginas com o kit (ARCHITECTURE §11.9). */
@@ -107,6 +110,12 @@ function agoraDaApuracao(status: LiveStatus | undefined, recebidoEm: number | un
   return status.wallNow + Math.max(0, Date.now() - recebidoEm);
 }
 
+/** Relógio do servidor pelo status JÁ em cache (sem consulta nova); sem status, o do aparelho. */
+function relogioServidor(status: LiveStatus | undefined, recebidoEm: number | undefined): number {
+  if (!status || !recebidoEm || !Number.isFinite(status.wallNow)) return Date.now();
+  return status.wallNow + Math.max(0, Date.now() - recebidoEm);
+}
+
 /** Este navegador aceita compartilhar um PNG pelo Web Share (teste com um arquivo de 1 byte). */
 function aceitaArquivoPng(): boolean {
   try {
@@ -136,6 +145,7 @@ export function CompartilharSheet({
   cartao,
   formatos = FORMATOS_PADRAO,
   simulado,
+  generico,
   descricao,
   carregando,
 }: CompartilharSheetProps) {
@@ -168,10 +178,14 @@ export function CompartilharSheet({
   const snap = useMemo(
     () => {
       if (!aberto) return null;
-      const t = comPrefixoSimulacao(texto, simulado);
-      const tags = normalizarHashtags(hashtags);
+      const status = qc.getQueryData<LiveStatus>(['status']);
+      const recebidoEm = qc.getQueryState(['status'])?.dataUpdatedAt;
+      // dia da votação, antes das 17h: o conteúdo com candidato vira o convite (sem imagem, nome, número ou percentual)
+      const convite = trocaPeloConvite(relogioServidor(status, recebidoEm), generico);
+      const t = convite ? TEXTO_DIA_VOTACAO : comPrefixoSimulacao(texto, simulado);
+      const tags = normalizarHashtags(convite ? HASHTAGS.apuracao : hashtags);
       const url = urlAbsoluta(caminho);
-      const agora = agoraDaApuracao(qc.getQueryData<LiveStatus>(['status']), qc.getQueryState(['status'])?.dataUpdatedAt);
+      const agora = agoraDaApuracao(status, recebidoEm);
       // um link por canal (I08); o `url` puro é o do Web Share genérico e o que aparece na caixa do texto
       const links = {
         x: urlCompartilhada(url, 'x', agora),
@@ -181,8 +195,8 @@ export function CompartilharSheet({
         story: urlCompartilhada(url, 'story'),
       };
       // WhatsApp, Telegram e Status: texto + "Acompanhe seção por seção:" (só na apuração), sem hashtags
-      const mensagem = comSufixoLink(t, sufixoDoCaminho(caminho));
-      return { texto: t, tags, url, links, mensagem, el: cartao ? cartao(formato) : null };
+      const mensagem = convite ? t : comSufixoLink(t, sufixoDoCaminho(caminho));
+      return { texto: t, tags, url, links, mensagem, convite, el: cartao && !convite ? cartao(formato) : null };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [aberto, formato, carregando],
@@ -374,7 +388,7 @@ export function CompartilharSheet({
         onClose={onFechar}
         title={titulo}
         description={
-          descricao ??
+          (snap?.convite ? DESCRICAO_DIA_VOTACAO : descricao) ??
           (temImagem
             ? celular
               ? 'Imagem, texto e link prontos para o WhatsApp, o Status e o X.'

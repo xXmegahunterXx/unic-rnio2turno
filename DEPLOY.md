@@ -190,7 +190,10 @@ app roda com CPU = núcleos − 1 (mínimo 1), peso 512 (metade do padrão: com 
 projeto têm prioridade) e até 512 processos (o app usa ~15). Os valores vão no `docker-compose.vps.yml` (gerado pelo
 `install.sh`/`dominio.sh` e regerado em toda atualização) e só valem se o Docker da máquina os suporta (ele confere).
 `deploy/limites.sh` mostra o configurado e o que está em vigor; **aumentou ou diminuiu a VPS?** `deploy/limites.sh
-aplicar` (vale na hora, sem reiniciar o app). Desligar: `deploy/limites.sh desligar` (grava `LIMITE_RECURSOS=0` no
+aplicar` **logo depois**, antes de qualquer restore, rollback ou `docker compose up` (vale na hora, sem reiniciar o app).
+Sem isso: VPS aumentada, o app segue preso ao limite antigo; VPS reduzida, o limite antigo passa dos núcleos e o Docker
+recusa recriar o contêiner (o `update.sh`, o `--rollback` e o `restore.sh` regeram sozinhos; um `docker compose up` à
+mão, não). Desligar: `deploy/limites.sh desligar` (grava `LIMITE_RECURSOS=0` no
 `.env`; `ligar` volta). Ajustes no `.env`: `APP_CPUS` (ex.: `2.5`), `APP_CPU_SHARES`, `APP_PIDS`. O Caddy e a rede do
 outro projeto não são tocados.
 
@@ -383,6 +386,17 @@ pedidos/10 s por IP) segura rajadas que a borda não guarda.
 
 ### 5.4 Conferindo
 
+Antes de ligar a nuvem laranja (e depois de uma atualização, se quiser), confira a ORIGEM na própria VPS, sem chave:
+
+```bash
+cd /opt/sintonia && node deploy/cloudflare.mjs --origem          # na VPS: os cabeçalhos que o app manda, regra por regra
+```
+
+O `--origem` conecta direto no app (`127.0.0.1:PORTA_LOCAL` na VPS compartilhada; o Caddy local na exclusiva) com o Host
+do domínio e reprova (saída 1) se a API pública não sair guardável (`Cloudflare-CDN-Cache-Control` com `max-age`; sem ele,
+o `.env` está com `CDN_CC=0`), se `/healthz`, `/api/saude-noite` ou o painel não saírem com `no-store`, ou se `/duelo` e
+`/relatorio` puderem ir para a borda. Também diz se o HTML iria para a borda (chave "HTML na borda"). Depois de ligar:
+
 ```bash
 node deploy/cloudflare.mjs --conferir --dominio=seu-dominio     # de qualquer computador, sem chave
 /opt/sintonia/deploy/status.sh                                  # na VPS: linha "Borda: guardando (HIT…)"
@@ -469,23 +483,30 @@ nunca junto com o backup comum.
 O que acontece:
 
 1. baixa o código novo (`git pull`; se você editou arquivos do repositório na VPS, ele para e avisa);
-2. monta a imagem nova **com o site no ar**;
+2. confere o disco do Docker (numa VPS compartilhada, o mesmo do outro projeto): com menos de 2 GB livres
+   (`DISCO_MIN_GB`), limpa o cache de build sem uso há 3 dias e, se ainda faltar, **para sem trocar nada**; depois
+   monta a imagem nova **com o site no ar**;
 3. **ensaio:** sobe a imagem nova ao lado da atual, sem visitantes, e exige que ela responda ao `/healthz` —
    uma versão quebrada **nunca** chega ao público;
 4. faz backup do estado e guarda a imagem atual como ponto de retorno;
 5. troca: o app reinicia em ~2–4 s e o Caddy **segura** as requisições nesse intervalo (medido: nenhum erro
    para quem está navegando);
-6. confere a saúde; se o app novo não ficar saudável, **volta sozinho** para a versão anterior.
+6. confere a saúde; se o app novo não ficar saudável, se o contêiner no ar não for o da imagem nova (o Docker recusou
+   recriar e o velho seguiu de pé) ou se o site respondia pelo servidor web antes da troca e parou depois, **volta
+   sozinho** para a versão anterior. A mensagem final diz o commit que está **no ar**.
 
 Na VPS compartilhada, o `docker-compose.vps.yml` é regerado do `.env` antes do ensaio (traz o que mudou nos scripts —
-na leva 3, os limites de CPU e de processos, seção 3.4); se a atualização não chegar ao fim, ele volta ao de antes.
+na leva 3, os limites de CPU e de processos, seção 3.4); se a atualização não chegar ao fim, ele volta ao de antes. Se
+o regerado não passar no `docker compose config` ou perder a rede ou uma porta do proxy que o anterior tinha, o
+anterior fica (com aviso). Depois da troca, com menos de 4 GB livres (`DISCO_FOLGA_GB`), limpa o cache de build sem uso
+há 3 dias (só cache: nada no ar é tocado). Antes de publicar uma leva: `df -h /var/lib/docker` e `docker system df`.
 
 | Comando | Quando usar |
 |---|---|
 | `deploy/update.sh` | atualização normal (≈ 30 s a 3 min) |
 | `deploy/update.sh --sem-pull` | mudou o `.env` (ex.: `VITE_SITE_URL`, domínio) e quer reconstruir sem baixar código |
 | `deploy/update.sh --forcar` | reconstruir mesmo sem código novo |
-| `deploy/update.sh --rollback` | voltar para a versão anterior (≈ 5 s) |
+| `deploy/update.sh --rollback` | voltar para a versão anterior (≈ 5 s): faz um backup do estado antes, regera o limite de CPU para os núcleos de agora e **troca as etiquetas** (outro `--rollback` volta para onde se estava) |
 | `deploy/update.sh --qualquer-commit` | publicar a ponta do branch mesmo sem `[deploy]` na mensagem |
 
 **Primeira atualização desta leva (saindo da 58efd31, de antes dos anúncios):** logo depois dela, e antes da próxima,
@@ -541,8 +562,11 @@ usuário `root` e a senha; depois cole o comando.
   ```
 - **Restaurar:** `/opt/sintonia/deploy/restore.sh --listar` e depois
   `/opt/sintonia/deploy/restore.sh /var/backups/sintonia/sintonia-AAAAMMDD-HHMMSS.tar.gz` (com `--so-admin`, só o
-  `admin.json` — painel, anúncios e contatos —, sem tocar na audiência, nos pedidos nem no chat)
-  (faz um backup do estado atual antes; o app fica parado ~5 s). A versão do estado restaurado é ajustada para
+  `admin.json` — painel, anúncios e contatos —, sem tocar na audiência, nos pedidos nem no chat; com `--so-audiencia`,
+  só a medição, `audiencia.json`)
+  (faz um backup do estado atual antes; o app fica parado ~5 s). Antes de parar o app, ele regera o limite de CPU para os
+  núcleos de agora e confere que o Docker consegue criar o contêiner (se não, para com o app no ar); se algo falhar
+  depois, religa o app ao sair, e o estado do volume só é trocado depois que o backup inteiro foi extraído. A versão do estado restaurado é ajustada para
   continuar crescendo, para nenhum cache antigo ser confundido com o estado restaurado. O restore **preserva** o
   registro cifrado do chat (`chat-registro/`, guarda de 6 meses) e a chave pública do registro (`*.pem`).
 - **VPS nova (desastre):** instale normalmente (seção 3) e rode

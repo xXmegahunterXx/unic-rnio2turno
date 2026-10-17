@@ -8,6 +8,7 @@
  */
 import type { FeedEvent, Race, Tally, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
+import { diaDeVotacaoAntesDas17 } from '@/shared/diaVotacao';
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtCompact, fmtHora, fmtInt, fmtLista, fmtPP, fmtPct } from '@/shared/format';
 import { nEstadosGov } from '@/shared/gov2t';
@@ -33,6 +34,23 @@ export const HASHTAGS = {
 } as const satisfies Record<string, readonly string[]>;
 
 export const hashtags = (k: keyof typeof HASHTAGS): string[] => [...HASHTAGS[k]];
+
+// ---- dia da votação (0h–17h de 25/10, Brasília) -----------------------------------------------------------------
+// Decisão do dono (CHECKLIST A11.10, "vale também para as imagens"): nesse intervalo, nada que circula com o link leva
+// nome, foto, número ou percentual de candidato. O kit troca o conteúdo com candidato pelo convite abaixo (só texto e
+// link, sem imagem); os conteúdos sem candidato (`generico`: convite do site, Teste Cego sem resultado, bancadas por
+// partido) seguem iguais. As meta tags e as rotas de imagem do servidor fazem o mesmo (src/server/meta-tags.ts).
+
+/** Convite neutro do dia da votação: sem nome, número nem percentual. */
+export const TEXTO_DIA_VOTACAO =
+  'É hoje: às 17h (Brasília) começa a apuração do 2º turno. Acompanhe ao vivo no Sintonia, do Brasil inteiro até a sua seção, com os dados oficiais do TSE.';
+/** Linha sob o título do sheet quando o conteúdo foi trocado pelo convite. */
+export const DESCRICAO_DIA_VOTACAO = 'Hoje, até as 17h, o compartilhamento leva só o convite para a apuração e o link: sem imagem, nomes ou números.';
+
+/** Conteúdo com candidato vira o convite agora? (relógio REAL do servidor; `generico` = conteúdo sem candidato) */
+export function trocaPeloConvite(agora: number, generico?: boolean): boolean {
+  return !generico && diaDeVotacaoAntesDas17(agora);
+}
 
 /** Acrescenta "[SIMULAÇÃO] " quando simulado (sem duplicar). */
 export function comPrefixoSimulacao(texto: string, simulado?: boolean): string {

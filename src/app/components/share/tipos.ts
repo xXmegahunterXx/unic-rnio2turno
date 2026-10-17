@@ -36,4 +36,10 @@ export interface ConteudoCompartilhavel {
   formatos?: FormatoCartao[];
   /** Números simulados: o texto ganha o prefixo "[SIMULAÇÃO]" (se ainda não tiver). */
   simulado?: boolean;
+  /**
+   * Conteúdo SEM candidato (nem nome, foto, número ou percentual: convite do site, Teste Cego sem resultado, bancadas por
+   * partido). Sem esta marca, no dia da votação (0h–17h de 25/10) o sheet troca texto e imagem pelo convite da apuração
+   * (`trocaPeloConvite`, textos.ts) — o padrão é o seguro.
+   */
+  generico?: boolean;
 }

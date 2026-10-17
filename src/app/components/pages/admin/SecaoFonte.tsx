@@ -251,7 +251,9 @@ export function SecaoFonte() {
               value={String(limite)}
               onChange={(e) => setEd((x) => ({ ...x, limitePorSeg: Number(e.target.value.replace(/\D/g, '').slice(0, 2)) || 0 }))}
               erro={limiteInvalido ? `Entre ${TSE_LIMITE_POR_SEG.min} e ${TSE_LIMITE_POR_SEG.max} pedidos por segundo.` : undefined}
-              dica={`Soma de tudo o que o servidor pede ao TSE, com uma fatia reservada para o placar nacional e os estados. Entre ${TSE_LIMITE_POR_SEG.min} e ${TSE_LIMITE_POR_SEG.max}; padrão ${TSE_LIMITE_POR_SEG.padrao}. Vale na hora.`}
+              // o balde do cliente do TSE (src/tse/client.ts › BaldeFichas) guarda até min(teto, 100 − teto) fichas: depois de uma
+              // pausa, um segundo pode levar teto + rajada = min(2 × teto, 100) pedidos — nunca acima dos 100/s do TSE
+              dica={`Média por segundo de tudo o que o servidor pede ao TSE, com uma fatia reservada para o placar nacional e os estados. Depois de uma pausa sai uma rajada curta de até ${fmtInt(Math.min(2 * (limiteInvalido ? TSE_LIMITE_POR_SEG.padrao : limite), 100))} pedidos num segundo (nunca mais de 100, o limite do TSE). Entre ${TSE_LIMITE_POR_SEG.min} e ${TSE_LIMITE_POR_SEG.max}; padrão ${TSE_LIMITE_POR_SEG.padrao}. Vale na hora.`}
             />
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
               {alterados.length ? (

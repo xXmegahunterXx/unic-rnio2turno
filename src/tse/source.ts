@@ -127,6 +127,8 @@ export interface TseSourceOptions {
   historico?: HistoricoSerializado[];
   /** Quando pausar por bloqueio do TSE (chave 'pausa-tse'; ver `TseClientOptions.modoPausa`). Padrão 'auto'. */
   modoPausa?: () => ModoPausaTse;
+  /** Pausa por bloqueio em curso antes de um reinício (ver `TseClientOptions.bloqueioInicial`). */
+  bloqueioInicial?: BloqueioTse | null;
 }
 
 export interface TseCorridaHealth {
@@ -444,6 +446,7 @@ export class TseSource {
         limitePorSeg: this.config.limitePorSeg,
         now: this.now,
         modoPausa: opts.modoPausa,
+        bloqueioInicial: opts.bloqueioInicial,
         // User-Agent identificável só no servidor (no navegador o cabeçalho é proibido/gera preflight)
         headers: ehNode() ? { 'User-Agent': 'Sintonia/1.0 (apuracao 2o turno 2026)' } : {},
       });
@@ -608,6 +611,16 @@ export class TseSource {
     this.prio.retryAfterMs = 0;
     this.agendarPrioritario(200);
     this.agendarCiclo(RETOMADA_NORMAL_ATRASO_MS);
+  }
+
+  /** Pausa por bloqueio em curso (null = lendo normalmente). */
+  bloqueio(): BloqueioTse | null {
+    return this.client.bloqueio();
+  }
+
+  /** Assina o início (com a pausa) e o fim antecipado (null, "Retomar agora") de uma pausa. Devolve a função para cancelar. */
+  aoMudarBloqueio(fn: (b: BloqueioTse | null) => void): () => void {
+    return this.client.aoMudarBloqueio(fn);
   }
 
   /** "Retomar agora" (comando `tse-retomar`): encerra a pausa por bloqueio antes da hora. Devolve a pausa encerrada. */

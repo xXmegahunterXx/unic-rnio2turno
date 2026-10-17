@@ -64,8 +64,8 @@ usam a senha do `.env` por dentro do contêiner, sem passar pela internet.
 | Cartões barrados por limite (429 nas imagens) | `docker compose logs --since 15m app \| grep '"status":429' \| grep -c '/api/og/'` |
 | CPU e memória ao vivo | `docker stats` (Ctrl+C sai) |
 | Backup agora | `deploy/backup.sh` |
-| Voltar para a versão anterior do código | `deploy/update.sh --rollback` (≈ 5 s; leia a seção 3.5) |
-| Restaurar o estado do painel | `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>` |
+| Voltar para a versão anterior do código | `deploy/update.sh --rollback` (≈ 5 s; faz um backup antes e troca as etiquetas: outro `--rollback` volta para onde se estava; leia a seção 3.5) |
+| Restaurar o estado do painel | `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>` (só o painel: `--so-admin`; só a medição: `--so-audiencia`) |
 | Reiniciar só o app (≈ 2–4 s; o proxy segura as requisições) | `docker compose restart app` |
 | Atualização automática: situação e congelamento | `deploy/auto-update.sh estado` · desligar: `deploy/auto-update.sh desligar` |
 | **Chaves da noite** (leva 3): todas, e o que está fora do padrão | `deploy/painel.sh chaves` (tabela e padrões: seção 3.10) |
@@ -76,7 +76,8 @@ usam a senha do `.env` por dentro do contêiner, sem passar pela internet.
 | Alertas no celular: mandar uma mensagem de teste | `deploy/painel.sh alerta-teste` |
 | Saúde da noite (o mesmo que o monitor externo lê) | `curl -s https://seu-dominio/api/saude-noite` → `{"noite":"ok"}` |
 | Cloudflare: conferir a borda (sem chave) | `node deploy/cloudflare.mjs --conferir` (DEPLOY §5.4); a linha "Borda" do `deploy/status.sh` resume |
-| Limites de CPU e processos do app (VPS compartilhada) | `deploy/limites.sh` · depois de aumentar a VPS: `deploy/limites.sh aplicar` |
+| Limites de CPU e processos do app (VPS compartilhada) | `deploy/limites.sh` · **logo depois de aumentar OU reduzir a VPS**, antes de qualquer restore, rollback ou `docker compose up`: `deploy/limites.sh aplicar` |
+| Disco do Docker (imagens, cache de build; o mesmo disco do outro projeto) | `df -h /var/lib/docker` e `docker system df` (o `update.sh` pede 2 GB livres; `deploy/status.sh` mostra) · só o cache de build, sem afetar nada no ar: `docker builder prune -f --filter until=72h` |
 
 `deploy/painel.sh --help` lista tudo. A simulação **não** pode ser ligada por esse script, e em produção o servidor
 também a recusa. O `painel.sh` faz login com a senha do `.env` e está sujeito ao **mesmo limite de tentativas** do painel
@@ -119,6 +120,7 @@ Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar c
 |---|---|---|
 | até 18/10 | **Cloudflare aplicada** pela chave temporária (DEPLOY §5.1, `node deploy/cloudflare.mjs --aplicar`; a chave só no ambiente de quem aplica, nunca na VPS) ou pelo passo a passo do celular (§5.2). **Revogue a chave** logo depois | `node deploy/cloudflare.mjs --conferir` → "Tudo certo"; `deploy/status.sh` → "Borda: guardando" |
 | até 20/10 | **Alertas no celular**: bot do Telegram e healthchecks.io no `.env` (DEPLOY §16.1), `docker compose up -d` | `deploy/painel.sh alerta-teste` chega no celular; healthchecks.io "up"; monitor externo em `/api/saude-noite` com a palavra-chave `"noite":"ok"` |
+| 21/10, antes das 12h | **Disco**: `df -h /var/lib/docker` e `docker system df` na VPS. O `update.sh` da leva 3 só constrói com 2 GB livres (abaixo disso limpa o cache de build sem uso há 3 dias e, se ainda faltar, para sem trocar nada) | ≥ 2 GB livres (melhor 4); se não: `docker builder prune -f --filter until=72h` (só cache) e backups antigos em `/var/backups/sintonia` |
 | 21/10, 12h | **Publicar a leva 3** (`update.sh`; commit `[deploy]`). Depois: tirar da borda `/robots.txt` e `/sitemap.xml` (a borda guardava os antigos por 1 dia): `node deploy/cloudflare.mjs --purgar /robots.txt /sitemap.xml` com a chave, ou, sem ela, pelo celular: Cloudflare → Caching → Configuration → Purge Cache → Custom Purge, os dois endereços completos | `deploy/status.sh` (imagem nova `healthy`, linha "Borda", limites); `deploy/limites.sh` → "em vigor" = "configurado"; `deploy/painel.sh chaves` → todas no padrão |
 | 21/10 | Search Console e Bing: domínio verificado (registro TXT na Cloudflare) e `https://seu-dominio/sitemap.xml` enviado | o Search Console lê o índice com 4 arquivos |
 | 22/10, 2h–6h | **Ensaio pela borda** (autorizado pelo dono): `SINTONIA_ADMIN_SENHA=… npx tsx scripts/ensaio-borda.ts --base=https://seu-dominio --usuarios=100` (depois 1000; 3000 só se passar) `--duracao=300`; dia de jogo numa cópia local com `SINTONIA_ENSAIO=1` e o TSE falso (bloqueio, arquivo nacional parado, placar parado); **6h na produção**: `painel.sh html-borda ligar`, `docker compose stop app` por 60 s (`/` e `/apuracao` abrem pelo celular, com a faixa "Conexão instável"), `docker compose start app`, `painel.sh html-borda desligar`; `painel.sh freio 2` e `freio 5` derrubam o req/s na origem; `freio 1` | relatório "APROVADO" (origem < 300 req/s, ≥ 95% HIT/UPDATING na API, p95 < 300 ms, zero 5xx); alertas de reinício, saúde da noite e homem-morto chegaram. **Anote os resultados aqui** |
@@ -132,7 +134,7 @@ Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar c
 | **até 12h00** | **Última atualização de código.** Depois disso, código congelado até segunda. Só versão **marcada** (`[deploy]` na mensagem do commit): `deploy/auto-update.sh rodar` vai até a última marcada; o `update.sh` pergunta antes de publicar um commit sem a marca | `git -C /opt/sintonia fetch -q && git -C /opt/sintonia log -1 --format='%h %s' '@{u}'` antes (o `rodar` com terminal diz o que fez: publicou, nada novo, congelado ou commit marcado como falho); no fim, `deploy/status.sh` mostra a imagem nova `healthy` |
 | até 12h00 | Atualização automática: congelada a partir das 12h de 24/10 até 06h de 26/10 (padrão), ou desligada | `deploy/auto-update.sh estado` mostra o intervalo; se tiver dúvida, `deploy/auto-update.sh desligar` |
 | até 12h00 | Situação do TSE no Governador: o "Testar conexão" diz quais UFs ainda não têm arquivo do 2º turno (hoje, TO). Se o TSE tiver mudado o quadro (ex.: TO eleito no 1º turno), a decisão é do dono e o procedimento está no README, "Mudança no quadro do 2º turno"; **não** faça isso no domingo | `deploy/painel.sh testar-tse` |
-| 14h00 | **Aumentar a VPS** para 4 vCPU / 8 GB, se ainda não estiver (o provedor reinicia a máquina: ≈ 1–2 min fora do ar; tudo volta sozinho) | depois: `deploy/status.sh` (tudo `healthy`) e `deploy/painel.sh chat-estado` (a configuração da sala voltou) |
+| 14h00 | **Aumentar a VPS** para 4 vCPU / 8 GB, se ainda não estiver (o provedor reinicia a máquina: ≈ 1–2 min fora do ar; tudo volta sozinho). **Logo depois: `deploy/limites.sh aplicar`** — o limite de CPU do app foi calculado para o tamanho antigo (com 2 vCPU, 1 núcleo) e não muda sozinho no congelamento; sem isso, o app fica preso a 1 núcleo a noite toda (vale na hora, sem reiniciar) | `deploy/limites.sh` → "em vigor" = "configurado" (CPU 3 de 4 núcleos); `deploy/status.sh` (tudo `healthy`, sem "LIMITE DE CPU DESATUALIZADO") e `deploy/painel.sh chat-estado` (a configuração da sala voltou) |
 | 15h00 | (Opcional) **ensaio da troca**: `deploy/painel.sh marcar HH:MM` (daqui a 3 min). No horário, `deploy/painel.sh estado` deve mostrar "feita". As páginas continuam no 1º turno (a fase depende da data da eleição) | `deploy/painel.sh estado` |
 | logo depois do ensaio | **Desfazer o ensaio** (obrigatório se ensaiou): `deploy/painel.sh fonte pre` e `deploy/painel.sh horario-padrao` | `painel.sh estado` = **"agendada para 25/10 17:00:00"** |
 | 12h00, depois da última atualização | **Ligar o "HTML na borda"**, só se o ensaio de 22/10 passou: `deploy/painel.sh html-borda ligar` (a partir daqui, nenhum deploy sem antes desligá-lo e esperar 30 s) | `deploy/painel.sh chaves` → "1 fora do padrão"; `deploy/status.sh` → "páginas (HTML): guardadas" |
@@ -253,7 +255,7 @@ da TV). Seções retardatárias podem levar horas.
 | manhã | backup copiado para fora da VPS |
 | até 17h | **Baixar os CSVs da noite** (a curva por minuto guarda só 24 h): painel → Audiência → CSV da curva, por hora e estados/aparelhos; painel → Lives → CSV. É o material de venda ("a noite em números") |
 | manhã | Chaves da noite de volta ao padrão: `deploy/painel.sh html-borda desligar` (antes de qualquer atualização de código) e `deploy/painel.sh chaves` |
-| depois do almoço | reduzir a VPS de volta, se quiser (reinício de 1–2 min, num horário de pouco acesso); `deploy/status.sh` depois |
+| depois do almoço | reduzir a VPS de volta, se quiser (reinício de 1–2 min, num horário de pouco acesso). **Logo depois: `deploy/limites.sh aplicar`** (o limite antigo, de 3 núcleos, passa dos núcleos da máquina reduzida: o app no ar segue, mas o Docker recusa recriar o contêiner — restore, rollback, `docker compose up`); conferir com `deploy/limites.sh` ("em vigor" = "configurado") e `deploy/status.sh` |
 | semana seguinte | o site continua de pé como registro. Se o TSE retotalizar, o feed continua sendo lido; nada a fazer. Mudanças de código voltam a ser permitidas com `update.sh` |
 
 ---
@@ -300,7 +302,10 @@ para não piorar o bloqueio. O site mostra o último dado bom.
    `deploy/painel.sh pausa-tse restrita` — pausa só com sinal claro (429 ou borda do TSE) e encerra a pausa em curso.
    `pausa-tse off` (nunca pausa, como antes da leva 3) só por decisão do dono: o risco de um bloqueio mais longo aumenta.
    Depois da noite: `deploy/painel.sh pausa-tse auto`.
-3. Para reduzir a pressão no TSE sem pausar: painel → Fonte → "Teto de pedidos ao TSE" (padrão 40/s; de 5 a 90).
+3. Para reduzir a pressão no TSE sem pausar: painel → Fonte → "Teto de pedidos ao TSE" (padrão 40/s; de 5 a 90). É a
+   **média**: depois de uma pausa, um segundo pode levar até o dobro (com 40, até 80), nunca mais de 100 (o limite do TSE).
+   A pausa sobrevive a um reinício do app (fica em `tse-pausa.json` no volume: o app volta pausado até o fim do prazo),
+   mas, com o TSE bloqueando, evite reiniciar ou rodar `update.sh` sem necessidade.
 
 **O arquivo nacional do TSE parou e os estados andam** (como em 04/10) — selo automático "O arquivo nacional do TSE
 não atualiza desde HH:MM · veja os estados" e alerta no Telegram. O site **nunca soma os estados** no lugar do número
@@ -379,9 +384,14 @@ O `update.sh` já barra versão que não sobe e volta sozinho se a nova não fic
 (o app sobe, mas algo está errado para o visitante):
 
 ```bash
-deploy/update.sh --rollback      # volta para a imagem anterior em ~5 s, sem derrubar o site
+deploy/update.sh --rollback      # backup do estado e volta para a imagem anterior em ~5 s, sem derrubar o site
 deploy/status.sh                 # confira "imagem no ar"
 ```
+
+O `--rollback` **troca as etiquetas**: a versão de onde você saiu vira o `:anterior`. Para voltar a ela (o defeito não
+era da versão nova, por exemplo), basta outro `deploy/update.sh --rollback`. Ele também faz um **backup do estado antes**
+(o caminho aparece na tela: anote) e diz o commit que ficou **no ar** — se o Docker não conseguir trocar, ele diz "O
+rollback NÃO foi feito" e o site segue na versão de antes (VPS mudou de tamanho? `deploy/limites.sh aplicar` e tente de novo).
 
 O rollback troca só o código; os arquivos do estado continuam os mesmos — mas a versão antiga só entende o que ela
 conhece (veja o aviso logo abaixo para a volta dos anunciantes v2 à leva 2). Se o estado também precisar voltar (ex.:
@@ -395,9 +405,13 @@ para qualquer `update.sh`.
 **Atenção — voltar da leva 3 para os anunciantes v2** (o `:anterior` logo depois da publicação da leva 3): a v2 não
 conhece as chaves da noite nem o teto de pedidos ao TSE. O site funciona como antes da leva 3 (sem freio, sem faixa
 "Conexão instável", sem pausa por bloqueio, sem `!apuracao` nem contagem de lives, `/sitemap.xml` como lista simples) e,
-na 1ª gravação dela, as chaves podem voltar ao padrão — ao subir a leva 3 de novo, confira `deploy/painel.sh chaves`. A
-audiência (`audiencia.json`) e as lives (`lives.json`) ficam intactas: a v2 ignora as chaves novas e a leva 3 lê o
-arquivo regravado pela v2 (só a curva, os estados e as horas de tela desse intervalo faltam).
+na 1ª gravação dela, as chaves podem voltar ao padrão — ao subir a leva 3 de novo, confira `deploy/painel.sh chaves`.
+**A medição da noite se perde no arquivo:** em até ~60 s a v2 regrava o `audiencia.json` **sem** a curva por minuto, os
+estados/país/aparelho e as horas de tela (de TODA a noite, não só do intervalo) e com só as últimas 48 h por hora (a
+leva 3 guarda 14 dias). As lives (`lives.json`) ficam. Antes do rollback, se der tempo: **baixe os CSVs** (painel →
+Audiência e Lives). Para recuperar depois de subir a leva 3 de novo (outro `deploy/update.sh --rollback`):
+`deploy/restore.sh <backup feito pelo rollback> --so-audiencia` (volta a medição de antes do rollback; o que a v2 contou
+no intervalo fica de fora; o painel, os pedidos de anunciantes e o chat não são tocados).
 
 **Atenção — voltar dos anunciantes v2 para a leva 2** (com a publicação desta leva, o `:anterior` do rollback rápido É
 a leva 2). A leva 2 não conhece nada do v2, e isso tem efeito na hora e efeito permanente:
@@ -445,7 +459,8 @@ docker tag sintonia-app:pre-anuncios sintonia-app:anterior
 deploy/update.sh --rollback                                     # sobe a antiga em ~5 s; NÃO mexa no painel nela
 ```
 
-Para subir de novo a versão nova: `docker tag sintonia-app:volta sintonia-app:anterior && deploy/update.sh --rollback`.
+Para subir de novo a versão nova: `deploy/update.sh --rollback` (o rollback anterior trocou as etiquetas: a versão nova
+virou o `:anterior`; confira antes com o comando acima). Depois, `docker image rm sintonia-app:volta` (só tira a etiqueta extra).
 Se alguém gravou algo no painel enquanto a antiga estava no ar (o app avisa no log: "sem a lista de anúncios"), restaure
 **só o painel** do último backup feito na versão nova — anúncios, contatos e o resto do `admin.json`; audiência, pedidos
 de anunciantes e chat ficam como estão:

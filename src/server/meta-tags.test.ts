@@ -386,6 +386,39 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     expect(metaDaRota('/curiosidades', q('fato=finalistas-menor-diferenca'), noite).imagem).toBe('/api/og/curiosidade.png?f=finalistas-menor-diferenca');
   });
 
+  it('dia da votação (0h–17h de 25/10): a ficha de um finalista sem nome, partido nem número no título, na descrição e na imagem', () => {
+    const manha = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 15, 1, 0) }; // 12h01 de Brasília
+    for (const sq of ['280002542548', '280002551544']) {
+      const m = metaDaRota(`/candidato/${sq}`, q(), manha);
+      expect(m.status, sq).toBe(200);
+      expect(m.titulo, sq).toBe('Ficha de candidato · Presidente · Sintonia');
+      for (const t of [m.titulo, m.descricao, m.imagemAlt ?? '']) expect(t, sq).not.toMatch(/Lula|Flávio|Bolsonaro|\bPT\b|\bPL\b|\b13\b|\b22\b|%/);
+      expect(m.imagem, sq).toBe(OG_GENERICA_DIA_VOTACAO);
+    }
+    // sem o índice de fichas no servidor: o título genérico também não leva o nome
+    const semIndice = { ...manha, ficha: () => ({ lida: null, existe: 'sem-indice' as const }) };
+    expect(metaDaRota('/candidato/280002542548', q(), semIndice).titulo).toBe('Ficha do candidato · Sintonia');
+    // às 17h volta
+    const noite = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 20, 0, 0) };
+    expect(metaDaRota('/candidato/280002542548', q(), noite).titulo).toBe('Lula (PT) · Presidente · Ficha do candidato · Sintonia');
+    expect(metaDaRota('/candidato/280002542548', q(), { ...noite, ficha: semIndice.ficha }).titulo).toBe('Lula (PT) · Ficha do candidato · Sintonia');
+  });
+
+  it('depois do fim e depois do prazo do palpite: sem "ao vivo" no título da Home e sem chamada para cravar', () => {
+    const c = comPlacarFixo(ctx, Date.UTC(2026, 9, 26, 0, 20, 0)); // 21h20 de 25/10
+    fase = 'apurando';
+    expect(metaDaRota('/', q(), c).titulo).toBe('Sintonia · Apuração ao vivo e Teste Cego do 2º turno');
+    fase = 'encerrada';
+    expect(metaDaRota('/', q(), c).titulo).toBe('Sintonia · Resultado e Teste Cego do 2º turno');
+    fase = 'pre';
+    const antes = metaDaRota('/palpite', q(), comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 2, 59, 0))); // 23h59 de 24/10
+    expect(antes.descricao).toMatch(/^Crave o percentual/);
+    const dia = metaDaRota('/palpite', q(), comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 15, 0, 0))); // 12h de 25/10
+    expect(dia.descricao).toMatch(/^Palpites encerrados às 23h59 de 24\/10/);
+    expect(dia.descricao).not.toMatch(/Crave/);
+    expect(dia.titulo).toBe('Palpite do 2º turno · Sintonia');
+  });
+
   it('simulação: o placar da descrição leva a marca SIMULAÇÃO', () => {
     const c = comPlacarFixo(ctx);
     const sim: ContextoMeta = { ...c, placar: (race) => ({ ...c.placar!(race)!, simulacao: true }) };

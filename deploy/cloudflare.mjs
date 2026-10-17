@@ -6,6 +6,11 @@
  *   node deploy/cloudflare.mjs --conferir [--dominio=sintonia2026.com.br]
  *                                                      pela borda, SEM chave: /api/status guardado, admin/cliques/saúde
  *                                                      nunca, /assets guardado, www 301; com a chave, também a zona
+ *   node deploy/cloudflare.mjs --origem [--dominio=…]  na VPS, ANTES de ligar a nuvem laranja (sem chave): confere, regra por
+ *                                                      regra, os cabeçalhos que a ORIGEM manda (API guardável, saúde/painel
+ *                                                      nunca, /duelo e /relatorio fora da borda, HTML conforme o html-borda).
+ *                                                      Conecta em http://127.0.0.1:PORTA_LOCAL (VPS compartilhada) ou no
+ *                                                      Caddy local (https://127.0.0.1), mandando o Host do domínio
  *   node deploy/cloudflare.mjs --desligar              desabilita as regras de cache do Sintonia SEM apagar (--aplicar
  *                                                      religa); a zona e o www ficam como estão
  *   node deploy/cloudflare.mjs --purgar /robots.txt [/sitemap.xml …]   tira estes endereços da borda (precisa da chave)
@@ -149,7 +154,7 @@ function lerArgs(argv) {
     if (/^--(api-)?token$|^--chave$/i.test(nome)) {
       throw new ErroUso('Nunca passe a chave na linha de comando (fica no histórico e na lista de processos). Use: read -rs CF_API_TOKEN && export CF_API_TOKEN');
     }
-    if (['--aplicar', '--conferir', '--desligar', '--purgar', '--mostrar'].includes(nome)) {
+    if (['--aplicar', '--conferir', '--origem', '--desligar', '--purgar', '--mostrar'].includes(nome)) {
       if (a.acao) throw new ErroUso(`Uma ação por vez (${a.acao} e ${nome}).`);
       a.acao = nome.slice(2);
     } else if (nome === '--simular') a.simular = true;
@@ -170,6 +175,18 @@ function dominioPadrao() {
   try {
     const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
     const m = /^\s*DOMINIO=['"]?([^'"\s]+)['"]?\s*$/m.exec(readFileSync(join(raiz, '.env'), 'utf8'));
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+/** PORTA_LOCAL do .env do projeto (VPS compartilhada: o app em 127.0.0.1:PORTA_LOCAL); null = não há (VPS exclusiva). */
+function portaLocalPadrao() {
+  if (process.env.PORTA_LOCAL) return process.env.PORTA_LOCAL;
+  try {
+    const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
+    const m = /^\s*PORTA_LOCAL=['"]?(\d{2,5})['"]?\s*$/m.exec(readFileSync(join(raiz, '.env'), 'utf8'));
     return m ? m[1] : null;
   } catch {
     return null;
@@ -499,10 +516,12 @@ async function conferirZona(zona, dominio) {
 const ORIGEM_TESTE = process.env.CF_CONFERIR_ORIGEM ? new URL(process.env.CF_CONFERIR_ORIGEM) : null;
 const UA = 'Mozilla/5.0 (compatible; sintonia-conferir/1; +deploy/cloudflare.mjs)';
 
-/** GET pela borda (ou pela origem de teste, mandando o Host do domínio). Nunca segue redirecionamento. */
-export function pedir(url, { corpo = false, aceitar = '*/*' } = {}) {
+/**
+ * GET pela borda (ou pela origem de teste / `alvo`, mandando o Host do domínio). Nunca segue redirecionamento.
+ */
+export function pedir(url, { corpo = false, aceitar = '*/*', alvo: alvoPedido = null } = {}) {
   const u = new URL(url);
-  const alvo = ORIGEM_TESTE ?? u;
+  const alvo = alvoPedido ?? ORIGEM_TESTE ?? u;
   const mod = alvo.protocol === 'https:' ? https : http;
   return new Promise((res, rej) => {
     const req = mod.request(
@@ -641,6 +660,74 @@ async function conferirBorda(dominio) {
   }
 }
 
+// ---- --origem: os cabeçalhos da ORIGEM, antes de ligar a Cloudflare (sem chave) ---------------------------------------
+
+const CDN_CC = 'cloudflare-cdn-cache-control';
+/** max-age de um cabeçalho de cache (null = sem). */
+const maxAge = (v) => {
+  const m = /(?:^|,)\s*(?:s-maxage|max-age)=(\d+)/i.exec(String(v ?? ''));
+  return m ? Number(m[1]) : null;
+};
+const semGuardar = (v) => /no-store|private/i.test(String(v ?? ''));
+/** A borda guardaria esta resposta (regras com "respeitar a origem")? CDN-CC manda; sem ele, o Cache-Control público. */
+export function guardavelNaBorda(h) {
+  const cdn = h[CDN_CC];
+  if (cdn !== undefined) return !semGuardar(cdn) && (maxAge(cdn) ?? 0) > 0;
+  const cc = h['cache-control'];
+  return !semGuardar(cc) && /public/i.test(String(cc ?? '')) && (maxAge(cc) ?? 0) > 0;
+}
+
+async function conferirOrigem(dominio) {
+  const porta = portaLocalPadrao();
+  const alvo = ORIGEM_TESTE ?? new URL(porta ? `http://127.0.0.1:${porta}` : 'https://127.0.0.1');
+  info(`Na origem, sem a Cloudflare: ${alvo.origin} com o Host ${dominio}`);
+  const base = `https://${dominio}`;
+  const ver = async (p, aceitar) => {
+    try {
+      return await pedir(base + p, { alvo, aceitar });
+    } catch (e) {
+      falha(`${p}: a origem não respondeu (${e.message}) — o app está no ar? (deploy/status.sh)`);
+      return null;
+    }
+  };
+  const r0 = await ver('/api/status');
+  if (!r0) return;
+  if (r0.h['cf-ray']) aviso('A resposta tem cf-ray: isto passou pela Cloudflare, não pela origem (confira CF_CONFERIR_ORIGEM/PORTA_LOCAL)');
+  if (r0.h[CDN_CC] === undefined) {
+    falha(`/api/status sem ${CDN_CC}: a origem está com CDN_CC=0 no .env? Sem ele a borda guarda pelo Cache-Control (s-maxage), mais longo que o da noite`);
+  }
+  // Regra 1 (API pública e dados): a borda só guarda se a origem mandar cabeçalho de cache
+  for (const p of ['/api/status', '/api/meta', '/api/apuracao/pres/br', '/api/og/teste.png', '/api/texto/placar']) {
+    const r = p === '/api/status' ? r0 : await ver(p);
+    if (!r) continue;
+    const det = `${r.status} · ${CDN_CC}: ${r.h[CDN_CC] ?? '—'} · cache-control: ${r.h['cache-control'] ?? '—'}`;
+    if (r.status === 200 && guardavelNaBorda(r.h)) ok(`regra 1 · ${p} guardável na borda (${det})`);
+    else falha(`regra 1 · ${p} NÃO seria guardado (${det})`);
+  }
+  // Regra 2 (nunca guardar): saúde, painel
+  for (const p of ['/healthz', '/api/saude-noite', '/api/admin/state']) {
+    const r = await ver(p);
+    if (!r) continue;
+    const det = `${r.status} · cache-control: ${r.h['cache-control'] ?? '—'}${r.h[CDN_CC] ? ` · ${CDN_CC}: ${r.h[CDN_CC]}` : ''}`;
+    if (semGuardar(r.h['cache-control']) && !guardavelNaBorda(r.h)) ok(`regra 2 · ${p} nunca guardado (${det})`);
+    else falha(`regra 2 · ${p} poderia ser guardado (${det}) — tem de sair com no-store`);
+  }
+  // Regra 4 (páginas): /duelo e /relatorio nunca, mesmo com o html-borda ligado
+  for (const p of ['/duelo/conferir', '/relatorio']) {
+    const r = await ver(p, 'text/html');
+    if (!r) continue;
+    const det = `${r.status} · ${CDN_CC}: ${r.h[CDN_CC] ?? '—'} · cache-control: ${r.h['cache-control'] ?? '—'}`;
+    if (!guardavelNaBorda(r.h)) ok(`regra 4 · ${p} fora da borda (${det})`);
+    else falha(`regra 4 · ${p} seria guardado na borda (${det}) — tem de sair com no-store`);
+  }
+  const html = await ver('/', 'text/html');
+  if (html) {
+    if (guardavelNaBorda(html.h) && html.h[CDN_CC] !== undefined) {
+      fraco(`HTML (/): ${CDN_CC} "${html.h[CDN_CC]}" — chave "html-borda" LIGADA (normal só de 24/10 12h em diante)`);
+    } else fraco(`HTML (/): sem ${CDN_CC} — a borda não guarda as páginas (chave "html-borda" desligada: normal até 24/10)`);
+  }
+}
+
 // ---- --purgar ----------------------------------------------------------------------------------------------------------
 
 async function purgar(zona, dominio, caminhos) {
@@ -696,7 +783,7 @@ export async function principal(argv) {
     console.error('CF_API_BASE recusado (só https://api.cloudflare.com, ou 127.0.0.1/localhost nos testes): tire a variável do ambiente — unset CF_API_BASE. Nada foi enviado.');
     return 2;
   }
-  const precisaChave = a.acao !== 'conferir';
+  const precisaChave = a.acao !== 'conferir' && a.acao !== 'origem';
   if (precisaChave && !TOKEN) {
     console.error(`--${a.acao} precisa da chave da API no ambiente: read -rs CF_API_TOKEN && export CF_API_TOKEN (DEPLOY.md §5.1). Sem chave: --conferir, ou o passo a passo pelo celular (DEPLOY.md §5.2).`);
     return 2;
@@ -708,6 +795,12 @@ export async function principal(argv) {
         console.error('Congelamento da noite (24/10 12h → 26/10 6h): nada de mudar a borda agora. Emergência: --desligar (sempre liberado). Se tiver certeza: --aplicar --forcar.');
         return 2;
       }
+    }
+    if (a.acao === 'origem') {
+      if (!dominioValido(dominio)) throw new ErroUso('Informe o domínio: --dominio=seu-dominio.com.br');
+      await conferirOrigem(dominio);
+      if (!FALHAS) console.log(c(32, '\nOrigem pronta: os cabeçalhos batem com as regras de cache. Depois de ligar a nuvem laranja: --conferir.'));
+      return FALHAS ? (console.log(c(31, `\n${FALHAS} problema(s) na origem.`)), 1) : 0;
     }
     let zona = null;
     if (TOKEN) {

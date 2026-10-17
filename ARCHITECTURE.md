@@ -736,7 +736,14 @@ meio; só se nem uma couber inteira ela vai em linha única com reticências.
   **Dia da votação (0h–17h de 25/10, `diaDeVotacao`)**: nenhuma descrição leva nome, número ou percentual de candidato
   (apuração, município, ficha, curiosidades, cenários) e as imagens que mostram candidato (apuração — inclusive `/`,
   `/live` e `/tv` —, município, seção, governadores, ficha, curiosidades, cenários) viram a prévia genérica
-  `/api/og/audiencia.png?m=0` ("Eleições 2026 · 2º turno / Apuração ao vivo"). Às 17h tudo volta.
+  `/api/og/audiencia.png?m=0` ("Eleições 2026 · 2º turno / Apuração ao vivo"). As próprias ROTAS dessas imagens
+  (`OG_COM_CANDIDATO`, og-rotas.ts) respondem o mesmo convite, com cache de 60 s: um cartão guardado antes pelo X ou pelo
+  WhatsApp com a URL antiga, ao buscar a imagem de novo, não recebe candidato. A ficha do candidato sai com título e
+  descrição sem nome, partido nem número ("Ficha de candidato · Presidente"; o título da aba no app também). No app, o
+  kit de compartilhar troca o conteúdo com candidato pelo convite da apuração (só texto e link, sem imagem;
+  `trocaPeloConvite`, `share/textos.ts`), pelo relógio do servidor; ficam iguais só os conteúdos marcados `generico`
+  (convite do site, Teste Cego sem resultado e Duelo, bancadas por partido) — o "Meu resultado" do Teste Cego some
+  nesse intervalo. Fonte única do intervalo: `diaDeVotacaoAntesDas17` em `src/shared/diaVotacao.ts`. Às 17h tudo volta.
 
 ### 11.8 Cores de identificação (decisão do dono, depois dos QAs)
 
@@ -835,7 +842,8 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
     (relógio real) = "A apuração do 2º turno começa hoje, às 17h"; simulação = "[SIMULAÇÃO]" e SEMPRE "Candidato A/B",
     mesmo com os nomes reais no painel (o texto colado num chat circula sem o prefixo); Presidente numa UF nunca diz
     "eleito"; `uf` aceita sigla ou nome. Borda 5 s, montado no máximo a cada 2 s, 20 pedidos/min por canal de bot e
-    6.000/min no total (nunca por IP); dos canais só a contagem (hash com sal do processo; `Nightbot-User` nunca é lido).
+    6.000 montagens novas/min no total (nunca por IP; o texto já montado nos últimos 2 s sai para todos sem contar —
+    uma enxurrada com query lixo, `&z=…`, que fura a cópia da borda não deixa os canais só com o endereço); dos canais só a contagem (hash com sal do processo; `Nightbot-User` nunca é lido).
     Chave `texto-bots` (desligada: só o endereço). A `/streamers` traz as linhas prontas do Nightbot, StreamElements e
     Fossabot, o timer e a prévia da resposta real.
   - **Contagem de lives** (`src/server/lives.ts`, `live/batimento.ts`, painel → Lives): a `/live` manda
@@ -1087,9 +1095,11 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
   `TRUST_PROXY=1`, `STATE_DIR`, pastas) valem mais que o `.env`; limites de memória (app 1,5 GB, Caddy 512 MB com
   `GOMEMLIMIT`), logs com rotação. Plano B de réplicas: `docker-compose.replicas.yml`.
 - **Scripts** (`deploy/`, bash, mensagens em pt-BR): `install.sh` (Docker, ufw, swap, `.env` com segredos gerados,
-  build, subida, HTTPS, backup de hora em hora), `update.sh` (build com o site no ar → **ensaio** da imagem nova ao lado
-  da atual, sem visitantes → backup → troca → volta sozinho se não ficar saudável; `--rollback` para a imagem
-  `sintonia-app:anterior`), `backup.sh`/`restore.sh` (estado + `.env`; a versão do estado restaurado continua subindo),
+  build, subida, HTTPS, backup de hora em hora), `update.sh` (disco livre conferido (`DISCO_MIN_GB`) → build com o site
+  no ar → **ensaio** da imagem nova ao lado da atual, sem visitantes, sem consultar o TSE e sem gravar nada → backup →
+  troca → volta sozinho se não ficar saudável, se o contêiner no ar não for o da imagem nova (o `docker compose up`
+  que falha deixa o velho de pé) ou se o caminho público que respondia parou; `--rollback` para a imagem
+  `sintonia-app:anterior`, com backup antes, limite de CPU regerado e as etiquetas TROCADAS — outro `--rollback` volta), `backup.sh`/`restore.sh` (estado + `.env`; a versão do estado restaurado continua subindo),
   `status.sh` (situação num relance) e `painel.sh` (comandos do painel pelo terminal, por dentro do contêiner).
 - **Configuração**: `.env.example` comentado; `src/server/config.ts` documenta todas as variáveis que o servidor lê e
   avisa no log sobre valores inválidos.
@@ -1134,7 +1144,8 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
   limitando leituras; nova tentativa às HH:MM"); "Retomar agora" (`tse-retomar`) para falso positivo. Chave
   `pausa-tse`: `auto` (padrão), `restrita` (só 429 e borda do TSE — o "403 num arquivo já lido" volta a ser ausente; use
   se a pausa recomeçar sozinha a cada "Retomar") e `off` (nunca pausa, como antes; risco maior de bloqueio). Trocar para
-  `restrita`/`off` encerra uma pausa em curso. A pausa não sobrevive a um reinício. `conferidoEm` só avança com 200/304
+  `restrita`/`off` encerra uma pausa em curso. A pausa sobrevive a um reinício (`STATE_DIR/tse-pausa.json`, gravado a cada início/fim de pausa: o processo novo nasce
+  pausado até o fim do prazo, sem pedido algum; prazo vencido ou acima de 1 h é ignorado). `conferidoEm` só avança com 200/304
   do arquivo principal.
 - **Arquivo nacional parado (I18, só o aviso)**: o arquivo Brasil de Presidente na mesma geração `dg/hg` por mais de 90 s
   (pelo relógio do TSE e pelo nosso) enquanto a soma das seções totalizadas das UFs e do exterior passa a dele →

@@ -154,26 +154,45 @@ export function formatoAudiencia(v: string | null | undefined): FormatoOgAudienc
   return v === 'x' || v === 'story' ? v : 'og';
 }
 
+/** Imagens prontas, por (marco, formato, domínio): no máximo 4 marcos × 3 formatos por domínio, cada uma gerada uma vez. */
+const memoImagens = new Map<string, Promise<Buffer>>();
+
+/** PNG do marco (null = o convite genérico "Apuração ao vivo", sem número nem candidato), gerado uma vez. */
+export function pngAudiencia(
+  marco: MarcoAudiencia | null,
+  formato: FormatoOgAudiencia = 'og',
+  dominio = 'sintonia2026.com.br',
+  log?: Pick<Logger, 'info'>,
+): Promise<Buffer> {
+  const chave = `${marco ?? 0}|${formato}|${dominio}`;
+  let pr = memoImagens.get(chave);
+  if (!pr) {
+    const t0 = performance.now();
+    const { w, h: alt } = DIM_OG_AUDIENCIA[formato];
+    pr = renderPng(layoutAudiencia(marco, formato, dominio), w, alt);
+    memoImagens.set(chave, pr);
+    pr.then(
+      (png) => log?.info(`OG audiência ${marco ?? 0}|${formato} gerada em ${Math.round(performance.now() - t0)} ms (${Math.round(png.length / 1024)} KB)`),
+      () => memoImagens.delete(chave),
+    );
+  }
+  return pr;
+}
+
+/**
+ * O convite genérico (o mesmo de `?m=0`): é a prévia do dia da votação (0h–17h de 25/10) nas meta tags e o que as rotas
+ * de imagem com candidato respondem nesse intervalo (og-rotas.ts).
+ */
+export const pngConvite = (formato: FormatoOgAudiencia = 'og', dominio = 'sintonia2026.com.br', log?: Pick<Logger, 'info'>) =>
+  pngAudiencia(null, formato, dominio, log);
+
 /** Registra `/api/og/audiencia.png` (1 import + 1 linha em app.ts, frente A2). */
 export function registrarOgAudiencia(app: App, d: DepsOgAudiencia): void {
-  const memo = new Map<string, Promise<Buffer>>();
   const dominio = d.dominio || 'sintonia2026.com.br';
   app.get(ROTA_OG_AUDIENCIA, async (c) => {
     const formato = formatoAudiencia(c.req.query('formato'));
     const marco = marcoExibido(d.pessoas(), c.req.query('m'));
-    const chave = `${marco ?? 0}|${formato}`;
-    let pr = memo.get(chave);
-    if (!pr) {
-      const t0 = performance.now();
-      const { w, h: alt } = DIM_OG_AUDIENCIA[formato];
-      pr = renderPng(layoutAudiencia(marco, formato, dominio), w, alt);
-      memo.set(chave, pr);
-      pr.then(
-        (png) => d.log?.info(`OG audiência ${chave} gerada em ${Math.round(performance.now() - t0)} ms (${Math.round(png.length / 1024)} KB)`),
-        () => memo.delete(chave),
-      );
-    }
-    const png = await pr;
+    const png = await pngAudiencia(marco, formato, dominio, d.log);
     const headers = {
       'content-type': 'image/png',
       ...cabecalhosCache(CC_OG_AUDIENCIA, CC_OG_AUDIENCIA_BORDA, d.borda !== false),

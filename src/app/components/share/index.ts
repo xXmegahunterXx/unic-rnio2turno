@@ -7,6 +7,7 @@ export { CartaoBase, SeloOficial, SeloSimulacao, brilhoDe, medidasCartao, useCar
 export { PreviaCartao, type PreviaCartaoProps } from './PreviaCartao';
 export { CompartilharSheet, LogoX, CLASSE_BOTAO_X, type CompartilharSheetProps } from './CompartilharSheet';
 export { BotaoCompartilhar, type BotaoCompartilharProps } from './BotaoCompartilhar';
+export { useDiaDeVotacao } from './useDiaDeVotacao';
 export { gerarPngCartao, cssFontesEmbutidas } from './png';
 export {
   HASHTAGS,
@@ -26,6 +27,9 @@ export {
   textoPlacar,
   textoSecao,
   textoSenadoUf,
+  DESCRICAO_DIA_VOTACAO,
+  TEXTO_DIA_VOTACAO,
+  trocaPeloConvite,
 } from './textos';
 export { AvatarCartao, BarraDuelo, PctGigante, PilulaApurado, RotuloCartao } from './cartoes/partes';
 

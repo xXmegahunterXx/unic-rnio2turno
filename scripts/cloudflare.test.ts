@@ -268,3 +268,43 @@ describe('DEPLOY.md e o script dizem a mesma coisa', () => {
     expect(doc).toContain('concat("https://seu-dominio", http.request.uri.path)');
   });
 });
+
+describe('--origem: os cabeçalhos da ORIGEM antes de ligar a Cloudflare (app de verdade, sem chave)', () => {
+  it('aprova o app como ele sai (regras 1, 2 e 4; HTML com o html-borda desligado) e reprova com CDN_CC=0', async () => {
+    const { createAdaptorServer } = await import('@hono/node-server');
+    const { montar } = await import('../src/server/test-helpers');
+    const servir = async (env: Record<string, string>) => {
+      // CDN_CC é lido do ambiente do processo (app.ts) na montagem
+      const antes = process.env.CDN_CC;
+      if (env.CDN_CC !== undefined) process.env.CDN_CC = env.CDN_CC;
+      const m = await montar({ env }).finally(() => {
+        if (antes === undefined) delete process.env.CDN_CC;
+        else process.env.CDN_CC = antes;
+      });
+      const srv = createAdaptorServer({ fetch: m.app.fetch });
+      await new Promise<void>((r) => srv.listen(0, '127.0.0.1', () => r()));
+      return { srv, porta: (srv.address() as { port: number }).port };
+    };
+    const fechar = (srv: { close: (cb: () => void) => void }) => new Promise<void>((r) => srv.close(() => r()));
+    const a = await servir({});
+    try {
+      const r = await rodar(['--origem', '--dominio=sintonia2026.com.br'], { CF_CONFERIR_ORIGEM: `http://127.0.0.1:${a.porta}` }, false);
+      expect(r.saida).toMatch(/regra 1 · \/api\/status guardável/);
+      expect(r.saida).toMatch(/regra 2 · \/healthz nunca guardado/);
+      expect(r.saida).toMatch(/regra 4 · \/duelo\/conferir fora da borda/);
+      expect(r.saida).toMatch(/html-borda" desligada/);
+      expect(r.saida).not.toMatch(/sem cf-ray/);
+      expect(r.codigo, r.saida).toBe(0);
+    } finally {
+      await fechar(a.srv);
+    }
+    const b = await servir({ CDN_CC: '0' });
+    try {
+      const r = await rodar(['--origem', '--dominio=sintonia2026.com.br'], { CF_CONFERIR_ORIGEM: `http://127.0.0.1:${b.porta}` }, false);
+      expect(r.saida).toMatch(/CDN_CC=0/);
+      expect(r.codigo).toBe(1);
+    } finally {
+      await fechar(b.srv);
+    }
+  }, 60_000);
+});

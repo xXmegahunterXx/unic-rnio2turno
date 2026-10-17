@@ -16,6 +16,7 @@ export default function CompartilharSite({ aberto, onFechar }: { aberto: boolean
       onFechar={onFechar}
       titulo="Compartilhar o Sintonia"
       descricao="Convite com a data da apuração e o Teste Cego. Sem números e sem candidatos."
+      generico
       texto={textoConviteSite(agora)}
       caminho="/"
       hashtags={HASHTAGS_HOME}

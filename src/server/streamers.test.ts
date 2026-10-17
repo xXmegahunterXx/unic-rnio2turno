@@ -128,6 +128,24 @@ describe('GET /api/texto/placar', () => {
     expect(JSON.stringify(m.log.recentes(500))).not.toMatch(/canalsecreto|outrocanal|alguem/);
   });
 
+  it('enxurrada com query que fura a cópia da borda (&z=…): o teto global não deixa os outros canais só com o endereço', async () => {
+    m.relogio.t += 61_000; // janela nova
+    const esperado = (await texto('?race=pres')).t;
+    expect(esperado).not.toBe('sintonia2026.com.br');
+    // 7.000 pedidos em menos de 2 s, cada um com uma query diferente (mais que o teto global de 6.000 por minuto)
+    for (let i = 0; i < 7000; i += 500) {
+      const lote = await Promise.all(Array.from({ length: 500 }, (_, k) => texto(`?race=pres&z=${i + k}`)));
+      for (const x of lote) expect(x.t).toBe(esperado);
+    }
+    // um bot de verdade, logo depois, no mesmo minuto: recebe o placar (com cache normal), não só o endereço
+    const bot = await texto('?race=pres', { 'nightbot-channel': 'name=canalteste&provider=twitch&providerId=123' });
+    expect(bot.t).toBe(esperado);
+    expect(bot.r.headers.get('cache-control')).toBe(`public, max-age=0, s-maxage=${TEXTO_PLACAR.bordaS}`);
+    // e um texto que precisa ser montado de novo (outra UF, depois dos 2 s) também sai: o lixo não gastou o teto
+    m.relogio.t += 2_500;
+    expect((await texto('?race=pres&uf=sp')).t).not.toBe('sintonia2026.com.br');
+  });
+
   it('canal do bot pelos cabeçalhos', () => {
     const h = (o: Record<string, string>) => (n: string) => o[n];
     expect(canalDoBot(h({ 'nightbot-channel': 'name=abc&displayName=Abc&provider=twitch&providerId=123' }))).toBe('nightbot:twitch:123');

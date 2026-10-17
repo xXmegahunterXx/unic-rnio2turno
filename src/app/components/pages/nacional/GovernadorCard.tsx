@@ -24,6 +24,9 @@ import { SimulationRibbon } from '@/app/components/apuracao/SimulationRibbon';
 import { VoteSplitBar } from '@/app/components/apuracao/VoteSplitBar';
 import { MiniBrMap, MiniUfMap } from './MiniUfMap';
 
+/** Separador "·" antes de cada parte; no começo de linha cai na margem negativa e o `overflow-hidden` o esconde. */
+const SEP_LINHA = "before:inline-block before:w-[1.1em] before:text-center before:content-['·']";
+
 /** Diferença (p.p.) entre os dois finalistas; null sem votos. */
 export function difFinalistas(resumo: Pick<Summary, 'votos'>): number | null {
   return validos(resumo) > 0 ? Math.abs(pctValidos(resumo, 0) - pctValidos(resumo, 1)) : null;
@@ -127,10 +130,18 @@ const DisputaCard = memo(function DisputaCard({ sigla, nome, sub, mapa, race, re
                 <div className="min-w-0 flex-1">
                   {/* até 3 linhas: em 768 px a coluna é estreita e "Professora Maria do Socorro…" pede 3 */}
                   <div className={cn('line-clamp-3 break-words text-[14.5px] leading-tight text-fg', lider ? 'font-semibold' : 'font-medium')}>{c.nomeUrna}</div>
-                  {/* sigla nunca cortada (REPUBLICANOS × PP): sem espaço, os votos descem para a linha de baixo */}
-                  <div className="num mt-0.5 flex min-w-0 flex-wrap text-[12px] text-fg-muted">
-                    <span className="shrink-0">{c.partido}</span>
-                    <span className="shrink-0 whitespace-pre"> · {fmtInt(resumo.votos[i] ?? 0)}</span>
+                  {/* sigla nunca cortada (REPUBLICANOS × PP): sem espaço, os votos descem para a linha de baixo — e o "·"
+                      do começo da linha some (cai na margem negativa, recortada), como no CarimboPrint: mesmo tratamento
+                      para os dois finalistas, numa linha ou em duas */}
+                  <div className="num mt-0.5 min-w-0 overflow-hidden text-[12px] text-fg-muted">
+                    <div className="-ml-[1.1em] flex flex-wrap">
+                      <span className={cn('shrink-0', SEP_LINHA)}>{c.partido}</span>
+                      <span className={cn('shrink-0 whitespace-nowrap', SEP_LINHA)}>
+                        {/* o "·" é desenho (CSS): o leitor de tela e o copiar ouvem uma pausa entre a sigla e os votos */}
+                        <span className="sr-only">, </span>
+                        {fmtInt(resumo.votos[i] ?? 0)}
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <NumberRoll

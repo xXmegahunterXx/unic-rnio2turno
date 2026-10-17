@@ -18,7 +18,8 @@
  * candidato. Parâmetros de origem do link (`utm_*`, `h`, `via`) nunca mudam o canônico, a chave do cache nem a imagem.
  */
 import { pctTotalizadas, pctValidos } from '../shared/calc';
-import { APP_NAME, INICIO_APURACAO, UF_NOMES } from '../shared/constants';
+import { APP_NAME, UF_NOMES } from '../shared/constants';
+import { INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from '../shared/diaVotacao';
 import { fmtInt, fmtPct } from '../shared/format';
 import { SIGLAS_GOV_2T, asDisputasGov } from '../shared/gov2t';
 import type { CandidatoFicha, CargoDataset } from '../shared/dataset';
@@ -139,9 +140,9 @@ export const PARAMS_RELEVANTES = ['race', 'uf', 'fato', 'f', 'tema', 'c'] as con
 export const PARAMS_ORIGEM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'h', 'via'] as const;
 
 /** 0h de 25/10/2026 em Brasília: do início do dia da votação até as 17h, nenhuma descrição leva nome ou número de candidato. */
-export const INICIO_DIA_VOTACAO = Date.UTC(2026, 9, 25, 3, 0, 0);
-/** Dia da votação, antes do início da apuração (0h–17h de 25/10, Brasília)? */
-export const diaDeVotacao = (agora: number) => agora >= INICIO_DIA_VOTACAO && agora < INICIO_APURACAO;
+export { INICIO_DIA_VOTACAO } from '../shared/diaVotacao';
+/** Dia da votação, antes do início da apuração (0h–17h de 25/10, Brasília)? Fonte única: src/shared/diaVotacao.ts. */
+export const diaDeVotacao = diaDeVotacaoAntesDas17;
 
 /** Momento de uma página de apuração (I07): a corrida de 1º turno é sempre o resultado oficial; senão, a fase pública. */
 export type MomentoMeta = MomentoTitulo;
@@ -164,8 +165,12 @@ export function consultaNormalizada(q: URLSearchParams): string {
  */
 export const OG_GENERICA_DIA_VOTACAO = '/api/og/audiencia.png?m=0';
 export const ALT_GENERICA_DIA_VOTACAO = 'Sintonia · apuração do 2º turno de 2026 ao vivo';
-/** Imagens de prévia que mostram candidato (foto, nome, número ou percentual): genéricas no dia da votação, antes das 17h. */
-const OG_COM_CANDIDATO = [
+/**
+ * Imagens de prévia que mostram candidato (foto, nome, número ou percentual): genéricas no dia da votação, antes das 17h
+ * — nas meta tags (aqui) e nas próprias rotas (og-rotas.ts responde o convite genérico: um cartão já guardado por um
+ * robô com a URL antiga, ao buscar a imagem de novo, também não recebe candidato).
+ */
+export const OG_COM_CANDIDATO = [
   '/api/og/apuracao.png',
   '/api/og/municipio.png',
   '/api/og/secao.png',
@@ -241,8 +246,10 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
   const pagina = (m: Omit<MetaPagina, 'status'> & { status?: 200 | 404 }): MetaPagina => ({ status: 200, ...m });
 
   if (seg.length === 0) {
+    // depois do fim, "ao vivo" não vale mais (a prévia do link continua circulando)
+    const encerrada = tentar(() => ctx.fase?.()) === 'encerrada';
     return pagina({
-      titulo: `${APP_NAME} · Apuração ao vivo e Teste Cego do 2º turno`,
+      titulo: encerrada ? `${APP_NAME} · Resultado e Teste Cego do 2º turno` : `${APP_NAME} · Apuração ao vivo e Teste Cego do 2º turno`,
       descricao: DESCRICAO_PADRAO,
       imagem: ogApuracao(),
       imagemAlt: altPlacar(''),
@@ -383,10 +390,13 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
   }
   // ---- Palpite (src/app/pages/palpite/PalpitePage.tsx): o palpite vai depois do "#" do link e nunca chega aqui ----------
   if (s0 === 'palpite' && seg.length === 1) {
+    // depois do prazo (0h de 25/10, o mesmo FIM_PALPITES do app), sem chamada para cravar
+    const encerrados = (tentar(() => ctx.agora?.()) ?? Date.now()) >= INICIO_DIA_VOTACAO;
     return pagina({
-      titulo: `Palpite do 2º turno · Qual é o seu? · ${APP_NAME}`,
-      descricao:
-        'Crave o percentual dos votos válidos de cada candidato a presidente até as 23h59 de 24/10 e, depois do resultado oficial, veja por quantos pontos errou. Individual: o palpite fica só no seu aparelho. Não é pesquisa.',
+      titulo: encerrados ? `Palpite do 2º turno · ${APP_NAME}` : `Palpite do 2º turno · Qual é o seu? · ${APP_NAME}`,
+      descricao: encerrados
+        ? 'Palpites encerrados às 23h59 de 24/10. Com o resultado oficial, quem cravou compara o seu palpite com o número do TSE. Individual: o palpite fica só no seu aparelho. Não é pesquisa.'
+        : 'Crave o percentual dos votos válidos de cada candidato a presidente até as 23h59 de 24/10 e, depois do resultado oficial, veja por quantos pontos errou. Individual: o palpite fica só no seu aparelho. Não é pesquisa.',
       imagem: '/api/og/palpite.png',
       imagemAlt: 'Palpite do 2º turno · Sintonia',
       imagemVersao: 'v1',
@@ -534,20 +544,23 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       const sit = situacaoTexto(r?.situacao, f.genero);
       const res = r ? ` No 1º turno de 2026: ${fmtInt(r.votos)} votos (${fmtPct(r.pct)} dos válidos)${sit ? `, ${sit}` : ''}.` : '';
       return pagina({
-        titulo: `${f.nomeUrna} (${f.partido}) · ${cargo}${f.uf === 'BR' ? '' : ` · ${onde}`} · Ficha do candidato · ${APP_NAME}`,
-        // dia da votação (0h–17h): sem o número de urna nem o resultado na descrição
+        // dia da votação (0h–17h): o título (o que o cartão do link mostra no WhatsApp e no X) sem nome nem partido
+        titulo: comNomes
+          ? `${f.nomeUrna} (${f.partido}) · ${cargo}${f.uf === 'BR' ? '' : ` · ${onde}`} · Ficha do candidato · ${APP_NAME}`
+          : `Ficha de candidato · ${cargo}${f.uf === 'BR' ? '' : ` · ${onde}`} · ${APP_NAME}`,
+        // dia da votação (0h–17h): sem o partido (com o cargo, ele identifica o finalista), o número nem o resultado
         descricao: comNomes
           ? `${cargo} · ${onde} · ${f.partido} ${f.numero}.${res} Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`
-          : `${cargo} · ${onde} · ${f.partido}. Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`,
+          : `${cargo} · ${onde}. Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`,
         imagem: `/api/og/candidato.png?sq=${f.sqcand}`,
         imagemAlt: `Ficha de ${f.nomeUrna} (${f.partido}), ${cargo}`,
         imagemVersao: fx?.lida?.versao,
         canonico: `/candidato/${f.sqcand}`,
       });
     }
-    // sem índice de candidatos no servidor: cartão genérico (a SPA resolve)
+    // sem índice de candidatos no servidor: cartão genérico (a SPA resolve); no dia da votação (0h–17h), sem o nome
     let nome: string | null = null;
-    for (const r of ctx.races.values()) {
+    for (const r of comNomes ? ctx.races.values() : []) {
       const c = r.candidatos.find((x) => !x.agregado && x.sqcand === s1);
       if (c) {
         nome = `${c.nomeUrna} (${c.partido})`;

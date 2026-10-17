@@ -12,8 +12,9 @@
  */
 import type { FrescorCorrida, ModoAvisoNacional, ModoPausaTse, Race, TseConfig, UF } from '../shared/types';
 import { TseSource, type FetchLike, type TseHealth } from '../tse';
-import type { HistoricoSerializado } from '../tse';
+import type { BloqueioTse, HistoricoSerializado } from '../tse';
 import type { JsonStore } from './state-store';
+import { fmtHoraSeg } from '../shared/format';
 
 export interface TseManagerOptions {
   races: Race[];
@@ -33,6 +34,18 @@ export interface TseManagerOptions {
   avisoNacional?: () => ModoAvisoNacional;
   /** Chave 'pausa-tse' do painel (I03), lida pelo cliente a cada 429/403. Ausente = 'auto'. */
   modoPausa?: () => ModoPausaTse;
+  /**
+   * Ensaio do update.sh (SINTONIA_ENSAIO=1: contêiner ao lado do que está no ar, mesmo volume e mesmo IP): NUNCA liga o
+   * polling (o app no ar já consulta o TSE — dois processos dobrariam os pedidos contra o limite do TSE) e nunca grava o
+   * histórico (o do app no ar é o que vale). A instância existe (lê o histórico salvo) para o /healthz e o status.
+   */
+  somenteLeitura?: boolean;
+  /**
+   * Pausa por bloqueio do TSE gravada em disco (STATE_DIR/tse-pausa.json): sobrevive a um reinício — o processo novo
+   * nasce pausado até o fim do prazo, sem mandar nenhum pedido (no TSE, cada tentativa durante o bloqueio reinicia o
+   * prazo). Gravada a cada início/fim de pausa; "Retomar agora" grava o fim (null).
+   */
+  pausa?: JsonStore;
 }
 
 /** Resultado do "Retomar agora" (comando `tse-retomar`). */
@@ -56,11 +69,35 @@ export class TseManager {
     return !!this.src?.ativo;
   }
 
+  /** Pausa por bloqueio ainda em curso, lida do disco (null = nenhuma, vencida ou arquivo inválido). */
+  private pausaSalva(): BloqueioTse | null {
+    const v = this.opts.pausa?.ler() as Partial<BloqueioTse> | null | undefined;
+    if (!v || typeof v !== 'object' || typeof v.ate !== 'number' || typeof v.desde !== 'number' || typeof v.motivo !== 'string') return null;
+    const agora = (this.opts.now ?? Date.now)();
+    // prazo absurdo (relógio errado, arquivo mexido à mão): no máximo 1 h, como o Retry-After aceito pelo cliente
+    if (v.ate <= agora || v.ate - agora > 60 * 60_000) return null;
+    return {
+      desde: v.desde,
+      ate: v.ate,
+      motivo: v.motivo as BloqueioTse['motivo'],
+      httpStatus: typeof v.httpStatus === 'number' ? v.httpStatus : 0,
+      arquivo: typeof v.arquivo === 'string' ? v.arquivo.slice(0, 300) : '',
+      porRetryAfter: !!v.porRetryAfter,
+    };
+  }
+
   /** Garante a instância com a config atual (sem iniciar o polling). */
   garantir(config: TseConfig): TseSource {
     if (!this.src) {
       const salvo = this.opts.historico?.ler();
       const historico = Array.isArray(salvo) ? (salvo as HistoricoSerializado[]) : undefined;
+      const bloqueioInicial = this.pausaSalva();
+      if (bloqueioInicial) {
+        this.opts.log(
+          `TSE: a pausa por bloqueio de antes do reinício continua — leituras paradas até ${fmtHoraSeg(bloqueioInicial.ate)} ` +
+            '(nenhum pedido sai até lá; "Retomar agora" no painel encerra a pausa)',
+        );
+      }
       this.src = this.opts.criar
         ? this.opts.criar(config, historico)
         : new TseSource({
@@ -74,7 +111,13 @@ export class TseManager {
             concorrencia: 8,
             workersMunicipios: 5,
             modoPausa: this.opts.modoPausa,
+            bloqueioInicial,
           });
+      // grava o início e o fim antecipado de cada pausa (o ensaio do update.sh só lê)
+      const pausa = this.opts.pausa;
+      if (pausa && !this.opts.somenteLeitura && typeof this.src.aoMudarBloqueio === 'function') {
+        this.src.aoMudarBloqueio((b) => pausa.salvar(b ?? null));
+      }
     } else {
       const atual = this.src.getConfig();
       const mudou = (Object.keys(config) as (keyof TseConfig)[]).some((k) => config[k] !== atual[k]);
@@ -85,6 +128,10 @@ export class TseManager {
 
   /** Sincroniza com o AdminState: liga o polling na fonte 'tse', desliga nas outras. */
   sincronizar(fonte: string, config: TseConfig): void {
+    if (this.opts.somenteLeitura) {
+      if (fonte === 'tse' || this.src) this.garantir(config);
+      return;
+    }
     if (fonte === 'tse') {
       const s = this.garantir(config);
       if (!s.ativo) {
@@ -146,7 +193,7 @@ export class TseManager {
 
   salvarHistorico() {
     const src = this.src;
-    if (!src || !this.opts.historico) return;
+    if (!src || !this.opts.historico || this.opts.somenteLeitura) return;
     this.opts.historico.salvar(() => src.exportarHistorico());
   }
 
@@ -157,6 +204,6 @@ export class TseManager {
       if (this.src.ativo) this.src.stop();
       this.salvarHistorico();
     }
-    await this.opts.historico?.flush();
+    if (!this.opts.somenteLeitura) await this.opts.historico?.flush();
   }
 }

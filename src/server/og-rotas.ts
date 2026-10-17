@@ -62,7 +62,8 @@ import {
 } from './og-cartoes';
 import type { Bancada } from './og-hemiciclo';
 import { LimiteOgExcedido, type OgPronta, type OgServida, type PedidoOg, type ServicoOg } from './og-servico';
-import { deUf } from './meta-tags';
+import { OG_COM_CANDIDATO, deUf, diaDeVotacao } from './meta-tags';
+import { CC_OG_AUDIENCIA, CC_OG_AUDIENCIA_BORDA, pngConvite, type FormatoOgAudiencia } from './og-audiencia';
 import { ErroValidacao, parseCodMunicipio, parseNumero, parseRace, parseUf } from './validation';
 
 /** Cache-Control das imagens (o app reexporta em CC). */
@@ -347,6 +348,29 @@ export function registrarOg(app: App, d: DepsOg): void {
     const s1 = r1 ? await dados.uf(r1.id, uf).catch(() => null) : null;
     return comPrimeiroTurnoLocal(race, r1, s1?.resumo ?? null);
   };
+
+  // ---- dia da votação (0h–17h de 25/10, Brasília) ----------------------------------------------------
+  // As imagens que mostram candidato (OG_COM_CANDIDATO: placar, município, seção, governadores, ficha, curiosidades,
+  // cenários) respondem o convite GENÉRICO (o de /api/og/audiencia.png?m=0: sem foto, nome, número nem percentual), com
+  // cache curto (60 s): as meta tags já apontam para o convite, mas um cartão guardado antes pelo X ou pelo WhatsApp com a
+  // URL antiga busca a imagem de novo — e não pode receber candidato. Às 17h volta sozinho (no máximo ~2 min de borda).
+  const dominioConvite = d.dominio || 'sintonia2026.com.br';
+  for (const rota of OG_COM_CANDIDATO) {
+    app.use(rota, async (c, next) => {
+      if (!diaDeVotacao(d.now())) return next();
+      const f = c.req.query('formato');
+      const formato: FormatoOgAudiencia = f === 'x' || f === 'story' ? f : 'og';
+      const png = await pngConvite(formato, dominioConvite, log);
+      return responder(c, c.req.method === 'HEAD' ? null : png, {
+        'content-type': 'image/png',
+        ...cabecalhosCache(CC_OG_AUDIENCIA, CC_OG_AUDIENCIA_BORDA, borda),
+        'access-control-allow-origin': '*',
+        'cross-origin-resource-policy': 'cross-origin',
+        'x-og-generica': 'dia-da-votacao',
+        'x-og-fotos': '0',
+      });
+    });
+  }
 
   // ---- placar (Brasil/UF) -------------------------------------------------------------------------
   app.get('/api/og/apuracao.png', async (c) => {

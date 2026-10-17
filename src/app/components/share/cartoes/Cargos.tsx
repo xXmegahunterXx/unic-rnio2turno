@@ -221,6 +221,8 @@ export function BotaoCompartilharComposicao({
       label={label}
       titulo={`Compartilhar · ${casa}`}
       descricao="Composição por partido · resultado oficial do 1º turno."
+      // bancadas por partido, sem candidato: igual também no dia da votação (como /api/og/camara.png)
+      generico
       texto={textoComposicao(casa, total, bancadas, rotuloTexto)}
       caminho={caminho}
       hashtags={tags ?? hashtags('primeiroTurno')}

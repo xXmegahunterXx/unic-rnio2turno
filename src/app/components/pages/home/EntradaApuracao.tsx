@@ -44,7 +44,9 @@ export function EntradaApuracao({ status, anonimizado, className }: { status: Li
               <Icon name="ao-vivo" size={20} />
             </span>
             {/* abaixo de 380 px, um pouco menor: inteiro, sem a pílula da data por cima */}
-            <span className="whitespace-nowrap font-display text-[16px] font-semibold tracking-[-0.02em] text-fg min-[380px]:text-[17px] sm:text-[19px]">Apuração ao vivo</span>
+            <span className="whitespace-nowrap font-display text-[16px] font-semibold tracking-[-0.02em] text-fg min-[380px]:text-[17px] sm:text-[19px]">{/* depois do fim, só "Apuração" (a pílula ao lado diz "Encerrada") */}
+              {fase === 'encerrada' ? 'Apuração' : 'Apuração ao vivo'}
+            </span>
           </span>
           {t1 ? (
             <span className="num inline-flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-surface-2 px-2.5 text-[12px] font-medium text-fg-muted">

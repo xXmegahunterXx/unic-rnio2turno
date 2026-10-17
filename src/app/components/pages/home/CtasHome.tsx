@@ -38,7 +38,7 @@ export function CtaApuracao({ fase, className }: { fase: Fase | undefined; class
       : fase === 'encerrada'
         ? 'O resultado e a reprise da noite, minuto a minuto'
         : 'Domingo, às 17h · até lá, o 1º turno oficial';
-  return <CtaLink to="/apuracao" icone="ao-vivo" titulo="Apuração ao vivo" sub={sub} className={className} />;
+  return <CtaLink to="/apuracao" icone="ao-vivo" titulo={fase === 'encerrada' ? 'Resultado do 2º turno' : 'Apuração ao vivo'} sub={sub} className={className} />;
 }
 
 export function CtaBusca({ fase, className }: { fase: Fase | undefined; className?: string }) {

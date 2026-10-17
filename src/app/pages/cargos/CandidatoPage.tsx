@@ -21,6 +21,7 @@ import { FotoOficial } from '@/app/components/pages/cargos/FotoOficial';
 import { PartidoChip, SituacaoSelo, FonteTse } from '@/app/components/pages/cargos/ui';
 import { cargoExibicao, ehEleito, fmtBens, fmtReais, rotuloSituacao, rotuloSituacaoCurto, useFicha, useFichasGrupo, useIndiceCandidatos } from '@/app/components/pages/cargos/dados';
 import { BotaoCompartilharCandidato } from '@/app/components/share/cartoes/Candidato';
+import { useDiaDeVotacao } from '@/app/components/share/useDiaDeVotacao';
 
 /** Página do cargo (para a trilha e o "ver todos"). */
 function rotaCargo(f: CandidatoFicha): { to: string; label: string } {
@@ -46,7 +47,9 @@ export default function CandidatoPage() {
   // vice: a ficha do titular da chapa (mesmo grupo, com `vice.sqcand` = este)
   const titular = f && /^Vice/.test(f.cargo) ? grupoQ.fichas.find((x) => x.vice?.sqcand === f.sqcand) : undefined;
   const indice = useIndiceCandidatos(!!f);
-  useTitulo(f ? `${f.nomeUrna} · ${cargoExibicao(f.cargo, f.genero)}` : 'Ficha do candidato');
+  // dia da votação (0h–17h de 25/10): o título da aba (que o "Compartilhar" do navegador leva) sem o nome, como o og:title
+  const diaDeVotacao = useDiaDeVotacao();
+  useTitulo(f ? (diaDeVotacao ? `Ficha de candidato · ${cargoExibicao(f.cargo, f.genero)}` : `${f.nomeUrna} · ${cargoExibicao(f.cargo, f.genero)}`) : 'Ficha do candidato');
 
   if (!valido || naoEncontrada) {
     return (

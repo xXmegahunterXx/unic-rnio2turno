@@ -96,3 +96,105 @@ describe('TseManager (leva 3)', () => {
     await tse.encerrar();
   });
 });
+
+describe('TseManager no ensaio do update.sh (somenteLeitura)', () => {
+  it('na fonte TSE: instância pronta (lê o histórico salvo), mas ZERO pedidos ao TSE e nenhuma gravação do histórico', async () => {
+    const f = criarFakeFetch();
+    f.rotas.set(BR, arq(1000, '19:00:00'));
+    f.rotas.set(SP, arq(1000, '19:00:00', 'sp'));
+    const salvos: unknown[] = [];
+    let lidas = 0;
+    const historico = {
+      caminho: '/tmp/tse-historico.json',
+      ler: () => {
+        lidas++;
+        return null;
+      },
+      salvar: (v: unknown) => void salvos.push(v),
+      flush: async () => undefined,
+      escritas: 0,
+      lerTexto: () => null,
+      gravadoPorMim: () => false,
+    };
+    const tse = new TseManager({
+      races,
+      log: () => undefined,
+      historico,
+      somenteLeitura: true,
+      criar: (config) => {
+        const client = new TseClient({ baseUrl: BASE, fetch: f, sleep: async () => undefined, concorrencia: 8, semTeto: true, limitePorSeg: config.limitePorSeg });
+        return new TseSource({ config, races, client, log: () => undefined, aquecerMunicipios: false });
+      },
+    });
+    tse.sincronizar('tse', CONFIG);
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(tse.fonte).not.toBeNull();
+    expect(tse.ativo).toBe(false);
+    expect(lidas).toBe(1);
+    expect(f.chamadas.length).toBe(0);
+    // a fonte do app no ar mudou (vigia do admin.json): continua sem consultar
+    tse.sincronizar('pre', CONFIG);
+    tse.sincronizar('tse', { ...CONFIG, intervaloSeg: 5 });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(f.chamadas.length).toBe(0);
+    await tse.encerrar();
+    expect(salvos).toEqual([]);
+  });
+});
+
+describe('pausa por bloqueio do TSE sobrevive a um reinício (tse-pausa.json)', () => {
+  const store = (inicial: unknown, gravados: unknown[]) => ({
+    caminho: '/tmp/tse-pausa.json',
+    ler: () => inicial,
+    salvar: (v: unknown) => void gravados.push(typeof v === 'function' ? (v as () => unknown)() : v),
+    flush: async () => undefined,
+    escritas: 0,
+    lerTexto: () => null,
+    gravadoPorMim: () => false,
+  });
+
+  it('o processo novo nasce pausado: zero pedidos até o fim do prazo; depois volta a ler', async () => {
+    const f = criarFakeFetch();
+    f.rotas.set(BR, arq(1000, '19:00:00'));
+    f.rotas.set(SP, arq(1000, '19:00:00', 'sp'));
+    const logs: string[] = [];
+    const salva = { desde: INICIO - 60_000, ate: INICIO + 5 * 60_000, motivo: 'http-429', httpStatus: 429, arquivo: BR, porRetryAfter: true };
+    const tse = new TseManager({ races, log: (m) => logs.push(m), fetch: f, now: () => Date.now(), pausa: store(salva, []) });
+    tse.sincronizar('tse', CONFIG);
+    await vi.advanceTimersByTimeAsync(4 * 60_000);
+    expect(f.chamadas.length).toBe(0);
+    expect(tse.health()?.bloqueio?.ate).toBe(salva.ate);
+    expect(logs.some((l) => /pausa por bloqueio de antes do reinício continua/.test(l))).toBe(true);
+    await vi.advanceTimersByTimeAsync(2 * 60_000);
+    expect(f.chamadas.length).toBeGreaterThan(0);
+    await tse.encerrar();
+  });
+
+  it('pausa vencida ou com prazo absurdo no disco: lê na hora', async () => {
+    for (const ate of [INICIO - 1_000, INICIO + 2 * 60 * 60_000]) {
+      const f = criarFakeFetch();
+      f.rotas.set(BR, arq(1000, '19:00:00'));
+      const tse = new TseManager({ races, log: () => undefined, fetch: f, now: () => Date.now(), pausa: store({ desde: INICIO - 9_000, ate, motivo: 'http-429', httpStatus: 429, arquivo: BR, porRetryAfter: false }, []) });
+      tse.sincronizar('tse', CONFIG);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(f.chamadas.length, String(ate)).toBeGreaterThan(0);
+      await tse.encerrar();
+    }
+  });
+
+  it('um 429 grava a pausa no disco; "Retomar agora" grava o fim (null)', async () => {
+    const f = criarFakeFetch();
+    f.rotas.set(BR, { status: 429, headers: { 'retry-after': '600' } });
+    f.rotas.set(SP, arq(1000, '19:00:00', 'sp'));
+    const gravados: unknown[] = [];
+    const tse = new TseManager({ races, log: () => undefined, fetch: f, now: () => Date.now(), pausa: store(null, gravados) });
+    tse.sincronizar('tse', CONFIG);
+    await vi.advanceTimersByTimeAsync(3_000);
+    const p = gravados.find((g) => g && typeof g === 'object') as { ate: number; motivo: string } | undefined;
+    expect(p?.motivo).toBe('http-429');
+    expect(p!.ate).toBeGreaterThanOrEqual(INICIO + 600_000 - 5_000);
+    expect(tse.retomar().retomou).toBe(true);
+    expect(gravados.at(-1)).toBeNull();
+    await tse.encerrar();
+  });
+});

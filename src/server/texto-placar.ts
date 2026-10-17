@@ -6,8 +6,10 @@
  *  - `text/plain; charset=utf-8`, ≤ 380 caracteres, SEMPRE 200 (um bot que recebe erro escreve o erro no chat);
  *  - cache: o navegador não guarda; a borda guarda 5 s (`Cloudflare-CDN-Cache-Control`; a Regra 1 da Cloudflare já
  *    cobre `/api/texto/`); na origem, o texto de cada (disputa, UF) é montado no máximo a cada 2 s;
- *  - limite na origem por CANAL do bot (`Nightbot-Channel`, `x-fossabot-channelid`…) e um teto global alto — NUNCA por
- *    IP (os bots saem de poucos endereços); acima do limite, só o endereço do site (`no-store`);
+ *  - limite na origem por CANAL do bot (`Nightbot-Channel`, `x-fossabot-channelid`…) — NUNCA por IP (os bots saem de
+ *    poucos endereços); acima dele, só o endereço do site (`no-store`). O teto global conta só as MONTAGENS novas (o
+ *    texto já montado nos últimos 2 s sai para todos, de graça): uma enxurrada de pedidos com query que fura a cópia da
+ *    borda (`&z=…`) nunca deixa os outros canais só com o endereço;
  *  - canais: só a CONTAGEM de canais distintos (hash com sal aleatório do processo, nunca gravado); o nome do canal não é
  *    guardado nem vai ao log, e `Nightbot-User` (quem digitou) nunca é lido;
  *  - chave 'texto-bots' desligada no painel: responde só o endereço do site.
@@ -127,9 +129,15 @@ export function registrarTextoPlacar(app: App, deps: DepsTextoPlacar) {
     return textoPlacarBot({ ...base, race, resumo });
   };
 
+  const chaveDe = (q: ConsultaTexto) => `${q.race}|${q.uf ?? 'br'}|${deps.ligado() ? 1 : 0}`;
+  /** Texto já montado (ou em montagem) nos últimos 2 s, se houver: servir não custa nada. */
+  const pronto = (q: ConsultaTexto): Promise<string> | null => {
+    const m = memo.get(chaveDe(q));
+    return m && now() - m.em < MEMO_MS ? m.p : null;
+  };
   /** Texto de uma consulta, montado no máximo a cada 2 s. */
   const texto = (q: ConsultaTexto): Promise<string> => {
-    const chave = `${q.race}|${q.uf ?? 'br'}|${deps.ligado() ? 1 : 0}`;
+    const chave = chaveDe(q);
     const t = now();
     const m = memo.get(chave);
     if (m && t - m.em < MEMO_MS) return m.p;
@@ -147,11 +155,17 @@ export function registrarTextoPlacar(app: App, deps: DepsTextoPlacar) {
   app.get(TEXTO_PLACAR.rota, async (c) => {
     const canal = canalDoBot((n) => c.req.header(n));
     const chaveCanal = canal ? createHash('sha256').update(sal).update(canal).digest('base64url').slice(0, 12) : null;
-    const limitado = !janelas.cabe('*', TEXTO_PLACAR.globalMin) || (chaveCanal !== null && !janelas.cabe(chaveCanal, TEXTO_PLACAR.porCanalMin));
+    const canalNoLimite = chaveCanal !== null && !janelas.cabe(chaveCanal, TEXTO_PLACAR.porCanalMin);
     if (chaveCanal) deps.aoCanal?.(chaveCanal);
-    if (limitado) return so(c, dominio, { 'cache-control': 'no-store' });
+    if (canalNoLimite) return so(c, dominio, { 'cache-control': 'no-store' });
     const q = lerConsultaTexto(c.req.query('race'), c.req.query('uf'));
-    return so(c, await texto(q), cabecalhosCache(CC_TEXTO, CC_BORDA_TEXTO, deps.borda !== false));
+    const cache = cabecalhosCache(CC_TEXTO, CC_BORDA_TEXTO, deps.borda !== false);
+    // já montado: sai para todos, sem contar no teto global (a query lixo cai na mesma chave e não custa nada)
+    const p = pronto(q);
+    if (p) return so(c, await p, cache);
+    // teto global: só as montagens novas contam (no máximo uma por disputa e UF a cada 2 s)
+    if (!janelas.cabe('*', TEXTO_PLACAR.globalMin)) return so(c, dominio, { 'cache-control': 'no-store' });
+    return so(c, await texto(q), cache);
   });
 
   return { texto };

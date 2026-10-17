@@ -315,3 +315,47 @@ describe('cartão de UF antes da apuração (revisão de QA)', () => {
     expect(comPrimeiroTurnoLocal(pres, undefined, null).candidatos.every((c) => c.primeiroTurno === undefined)).toBe(true);
   });
 });
+
+describe('dia da votação (0h–17h de 25/10): as rotas de imagem com candidato respondem o convite genérico', () => {
+  const COM_CANDIDATO = [
+    '/api/og/apuracao.png?race=pres',
+    '/api/og/apuracao.png?race=pres&uf=sp&formato=x',
+    '/api/og/municipio.png?race=pres&uf=sp&cod=71072',
+    '/api/og/secao.png?race=pres&uf=sp&cod=71072&zona=1&secao=15',
+    '/api/og/governadores.png',
+    '/api/og/candidato.png?sq=280002542548',
+    '/api/og/curiosidade.png?f=finalistas-menor-diferenca',
+    '/api/og/cenario.png',
+  ];
+  let dia: Montado;
+  beforeAll(async () => {
+    dia = await montar({ agora: Date.UTC(2026, 9, 25, 15, 0, 0) }); // 12h de Brasília
+  });
+
+  it('às 12h: convite genérico (o mesmo do ?m=0), sem foto, cache curto; às 17h volta o cartão com candidato', async () => {
+    const convite = Buffer.from(await (await dia.app.request('/api/og/audiencia.png?m=0')).arrayBuffer());
+    const conviteX = Buffer.from(await (await dia.app.request('/api/og/audiencia.png?m=0&formato=x')).arrayBuffer());
+    for (const url of COM_CANDIDATO) {
+      const r = await dia.app.request(url);
+      expect(r.status, url).toBe(200);
+      expect(r.headers.get('content-type'), url).toBe('image/png');
+      expect(r.headers.get('x-og-generica'), url).toBe('dia-da-votacao');
+      expect(r.headers.get('x-og-fotos'), url).toBe('0');
+      expect(r.headers.get('cache-control'), url).toMatch(/max-age=60\b/);
+      expect(r.headers.get(CABECALHO_BORDA), url).toMatch(/^max-age=60\b/);
+      const buf = Buffer.from(await r.arrayBuffer());
+      expect(buf.equals(url.includes('formato=x') ? conviteX : convite), url).toBe(true);
+    }
+    // imagens sem candidato seguem como sempre (composição das bancadas, Teste Cego)
+    expect((await dia.app.request('/api/og/camara.png')).headers.get('x-og-generica')).toBeNull();
+    expect((await dia.app.request('/api/og/teste.png')).headers.get('x-og-generica')).toBeNull();
+    // 17h00: a apuração começa — o placar volta (com as fotos oficiais), sem reiniciar nada
+    dia.relogio.t = Date.UTC(2026, 9, 25, 20, 0, 0);
+    const depois = await dia.app.request('/api/og/candidato.png?sq=280002542548');
+    expect(depois.headers.get('x-og-generica')).toBeNull();
+    expect(depois.headers.get('x-og-fotos')).toBe('1');
+    // 23h59 de 24/10: ainda não é o dia da votação
+    dia.relogio.t = Date.UTC(2026, 9, 25, 2, 59, 0);
+    expect((await dia.app.request('/api/og/candidato.png?sq=280002542548')).headers.get('x-og-generica')).toBeNull();
+  }, 60_000);
+});

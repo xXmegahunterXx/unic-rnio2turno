@@ -98,12 +98,26 @@ if compartilhado; then
   lim="$(resumo_limites)"
   vig="$(docker inspect -f '{{.HostConfig.NanoCpus}}' "$(ids_app | head -n 1)" 2>/dev/null || echo 0)"
   if limites_ligados && [[ $vig =~ ^[0-9]+$ ]] && ((vig > 0)) && [[ "$(awk -v n="$vig" 'BEGIN { printf "%g", n / 1e9 }')" != "$(awk -v n="$(limite_cpus)" 'BEGIN { printf "%g", n }')" ]]; then
-    aviso "   limites do app: $lim — mas o contêiner está com CPU $(awk -v n="$vig" 'BEGIN { printf "%g", n / 1e9 }') (a VPS mudou de tamanho?): sudo $DIR_DEPLOY/limites.sh aplicar"
+    # VPS aumentada: o app segue preso ao limite antigo; reduzida: o limite antigo passa dos núcleos e o Docker recusa
+    # recriar o contêiner (restore, rollback, docker compose up)
+    erro "   LIMITE DE CPU DESATUALIZADO: configurado $lim, mas o contêiner está com CPU $(awk -v n="$vig" 'BEGIN { printf "%g", n / 1e9 }') (a VPS mudou de tamanho?). Aplique já: sudo $DIR_DEPLOY/limites.sh aplicar"
   else
     echo "   limites do app: $lim ($DIR_DEPLOY/limites.sh)"
   fi
 fi
 echo "   máquina: $(nproc) vCPU · carga $(cut -d' ' -f1-3 /proc/loadavg) · memória $(free -h | awk '/^Mem:/ {print $3 " usados de " $2}') · disco $(df -h "$RAIZ" | awk 'NR == 2 {print $4 " livres (" $5 " usado)"}')"
+# disco do Docker (imagens, cache de build e volumes; na VPS compartilhada, o mesmo do outro projeto): o update.sh pede
+# DISCO_MIN_GB (padrão 2) livres para construir
+livre_docker="$(disco_livre_mb || true)"
+cache_build="$(docker system df --format '{{.Type}}|{{.Size}}|{{.Reclaimable}}' 2>/dev/null | awk -F'|' '$1 == "Build Cache" {print $2 " (" $3 " liberável)"}' || true)"
+linha_disco="   disco do Docker: $([[ -n $livre_docker ]] && mb_em_gb "$livre_docker" || echo '?') GB livres${cache_build:+ · cache de build: $cache_build, de todos os projetos}"
+disco_min="$(cfg DISCO_MIN_GB 2)"
+[[ $disco_min =~ ^[0-9]+$ ]] || disco_min=2
+if [[ $livre_docker =~ ^[0-9]+$ ]] && ((livre_docker < disco_min * 1024)); then
+  erro "$linha_disco — POUCO ESPAÇO: o update.sh não constrói assim. Só o cache de build (nada no ar): docker builder prune -f --filter until=72h"
+else
+  echo "$linha_disco"
+fi
 
 site="$(cfg SITE_ADDRESS "$(cfg DOMINIO)")"
 host="${site%%,*}"

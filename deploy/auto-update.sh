@@ -122,8 +122,10 @@ CRON
     fi
     if ((saida == 0)); then
       rm -f "$DIR_ESTADO/falhou"
-      registrar "no ar: $(commit_atual)"
-      contar "No ar: $(commit_atual)."
+      # o commit do contêiner que está NO AR (o do código local só diz o que foi baixado)
+      rev=$(revisao_rodando 2>/dev/null || true)
+      registrar "no ar: ${rev:-?} (código: $(commit_atual))"
+      contar "No ar: ${rev:-?} (código: $(commit_atual))."
     elif ((saida == SAIDA_OCUPADO)); then
       registrar "outra operação de deploy (update/restore) em andamento: tento $curto de novo na próxima conferência"
       contar "Outra operação de deploy (update/restore) está em andamento: tente de novo daqui a pouco."

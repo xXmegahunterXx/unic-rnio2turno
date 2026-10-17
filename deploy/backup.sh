@@ -46,7 +46,8 @@ mkdir -p "$TMP/estado"
 # copia o volume pelo próprio contêiner do app (não precisa saber o nome do volume); app parado → contêiner avulso
 # chat-registro (registro cifrado dos envios do chat, se ligado): fica FORA do backup comum — dado sob sigilo, guardado
 # só no volume e apagado sozinho depois de 6 meses (src/server/chat-registro.ts)
-copiar='tar -C /var/lib/sintonia --exclude=*.tmp --exclude=./chat-registro --warning=no-file-changed -cf - .'
+# .restauracao: pasta de passagem do restore.sh (só sobra se uma restauração falhou no meio)
+copiar='tar -C /var/lib/sintonia --exclude=*.tmp --exclude=./chat-registro --exclude=./.restauracao --warning=no-file-changed -cf - .'
 if app_rodando; then
   dc exec -T app sh -c "$copiar" | tar -C "$TMP/estado" -xf -
 else

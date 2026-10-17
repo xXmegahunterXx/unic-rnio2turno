@@ -109,6 +109,33 @@ esperar_saude() {
   return 1
 }
 
+# app_na_imagem_latest → 0 quando TODAS as instâncias do app rodam a imagem $IMAGEM:latest. Um "docker compose up" que
+# falha (ex.: limite de CPU acima dos núcleos da VPS) cria o contêiner novo ANTES de tirar o velho: o velho segue de pé e
+# saudável, e só esperar a saúde não percebe que a troca não aconteceu. As duas referências passam pelo mesmo
+# "docker image inspect" (mesmo formato de ID em qualquer armazenamento de imagens).
+app_na_imagem_latest() {
+  local quer id img tem=''
+  quer="$(docker image inspect -f '{{.Id}}' "$IMAGEM:latest" 2>/dev/null)" || return 1
+  for id in $(ids_app); do
+    tem=1
+    img="$(docker inspect -f '{{.Image}}' "$id" 2>/dev/null)" || return 1
+    [[ "$(docker image inspect -f '{{.Id}}' "$img" 2>/dev/null)" == "$quer" ]] || return 1
+  done
+  [[ -n $tem ]]
+}
+
+# MB livres no disco do Docker (onde ficam imagens, cache de build e volumes; numa VPS compartilhada, o mesmo disco
+# do outro projeto). Volta 1 se não deu para medir. mb_em_gb 1500 → "1,5".
+disco_livre_mb() {
+  local dir v
+  dir="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || true)"
+  [[ -n $dir && -d $dir ]] || dir=/
+  v="$(df -BM --output=avail "$dir" 2>/dev/null | tail -n 1 | tr -dc 0-9)"
+  [[ -n $v ]] || return 1
+  printf '%s' "$v"
+}
+mb_em_gb() { awk -v m="${1:-0}" 'BEGIN { s = sprintf("%.1f", m / 1024); sub(/\./, ",", s); print s }'; }
+
 # /healthz de dentro do contêiner (não depende do Caddy nem do DNS); imprime o JSON. Entrada fechada (</dev/null):
 # o "exec" nunca lê a entrada de quem chamou (ex.: um script vindo de "curl | bash")
 healthz() {
@@ -469,6 +496,40 @@ gerar_compose_vps() {
   } >"$tmp"
   chmod 644 "$tmp"
   mv "$tmp" "$arq"
+}
+
+# regerar_compose_vps [cópia] — o gerar_compose_vps dos scripts que rodam SOZINHOS (update.sh, restore.sh, --rollback):
+# regera do .env (o limite de CPU acompanha os núcleos de agora: a VPS pode ter sido aumentada ou reduzida) e confere
+# o resultado. Mantém o arquivo anterior (e volta 1) quando o novo não passa no "docker compose config" ou PERDERIA o
+# caminho do servidor web até o app: uma rede do proxy ("networks:") ou uma porta publicada que o anterior tinha (o
+# proxy da máquina daria 502). O deploy/limites.sh aplicar regera sem essa trava (é pedido explícito de quem opera).
+# Com [cópia], o arquivo anterior fica guardado ali (quem chama decide se volta a ele). Fora do modo compartilhado: nada.
+regerar_compose_vps() {
+  compartilhado || return 0
+  local arq="$RAIZ/docker-compose.vps.yml" antes motivo='' linha
+  antes="${1:-$(mktemp "${TMPDIR:-/tmp}/sintonia-vps-yml.XXXXXX")}"
+  cp -p "$arq" "$antes" 2>/dev/null || : >"$antes"
+  gerar_compose_vps
+  if ! dc config -q >/dev/null 2>&1; then
+    motivo='não passou na conferência do Docker Compose'
+  elif [[ -s $antes ]]; then
+    if grep -q '^    networks:' "$antes" && ! grep -q '^    networks:' "$arq"; then
+      motivo='perderia a rede do proxy (networks:) que o anterior tinha'
+    else
+      while IFS= read -r linha; do
+        if ! grep -qxF -- "$linha" "$arq"; then
+          motivo="perderia a porta publicada ${linha#*- } que o anterior tinha"
+          break
+        fi
+      done < <(grep -E '^      - "[0-9.]+:[0-9]+:[0-9]+"$' "$antes" || true)
+    fi
+  fi
+  if [[ -n $motivo ]]; then
+    [[ -s $antes ]] && cp -p "$antes" "$arq"
+    aviso "O docker-compose.vps.yml regerado do .env $motivo: mantive o anterior. Confira o .env (PORTA_LOCAL, IP_PONTE, REDES_PROXY, PROXY_DOCKER); se a mudança for de propósito: sudo $DIR_DEPLOY/limites.sh aplicar (regera sem esta trava) e depois cd $RAIZ && docker compose up -d app"
+  fi
+  [[ -n ${1:-} ]] || rm -f "$antes"
+  [[ -z $motivo ]]
 }
 
 # ---- borda (Cloudflare, I02) ------------------------------------------------------------------------------------

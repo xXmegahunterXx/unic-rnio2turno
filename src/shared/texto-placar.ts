@@ -16,6 +16,7 @@
 import type { LiveStatus, Race, Summary, UF } from './types';
 import { UFS } from './types';
 import { INICIO_APURACAO, UF_NOMES, UFS_GOV_2T } from './constants';
+import { diaDeVotacaoAntesDas17 } from './diaVotacao';
 import { pctTotalizadas, pctValidos, validos } from './calc';
 import { fmtHora, fmtInt, fmtPct, normalize } from './format';
 import { anonimizarRace } from './anon';
@@ -31,17 +32,18 @@ export const TEXTO_PLACAR = {
   bordaS: 5,
   /** pedidos por canal de bot (Nightbot-Channel e afins) por minuto na origem; acima, só o endereço */
   porCanalMin: 20,
-  /** pedidos por minuto na origem, somando todos (nunca por IP: os bots dividem poucos endereços); acima, só o endereço */
+  /**
+   * MONTAGENS novas do texto por minuto na origem, somando todas (o texto já montado nos últimos 2 s sai sem contar;
+   * nunca por IP: os bots dividem poucos endereços); acima, quem pede um texto que precisaria ser montado recebe só o endereço
+   */
   globalMin: 6000,
 } as const;
 
 /** Endereço exibido quando o servidor não tem PUBLIC_URL. */
 export const DOMINIO_TEXTO_PADRAO = 'sintonia2026.com.br';
 
-/** 0h de 25/10/2026 em Brasília. */
-export const INICIO_DIA_VOTACAO = Date.UTC(2026, 9, 25, 3, 0, 0);
-/** Dia da votação, antes do início da apuração (0h–17h de 25/10, Brasília)? Relógio REAL. */
-export const diaDeVotacaoAntesDas17 = (agora: number) => agora >= INICIO_DIA_VOTACAO && agora < INICIO_APURACAO;
+/** 0h de 25/10/2026 em Brasília e o "dia da votação antes das 17h" (relógio REAL): fonte única em diaVotacao.ts. */
+export { INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from './diaVotacao';
 
 export const PREFIXO_SIMULACAO_TEXTO = '[SIMULAÇÃO] ';
 

@@ -82,6 +82,11 @@ export interface TseClientOptions {
    * arquivo já lido; 'restrita' = só 429 e borda do TSE; 'off' = nunca (429 vira erro comum; 403, "ausente").
    */
   modoPausa?: () => ModoPausaTse;
+  /**
+   * Pausa por bloqueio que já estava em curso antes de um reinício (lida do disco pelo servidor): o cliente nasce pausado
+   * até `ate` — nenhum pedido sai durante o bloqueio (no TSE, cada tentativa nele reinicia o prazo). Vencida = ignorada.
+   */
+  bloqueioInicial?: BloqueioTse | null;
   /** Envia If-None-Match/If-Modified-Since. Padrão true. */
   condicional?: boolean;
   /** Cabeçalhos extras (ex.: User-Agent identificável no servidor). */
@@ -321,6 +326,8 @@ export class TseClient {
     this.balde = new BaldeFichas(opts.limitePorSeg ?? TSE_LIMITE_POR_SEG.padrao, this.relogioBalde);
     this.semTeto = !!opts.semTeto;
     this.modoPausaFn = opts.modoPausa ?? (() => 'auto');
+    const b0 = opts.bloqueioInicial;
+    if (b0 && Number.isFinite(b0.ate) && b0.ate > this.now()) this.bloqueioAtual = { ...b0 };
   }
 
   /** Modo da pausa por bloqueio agora (nunca lança; erro = 'auto'). */

@@ -98,6 +98,11 @@ async function main() {
     }
   }
 
+  // ensaio do update.sh (contêiner ao lado do que está no ar, mesmo volume): não grava audiência nem métricas — o app no
+  // ar é quem conta (senão cada update somaria um "reinício" e poderia regravar contagens velhas) —, não manda alertas,
+  // não consulta o TSE (o app no ar já consulta, do mesmo IP), não grava o histórico do TSE e não faz a troca automática
+  const ensaio = /^(1|true|sim)$/i.test(process.env.SINTONIA_ENSAIO?.trim() ?? '');
+
   // ---- fonte TSE -----------------------------------------------------------------------------------
   const nomes = new Map<string, string>();
   for (const [uf, d] of Object.entries(ds.ufs)) for (const m of d?.municipios ?? []) nomes.set(`${uf}|${m.cod}`, m.nome);
@@ -110,11 +115,11 @@ async function main() {
     avisoNacional: () => chavesNoite(controller.state()).avisoNacional,
     // I03: quando pausar por bloqueio do TSE (chave 'pausa-tse'; lida só a cada 429/403)
     modoPausa: () => chavesNoite(controller.state()).pausaTse,
+    somenteLeitura: ensaio,
+    // a pausa por bloqueio do TSE sobrevive a um reinício (vigia do healthcheck, troca de imagem): o processo novo nasce
+    // pausado até o fim do prazo, sem mandar pedido algum durante o bloqueio
+    pausa: createJsonStore(config.stateDir, 'tse-pausa.json', { debounceMs: 0, onErro: (e) => log.erro('Falha ao salvar a pausa do TSE', e) }),
   });
-
-  // ensaio do update.sh (contêiner ao lado do que está no ar, mesmo volume): não grava audiência nem métricas — o app no
-  // ar é quem conta (senão cada update somaria um "reinício" e poderia regravar contagens velhas) — e não manda alertas
-  const ensaio = /^(1|true|sim)$/i.test(process.env.SINTONIA_ENSAIO?.trim() ?? '');
 
   // ---- alertas da noite (I16) ------------------------------------------------------------------------
   const cfgAlertas = configAlertas(process.env);
@@ -170,7 +175,8 @@ async function main() {
   sintonia.crescimento.iniciar();
   const s0 = controller.state();
   tse.sincronizar(s0.fonte, s0.tse);
-  sintonia.agendador.iniciar();
+  // a troca automática das 17h é do app no ar (o ensaio nunca muda a fonte nem grava o admin.json por conta própria)
+  if (!ensaio) sintonia.agendador.iniciar();
   alertas.iniciar();
 
   // Várias instâncias com o mesmo STATE_DIR (volume compartilhado, PM2/cluster) convergem para o admin.json
@@ -237,7 +243,7 @@ async function main() {
     setInterval(bater, 1000).unref();
   }
 
-  if (ensaio) log.info('SINTONIA_ENSAIO: contêiner de ensaio — audiência e métricas dos anúncios não são gravadas');
+  if (ensaio) log.info('SINTONIA_ENSAIO: contêiner de ensaio — sem consultas ao TSE, sem troca automática; audiência, métricas dos anúncios e histórico do TSE não são gravados');
   const resumo = setInterval(() => {
     const r = sintonia.resumoMinuto();
     if (r) log.info(r.msg, r.campos);

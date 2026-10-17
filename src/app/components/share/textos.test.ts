@@ -3,6 +3,9 @@ import { anonimizarRace } from '@/shared/anon';
 import { coreFixtures, RACE_PRES, RACE_PRES_T1, RESUMO_T1 } from '@/app/fixtures/core';
 import { pesoPostX, pesoTextoX, xIntentUrl } from '@/app/lib/share';
 import {
+  DESCRICAO_DIA_VOTACAO,
+  TEXTO_DIA_VOTACAO,
+  trocaPeloConvite,
   HASHTAGS,
   LIMITE_TEXTO,
   PREFIXO_SIMULACAO,
@@ -254,5 +257,23 @@ describe('textos da aba "Postar" (I26)', () => {
       conferir(t);
       expect(t).not.toMatch(/Lula|Bolsonaro|Candidato|PT|PL/);
     }
+  });
+});
+
+describe('dia da votação (0h–17h de 25/10): o kit troca o conteúdo com candidato pelo convite', () => {
+  const h = (dia: number, hora: number, min = 0) => Date.UTC(2026, 9, dia, hora + 3, min, 0); // hora de Brasília
+  it('troca só de 0h a 16h59 de 25/10, e nunca o conteúdo marcado como genérico', () => {
+    expect(trocaPeloConvite(h(24, 23, 59))).toBe(false);
+    expect(trocaPeloConvite(h(25, 0, 0))).toBe(true);
+    expect(trocaPeloConvite(h(25, 12, 1))).toBe(true);
+    expect(trocaPeloConvite(h(25, 16, 59))).toBe(true);
+    expect(trocaPeloConvite(h(25, 17, 0))).toBe(false);
+    expect(trocaPeloConvite(h(25, 12, 1), true)).toBe(false);
+  });
+  it('o convite não tem nome, partido, número nem percentual, e cabe no X', () => {
+    for (const t of [TEXTO_DIA_VOTACAO, DESCRICAO_DIA_VOTACAO]) {
+      expect(t).not.toMatch(/\d+[,.]?\d*\s*%|Lula|Flávio|Bolsonaro|\bPT\b|\bPL\b|\b13\b|\b22\b/);
+    }
+    expect(TEXTO_DIA_VOTACAO.length).toBeLessThanOrEqual(LIMITE_TEXTO);
   });
 });

@@ -66,7 +66,8 @@ export function HeroHome({ status, recebidoEm, race, raceT1, resumo, anonimizado
   );
   const descricao = (
     <p className="max-w-[36rem] text-pretty text-[14.5px] leading-snug text-fg-muted sm:text-[17px] sm:leading-relaxed">
-      A apuração do 2º turno ao vivo, do Brasil inteiro até a urna da sua seção.{' '}
+      {/* depois do fim, "ao vivo" não vale mais (como o título da aba e o cabeçalho) */}
+      {fase === 'encerrada' ? 'O resultado do 2º turno, do Brasil inteiro até a urna da sua seção.' : 'A apuração do 2º turno ao vivo, do Brasil inteiro até a urna da sua seção.'}{' '}
       <span className="text-fg">Apartidária, com os dados oficiais do TSE.</span>
     </p>
   );

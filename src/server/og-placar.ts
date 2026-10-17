@@ -546,7 +546,7 @@ export function layoutPlacar(inp: OgPlacarInput, opts: { semFundo?: boolean } = 
       'div',
       { flexDirection: 'column', alignItems: alinhar, flexShrink: 0 },
       h('div', { fontSize: m.status, fontWeight: 700, color: C.fg, letterSpacing: -0.3 }, dominio),
-      h('div', { fontSize: m.sub, color: inp.simulacao ? C.brand2 : C.subtle, marginTop: Math.round(5 * m.k) }, inp.simulacao ? 'Simulação · não é resultado' : 'Apuração ao vivo e 1º turno'),
+      h('div', { fontSize: m.sub, color: inp.simulacao ? C.brand2 : C.subtle, marginTop: Math.round(5 * m.k) }, inp.simulacao ? 'Simulação · não é resultado' : encerrada ? 'Resultado e 1º turno' : 'Apuração ao vivo e 1º turno'),
     );
 
   // ---- diferença (2º turno com votos): neutra, sem dizer quem; a cor e os números já dizem ----
