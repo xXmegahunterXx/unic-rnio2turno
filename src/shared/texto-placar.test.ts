@@ -217,10 +217,11 @@ describe('placar', () => {
     }
   });
 
-  it('simulação: "[SIMULAÇÃO]" na frente; com nomes ocultos, Candidato A/B sem partido', () => {
+  it('simulação: "[SIMULAÇÃO]" na frente e SEMPRE Candidato A/B sem partido (mesmo com os nomes reais no painel)', () => {
     const s = textoPlacarBot(entrada({ status: status({ simulacao: true }) }));
     conferir(s);
-    expect(s.startsWith('[SIMULAÇÃO] Presidente · 2º turno: Lula (PT)')).toBe(true);
+    expect(s).toMatch(/^\[SIMULAÇÃO\] Presidente · 2º turno: Candidato A \d/);
+    expect(s).not.toMatch(/Lula|Flávio|Bolsonaro|\(PT\)|\(PL\)/);
     const a = textoPlacarBot(entrada({ status: status({ simulacao: true, anonimizado: true }), resumo: resumo({ eleito: 0 }) }));
     conferir(a);
     expect(a).toMatch(/^\[SIMULAÇÃO\] Presidente · 2º turno: Candidato A 50,12% × Candidato B 49,88%/);

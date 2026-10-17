@@ -106,6 +106,13 @@ describe('chaves da noite', () => {
       [{ tipo: 'texto-bots', ligado: false }, { textoBots: false }],
       [{ tipo: 'contar-lives', ligado: false }, { contarLives: false }],
       [{ tipo: 'aviso-nacional', modo: 'off' }, { avisoNacional: 'off' }],
+      // integração da leva 3: peças novas da noite
+      [{ tipo: 'faixa-conexao', ligado: false }, { faixaConexao: false }],
+      [{ tipo: 'carimbo-print', ligado: false }, { carimboPrint: false }],
+      [{ tipo: 'meta-placar', ligado: false }, { metaPlacar: false }],
+      [{ tipo: 'medir-local', ligado: false }, { medirLocal: false }],
+      [{ tipo: 'pausa-tse', modo: 'restrita' }, { pausaTse: 'restrita' }],
+      [{ tipo: 'pausa-tse', modo: 'off' }, { pausaTse: 'off' }],
     ];
     let esperado = { ...CHAVES_NOITE_PADRAO, freio: { ...CHAVES_NOITE_PADRAO.freio } };
     for (const [cmd, campo] of cmds) {
@@ -116,6 +123,11 @@ describe('chaves da noite', () => {
     expect(c.state().versao).toBe(v0);
     c.command({ tipo: 'aviso-nacional', modo: 'auto' });
     expect(c.state().noite?.avisoNacional).toBe('auto');
+    // faixa e carimbo desligados vão ao site (status); ligados, o campo some
+    expect(c.status()).toMatchObject({ semFaixaConexao: true, semCarimbo: true });
+    c.command({ tipo: 'faixa-conexao', ligado: true });
+    c.command({ tipo: 'carimbo-print', ligado: true });
+    expect('semFaixaConexao' in c.status() || 'semCarimbo' in c.status()).toBe(false);
   });
 
   it('valores inválidos → CommandError, nada muda', () => {
@@ -125,6 +137,8 @@ describe('chaves da noite', () => {
     expect(() => c.command({ tipo: 'freio', fator: 2, leve: 'sim' } as never)).toThrow(CommandError);
     expect(() => c.command({ tipo: 'html-borda', ligado: 1 } as never)).toThrow(CommandError);
     expect(() => c.command({ tipo: 'aviso-nacional', modo: 'sempre' } as never)).toThrow(CommandError);
+    expect(() => c.command({ tipo: 'pausa-tse', modo: 'nunca' } as never)).toThrow(CommandError);
+    expect(() => c.command({ tipo: 'faixa-conexao', ligado: 'nao' } as never)).toThrow(CommandError);
     expect(() => c.command({ tipo: 'tse', tse: { limitePorSeg: 4 } })).toThrow(/5 e 90/);
     expect(() => c.command({ tipo: 'tse', tse: { limitePorSeg: 40.5 } })).toThrow(CommandError);
     expect(c.toJSON()).toBe(antes);

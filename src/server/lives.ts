@@ -3,14 +3,15 @@
  *
  * Contagem ANÔNIMA: a /live (fonte de navegador do OBS) manda um batimento a cada 60 s com um id aleatório da carga da
  * página, o layout e os anúncios na tela. Nada identifica canal nem pessoa: a rede do cliente entra só como hash com sal
- * (`clienteDe`, nunca o IP) para o teto de 30 fontes por rede, e só na memória. Guardado em disco (STATE_DIR/lives.json,
+ * (`clienteDe`, nunca o IP) para o teto de fontes por rede (`LIVES.maxFontesPorRede`), e só na memória. Guardado em disco (STATE_DIR/lives.json,
  * gravação atômica no máximo a cada 15 s; nada no contêiner de ensaio, SINTONIA_ENSAIO): minutos no ar (total, por
  * layout, por anúncio), o pico de lives ao mesmo tempo, o detalhe por hora (14 dias) e o MAIOR número de canais de bot
  * já visto — os canais em si (hash com sal do processo) ficam só na memória.
  *
  * Rotas (registradas por `registrarStreamers`, 1 linha em app.ts, antes do 404 de /api/* e do `app.route` do admin):
- *  - `POST /api/live/batimento`  corpo ≤ 200 B (text/plain do sendBeacon ou JSON) `{ id, layout, a? }` → 204. Só do
- *    próprio site (Sec-Fetch-Site same-origin / Origin do site); sem nenhum dos dois (curl) → 204 sem contar. Chave
+ *  - `POST /api/live/batimento`  corpo ≤ 200 B (text/plain do sendBeacon ou JSON) `{ id, layout, a? }` → 204. Conta só
+ *    com Origin do site (outro site → 403; sem Origin, como no curl → 204 sem contar). Uma fonte só entra em "agora", no
+ *    pico e nos quadros depois de confirmada (2 batimentos com ≥ 45 s entre eles; ver `Fonte.confirmada`). Chave
  *    'contar-lives' desligada → 204 sem ler nem contar. Na Cloudflare: regra de bypass (nunca guardado).
  *  - `GET /api/live/agora`  `{ agora: N | null }` — N só a partir de 5 lives (e null com a chave desligada); a borda guarda 30 s.
  *  - `GET /api/admin/lives`  LivesResumo · `POST /api/admin/lives { acao: 'zerar' }` (painel → Lives).
@@ -41,6 +42,11 @@ interface Fonte {
   visto: number;
   /** último batimento que somou minuto (ou o 1º, que só registra) */
   contado: number;
+  /**
+   * já somou um minuto (2 batimentos com ≥ `minutoMinS` entre eles). Só as confirmadas contam em "agora", no pico, por
+   * layout e por hora: um id mandado uma vez (curl, recarga) nunca vira "live" — forjar exige manter cada id vivo.
+   */
+  confirmada: boolean;
 }
 
 /** Arquivo STATE_DIR/lives.json (só contagens). */
@@ -59,6 +65,8 @@ export type ResultadoBatimento = 'nova' | 'minuto' | 'visto' | 'teto-rede' | 'te
 /** Contagem anônima das lives. Relógio injetável (testes). */
 export class Lives {
   private fontes = new Map<string, Fonte>();
+  /** fontes confirmadas (ver `Fonte.confirmada`) entre as ativas */
+  private confirmadas = 0;
   private porRede = new Map<string, Set<string>>();
   private minutos = { total: 0, porLayout: {} as Record<string, number>, porAnuncio: {} as Record<string, number> };
   private pico: { n: number; em: number } | null = null;
@@ -82,6 +90,7 @@ export class Lives {
     for (const [id, f] of this.fontes) {
       if (f.visto >= limite) continue;
       this.fontes.delete(id);
+      if (f.confirmada) this.confirmadas--;
       const s = this.porRede.get(f.rede);
       s?.delete(id);
       if (s && s.size === 0) this.porRede.delete(f.rede);
@@ -117,21 +126,22 @@ export class Lives {
       if (s && s.size >= LIVES.maxFontesPorRede) return 'teto-rede';
       if (!s) this.porRede.set(rede, (s = new Set()));
       s.add(b.id);
-      this.fontes.set(b.id, { rede, layout: b.layout, anuncios, visto: t, contado: t });
-      const n = this.fontes.size;
-      if (!this.pico || n > this.pico.n) this.pico = { n, em: t };
-      const h = this.hora(t);
-      h.max = Math.max(h.max, n);
-      this.sujo = true;
+      // só registra: a fonte entra na contagem quando confirmar (2º batimento ≥ 45 s depois)
+      this.fontes.set(b.id, { rede, layout: b.layout, anuncios, visto: t, contado: t, confirmada: false });
       return 'nova';
     }
     f.visto = t;
     f.layout = b.layout;
     f.anuncios = anuncios;
-    const h = this.hora(t);
-    h.max = Math.max(h.max, this.fontes.size);
     if (t - f.contado < LIVES.minutoMinS * 1000) return 'visto';
     f.contado = t;
+    const h = this.hora(t);
+    if (!f.confirmada) {
+      f.confirmada = true;
+      this.confirmadas++;
+      if (!this.pico || this.confirmadas > this.pico.n) this.pico = { n: this.confirmadas, em: t };
+    }
+    h.max = Math.max(h.max, this.confirmadas);
     this.minutos.total++;
     this.minutos.porLayout[b.layout] = (this.minutos.porLayout[b.layout] ?? 0) + 1;
     for (const a of anuncios) this.minutos.porAnuncio[a] = (this.minutos.porAnuncio[a] ?? 0) + 1;
@@ -147,8 +157,14 @@ export class Lives {
     if (this.canais.size > this.canaisAntes) this.sujo = true;
   }
 
-  /** Lives ativas agora. */
+  /** Lives ativas e confirmadas agora (no ar há pelo menos ~1 min). */
   agora(): number {
+    this.limpar(this.now());
+    return this.confirmadas;
+  }
+
+  /** Fontes registradas (confirmadas ou não): só para testes e o teto de memória. */
+  fontesRegistradas(): number {
     this.limpar(this.now());
     return this.fontes.size;
   }
@@ -169,12 +185,13 @@ export class Lives {
     const porLayout: Record<string, number> = {};
     const agoraPorAnuncio: Record<string, number> = {};
     for (const f of this.fontes.values()) {
+      if (!f.confirmada) continue;
       porLayout[f.layout] = (porLayout[f.layout] ?? 0) + 1;
       for (const a of f.anuncios) agoraPorAnuncio[a] = (agoraPorAnuncio[a] ?? 0) + 1;
     }
     const horas: HoraLives[] = [...this.horas.entries()].sort((a, b) => a[0] - b[0]).map(([h, x]) => ({ h, max: x.max, minutos: x.minutos }));
     return {
-      agora: this.fontes.size,
+      agora: this.confirmadas,
       porLayout,
       minutos: { total: this.minutos.total, porLayout: { ...this.minutos.porLayout }, porAnuncio: { ...this.minutos.porAnuncio } },
       canaisBot: this.canaisBot,
@@ -194,7 +211,7 @@ export class Lives {
     this.canaisAntes = 0;
     this.desde = t;
     this.limpar(t, true);
-    this.pico = this.fontes.size ? { n: this.fontes.size, em: t } : null;
+    this.pico = this.confirmadas ? { n: this.confirmadas, em: t } : null;
     this.sujo = true;
   }
 
@@ -294,11 +311,15 @@ export function registrarStreamers(app: App, admin: App, deps: DepsStreamers) {
     store.salvar(() => lives.toJSON());
   };
 
-  /** Batimento mandado pelo próprio site? Outro site → 403; sem Origin nem Sec-Fetch-Site → aceito, mas não conta. */
+  /**
+   * Batimento mandado pelo próprio site? Outro site → 403. Conta só com `Origin` do site: todo navegador (e o OBS/CEF)
+   * manda Origin num POST, inclusive no sendBeacon; sem Origin (curl, mesmo com Sec-Fetch-Site forjado) → aceito, mas
+   * não conta. Não impede quem forja o Origin também — por isso o teto por rede e a confirmação em 2 batimentos.
+   */
   const doSite = (c: Ctx): boolean | 'outro' => {
     const sfs = c.req.header('sec-fetch-site');
     if (sfs && sfs !== 'same-origin') return 'outro';
-    if (!c.req.header('origin')) return sfs === 'same-origin';
+    if (!c.req.header('origin')) return false;
     return deps.origemPermitida(c) ? true : 'outro';
   };
   const porRede = new Map<string, number>();

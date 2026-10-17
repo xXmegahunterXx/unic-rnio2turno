@@ -18,7 +18,7 @@
  * HC_PING_URL, `ALERTAS=0` desliga; desligados sem as variáveis e sempre no ensaio do update.sh) e a chave 'aviso-nacional'
  * do painel lida pelo TseManager a cada status.
  */
-import { unwatchFile, watchFile, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createAdaptorServer } from '@hono/node-server';
@@ -33,6 +33,7 @@ import { createLogger, msgErro } from './log';
 import { createJsonStore } from './state-store';
 import { TseManager } from './tse';
 import { AlertasNoite, configAlertas, limiteMemoriaMb } from './alertas';
+import { vigiarAdmin } from './vigia-admin';
 
 async function main() {
   const t0 = performance.now();
@@ -47,7 +48,8 @@ async function main() {
   const ds = await loadDataset(loader);
   log.info(`Dataset: ${ds.meta.races.length} corridas, ${ds.meta.ufs.length} UFs (${config.dataDir})`);
 
-  const store = createJsonStore(config.stateDir, 'admin.json', { onErro: (e) => log.erro('Falha ao salvar o estado do admin', e) });
+  // `lembrar`: o vigia do arquivo (vigia-admin.ts) reconhece as últimas 20 gravações desta instância e não as adota
+  const store = createJsonStore(config.stateDir, 'admin.json', { lembrar: 20, onErro: (e) => log.erro('Falha ao salvar o estado do admin', e) });
   const salvo = store.ler();
   const controller = createController(ds, {
     modo: 'servidor',
@@ -106,6 +108,8 @@ async function main() {
     historico: createJsonStore(config.stateDir, 'tse-historico.json', { debounceMs: 1000, onErro: (e) => log.erro('Falha ao salvar o histórico do TSE', e) }),
     // I18: 'off' no painel ("Chaves da noite") tira o aviso do arquivo nacional parado do status público, na hora
     avisoNacional: () => chavesNoite(controller.state()).avisoNacional,
+    // I03: quando pausar por bloqueio do TSE (chave 'pausa-tse'; lida só a cada 429/403)
+    modoPausa: () => chavesNoite(controller.state()).pausaTse,
   });
 
   // ensaio do update.sh (contêiner ao lado do que está no ar, mesmo volume): não grava audiência nem métricas — o app no
@@ -170,25 +174,14 @@ async function main() {
   alertas.iniciar();
 
   // Várias instâncias com o mesmo STATE_DIR (volume compartilhado, PM2/cluster) convergem para o admin.json
-  // mais recente: quem não escreveu adota o estado (setState não regrava → sem laço). Atraso ≤ ~1 s.
-  watchFile(store.caminho, { interval: 1000, persistent: false }, (cur, prev) => {
-    if (cur.mtimeMs === prev.mtimeMs || cur.mtimeMs === 0) return;
-    const v = store.ler() as AdminState | null;
-    if (!v || typeof v !== 'object' || typeof v.versao !== 'number') return;
-    const atual = controller.state();
-    if (v.versao < atual.versao || JSON.stringify(v) === JSON.stringify(atual)) return;
-    if (!config.permitirSimulacao && v.fonte === 'simulacao') {
-      log.aviso(`Estado de outra instância IGNORADO: fonte "simulacao" sem ALLOW_SIMULACAO=1 (versão ${v.versao})`);
-      return;
-    }
-    try {
-      controller.setState(v);
-      const s = controller.state();
-      tse.sincronizar(s.fonte, s.tse);
-      log.info(`Estado do admin sincronizado de outra instância (versão ${s.versao}, fonte ${s.fonte})`);
-    } catch (e) {
-      log.erro('Falha ao adotar o estado de outra instância', e);
-    }
+  // mais recente: quem não escreveu adota o estado (setState não regrava → sem laço). Atraso ≤ ~1 s. A própria gravação
+  // (atrasada pelo debounce) é reconhecida pelo hash e nunca adotada — senão uma chave da noite voltava atrás (vigia-admin.ts).
+  const pararVigia = vigiarAdmin({
+    store,
+    controller,
+    permitirSimulacao: config.permitirSimulacao,
+    aoAdotar: (s) => tse.sincronizar(s.fonte, s.tse),
+    log,
   });
 
   const server = createAdaptorServer({ fetch: sintonia.app.fetch, hostname: config.host });
@@ -272,7 +265,7 @@ async function main() {
     sintonia.encerrar();
     alertas.parar();
     clearInterval(resumo);
-    unwatchFile(store.caminho);
+    pararVigia();
     // 1ª fase (até 2 s): continua atendendo, mas cada resposta sai com `Connection: close` — os clientes keep-alive
     // fecham a conexão depois da resposta em vez de levar um reset no meio de um pedido novo; o /readyz já diz 503
     const fase1 = Math.min(2_000, config.encerramentoMs / 2);

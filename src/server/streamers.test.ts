@@ -74,7 +74,7 @@ describe('GET /api/texto/placar', () => {
     }
   });
 
-  it('simulação: [SIMULAÇÃO], nomes ocultos por padrão; com nomes reais, na ordem da urna; UF e governador', async () => {
+  it('simulação: [SIMULAÇÃO] e nomes SEMPRE ocultos (mesmo com os nomes reais no painel); UF e governador', async () => {
     await comando(m, cookie, { tipo: 'velocidade', velocidade: 20 });
     expect((await comando(m, cookie, { tipo: 'relogio', acao: 'iniciar' })).status).toBe(200);
     await comando(m, cookie, { tipo: 'saltar-pct', pct: 50 });
@@ -86,10 +86,11 @@ describe('GET /api/texto/placar', () => {
     await comando(m, cookie, { tipo: 'nomes-reais', ativo: true });
     m.relogio.t += 3000;
     const n = (await texto()).t;
-    expect(n).toMatch(/^\[SIMULAÇÃO\] Presidente · 2º turno: Lula \(PT\) \d+,\d\d% × Flávio Bolsonaro \(PL\) \d+,\d\d%/);
-    expect(n).not.toMatch(/lidera/i);
+    // o texto do bot vai para o chat da live sem o contexto da página: nunca nome real com número fictício
+    expect(n).toMatch(/^\[SIMULAÇÃO\] Presidente · 2º turno: Candidato A \d+,\d\d% × Candidato B \d+,\d\d%/);
+    expect(n).not.toMatch(/Lula|Flávio|\(PT\)|\(PL\)|lidera/i);
     const pe = (await texto('?uf=Pernambuco')).t;
-    expect(pe).toMatch(/^\[SIMULAÇÃO\] Presidente · Pernambuco · 2º turno: Lula/);
+    expect(pe).toMatch(/^\[SIMULAÇÃO\] Presidente · Pernambuco · 2º turno: Candidato A/);
     expect(pe).not.toMatch(/eleito/);
     const gov = (await texto('?uf=governador%20df')).t;
     expect(gov).toMatch(/^\[SIMULAÇÃO\] Governador · Distrito Federal · 2º turno: /);
@@ -139,8 +140,23 @@ describe('GET /api/texto/placar', () => {
 });
 
 describe('lives: batimento, agora e painel', () => {
-  it('conta só do próprio site; outro site 403; sem cabeçalhos aceita sem contar; corpo inválido 400/413', async () => {
+  it('conta só com Origin do site e depois de confirmada (2 batimentos ≥ 45 s); outro site 403; sem Origin (curl) aceita sem contar; corpo inválido 400/413', async () => {
+    m.relogio.t += (LIVES.ativaS + 1) * 1000;
     expect((await batimento({ id: 'abcdefgh0001', layout: 'barra' })).status).toBe(204);
+    expect((await resumoAdmin()).agora).toBe(0); // registrada, ainda não confirmada
+    m.relogio.t += 46_000;
+    expect((await batimento({ id: 'abcdefgh0001', layout: 'barra' })).status).toBe(204);
+    expect((await resumoAdmin()).agora).toBe(1);
+    // curl com Sec-Fetch-Site forjado e sem Origin: 204, nunca conta (nem confirmado)
+    const curl = () =>
+      m.app.request('/api/live/batimento', {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain', 'sec-fetch-site': 'same-origin', 'x-real-ip': '200.5.5.5' },
+        body: JSON.stringify({ id: 'curlforjado1', layout: 'barra' }),
+      });
+    expect((await curl()).status).toBe(204);
+    m.relogio.t += 46_000;
+    expect((await curl()).status).toBe(204);
     expect((await resumoAdmin()).agora).toBe(1);
     expect((await batimento({ id: 'abcdefgh0002', layout: 'barra' }, { 'sec-fetch-site': 'cross-site', origin: 'https://outro.site' })).status).toBe(403);
     const semCab = await m.app.request('/api/live/batimento', { method: 'POST', headers: { 'content-type': 'text/plain' }, body: JSON.stringify({ id: 'abcdefgh0003', layout: 'barra' }) });
@@ -153,20 +169,34 @@ describe('lives: batimento, agora e painel', () => {
     expect((await batimento({ id: 'abcdefgh0006', layout: 'barra' }, { 'content-type': 'application/x-www-form-urlencoded' })).status).toBe(415);
   });
 
-  it('"agora" público só a partir de 5 lives; borda 30 s', async () => {
+  it('"agora" público só a partir de 5 lives confirmadas; borda 30 s', async () => {
+    m.relogio.t += (LIVES.ativaS + 1) * 1000;
     const r = await m.app.request('/api/live/agora');
     expect(r.headers.get('cache-control')).toBe(`public, max-age=0, s-maxage=${LIVES.agoraBordaS}`);
     expect(r.headers.get('cloudflare-cdn-cache-control')).toMatch(/^max-age=30\b/);
     expect(await agora()).toBeNull();
-    for (let i = 0; i < 4; i++) await batimento({ id: `fonte5vivas${i}`, layout: 'canto' }, { 'x-real-ip': `200.9.9.${i}` });
+    const cinco = () => Promise.all(Array.from({ length: 5 }, (_, i) => batimento({ id: `fonte5vivas${i}`, layout: 'canto' }, { 'x-real-ip': `200.9.9.${i}` })));
+    await cinco();
+    expect(await agora()).toBeNull(); // 5 registradas, nenhuma confirmada
+    m.relogio.t += 46_000;
+    await cinco();
     expect(await agora()).toBe(5);
     const s = await resumoAdmin();
-    expect(s.porLayout).toEqual({ barra: 1, canto: 4 });
+    expect(s.porLayout).toEqual({ canto: 5 });
     expect(s.ligado).toBe(true);
   });
 
-  it('teto de 30 fontes por rede', async () => {
-    for (let i = 0; i < LIVES.maxFontesPorRede + 5; i++) await batimento({ id: `mesmarede${String(i).padStart(3, '0')}`, layout: 'placar' }, { 'x-real-ip': '177.7.7.7' });
+  it(`teto de ${LIVES.maxFontesPorRede} fontes por rede`, async () => {
+    m.relogio.t += (LIVES.ativaS + 1) * 1000;
+    const todas = () =>
+      Promise.all(
+        Array.from({ length: LIVES.maxFontesPorRede + 5 }, (_, i) =>
+          batimento({ id: `mesmarede${String(i).padStart(3, '0')}`, layout: 'placar' }, { 'x-real-ip': '177.7.7.7' }),
+        ),
+      );
+    await todas();
+    m.relogio.t += 46_000;
+    await todas();
     expect((await resumoAdmin()).porLayout.placar).toBe(LIVES.maxFontesPorRede);
   });
 
@@ -228,11 +258,16 @@ describe('Lives (classe)', () => {
     l.canal('k1');
     const r = l.resumo();
     expect(r.agora).toBe(3);
-    expect(r.pico).toEqual({ n: 3, em: Date.UTC(2026, 9, 25, 22, 0, 0) });
+    // o pico conta só as confirmadas (2º batimento, 1 min depois)
+    expect(r.pico).toEqual({ n: 3, em: Date.UTC(2026, 9, 25, 22, 1, 0) });
     expect(r.minutos).toEqual({ total: 3, porLayout: { barra: 3 }, porAnuncio: { 'marca-x': 3 } });
     expect(r.agoraPorAnuncio).toEqual({ 'marca-x': 3 });
     expect(r.canaisBot).toBe(2);
     expect(r.horas).toEqual([{ h: Date.UTC(2026, 9, 25, 22), max: 3, minutos: 3 }]);
+    // uma fonte que mandou um batimento só (curl, recarga) nunca vira live
+    expect(l.batimento('rede-nova', { id: 'umavezso0001', layout: 'barra' }, noAr)).toBe('nova');
+    expect(l.resumo().agora).toBe(3);
+    expect(l.resumo().pico?.n).toBe(3);
     // id de outra rede não "rouba" a fonte
     expect(l.batimento('outra', { id: 'idfonte00000', layout: 'mapa' }, noAr)).toBe('visto');
 
@@ -249,8 +284,8 @@ describe('Lives (classe)', () => {
     expect(l2.resumo().canaisBot).toBe(2);
     // teto global de fontes (memória limitada)
     const cheia = new Lives(() => rel.t);
-    for (let i = 0; i < LIVES.maxFontes; i++) cheia.batimento(`r${Math.floor(i / 30)}`, { id: `f${String(i).padStart(11, '0')}`, layout: 'barra' }, noAr);
-    expect(cheia.agora()).toBe(LIVES.maxFontes);
+    for (let i = 0; i < LIVES.maxFontes; i++) cheia.batimento(`r${Math.floor(i / LIVES.maxFontesPorRede)}`, { id: `f${String(i).padStart(11, '0')}`, layout: 'barra' }, noAr);
+    expect(cheia.fontesRegistradas()).toBe(LIVES.maxFontes);
     expect(cheia.batimento('nova-rede', { id: 'fonteextra01', layout: 'barra' }, noAr)).toBe('teto');
     expect(new Lives().carregar({ v: 2 })).toBe(false);
     expect(new Lives().carregar('lixo')).toBe(false);
@@ -262,12 +297,13 @@ describe('Lives (classe)', () => {
   });
 
   it('registro isolado: grava em STATE_DIR/lives.json (atômico) e não grava no ensaio', async () => {
+    const rel = { t: Date.UTC(2026, 9, 25, 22) };
     const montarIsolado = (stateDir: string, gravar?: boolean) => {
       const app = new Hono<{ Bindings: HttpBindings }>();
       const admin = new Hono<{ Bindings: HttpBindings }>();
       const log = createLogger({ saida: false });
       const s = registrarStreamers(app, admin, {
-        now: () => Date.UTC(2026, 9, 25, 22),
+        now: () => rel.t,
         log,
         dados: {
           status: () => ({ anuncios: [] }) as never,
@@ -291,8 +327,15 @@ describe('Lives (classe)', () => {
     };
     const dir = mkdtempSync(join(tmpdir(), 'sintonia-lives-'));
     const { app, s } = montarIsolado(dir);
-    const r = await app.request('/api/live/batimento', { method: 'POST', headers: { 'content-type': 'text/plain', 'sec-fetch-site': 'same-origin' }, body: JSON.stringify({ id: 'isolado00001', layout: 'vertical' }) });
-    expect(r.status).toBe(204);
+    const bat = (a: typeof app, id: string, layout: string) =>
+      a.request('/api/live/batimento', {
+        method: 'POST',
+        headers: { 'content-type': 'text/plain', 'sec-fetch-site': 'same-origin', origin: 'https://sintonia2026.com.br' },
+        body: JSON.stringify({ id, layout }),
+      });
+    expect((await bat(app, 'isolado00001', 'vertical')).status).toBe(204);
+    rel.t += 60_000;
+    expect((await bat(app, 'isolado00001', 'vertical')).status).toBe(204);
     await s.persistir();
     const salvo = JSON.parse(readFileSync(join(dir, 'lives.json'), 'utf8'));
     expect(salvo.v).toBe(1);
@@ -305,7 +348,9 @@ describe('Lives (classe)', () => {
 
     const dir2 = mkdtempSync(join(tmpdir(), 'sintonia-lives-'));
     const iso2 = montarIsolado(dir2, false);
-    await iso2.app.request('/api/live/batimento', { method: 'POST', headers: { 'content-type': 'text/plain', 'sec-fetch-site': 'same-origin' }, body: JSON.stringify({ id: 'isolado00002', layout: 'barra' }) });
+    await bat(iso2.app, 'isolado00002', 'barra');
+    rel.t += 60_000;
+    await bat(iso2.app, 'isolado00002', 'barra');
     await iso2.s.persistir();
     expect(existsSync(join(dir2, 'lives.json'))).toBe(false);
   });

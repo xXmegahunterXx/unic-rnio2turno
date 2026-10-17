@@ -3,7 +3,11 @@
  * quando o status falha 3 vezes seguidas ou quando as respostas chegam com o relógio do servidor parado há 60 s (status
  * velho servido pela borda). Diz só o fato e a hora do último dado recebido (a mesma da pílula "ao vivo": horário de
  * Brasília; na simulação, o relógio simulado); some sozinha na primeira resposta nova. Regras em
- * `src/app/data/carga.ts`; estado em `useConexaoInstavel` (hooks.ts).
+ * `src/app/data/carga.ts`; estado em `useConexaoInstavel` (hooks.ts). Chave 'faixa-conexao' no painel (Chaves da noite):
+ * desligada, o status traz `semFaixaConexao` e a faixa não aparece (o recuo do status continua).
+ *
+ * Fora do JS inicial: o AppShell monta a região viva (`role="status"`) e carrega este arquivo só quando a conexão fica
+ * instável — e o pré-carrega alguns segundos depois da abertura, para já estar no aparelho quando a rede falhar.
  */
 import { AnimatePresence, motion } from 'framer-motion';
 import { fmtHoraSeg } from '@/shared/format';
@@ -14,9 +18,8 @@ import { Container } from './Container';
 export function FaixaConexao() {
   const { instavel, ultimoDado } = useConexaoInstavel();
   return (
-    // região viva sempre montada: o leitor de tela anuncia quando a faixa aparece
-    <div role="status" aria-live="polite">
-      <AnimatePresence initial={false}>
+    // a região viva (role="status") fica no AppShell, sempre montada: o leitor de tela anuncia quando a faixa aparece
+    <AnimatePresence initial={false}>
         {instavel ? (
           <motion.div
             key="faixa-conexao"
@@ -45,7 +48,6 @@ export function FaixaConexao() {
             </div>
           </motion.div>
         ) : null}
-      </AnimatePresence>
-    </div>
+    </AnimatePresence>
   );
 }

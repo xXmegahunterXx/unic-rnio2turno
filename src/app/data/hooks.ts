@@ -74,11 +74,13 @@ export interface FaixaConexaoEstado {
 }
 let faixa: FaixaConexaoEstado = { instavel: false, ultimoDado: null };
 const ouvintesFaixa = new Set<() => void>();
+/** Chave 'faixa-conexao' desligada no painel (`LiveStatus.semFaixaConexao`, do último status recebido): sem faixa. */
+let semFaixa = false;
 
 function mudarConexao(e: EstadoConexao) {
   conexao = e;
   atrasoStatus = intervaloStatus(e.falhas, cargaVigenteAgora(), Math.random());
-  const instavel = conexaoInstavel(e);
+  const instavel = !semFaixa && conexaoInstavel(e);
   const ultimoDado = instavel ? e.ultimoDado : null;
   if (instavel !== faixa.instavel || ultimoDado !== faixa.ultimoDado) {
     faixa = { instavel, ultimoDado };
@@ -96,6 +98,7 @@ async function buscarStatus(): Promise<LiveStatus> {
     throw e;
   }
   definirCargaVigente(s.carga);
+  semFaixa = s.semFaixaConexao === true;
   mudarConexao(registrarSucesso(conexao, s.wallNow, Date.now(), s.simNow));
   return s;
 }

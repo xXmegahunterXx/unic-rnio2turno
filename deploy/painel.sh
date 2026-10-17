@@ -48,6 +48,13 @@
 #   sudo /opt/sintonia/deploy/painel.sh texto-bots ligar|desligar   !apuracao dos bots de chat (desligado: só o endereço)
 #   sudo /opt/sintonia/deploy/painel.sh contar-lives ligar|desligar contagem anônima de lives
 #   sudo /opt/sintonia/deploy/painel.sh aviso-nacional auto|off     aviso "o arquivo nacional do TSE não atualiza desde…"
+#   PEÇAS NOVAS DA NOITE (todas ligadas por padrão; desligar volta ao site de antes delas):
+#   sudo /opt/sintonia/deploy/painel.sh faixa-conexao ligar|desligar faixa "Conexão instável" no site (o recuo continua)
+#   sudo /opt/sintonia/deploy/painel.sh carimbo-print ligar|desligar carimbo "domínio · % apurado · hora" nos mapas e no placar
+#   sudo /opt/sintonia/deploy/painel.sh meta-placar ligar|desligar   placar na descrição dos links (WhatsApp, X)
+#   sudo /opt/sintonia/deploy/painel.sh medir-local ligar|desligar   audiência por estado, país e aparelho
+#   sudo /opt/sintonia/deploy/painel.sh pausa-tse auto|restrita|off  pausa quando o TSE bloqueia: auto (padrão); restrita =
+#                                                         só 429 ou borda do TSE; off = nunca pausa (risco maior de bloqueio)
 #   sudo /opt/sintonia/deploy/painel.sh tse-retomar       retoma JÁ as leituras do TSE pausadas por bloqueio (falso positivo)
 #   sudo /opt/sintonia/deploy/painel.sh alerta-teste      manda uma mensagem de teste ao Telegram dos alertas
 #
@@ -71,8 +78,11 @@ case ${1:-} in
     [[ ${2:-} =~ ^[1235]$ ]] || morrer "Use: painel.sh freio 2   (1 = solta; 2, 3 ou 5; acrescente \"leve\" para o modo leve: painel.sh freio 3 leve)"
     [[ -z ${3:-} || ${3:-} == leve ]] || morrer "Use: painel.sh freio $2 leve   (ou sem o \"leve\")"
     ;;
-  contador-publico | html-borda | medir-anuncios | texto-bots | contar-lives)
+  contador-publico | html-borda | medir-anuncios | texto-bots | contar-lives | faixa-conexao | carimbo-print | meta-placar | medir-local)
     [[ ${2:-} =~ ^(ligar|desligar)$ ]] || morrer "Use: painel.sh $1 ligar   ou   painel.sh $1 desligar"
+    ;;
+  pausa-tse)
+    [[ ${2:-} =~ ^(auto|restrita|off)$ ]] || morrer "Use: painel.sh pausa-tse auto   (ou restrita, ou off)"
     ;;
   aviso-nacional)
     [[ ${2:-} =~ ^(auto|off)$ ]] || morrer "Use: painel.sh aviso-nacional auto   ou   painel.sh aviso-nacional off"
@@ -200,7 +210,10 @@ function resumoTse(h) {
 }
 
 // ---- chaves da noite (leva 3; padrões = CHAVES_NOITE_PADRAO em src/shared/chaves-noite.ts) ----------------------
-const PADRAO_NOITE = { freio: { fator: 1, leve: false }, contadorPublico: true, htmlBorda: false, medirAnuncios: true, avisoNacional: 'auto', textoBots: true, contarLives: true };
+const PADRAO_NOITE = {
+  freio: { fator: 1, leve: false }, contadorPublico: true, htmlBorda: false, medirAnuncios: true, avisoNacional: 'auto', textoBots: true, contarLives: true,
+  faixaConexao: true, carimboPrint: true, metaPlacar: true, medirLocal: true, pausaTse: 'auto',
+};
 /** comando → [campo em AdminState.noite, rótulo] */
 const CHAVES = {
   'contador-publico': ['contadorPublico', '"Pessoas agora" no site'],
@@ -208,6 +221,15 @@ const CHAVES = {
   'medir-anuncios': ['medirAnuncios', 'Medição das impressões dos anúncios'],
   'texto-bots': ['textoBots', 'Texto do placar para bots de chat'],
   'contar-lives': ['contarLives', 'Contagem de lives'],
+  'faixa-conexao': ['faixaConexao', 'Faixa "Conexão instável" no site'],
+  'carimbo-print': ['carimboPrint', 'Carimbo nos mapas e no placar'],
+  'meta-placar': ['metaPlacar', 'Placar na prévia dos links'],
+  'medir-local': ['medirLocal', 'Medição por estado, país e aparelho'],
+};
+const PAUSA_TSE = {
+  auto: 'automática (429, borda do TSE ou 403 num arquivo já lido)',
+  restrita: 'SÓ COM SINAL CLARO (429 ou borda do TSE)',
+  off: 'DESLIGADA (nunca pausa: risco maior de bloqueio)',
 };
 const EXPLICA = {
   contadorPublico: (v) => (v ? 'o site mostra "N pessoas agora" a partir de 500 pessoas' : 'o site não mostra (o painel vê)'),
@@ -215,6 +237,10 @@ const EXPLICA = {
   medirAnuncios: (v) => (v ? 'impressões contadas' : 'impressões NÃO contadas (o relatório dos anunciantes fica sem esse período)'),
   textoBots: (v) => (v ? '!apuracao responde o placar' : '!apuracao responde só o endereço do site'),
   contarLives: (v) => (v ? 'lives contadas (anônimo)' : 'lives não contadas'),
+  faixaConexao: (v) => (v ? 'o site avisa quando o servidor não responde' : 'sem a faixa (o site só espera)'),
+  carimboPrint: (v) => (v ? 'mapas e placar com o carimbo' : 'sem carimbo'),
+  metaPlacar: (v) => (v ? 'descrições dos links com o placar' : 'descrições sem números'),
+  medirLocal: (v) => (v ? 'páginas contadas por estado, país e aparelho' : 'essa parte da audiência parada'),
 };
 
 function chavesDe(s) {
@@ -239,6 +265,8 @@ function linhasChaves(s) {
   }
   out.push(`${col('Aviso do arquivo nacional parado')}${c.avisoNacional === 'auto' ? 'automático' : 'DESLIGADO (nunca avisa)'}${fora(c.avisoNacional, PADRAO_NOITE.avisoNacional)}` +
     `   [painel.sh aviso-nacional ${c.avisoNacional === 'auto' ? 'off' : 'auto'}]`);
+  out.push(`${col('Pausa quando o TSE bloqueia')}${PAUSA_TSE[c.pausaTse] ?? c.pausaTse}${fora(c.pausaTse, PADRAO_NOITE.pausaTse)}` +
+    `   [painel.sh pausa-tse auto|restrita|off]`);
   return out;
 }
 
@@ -258,7 +286,8 @@ async function estado() {
   console.log('Chat ao vivo:     ' + linhaChat(c));
   console.log('Anúncios:         ' + linhaAnuncios(s));
   const nt = chavesDe(s);
-  const fora = ['contadorPublico', 'htmlBorda', 'medirAnuncios', 'textoBots', 'contarLives', 'avisoNacional'].filter((k) => nt[k] !== PADRAO_NOITE[k]).length;
+  const fora = ['contadorPublico', 'htmlBorda', 'medirAnuncios', 'textoBots', 'contarLives', 'avisoNacional', 'faixaConexao', 'carimboPrint', 'metaPlacar', 'medirLocal', 'pausaTse']
+    .filter((k) => nt[k] !== PADRAO_NOITE[k]).length;
   console.log('Freio de carga:   ' + linhaFreio(nt.freio));
   console.log('Chaves da noite:  ' + (fora ? `${fora} fora do padrão (veja: painel.sh chaves)` : 'todas no padrão (painel.sh chaves)'));
   if (s.state.fonte === 'tse') {
@@ -451,7 +480,11 @@ function horarioDe(txt) {
       case 'html-borda':
       case 'medir-anuncios':
       case 'texto-bots':
-      case 'contar-lives': {
+      case 'contar-lives':
+      case 'faixa-conexao':
+      case 'carimbo-print':
+      case 'meta-placar':
+      case 'medir-local': {
         const [campo, rotulo] = CHAVES[cmd];
         const r = await comando({ tipo: cmd, ligado: arg === 'ligar' });
         const v = chavesDe(r)[campo];
@@ -461,6 +494,11 @@ function horarioDe(txt) {
       case 'aviso-nacional': {
         const r = await comando({ tipo: 'aviso-nacional', modo: arg });
         ok('Aviso do arquivo nacional parado: ' + (chavesDe(r).avisoNacional === 'auto' ? 'automático' : 'desligado (nunca avisa)'));
+        break;
+      }
+      case 'pausa-tse': {
+        const r = await comando({ tipo: 'pausa-tse', modo: arg });
+        ok('Pausa quando o TSE bloqueia: ' + (PAUSA_TSE[chavesDe(r).pausaTse] ?? chavesDe(r).pausaTse) + (arg === 'auto' ? '' : ' · uma pausa em curso terminou agora'));
         break;
       }
       case 'tse-retomar': {

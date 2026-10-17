@@ -14,8 +14,11 @@ export const LIVES = {
   batimentoS: 60,
   /** uma fonte conta como ativa se mandou batimento nos últimos `ativaS` segundos */
   ativaS: 150,
-  /** fontes distintas aceitas por rede (o resto é ignorado) */
-  maxFontesPorRede: 30,
+  /**
+   * fontes distintas aceitas por rede (o resto é ignorado). Integração da leva 3: 30 → 10 (um streamer tem 2–3 cenas com a
+   * /live; 10 ainda cobre alguns na mesma rede, e corta a contagem inflada de uma rede só).
+   */
+  maxFontesPorRede: 10,
   /** fontes ativas no total (memória limitada mesmo sob ataque; acima, as novas são ignoradas) */
   maxFontes: 20_000,
   /** corpo máximo do POST /api/live/batimento (bytes) */

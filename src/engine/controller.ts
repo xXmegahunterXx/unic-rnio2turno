@@ -31,7 +31,7 @@ import {
   type AnuncioConfig,
   type AnuncioPublico,
 } from '../shared/anuncios';
-import { cargaDoFreio, chavesNoite, COMANDO_CHAVE, ehFatorCarga, MODOS_AVISO_NACIONAL, ROTULO_CHAVE } from '../shared/chaves-noite';
+import { cargaDoFreio, chavesNoite, COMANDO_CHAVE, ehFatorCarga, MODOS_AVISO_NACIONAL, MODOS_PAUSA_TSE, ROTULO_CHAVE } from '../shared/chaves-noite';
 import { validaContatosPublicos } from '../shared/contatos';
 import { INICIO_APURACAO, TSE_LIMITE_POR_SEG } from '../shared/constants';
 import { fmtDataHora, fmtHoraSeg } from '../shared/format';
@@ -707,7 +707,11 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       case 'html-borda':
       case 'medir-anuncios':
       case 'texto-bots':
-      case 'contar-lives': {
+      case 'contar-lives':
+      case 'faixa-conexao':
+      case 'carimbo-print':
+      case 'meta-placar':
+      case 'medir-local': {
         if (typeof cmd.ligado !== 'boolean') throw new CommandError(`${cmd.tipo}: informe "ligado" (true ou false).`);
         state = { ...state, noite: { ...chavesNoite(state), [COMANDO_CHAVE[cmd.tipo]]: cmd.ligado } };
         log(`${ROTULO_CHAVE[cmd.tipo]}: ${cmd.ligado ? 'ligado' : 'desligado'}`);
@@ -718,6 +722,19 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
         if (!MODOS_AVISO_NACIONAL.includes(cmd.modo)) throw new CommandError('aviso-nacional: use o modo "auto" ou "off".');
         state = { ...state, noite: { ...chavesNoite(state), avisoNacional: cmd.modo } };
         log(cmd.modo === 'auto' ? 'Aviso do arquivo nacional parado: automático' : 'Aviso do arquivo nacional parado: desligado');
+        semVersao = true;
+        break;
+      }
+      case 'pausa-tse': {
+        if (!MODOS_PAUSA_TSE.includes(cmd.modo)) throw new CommandError('pausa-tse: use o modo "auto", "restrita" ou "off".');
+        state = { ...state, noite: { ...chavesNoite(state), pausaTse: cmd.modo } };
+        log(
+          cmd.modo === 'auto'
+            ? 'Pausa por bloqueio do TSE: automática'
+            : cmd.modo === 'restrita'
+              ? 'Pausa por bloqueio do TSE: só com sinal claro (429 ou borda do TSE)'
+              : 'Pausa por bloqueio do TSE: desligada',
+        );
         semVersao = true;
         break;
       }
@@ -767,6 +784,7 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
     const sim = state.fonte === 'simulacao';
     const pub = anunciosPublicos(wall);
     const carga = cargaDoFreio(state.noite?.freio);
+    const noite = state.noite;
     return {
       fonte: state.fonte,
       fase: fase(wall),
@@ -788,6 +806,9 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       contatos: state.contatos ? { ...state.contatos } : null,
       // freio do painel (I37): só quando puxado — ausente = ritmo normal
       ...(carga ? { carga } : {}),
+      // chaves das peças do app (integração da leva 3): só quando DESLIGADAS — ausente = ligada (padrão)
+      ...(noite && noite.faixaConexao === false ? { semFaixaConexao: true as const } : {}),
+      ...(noite && noite.carimboPrint === false ? { semCarimbo: true as const } : {}),
     };
   };
 

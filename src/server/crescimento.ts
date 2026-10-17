@@ -59,6 +59,8 @@ export interface DepsCrescimento {
    * consentimento (LGPD art. 18) — a mesma regra que fecha o formulário no app.
    */
   formularioFechado?: () => string | null;
+  /** I14: contar UF, país e aparelho agora? (chave 'medir-local' do painel; `AUDIENCIA_LOCAL=0` desliga sempre). Padrão: sim. */
+  medirLocal?: () => boolean;
 }
 
 /** Configuração do painel: redes do Sintonia e o interruptor da audiência na /anuncie (padrão: desligado). */
@@ -133,7 +135,7 @@ async function jsonAdmin(c: Ctx): Promise<unknown | Response> {
 
 export function registrarCrescimento(app: App, admin: App, deps: DepsCrescimento) {
   const { log } = deps;
-  const audiencia = new Audiencia({ now: deps.now, pessoasServidor: deps.pessoasAgora, store: deps.stores?.audiencia ?? null });
+  const audiencia = new Audiencia({ now: deps.now, pessoasServidor: deps.pessoasAgora, store: deps.stores?.audiencia ?? null, medirLocal: deps.medirLocal });
   const leads = new Leads({ now: deps.now, store: deps.stores?.leads ?? null });
   const divulgacao = new Divulgacao(deps.stores?.divulgacao ?? null);
 

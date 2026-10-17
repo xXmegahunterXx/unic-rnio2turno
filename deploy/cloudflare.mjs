@@ -82,7 +82,11 @@ export const REGRAS_CACHE = Object.freeze([
   {
     ref: 'sintonia_html',
     description: 'Sintonia: páginas (HTML, só com a chave html-borda)',
-    expression: `(not starts_with(${P}, "/api/") and not starts_with(${P}, "/admin") and not starts_with(${P}, "/embed") and ${P} ne "/healthz")`,
+    // /duelo/<código> (respostas do Teste Cego no caminho) e /relatorio (anunciante): nunca na borda, nem "guardado e
+    // sempre revalidado" — com a origem respeitada, a Cloudflare guarda até o `no-cache` do HTML
+    expression:
+      `(not starts_with(${P}, "/api/") and not starts_with(${P}, "/admin") and not starts_with(${P}, "/embed") and ${P} ne "/healthz"` +
+      ` and not starts_with(${P}, "/duelo/") and not starts_with(${P}, "/relatorio"))`,
     action: 'set_cache_settings',
     action_parameters: { cache: true, ...RESPEITAR },
     enabled: true,
@@ -176,7 +180,25 @@ const dominioValido = (d) => typeof d === 'string' && /^([a-z0-9]([a-z0-9-]{0,61
 
 // ---- API da Cloudflare ------------------------------------------------------------------------------------------------
 
-const API = (process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4').replace(/\/+$/, '');
+const API_PADRAO = 'https://api.cloudflare.com/client/v4';
+/**
+ * Base da API: a oficial (https://api.cloudflare.com) ou, só para a Cloudflare falsa dos testes, http://127.0.0.1 /
+ * localhost / [::1]. Qualquer outro CF_API_BASE é recusado ANTES de mandar a chave (um valor esquecido no ambiente
+ * entregaria o token a outro servidor, talvez em texto claro).
+ */
+export function baseApiPermitida(v) {
+  if (!v) return API_PADRAO;
+  let u;
+  try {
+    u = new URL(v);
+  } catch {
+    return null;
+  }
+  const oficial = u.protocol === 'https:' && u.hostname === 'api.cloudflare.com' && !u.username && !u.password;
+  const local = u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname);
+  return oficial || local ? v.replace(/\/+$/, '') : null;
+}
+const API = baseApiPermitida(process.env.CF_API_BASE);
 const TOKEN = (process.env.CF_API_TOKEN || '').trim();
 /** Nenhuma mensagem sai com a chave dentro (nem por acidente num erro). */
 const semChave = (s) => (TOKEN && TOKEN.length >= 8 ? String(s).split(TOKEN).join('***') : String(s));
@@ -192,6 +214,7 @@ class ErroCf extends Error {
 }
 
 async function cf(metodo, caminho, corpo) {
+  if (!API) throw new ErroUso('CF_API_BASE recusado: use https://api.cloudflare.com/client/v4 (ou tire a variável do ambiente). A chave não foi enviada.');
   let r;
   try {
     r = await fetch(API + caminho, {
@@ -668,6 +691,10 @@ export async function principal(argv) {
   if (a.acao === 'mostrar') {
     mostrar(dominio);
     return 0;
+  }
+  if (!API) {
+    console.error('CF_API_BASE recusado (só https://api.cloudflare.com, ou 127.0.0.1/localhost nos testes): tire a variável do ambiente — unset CF_API_BASE. Nada foi enviado.');
+    return 2;
   }
   const precisaChave = a.acao !== 'conferir';
   if (precisaChave && !TOKEN) {

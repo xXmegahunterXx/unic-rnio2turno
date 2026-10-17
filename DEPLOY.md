@@ -356,13 +356,15 @@ viraria um endereço novo a cada pedido e chegaria à VPS.
 
 **Regra 4 — "Sintonia: páginas (HTML, só com a chave html-borda)"** (como a 1)
 ```
-(not starts_with(http.request.uri.path, "/api/") and not starts_with(http.request.uri.path, "/admin") and not starts_with(http.request.uri.path, "/embed") and http.request.uri.path ne "/healthz")
+(not starts_with(http.request.uri.path, "/api/") and not starts_with(http.request.uri.path, "/admin") and not starts_with(http.request.uri.path, "/embed") and http.request.uri.path ne "/healthz" and not starts_with(http.request.uri.path, "/duelo/") and not starts_with(http.request.uri.path, "/relatorio"))
 ```
 Deixa as páginas *elegíveis*, mas a borda só as guarda quando o app manda `Cloudflare-CDN-Cache-Control` no HTML — o
 que só acontece com a chave **"HTML na borda"** ligada no painel (`deploy/painel.sh html-borda ligar`; padrão
 desligada). Plano: ligar **só no congelamento (24/10, 12h)** e só se passar no ensaio; com ela, a borda guarda cada
 página por 15 s e a serve por até 1 dia se a VPS cair. Nunca em `/admin`, `/embed`, `/duelo`, `/relatorio`, 404 ou erro
-(o app não manda o cabeçalho). **Antes de publicar uma versão nova com ela ligada: desligue e espere 30 s** (o HTML
+(o app não manda o cabeçalho; em `/duelo/…` e `/relatorio` a regra nem se aplica e o app ainda manda
+`Cloudflare-CDN-Cache-Control: no-store` — o código do Duelo vai no caminho, e com a origem respeitada a Cloudflare
+guardaria até o `no-cache` do HTML, "sempre revalidando"). **Antes de publicar uma versão nova com ela ligada: desligue e espere 30 s** (o HTML
 guardado aponta para arquivos `/assets` da versão antiga). Os arquivos `/assets/*` (nomes com hash) já são guardados
 pela Cloudflare por padrão, com o `immutable` do app.
 

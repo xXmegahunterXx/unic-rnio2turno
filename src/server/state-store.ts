@@ -2,8 +2,11 @@
  * Persistência em disco de pequenos documentos JSON (AdminState, histórico do TSE), com:
  *  - escrita atômica: grava em arquivo temporário, fsync e `rename` sobre o destino (nunca deixa JSON pela metade);
  *  - debounce: rajadas de mudanças viram uma escrita (padrão 250 ms);
- *  - escritas serializadas (nunca duas ao mesmo tempo) e `flush()` para o encerramento gracioso.
+ *  - escritas serializadas (nunca duas ao mesmo tempo) e `flush()` para o encerramento gracioso;
+ *  - (opcional, `lembrar`) memória das últimas gravações DESTE processo (só o hash), para o vigia do arquivo
+ *    (vigia-admin.ts) reconhecer a própria gravação atrasada e não adotá-la como "estado de outra instância".
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { mkdir, open, rename, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -17,12 +20,23 @@ export interface JsonStore {
   /** Grava o pendente agora e espera terminar. */
   flush(): Promise<void>;
   readonly escritas: number;
+  /** Texto atual do arquivo (null se não existir). Síncrono. */
+  lerTexto(): string | null;
+  /**
+   * true se `texto` é idêntico a uma das últimas `lembrar` gravações feitas (ou já serializadas para gravar) por ESTE
+   * processo. Sempre false sem a opção `lembrar`.
+   */
+  gravadoPorMim(texto: string): boolean;
 }
 
 export interface JsonStoreOptions {
   debounceMs?: number;
   onErro?: (err: unknown) => void;
+  /** Quantas gravações recentes lembrar (por hash) para `gravadoPorMim` (padrão 0 = nenhuma). */
+  lembrar?: number;
 }
+
+const hashTexto = (t: string) => createHash('sha256').update(t).digest('base64');
 
 export function createJsonStore(dir: string, arquivo: string, opts: JsonStoreOptions = {}): JsonStore {
   const caminho = join(dir, arquivo);
@@ -32,6 +46,8 @@ export function createJsonStore(dir: string, arquivo: string, opts: JsonStoreOpt
   let gravando: Promise<void> = Promise.resolve();
   let escritas = 0;
   let seq = 0;
+  const lembrar = Math.max(0, Math.floor(opts.lembrar ?? 0));
+  const recentes: string[] = [];
 
   const gravar = async (texto: string) => {
     await mkdir(dirname(caminho), { recursive: true });
@@ -67,6 +83,11 @@ export function createJsonStore(dir: string, arquivo: string, opts: JsonStoreOpt
       opts.onErro?.(err);
       return gravando;
     }
+    // lembrado ANTES de gravar: o vigia pode ver o arquivo novo logo depois do rename, antes do `then` seguinte
+    if (lembrar > 0) {
+      recentes.push(hashTexto(texto));
+      if (recentes.length > lembrar) recentes.splice(0, recentes.length - lembrar);
+    }
     gravando = gravando.then(() => gravar(texto)).catch((err) => opts.onErro?.(err));
     return gravando;
   };
@@ -89,6 +110,17 @@ export function createJsonStore(dir: string, arquivo: string, opts: JsonStoreOpt
     flush: () => descarregar(),
     get escritas() {
       return escritas;
+    },
+    lerTexto() {
+      try {
+        return readFileSync(caminho, 'utf8');
+      } catch {
+        return null;
+      }
+    },
+    gravadoPorMim(texto) {
+      if (lembrar === 0 || recentes.length === 0) return false;
+      return recentes.includes(hashTexto(texto));
     },
   };
 }

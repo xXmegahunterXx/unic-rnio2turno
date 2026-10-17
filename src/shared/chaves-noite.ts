@@ -9,15 +9,19 @@
  *  - medirAnuncios: ligado (como hoje);
  *  - avisoNacional: 'auto' (aviso factual, só com os arquivos do próprio TSE; 'off' a um toque);
  *  - textoBots: ligado (rota nova /api/texto/placar; desligada responde só o endereço do site);
- *  - contarLives: ligado (contagem anônima; desligada responde 204 sem contar).
+ *  - contarLives: ligado (contagem anônima; desligada responde 204 sem contar);
+ *  - (integração da leva 3: tudo o que é novo na noite tem chave) faixaConexao, carimboPrint, metaPlacar e medirLocal
+ *    ligados; pausaTse 'auto'.
  */
-import type { CargaStatus, ChavesNoite, FatorCarga, ModoAvisoNacional } from './types';
+import type { CargaStatus, ChavesNoite, FatorCarga, ModoAvisoNacional, ModoPausaTse } from './types';
 
 export const FATORES_CARGA: readonly FatorCarga[] = [1, 2, 3, 5];
 
 export const ehFatorCarga = (v: unknown): v is FatorCarga => typeof v === 'number' && (FATORES_CARGA as readonly number[]).includes(v);
 
 export const MODOS_AVISO_NACIONAL: readonly ModoAvisoNacional[] = ['auto', 'off'];
+
+export const MODOS_PAUSA_TSE: readonly ModoPausaTse[] = ['auto', 'restrita', 'off'];
 
 export const CHAVES_NOITE_PADRAO: Readonly<ChavesNoite> = Object.freeze({
   freio: Object.freeze({ fator: 1 as FatorCarga, leve: false }),
@@ -27,6 +31,11 @@ export const CHAVES_NOITE_PADRAO: Readonly<ChavesNoite> = Object.freeze({
   avisoNacional: 'auto' as ModoAvisoNacional,
   textoBots: true,
   contarLives: true,
+  faixaConexao: true,
+  carimboPrint: true,
+  metaPlacar: true,
+  medirLocal: true,
+  pausaTse: 'auto' as ModoPausaTse,
 });
 
 /** Chaves liga/desliga: nome do comando do painel → campo em `ChavesNoite`. */
@@ -36,6 +45,10 @@ export const COMANDO_CHAVE = {
   'medir-anuncios': 'medirAnuncios',
   'texto-bots': 'textoBots',
   'contar-lives': 'contarLives',
+  'faixa-conexao': 'faixaConexao',
+  'carimbo-print': 'carimboPrint',
+  'meta-placar': 'metaPlacar',
+  'medir-local': 'medirLocal',
 } as const satisfies Record<string, keyof ChavesNoite>;
 export type ComandoChave = keyof typeof COMANDO_CHAVE;
 
@@ -46,6 +59,10 @@ export const ROTULO_CHAVE: Record<ComandoChave, string> = {
   'medir-anuncios': 'Medição das impressões dos anúncios',
   'texto-bots': 'Texto do placar para bots de chat',
   'contar-lives': 'Contagem de lives',
+  'faixa-conexao': 'Faixa “Conexão instável” no site',
+  'carimbo-print': 'Carimbo nos mapas e no placar',
+  'meta-placar': 'Placar na prévia dos links',
+  'medir-local': 'Medição por estado, país e aparelho',
 };
 
 const copia = (c: Readonly<ChavesNoite>): ChavesNoite => ({ ...c, freio: { ...c.freio } });
@@ -67,6 +84,11 @@ export function parseChavesNoite(v: unknown, fallback: Readonly<ChavesNoite> = C
     avisoNacional: (MODOS_AVISO_NACIONAL as readonly unknown[]).includes(o.avisoNacional) ? (o.avisoNacional as ModoAvisoNacional) : fallback.avisoNacional,
     textoBots: bool(o.textoBots, fallback.textoBots),
     contarLives: bool(o.contarLives, fallback.contarLives),
+    faixaConexao: bool(o.faixaConexao, fallback.faixaConexao ?? true),
+    carimboPrint: bool(o.carimboPrint, fallback.carimboPrint ?? true),
+    metaPlacar: bool(o.metaPlacar, fallback.metaPlacar ?? true),
+    medirLocal: bool(o.medirLocal, fallback.medirLocal ?? true),
+    pausaTse: (MODOS_PAUSA_TSE as readonly unknown[]).includes(o.pausaTse) ? (o.pausaTse as ModoPausaTse) : (fallback.pausaTse ?? 'auto'),
   };
 }
 

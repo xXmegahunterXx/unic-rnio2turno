@@ -1,7 +1,9 @@
 /**
  * Bloco "Chaves da noite" (leva 3, seção Controle): os interruptores operacionais gravados em `AdminState.noite`
  * (src/shared/chaves-noite.ts) — freio de carga (I37), "pessoas agora" no site (I09), HTML na borda (I05), medição dos
- * anúncios (I11), aviso do arquivo nacional parado (I18), texto para bots (I22) e contagem de lives (I23).
+ * anúncios (I11), aviso do arquivo nacional parado (I18), texto para bots (I22) e contagem de lives (I23) — e, desde a
+ * integração da leva 3, as peças novas da noite: faixa "Conexão instável" (I05), carimbo do print (I10), placar na prévia
+ * dos links (I07a), medição por estado/país/aparelho (I14) e a pausa por bloqueio do TSE (I03).
  *
  * Valem na hora, para todos os visitantes, sem publicar nada. No servidor as chaves NÃO sobem a versão do estado (não
  * invalidam o cache de ninguém): por isso uma consulta do painel que saiu antes do comando pode trazer o valor anterior
@@ -10,7 +12,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import type { AdminCommand } from '@/shared/api';
-import type { ChavesNoite, FatorCarga, ModoAvisoNacional } from '@/shared/types';
+import type { ChavesNoite, FatorCarga, ModoAvisoNacional, ModoPausaTse } from '@/shared/types';
 import { CHAVES_NOITE_PADRAO, ROTULO_CHAVE, chavesNoite, type ComandoChave } from '@/shared/chaves-noite';
 import { PISO_PESSOAS_PUBLICO } from '@/shared/constants';
 import { fmtDecimal, fmtInt } from '@/shared/format';
@@ -36,6 +38,42 @@ const OPCOES_AVISO: { value: ModoAvisoNacional; label: string }[] = [
   { value: 'off', label: 'Desligado' },
 ];
 
+const OPCOES_PAUSA: { value: ModoPausaTse; label: string; ariaLabel: string }[] = [
+  { value: 'auto', label: 'Automática', ariaLabel: 'Pausa automática' },
+  { value: 'restrita', label: 'Só sinal claro', ariaLabel: 'Pausa só com sinal claro' },
+  { value: 'off', label: 'Desligada', ariaLabel: 'Pausa desligada' },
+];
+
+const SUCESSO_PAUSA: Record<ModoPausaTse, string> = {
+  auto: 'Pausa por bloqueio do TSE: automática',
+  restrita: 'Pausa por bloqueio do TSE: só com sinal claro',
+  off: 'Pausa por bloqueio do TSE: desligada',
+};
+
+/** Peças novas da noite (integração da leva 3): todas ligadas por padrão; desligar volta ao site de antes delas. */
+const PECAS_NOVAS: { cmd: ComandoChave; campo: 'faixaConexao' | 'carimboPrint' | 'metaPlacar' | 'medirLocal'; descricao: string }[] = [
+  {
+    cmd: 'faixa-conexao',
+    campo: 'faixaConexao',
+    descricao: 'Avisa “Conexão instável — mostrando o último dado recebido às HH:MM:SS” quando o servidor não responde. Desligada, o site só espera.',
+  },
+  {
+    cmd: 'carimbo-print',
+    campo: 'carimboPrint',
+    descricao: 'Linha “sintonia2026.com.br · X% apurado · hora” dentro dos mapas e no pé do placar. Desligada, some em todas as telas.',
+  },
+  {
+    cmd: 'meta-placar',
+    campo: 'metaPlacar',
+    descricao: 'O placar entra na descrição dos links no WhatsApp e no X. Desligado, as descrições ficam sem números.',
+  },
+  {
+    cmd: 'medir-local',
+    campo: 'medirLocal',
+    descricao: 'Conta as páginas por estado, país e celular/computador (só siglas). Desligada, só essa parte da audiência para.',
+  },
+];
+
 /** Segundos com 1 casa só quando precisa ("2 s", "7,5 s"). */
 const seg = (ms: number) => `${fmtDecimal(ms / 1000, Number.isInteger(ms / 1000) ? 0 : 1)} s`;
 
@@ -43,7 +81,19 @@ const seg = (ms: number) => `${fmtDecimal(ms / 1000, Number.isInteger(ms / 1000)
 export function foraDoPadrao(c: ChavesNoite): number {
   const p = CHAVES_NOITE_PADRAO;
   let n = c.freio.fator !== p.freio.fator || c.freio.leve !== p.freio.leve ? 1 : 0;
-  for (const k of ['contadorPublico', 'htmlBorda', 'medirAnuncios', 'textoBots', 'contarLives', 'avisoNacional'] as const) {
+  for (const k of [
+    'contadorPublico',
+    'htmlBorda',
+    'medirAnuncios',
+    'textoBots',
+    'contarLives',
+    'avisoNacional',
+    'faixaConexao',
+    'carimboPrint',
+    'metaPlacar',
+    'medirLocal',
+    'pausaTse',
+  ] as const) {
     if (c[k] !== p[k]) n++;
   }
   return n;
@@ -88,6 +138,20 @@ export function ChavesDaNoite({ className }: { className?: string }) {
       if (!ok) return;
     }
     await enviar({ tipo: cmd, ligado } as AdminCommand, `noite-${cmd}`, `${ROTULO_CHAVE[cmd]}: ${ligado ? 'ligado' : 'desligado'}`);
+  }
+
+  async function mudarPausa(modo: ModoPausaTse) {
+    if (modo === 'off') {
+      const ok = await confirmar({
+        titulo: 'Desligar a pausa por bloqueio?',
+        descricao:
+          'O servidor continua lendo o TSE mesmo quando ele limita as leituras (429 ou 403). Use só se a pausa estiver disparando por engano; o risco de um bloqueio mais longo aumenta. Uma pausa em curso termina agora.',
+        confirmar: 'Desligar a pausa',
+        perigo: true,
+      });
+      if (!ok) return;
+    }
+    await enviar({ tipo: 'pausa-tse', modo }, 'noite-pausa-tse', SUCESSO_PAUSA[modo]);
   }
 
   const puxado = c.freio.fator > 1 || c.freio.leve;
@@ -230,6 +294,42 @@ export function ChavesDaNoite({ className }: { className?: string }) {
               description="Conta quantas lives exibem o Sintonia, sem identificar canal nem pessoa. Desligado, nada é contado."
             />
           </Linha>
+        </ul>
+      </div>
+
+      {/* peças novas da leva 3: chave para desligar cada uma, sem publicar */}
+      <div className="mt-4">
+        <Rotulo>Peças novas da noite · padrão ligadas</Rotulo>
+        <ul className="mt-2 grid grid-cols-1 divide-y divide-[rgb(var(--line)/var(--line-alpha))] rounded-2xl border border-line lg:grid-cols-2 lg:divide-y-0">
+          {PECAS_NOVAS.map((p, i) => (
+            <li key={p.cmd} className={cn('px-4 py-3.5', i >= 2 && 'lg:border-t lg:border-line', i % 2 === 1 && 'lg:border-l lg:border-line')}>
+              <Toggle
+                checked={c[p.campo]}
+                onChange={(v) => void alternar(p.cmd, v)}
+                disabled={pendente(`noite-${p.cmd}`)}
+                label={ROTULO_CHAVE[p.cmd]}
+                description={p.descricao}
+              />
+            </li>
+          ))}
+          <li className="px-4 py-3.5 lg:col-span-2 lg:border-t lg:border-line">
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2.5">
+              <div className="min-w-0 flex-[1_1_14rem]">
+                <span className="block text-sm font-medium text-fg">Pausa das leituras quando o TSE bloqueia</span>
+                <span className="mt-0.5 block text-pretty text-[13px] text-fg-muted">
+                  Automática: pausa com 429, com a borda do TSE ou com 403 num arquivo já lido. Só sinal claro: ignora o último caso
+                  (falso positivo repetido). Desligada: nunca pausa, como antes — risco maior de bloqueio.
+                </span>
+              </div>
+              <Segmented
+                size="sm"
+                ariaLabel="Pausa das leituras quando o TSE bloqueia"
+                options={OPCOES_PAUSA.map((o) => ({ ...o, disabled: pendente('noite-pausa-tse') }))}
+                value={c.pausaTse}
+                onChange={(modo) => void mudarPausa(modo)}
+              />
+            </div>
+          </li>
         </ul>
       </div>
       <p className="mt-4 text-pretty text-[12.5px] leading-snug text-fg-subtle">

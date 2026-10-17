@@ -20,8 +20,11 @@
  *    canto vazio garantido);
  *  - `forma="pilha"` (cartograma): uma parte por linha, para caber na área sem blocos da grade.
  * As partes quebram linha sem deixar "·" sobrando no fim ou no começo (o separador do começo de linha fica escondido).
+ *
+ * Chave 'carimbo-print' no painel (Chaves da noite): desligada, o status traz `semCarimbo` e nenhum carimbo aparece.
  */
 import { useInRouterContext, useSearchParams } from 'react-router-dom';
+import { useStatus } from '@/app/data/hooks';
 import type { Tally } from '@/shared/types';
 import { pctTotalizadas } from '@/shared/calc';
 import { fmtHoraSeg, fmtPct } from '@/shared/format';
@@ -113,8 +116,11 @@ export interface CarimboPrintProps {
 }
 
 export function CarimboPrint(props: CarimboPrintProps) {
+  const desligado = useStatus().data?.semCarimbo === true;
+  const comRota = useInRouterContext();
+  if (desligado) return null;
   // Fora de um Router (testes, widgets isolados) não há `?t=`: só o `instante` explícito vale.
-  return useInRouterContext() ? <CarimboComRota {...props} /> : <CarimboCorpo {...props} reveja={props.instante !== undefined} />;
+  return comRota ? <CarimboComRota {...props} /> : <CarimboCorpo {...props} reveja={props.instante !== undefined} />;
 }
 
 function CarimboComRota(props: CarimboPrintProps) {

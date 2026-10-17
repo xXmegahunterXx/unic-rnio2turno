@@ -4,10 +4,10 @@
 import { z } from 'zod';
 import { PRECOS_ANUNCIE_LIMITES, type AdminCommand } from '../shared/api';
 import { validaAjusteImagem, validaAnuncio, validaContatoAnuncie, validaLogoAnuncio } from '../shared/anuncios';
-import { ehFatorCarga, MODOS_AVISO_NACIONAL } from '../shared/chaves-noite';
+import { ehFatorCarga, MODOS_AVISO_NACIONAL, MODOS_PAUSA_TSE } from '../shared/chaves-noite';
 import { TSE_LIMITE_POR_SEG } from '../shared/constants';
 import { validaContatosPublicos } from '../shared/contatos';
-import { UFS, type FatorCarga, type ModoAvisoNacional, type UF } from '../shared/types';
+import { UFS, type FatorCarga, type ModoAvisoNacional, type ModoPausaTse, type UF } from '../shared/types';
 import { TROCA_AUTO_MAX, TROCA_AUTO_MIN } from '../engine/state';
 
 export class ErroValidacao extends Error {
@@ -117,7 +117,10 @@ const tse = z
     intervaloSeg: finito.min(5).max(600),
     intervaloPrioritarioSeg: finito.min(3).max(600),
     // I03 (leva 3): teto de pedidos por segundo ao TSE
-    limitePorSeg: finito.int('limitePorSeg: use um número inteiro').min(TSE_LIMITE_POR_SEG.min).max(TSE_LIMITE_POR_SEG.max),
+    limitePorSeg: finito
+      .int('use um número inteiro')
+      .min(TSE_LIMITE_POR_SEG.min, `use de ${TSE_LIMITE_POR_SEG.min} a ${TSE_LIMITE_POR_SEG.max} pedidos por segundo`)
+      .max(TSE_LIMITE_POR_SEG.max, `use de ${TSE_LIMITE_POR_SEG.min} a ${TSE_LIMITE_POR_SEG.max} pedidos por segundo`),
   })
   .partial()
   .strict();
@@ -301,6 +304,17 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
     .object({
       tipo: z.literal('aviso-nacional'),
       modo: z.custom<ModoAvisoNacional>((v) => (MODOS_AVISO_NACIONAL as readonly unknown[]).includes(v), 'use "auto" ou "off"'),
+    })
+    .strict(),
+  // integração da leva 3: chaves das peças novas da noite (padrão ligado / 'auto')
+  chave('faixa-conexao'),
+  chave('carimbo-print'),
+  chave('meta-placar'),
+  chave('medir-local'),
+  z
+    .object({
+      tipo: z.literal('pausa-tse'),
+      modo: z.custom<ModoPausaTse>((v) => (MODOS_PAUSA_TSE as readonly unknown[]).includes(v), 'use "auto", "restrita" ou "off"'),
     })
     .strict(),
   // ---- leva 3: ações do servidor (até a frente dona ligar em app.ts, o motor responde "indisponível nesta versão") ----

@@ -341,8 +341,11 @@ export interface OpcoesAudiencia {
   /** estimativa que o servidor já tinha (Metricas.pessoasAgora, arredondada) */
   pessoasServidor?: () => number;
   store?: JsonStore | null;
-  /** contar UF, país e aparelho (I14); padrão: ligado, salvo `AUDIENCIA_LOCAL=0` no ambiente */
-  medirLocal?: boolean;
+  /**
+   * contar UF, país e aparelho (I14); padrão: ligado, salvo `AUDIENCIA_LOCAL=0` no ambiente. Uma função é lida a cada
+   * página (chave 'medir-local' do painel); o `AUDIENCIA_LOCAL=0` desliga de qualquer jeito.
+   */
+  medirLocal?: boolean | (() => boolean);
 }
 
 const ehNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0;
@@ -394,7 +397,8 @@ export class Audiencia {
   private telaHora = new Map<number, number>();
   /** instante da última amostra (horas de tela: o tempo de verdade entre amostras, até 20 s) */
   private ultimaAmostra = 0;
-  private readonly medirLocal: boolean;
+  private readonly medirLocalEnv: boolean;
+  private readonly medirLocalFn: () => boolean;
 
   // ---- só memória (nunca gravado) ----
   private diaAtual = '';
@@ -423,7 +427,10 @@ export class Audiencia {
     this.now = o.now ?? Date.now;
     this.pessoasServidor = o.pessoasServidor ?? (() => 0);
     this.store = o.store ?? null;
-    this.medirLocal = o.medirLocal ?? process.env.AUDIENCIA_LOCAL?.trim() !== '0';
+    this.medirLocalEnv = process.env.AUDIENCIA_LOCAL?.trim() !== '0';
+    const ml = o.medirLocal;
+    this.medirLocalFn = typeof ml === 'function' ? ml : ml === undefined ? () => true : () => ml;
+    if (typeof ml === 'boolean') this.medirLocalEnv = ml;
     this.presenca = new Presenca(this.now);
     this.limiteRede = new LimiteJanela(SINAIS_REDE_MIN, 60_000, this.now, 300_000);
     this.limitePaginas = new LimiteJanela(PAGINAS_PESSOA_MIN, 60_000, this.now, 300_000);
@@ -441,6 +448,16 @@ export class Audiencia {
    * `Sec-CH-UA-Mobile`; só viram +1 numa sigla). Devolve o intervalo do próximo sinal de presença (s). Corpo inválido →
    * null.
    */
+  /** UF, país e aparelho contados agora? (`AUDIENCIA_LOCAL=0` desliga sempre; a chave do painel, na hora). Nunca lança. */
+  private medirLocal(): boolean {
+    if (!this.medirLocalEnv) return false;
+    try {
+      return this.medirLocalFn() !== false;
+    } catch {
+      return true;
+    }
+  }
+
   sinal(rede: string, ua: string | undefined, corpo: unknown, cab?: CabecalhoDe): { s: number } | null {
     const c = (corpo && typeof corpo === 'object' && !Array.isArray(corpo) ? corpo : null) as Record<string, unknown> | null;
     if (!c) return null;
@@ -479,7 +496,7 @@ export class Audiencia {
         else d.origens.outros = (d.origens.outros ?? 0) + 1;
       }
       this.hora(agora).paginas++;
-      if (this.medirLocal) this.contarLocal(cab, ua);
+      if (this.medirLocal()) this.contarLocal(cab, ua);
     }
     this.marcarInicio(agora);
     return resposta;

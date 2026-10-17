@@ -576,6 +576,8 @@ describe('leva 3: borda da Cloudflare em produção', () => {
     // erro do servidor nunca vai para a borda; admin sempre no-store
     expect((await m.app.request('/admin')).headers.get('cloudflare-cdn-cache-control')).toBeNull();
     expect((await m.app.request('/api/admin/state', { headers: { cookie } })).headers.get('cloudflare-cdn-cache-control')).toBeNull();
+    // Duelo (código no caminho) e relatório do anunciante: no-store na borda, com a chave ligada ou não
+    for (const p of ['/duelo/abc123', '/relatorio']) expect((await m.app.request(p)).headers.get('cloudflare-cdn-cache-control'), p).toBe('no-store');
   });
 
   it('CDN_CC=0: nem a chave html-borda põe o cabeçalho (formato anterior a tudo)', async () => {

@@ -195,6 +195,24 @@ describe('ligarMetaNoite', () => {
     expect(mun.descricao).toMatch(/^Campinas \(SP\) · Com 100,00% das seções totalizadas: Lula 70,00% · Flávio Bolsonaro 30,00%/);
     expect(motor).toHaveBeenCalledTimes(1);
   });
+
+  it("chave 'meta-placar' desligada: nenhuma descrição com placar (TSE nem motor); religada, volta", async () => {
+    const t = Date.UTC(2026, 9, 25, 22, 0, 0);
+    const f = fonteFalsa(() => t);
+    const motor = vi.fn(() => null);
+    let ligado = false;
+    const ctx: ContextoMeta = { races, nomeMunicipio: () => 'Campinas', placar: motor, placarMunicipio: motor, fase: () => 'apurando' };
+    ligarMetaNoite(ctx, { tse: { fonte: f }, fonteDe: (r) => (races.get(r)?.turno === 2 ? 'tse' : 'motor'), races, now: () => t, ligado: () => ligado });
+    expect(ctx.placar!('pres-t1')).toBeNull();
+    expect(motor).not.toHaveBeenCalled();
+    metaDaRota('/apuracao', new URLSearchParams(), ctx);
+    await esperar();
+    expect(metaDaRota('/apuracao', new URLSearchParams(), ctx).descricao).not.toMatch(/Lula|%/);
+    ligado = true;
+    metaDaRota('/apuracao', new URLSearchParams(), ctx);
+    await esperar();
+    expect(metaDaRota('/apuracao', new URLSearchParams(), ctx).descricao).toMatch(/Lula 48,00%/);
+  });
 });
 
 describe('app na fonte TSE (fetch falso): placar do arquivo nacional na descrição, sem pedido a mais', () => {

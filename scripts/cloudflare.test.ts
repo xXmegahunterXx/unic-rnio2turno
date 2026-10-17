@@ -71,6 +71,16 @@ describe('deploy/cloudflare.mjs', () => {
     expect(cf.estado.chamadas).toEqual([]);
   });
 
+  it('CF_API_BASE fora da API oficial (ou de 127.0.0.1/localhost nos testes) é recusado sem mandar a chave', async () => {
+    for (const base of ['http://api.cloudflare.com/client/v4', 'https://exemplo.com/client/v4', 'http://10.0.0.5/client/v4', 'lixo']) {
+      const r = await rodar(['--aplicar'], { CF_API_BASE: base });
+      expect(r.codigo, base).toBe(2);
+      expect(r.saida).toMatch(/CF_API_BASE recusado/);
+      expect(r.saida).not.toContain(cf.token);
+    }
+    expect(cf.estado.chamadas).toEqual([]);
+  });
+
   it('recusa a chave na linha de comando (histórico)', async () => {
     const r = await rodar(['--aplicar', '--token=abc123'], {}, false);
     expect(r.codigo).toBe(2);

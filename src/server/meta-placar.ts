@@ -38,6 +38,11 @@ export interface DepsMetaPlacar {
   now: () => number;
   /** Simulação com nomes ocultos ligada no painel. */
   anonimizado?: () => boolean | undefined;
+  /**
+   * Chave 'meta-placar' do painel (integração da leva 3), lida a cada página: false = nenhuma descrição leva placar
+   * (nem da fonte TSE nem do motor). Ausente = ligada.
+   */
+  ligado?: () => boolean;
 }
 
 /** Intervalo mínimo entre leituras do cache da fonte, por corrida. */
@@ -143,8 +148,16 @@ export class MetaPlacarTse {
 export function ligarMetaNoite(ctx: ContextoMeta, d: DepsMetaPlacar): MetaPlacarTse {
   const tse = new MetaPlacarTse(d);
   const { placar, placarMunicipio } = ctx;
-  ctx.placar = (race, uf) => (d.fonteDe(race) === 'tse' ? tse.placar(race, uf) : (placar?.(race, uf) ?? null));
-  ctx.placarMunicipio = (race, uf, cod) => (d.fonteDe(race) === 'tse' ? tse.placarMunicipio(race, uf, cod) : (placarMunicipio?.(race, uf, cod) ?? null));
+  const ligado = () => {
+    try {
+      return d.ligado?.() !== false;
+    } catch {
+      return true;
+    }
+  };
+  ctx.placar = (race, uf) => (!ligado() ? null : d.fonteDe(race) === 'tse' ? tse.placar(race, uf) : (placar?.(race, uf) ?? null));
+  ctx.placarMunicipio = (race, uf, cod) =>
+    !ligado() ? null : d.fonteDe(race) === 'tse' ? tse.placarMunicipio(race, uf, cod) : (placarMunicipio?.(race, uf, cod) ?? null);
   ctx.agora ??= d.now;
   return tse;
 }

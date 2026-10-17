@@ -25,7 +25,7 @@ describe('validação dos comandos da leva 3', () => {
   });
 
   it('chaves liga/desliga: só `ligado` booleano', () => {
-    for (const tipo of ['contador-publico', 'html-borda', 'medir-anuncios', 'texto-bots', 'contar-lives']) {
+    for (const tipo of ['contador-publico', 'html-borda', 'medir-anuncios', 'texto-bots', 'contar-lives', 'faixa-conexao', 'carimbo-print', 'meta-placar', 'medir-local']) {
       aceita({ tipo, ligado: true });
       aceita({ tipo, ligado: false });
       recusa({ tipo });
@@ -70,6 +70,12 @@ describe('validação dos comandos da leva 3', () => {
     recusa({ tipo: 'tse', tse: { limitePorSeg: 4 } });
     recusa({ tipo: 'tse', tse: { limitePorSeg: 91 } });
     recusa({ tipo: 'tse', tse: { limitePorSeg: 40.5 } });
+  });
+
+  it('pausa-tse: "auto", "restrita" ou "off"', () => {
+    for (const modo of ['auto', 'restrita', 'off']) aceita({ tipo: 'pausa-tse', modo });
+    recusa({ tipo: 'pausa-tse', modo: 'nunca' }, /auto|restrita|off/);
+    recusa({ tipo: 'pausa-tse' });
   });
 
   it('comandos antigos continuam iguais', () => {
@@ -117,6 +123,35 @@ describe('POST /api/admin/command (leva 3)', () => {
     expect(((await r.json()) as AdminSnapshot).state.noite?.htmlBorda).toBe(true);
     expect((await comando(m, cookie, { tipo: 'html-borda', ligado: 'sim' })).status).toBe(400);
     expect((await comando(m, cookie, { tipo: 'html-borda', ligado: false })).status).toBe(200);
+  });
+
+  it('faixa e carimbo desligados vão ao /api/status (semFaixaConexao, semCarimbo) sem mudar a versão; religados, somem', async () => {
+    const v0 = m.controller.state().versao;
+    expect((await comando(m, cookie, { tipo: 'faixa-conexao', ligado: false })).status).toBe(200);
+    expect((await comando(m, cookie, { tipo: 'carimbo-print', ligado: false })).status).toBe(200);
+    m.relogio.t += 1000;
+    expect(await status()).toMatchObject({ semFaixaConexao: true, semCarimbo: true });
+    expect((await comando(m, cookie, { tipo: 'faixa-conexao', ligado: true })).status).toBe(200);
+    expect((await comando(m, cookie, { tipo: 'carimbo-print', ligado: true })).status).toBe(200);
+    m.relogio.t += 1000;
+    const st = await status();
+    expect('semFaixaConexao' in st || 'semCarimbo' in st).toBe(false);
+    expect(m.controller.state().versao).toBe(v0);
+  });
+
+  it('pausa-tse e as chaves só do servidor: gravadas (200) e voltam ao padrão', async () => {
+    for (const cmd of [
+      { tipo: 'pausa-tse', modo: 'off' },
+      { tipo: 'meta-placar', ligado: false },
+      { tipo: 'medir-local', ligado: false },
+    ]) expect((await comando(m, cookie, cmd)).status).toBe(200);
+    expect(m.controller.state().noite).toMatchObject({ pausaTse: 'off', metaPlacar: false, medirLocal: false });
+    for (const cmd of [
+      { tipo: 'pausa-tse', modo: 'auto' },
+      { tipo: 'meta-placar', ligado: true },
+      { tipo: 'medir-local', ligado: true },
+    ]) expect((await comando(m, cookie, cmd)).status).toBe(200);
+    expect(m.controller.state().noite).toMatchObject({ pausaTse: 'auto', metaPlacar: true, medirLocal: true });
   });
 
   it('ações sem peça ligada: 400 "indisponível nesta versão", nada muda; tse-retomar (frente B) não mexe no estado', async () => {

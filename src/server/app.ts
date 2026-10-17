@@ -282,9 +282,14 @@ export function cspPagina(template: string, embed: boolean, origemPublica?: stri
 export const htmlForaDaBorda = (p: string): boolean =>
   p === '/admin' || p.startsWith('/admin/') || p.startsWith('/duelo/') || p === '/relatorio' || p.startsWith('/relatorio/') || p.startsWith('/embed/');
 
-/** Rotas "quentes" (polling, estáticos e os eventos/cliques dos anúncios): log por amostragem. */
+/**
+ * Rotas "quentes" (polling, estáticos, os eventos/cliques dos anúncios e, desde a leva 3, o texto para bots de chat e o
+ * batimento/contagem das lives): log por amostragem.
+ */
 const ehQuente = (p: string) =>
   p === '/api/status' ||
+  p.startsWith('/api/texto/') ||
+  p.startsWith('/api/live/') ||
   p.startsWith('/api/apuracao/') ||
   p.startsWith('/api/anuncio/') ||
   p.startsWith('/api/chat') ||
@@ -884,7 +889,7 @@ export function createApp(deps: AppDeps) {
     const fr = dados.frescor();
     vigia.observarMarca(fr?.pres?.marca, now());
     const n = noite();
-    const chaveNoite = `${n.contadorPublico ? 1 : 0}${n.avisoNacional}${st.carga ? `${st.carga.fator}${st.carga.leve ? 'l' : ''}` : ''}`;
+    const chaveNoite = `${n.contadorPublico ? 1 : 0}${n.avisoNacional}${st.carga ? `${st.carga.fator}${st.carga.leve ? 'l' : ''}` : ''}${st.semFaixaConexao ? 'f' : ''}${st.semCarimbo ? 'c' : ''}`;
     const chave = `status|${origemDe(c)}|${st.versao}|${st.fase}|${st.aviso?.texto ?? ''}|${agendador.avisoPublico() ? 1 : 0}|${tseEncerrado() ? 1 : 0}|${fr ? hashCurto(JSON.stringify(fr)) : ''}|e${metricasAnuncios.geracaoEsgotados}|${chaveNoite}`;
     const { p, hit } = respostas.obter(chave, () => ({ bruto: Buffer.from(JSON.stringify(statusPublico(c))) }));
     metricas.cache(hit);
@@ -1339,6 +1344,12 @@ export function createApp(deps: AppDeps) {
     controller.command(cmd);
     // chaves da noite: valem já (a leitura guardada por 1 s é renovada)
     noiteMemo = null;
+    // pausa por bloqueio do TSE desligada (ou só com sinal claro): uma pausa em curso termina já
+    if (cmd.tipo === 'pausa-tse' && cmd.modo !== 'auto') {
+      const tse = deps.tse as Omit<TseManager, 'retomar'> & { retomar?: () => { detalhe?: string } | null };
+      const r = typeof tse.retomar === 'function' ? tse.retomar() : null;
+      if (r?.detalhe) log.info(`Admin: "pausa-tse ${cmd.modo}" — ${r.detalhe}`);
+    }
     // anúncio removido: os links de relatório dele morrem junto (um id recriado não reabre o link antigo)
     if (cmd.tipo === 'anuncio-remover') relatorios.revogarDoAnuncio(cmd.id);
     // meta aumentada/retirada ou anúncio novo com meta: o site reflete já, sem esperar os 15 s
@@ -1404,6 +1415,7 @@ export function createApp(deps: AppDeps) {
     stores: deps.crescimentoStores,
     // produção: o formulário só abre com um e-mail de privacidade configurado no painel (canal para retirar o consentimento)
     formularioFechado: () => (config.producao && !contatosEfetivos(dados.status().contatos).privacidade ? 'O formulário abre em breve.' : null),
+    medirLocal: () => noite().medirLocal, // I14: chave 'medir-local' do painel (AUDIENCIA_LOCAL=0 desliga sempre)
   });
 
   // relatório do anunciante por link privado (src/server/relatorios.ts): rota pública + links no painel
@@ -1515,7 +1527,8 @@ export function createApp(deps: AppDeps) {
         return { codigo: codificarCenario(cen), placar: placarCenarioTexto(ds.valor, calcularCenario(ds.valor, cen)), versao: ds.versao };
       },
     };
-    ligarMetaNoite(ctxMeta, { tse: deps.tse, fonteDe: (r) => dados.fonteDe(r), races, now, anonimizado: () => dados.status().anonimizado }); // I07a: placar do cache do TSE e relógio (frente E)
+    // I07a: placar do cache do TSE e relógio (frente E); chave 'meta-placar' desligada = descrições sem placar
+    ligarMetaNoite(ctxMeta, { tse: deps.tse, fonteDe: (r) => dados.fonteDe(r), races, now, anonimizado: () => dados.status().anonimizado, ligado: () => noite().metaPlacar });
 
     /** CSP por template (os hashes dos scripts inline mudam a cada build). */
     let cspMemo: { tpl: string; pagina: string; embed: string } | null = null;
@@ -1575,6 +1588,9 @@ export function createApp(deps: AppDeps) {
       // O navegador continua com no-cache. Nunca no admin, nos widgets, no Duelo (o código vai na URL), no relatório
       // do anunciante, na página "não encontrada" nem em erro.
       if (cdnCc && corpo.status === 200 && !embed && !htmlForaDaBorda(path) && noite().htmlBorda) headers[CABECALHO_BORDA] = CC_BORDA.html;
+      // Duelo (o código com as respostas do Teste Cego vai no caminho) e relatório do anunciante: nunca guardados na borda,
+      // nem como "guardado e sempre revalidado" (é o que a Cloudflare faz com o `no-cache` quando respeita a origem)
+      if (cdnCc && (path.startsWith('/duelo/') || path === '/relatorio' || path.startsWith('/relatorio/'))) headers[CABECALHO_BORDA] = 'no-store';
       return responder(c, head ? null : body, corpo.status, headers);
     });
   }

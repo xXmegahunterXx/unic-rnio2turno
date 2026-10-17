@@ -11,8 +11,13 @@
  * - Faixa "Conexão instável" (`FaixaConexao`): depois de 3 falhas seguidas, ou quando as respostas chegam mas o relógio
  *   do servidor (`wallNow`) não avança há 60 s pelo relógio deste aparelho — o status velho servido pela borda.
  */
-import type { CargaStatus } from '@/shared/types';
-import { ehFatorCarga } from '@/shared/chaves-noite';
+import type { CargaStatus, FatorCarga } from '@/shared/types';
+
+/**
+ * Fator válido (1, 2, 3 ou 5) — a mesma regra de `ehFatorCarga` (src/shared/chaves-noite.ts), repetida aqui de propósito:
+ * importar de lá punha o módulo inteiro das chaves (padrões, rótulos, leitura do estado) no JS inicial de todas as páginas.
+ */
+const ehFatorCarga = (v: unknown): v is FatorCarga => v === 1 || v === 2 || v === 3 || v === 5;
 
 /** Intervalo normal do status (ms). */
 export const STATUS_MS = 2000;

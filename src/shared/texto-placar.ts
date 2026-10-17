@@ -9,7 +9,7 @@
  *  - candidatos na ORDEM DA URNA (menor número primeiro), mesmo formato para os dois, sem "lidera", sem adjetivo;
  *  - nenhum nome antes das 17h de 25/10: na fase 'pre' só a contagem regressiva e, no dia da votação (0h–17h de
  *    Brasília, pelo relógio REAL), só "a apuração começa às 17h" (Lei 9.504/97, art. 39, § 5º);
- *  - simulação: "[SIMULAÇÃO]" na frente; com os nomes ocultos (`status.anonimizado`), "Candidato A/B" e sem partido;
+ *  - simulação: "[SIMULAÇÃO]" na frente e SEMPRE "Candidato A/B", sem partido (mesmo com os nomes reais no painel);
  *  - Presidente numa UF: nunca "eleito" (o resultado de um estado não elege ninguém);
  *  - chave 'texto-bots' desligada no painel: só o endereço do site.
  */
@@ -191,7 +191,9 @@ export function textoPlacarBot(e: EntradaTextoPlacar): string {
     return caber([pre(`${cab}: aguardando as primeiras seções totalizadas. ${fim}`), pre(`${cab}: aguardando os primeiros dados · ${fimCurto}`)]);
   }
 
-  const anon = !!e.status.anonimizado;
+  // simulação SEMPRE com os nomes ocultos no texto dos bots, mesmo que o painel mostre os nomes reais: um "[SIMULAÇÃO]
+  // Lula x%…" colado num chat circula sem o prefixo (print fora de contexto) — o plano descartou o ensaio fictício na /live
+  const anon = !!e.status.anonimizado || sim;
   const race = anon ? anonimizarRace(e.race as Race) : e.race;
   // ordem da urna: menor número primeiro (com os nomes ocultos, A antes de B — a mesma ordem)
   const fin = race.candidatos

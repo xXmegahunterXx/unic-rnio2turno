@@ -13,7 +13,7 @@ import { REGRA_CORES_CURTA } from '@/shared/cores';
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, Outlet, ScrollRestoration, useLocation } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
-import { useStatus } from '@/app/data/hooks';
+import { useConexaoInstavel, useStatus } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { ThemeToggle } from '@/app/ui/ThemeToggle';
@@ -24,7 +24,6 @@ import { Container } from './Container';
 import { Logo } from './Logo';
 import { NAV, NAV_TAB, ativoNoMais } from './nav';
 import { StatusPill } from './StatusPill';
-import { FaixaConexao } from './FaixaConexao';
 import { BotaoBusca, BuscaRapida, abrirBusca, preCarregarBusca } from '../busca/BuscaRapida';
 import { AcoesGlobais, abrirCompartilharSite, abrirIncorporar, preCarregarCompartilharSite, preCarregarIncorporar } from './acoesGlobais';
 import { BotaoMaisDesktop, FolhaMaisPreguicosa, preCarregarMenuMais, usePreCarregarMenuMais } from './BotaoMais';
@@ -262,11 +261,52 @@ function Header() {
           />
         ) : null}
         {/* I05: "Conexão instável" (status falhando ou relógio do servidor parado), presa sob o cabeçalho em toda página */}
-        <FaixaConexao />
+        <FaixaConexaoSobDemanda />
       </div>
       <FaixaTopo />
       <AvisoBanner aviso={status.data?.aviso ?? null} />
     </>
+  );
+}
+
+/**
+ * Faixa "Conexão instável" fora do JS inicial: o arquivo é pré-carregado 8 s depois da abertura (quando a rede falhar ele
+ * já está no aparelho) e montado só quando a conexão fica instável. Falha ao carregar = sem faixa (nunca quebra a página).
+ */
+let faixaCarregando: Promise<typeof import('./FaixaConexao')> | null = null;
+const carregarFaixa = () => {
+  faixaCarregando ??= import('./FaixaConexao').catch((e: unknown) => {
+    faixaCarregando = null;
+    throw e;
+  });
+  return faixaCarregando;
+};
+const SemFaixa = (): ReactNode => null;
+const FaixaConexaoPreguicosa = lazy(() =>
+  carregarFaixa()
+    .then((m): { default: () => ReactNode } => ({ default: m.FaixaConexao }))
+    .catch(() => ({ default: SemFaixa })),
+);
+
+function FaixaConexaoSobDemanda() {
+  const { instavel } = useConexaoInstavel();
+  const [montar, setMontar] = useState(false);
+  useEffect(() => {
+    if (instavel) setMontar(true);
+  }, [instavel]);
+  useEffect(() => {
+    const t = setTimeout(() => void carregarFaixa().catch(() => undefined), 8000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    // região viva sempre montada: o leitor de tela anuncia quando a faixa aparece
+    <div role="status" aria-live="polite">
+      {montar ? (
+        <Suspense fallback={null}>
+          <FaixaConexaoPreguicosa />
+        </Suspense>
+      ) : null}
+    </div>
   );
 }
 

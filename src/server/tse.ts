@@ -10,7 +10,7 @@
  *    por bloqueio do TSE (comando `tse-retomar`); o `frescor` só leva `nacionalParadoDesde` (I18) com a chave
  *    'aviso-nacional' em 'auto' (lida a cada chamada por `avisoNacional`, sem reiniciar nada).
  */
-import type { FrescorCorrida, ModoAvisoNacional, Race, TseConfig, UF } from '../shared/types';
+import type { FrescorCorrida, ModoAvisoNacional, ModoPausaTse, Race, TseConfig, UF } from '../shared/types';
 import { TseSource, type FetchLike, type TseHealth } from '../tse';
 import type { HistoricoSerializado } from '../tse';
 import type { JsonStore } from './state-store';
@@ -31,6 +31,8 @@ export interface TseManagerOptions {
    * (o detector segue rodando para o painel e os alertas). Ausente = 'auto'.
    */
   avisoNacional?: () => ModoAvisoNacional;
+  /** Chave 'pausa-tse' do painel (I03), lida pelo cliente a cada 429/403. Ausente = 'auto'. */
+  modoPausa?: () => ModoPausaTse;
 }
 
 /** Resultado do "Retomar agora" (comando `tse-retomar`). */
@@ -71,6 +73,7 @@ export class TseManager {
             now: this.opts.now,
             concorrencia: 8,
             workersMunicipios: 5,
+            modoPausa: this.opts.modoPausa,
           });
     } else {
       const atual = this.src.getConfig();

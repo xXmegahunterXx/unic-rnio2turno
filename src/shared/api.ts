@@ -63,6 +63,7 @@ import type {
   FatorCarga,
   FonteDados,
   ModoAvisoNacional,
+  ModoPausaTse,
   MunicipiosNacionalSnapshot,
   Patrocinio,
   LiveStatus,
@@ -142,6 +143,16 @@ export type AdminCommand =
   | { tipo: 'texto-bots'; ligado: boolean }
   /** I23: contagem anônima de lives (desligado = 204 sem contar). */
   | { tipo: 'contar-lives'; ligado: boolean }
+  /** I05 cliente: faixa "Conexão instável" no site (desligado = `LiveStatus.semFaixaConexao`; o recuo continua). */
+  | { tipo: 'faixa-conexao'; ligado: boolean }
+  /** I10: carimbo do print nos mapas e no placar (desligado = `LiveStatus.semCarimbo`). */
+  | { tipo: 'carimbo-print'; ligado: boolean }
+  /** I07a: placar da fonte TSE na descrição das prévias de link (desligado = descrições sem placar). */
+  | { tipo: 'meta-placar'; ligado: boolean }
+  /** I14: contagem de páginas por estado, país e aparelho (desligado = não conta). */
+  | { tipo: 'medir-local'; ligado: boolean }
+  /** I03: quando pausar as leituras do TSE por bloqueio ('off' também encerra uma pausa em curso). */
+  | { tipo: 'pausa-tse'; modo: ModoPausaTse }
   // ---- Leva 3: ações executadas pelo SERVIDOR (interceptadas em app.ts; o motor recusa: "indisponível nesta versão") ---
   /** I03: retoma já as leituras do TSE pausadas por bloqueio (falso positivo). */
   | { tipo: 'tse-retomar' }

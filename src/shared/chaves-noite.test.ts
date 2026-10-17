@@ -14,6 +14,12 @@ describe('chaves da noite', () => {
       avisoNacional: 'auto',
       textoBots: true,
       contarLives: true,
+      // integração da leva 3: peças novas da noite ligadas; pausa por bloqueio do TSE automática
+      faixaConexao: true,
+      carimboPrint: true,
+      metaPlacar: true,
+      medirLocal: true,
+      pausaTse: 'auto',
     });
     expect(Object.isFrozen(CHAVES_NOITE_PADRAO) && Object.isFrozen(CHAVES_NOITE_PADRAO.freio)).toBe(true);
     expect(PISO_PESSOAS_PUBLICO).toBe(500);
@@ -38,8 +44,36 @@ describe('chaves da noite', () => {
       { freio: { fator: 4, leve: 'sim' }, contadorPublico: false, htmlBorda: 'x', medirAnuncios: 0, avisoNacional: 'talvez', textoBots: false, contarLives: false, extra: 1 },
       fb,
     );
-    expect(r).toEqual({ freio: { fator: 3, leve: true }, contadorPublico: false, htmlBorda: true, medirAnuncios: true, avisoNacional: 'auto', textoBots: false, contarLives: false });
+    expect(r).toEqual({
+      freio: { fator: 3, leve: true },
+      contadorPublico: false,
+      htmlBorda: true,
+      medirAnuncios: true,
+      avisoNacional: 'auto',
+      textoBots: false,
+      contarLives: false,
+      faixaConexao: true,
+      carimboPrint: true,
+      metaPlacar: true,
+      medirLocal: true,
+      pausaTse: 'auto',
+    });
     expect(parseChavesNoite({ freio: { fator: 5 }, avisoNacional: 'off' })).toMatchObject({ freio: { fator: 5, leve: false }, avisoNacional: 'off' });
+  });
+
+  it('peças novas da noite: estado salvo sem os campos → ligadas e pausa automática; valores válidos ficam, inválidos voltam', () => {
+    // admin.json da leva 3 antes da integração (sem os campos novos)
+    const antigo = { freio: { fator: 2, leve: false }, contadorPublico: true, htmlBorda: true, medirAnuncios: true, avisoNacional: 'off', textoBots: true, contarLives: true };
+    expect(parseChavesNoite(antigo)).toMatchObject({ htmlBorda: true, avisoNacional: 'off', faixaConexao: true, carimboPrint: true, metaPlacar: true, medirLocal: true, pausaTse: 'auto' });
+    expect(parseChavesNoite({ faixaConexao: false, carimboPrint: false, metaPlacar: false, medirLocal: false, pausaTse: 'restrita' })).toMatchObject({
+      faixaConexao: false,
+      carimboPrint: false,
+      metaPlacar: false,
+      medirLocal: false,
+      pausaTse: 'restrita',
+    });
+    expect(parseChavesNoite({ pausaTse: 'off' }).pausaTse).toBe('off');
+    expect(parseChavesNoite({ faixaConexao: 'nao', pausaTse: 'sempre' })).toMatchObject({ faixaConexao: true, pausaTse: 'auto' });
   });
 
   it('fatores aceitos: 1, 2, 3 e 5', () => {

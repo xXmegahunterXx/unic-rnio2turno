@@ -7,7 +7,7 @@ import type { Race } from '../shared/types';
 import { UFS_GOV_2T } from '../shared/constants';
 import { fmtLista } from '../shared/format';
 import { DadosEstaticos } from './dados-estaticos';
-import { consultaNormalizada, deUf, emUf, escapeHtml, injetarMeta, metaDaRota, normalizarTwitterSite, type ContextoMeta } from './meta-tags';
+import { OG_GENERICA_DIA_VOTACAO, consultaNormalizada, deUf, emUf, escapeHtml, injetarMeta, metaDaRota, normalizarTwitterSite, type ContextoMeta } from './meta-tags';
 import { RAIZ, datasetReal } from './test-helpers';
 import { join } from 'node:path';
 import { MAX_CODIGO, calcularCenario, codificarCenario, cenarioDoPreset, decodificarCenario, placarCenarioTexto } from '../shared/cenarios';
@@ -345,6 +345,27 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 20, 0, 0)); // 17h
     fase = 'apurando';
     expect(metaDaRota('/apuracao/sp/62910', q(), apuracao).descricao).toMatch(/Lula 48,00%/);
+    fase = 'pre';
+  });
+
+  it('dia da votação (0h–17h de 25/10): a IMAGEM de prévia também sai sem candidato; antes e às 17h volta', () => {
+    const manha = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 19, 59, 0)); // 16h59 de Brasília
+    fase = 'pre';
+    for (const p of ['/', '/apuracao', '/apuracao/sp', '/apuracao/sp/62910', '/apuracao/sp/62910/1/1', '/governadores', '/live', '/tv', '/streamers', '/sobre', '/embed/placar']) {
+      const m = metaDaRota(p, q(), manha);
+      expect(m.imagem, p).toBe(OG_GENERICA_DIA_VOTACAO);
+      expect(m.imagemVersao, p).toBeUndefined();
+      expect(m.imagemAlt, p).not.toMatch(/Lula|Flávio|Placar/);
+    }
+    // imagens sem candidato não mudam (Teste Cego, Anuncie, Palpite)
+    expect(metaDaRota('/teste', q(), manha).imagem).toBe('/api/og/teste.png');
+    expect(metaDaRota('/anuncie', q(), manha).imagem).toBe('/api/og/anuncie.png');
+    const vespera = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 2, 59, 0)); // 23h59 de 24/10
+    expect(metaDaRota('/apuracao', q(), vespera).imagem).toBe('/api/og/apuracao.png?race=pres');
+    const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 20, 0, 0)); // 17h
+    fase = 'apurando';
+    expect(metaDaRota('/apuracao/sp', q(), apuracao).imagem).toBe('/api/og/apuracao.png?race=pres&uf=sp');
+    expect(metaDaRota('/', q(), apuracao).imagem).toBe('/api/og/apuracao.png?race=pres');
     fase = 'pre';
   });
 

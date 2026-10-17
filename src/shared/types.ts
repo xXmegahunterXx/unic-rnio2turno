@@ -317,6 +317,16 @@ export interface LiveStatus {
    * AUSENTE = normal (fator 1, sem leve): o motor só manda quando o freio está puxado. Cliente antigo ignora.
    */
   carga?: CargaStatus;
+  /**
+   * Chave 'faixa-conexao' DESLIGADA no painel (leva 3): o app não mostra a faixa "Conexão instável" (o recuo do status
+   * continua). AUSENTE = ligada (padrão). Cliente antigo ignora.
+   */
+  semFaixaConexao?: true;
+  /**
+   * Chave 'carimbo-print' DESLIGADA no painel (I10): mapas e placar sem o carimbo "domínio · % apurado · hora".
+   * AUSENTE = ligado (padrão). Cliente antigo ignora.
+   */
+  semCarimbo?: true;
 }
 
 /** Frescor dos números de uma disputa na fonte 'tse' (ver `LiveStatus.frescor`). */
@@ -357,6 +367,14 @@ export interface CargaStatus {
 export type ModoAvisoNacional = 'auto' | 'off';
 
 /**
+ * Pausa das leituras quando o TSE limita (I03, chave 'pausa-tse'):
+ *  - 'auto' (padrão): pausa com 429, 403 da borda do TSE (Akamai / "Access Denied") ou 403 num arquivo que já deu 200;
+ *  - 'restrita': só com sinal claro (429 ou 403 da borda do TSE) — o "403 num arquivo já lido" volta a ser "ausente";
+ *  - 'off': nunca pausa (como antes da leva 3): 429 vira erro comum e 403 vira "ausente". Risco maior de bloqueio.
+ */
+export type ModoPausaTse = 'auto' | 'restrita' | 'off';
+
+/**
  * "Chaves da noite" (painel → Controle e `deploy/painel.sh`): interruptores operacionais da noite, gravados no
  * AdminState — valem para todas as instâncias (admin.json) e sobrevivem a reinícios. No servidor, mudar uma chave NÃO
  * incrementa `AdminState.versao` (não invalida o cache dos visitantes nem as ETags; no demo incrementa). Padrões em `CHAVES_NOITE_PADRAO`
@@ -377,6 +395,22 @@ export interface ChavesNoite {
   textoBots: boolean;
   /** I23 ('contar-lives'): contagem anônima de lives (POST /api/live/batimento). false = 204 sem contar. */
   contarLives: boolean;
+  /**
+   * I05 cliente ('faixa-conexao'): faixa "Conexão instável — mostrando o último dado recebido às HH:MM:SS". false = o app
+   * não mostra a faixa (vai ao site como `LiveStatus.semFaixaConexao`; o recuo do status continua). Leva 3, integração.
+   */
+  faixaConexao: boolean;
+  /** I10 ('carimbo-print'): carimbo do print nos mapas e no placar. false = `LiveStatus.semCarimbo` (sem carimbo). */
+  carimboPrint: boolean;
+  /** I07a ('meta-placar'): placar da fonte TSE na descrição das prévias de link. false = descrições sem placar. */
+  metaPlacar: boolean;
+  /**
+   * I14 ('medir-local'): contar páginas por estado, país e aparelho (cabeçalhos da Cloudflare). false = não conta
+   * (curva, horas de tela e o resto da audiência seguem). `AUDIENCIA_LOCAL=0` no ambiente também desliga.
+   */
+  medirLocal: boolean;
+  /** I03 ('pausa-tse'): quando o servidor pausa as leituras do TSE por bloqueio (ver `ModoPausaTse`). */
+  pausaTse: ModoPausaTse;
 }
 
 /** Patrocínio/anúncio institucional (nunca político — ARCHITECTURE §1.5). */

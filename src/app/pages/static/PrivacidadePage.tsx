@@ -83,7 +83,7 @@ export default function PrivacidadePage() {
       icone="olho-fechado"
       titulo="Sua opinião é só sua"
       lead="O Sintonia foi feito para funcionar sem saber quem você é. As respostas do Teste Cego nunca saem do seu aparelho, e não usamos cookies de rastreamento."
-      atualizado="15 de outubro de 2026"
+      atualizado="16 de outubro de 2026"
       sumario={SUMARIO}
       destaque={
         <Resumo
@@ -221,15 +221,17 @@ export default function PrivacidadePage() {
             <>
               <strong>Modo streamer.</strong> A página usada como fonte de transmissão ao vivo (/live) avisa o servidor a cada minuto, com um código
               aleatório criado cada vez que ela abre (não identifica canal nem pessoa), o layout em uso e os anúncios na tela. Contamos só quantas
-              transmissões estão no ar e os minutos por layout e por anúncio. Quando um bot de chat de transmissão pede o placar em texto, contamos
-              só quantos canais diferentes pediram: o nome do canal não aparece no painel nem é publicado. Quem assiste à transmissão não envia
-              nada ao Sintonia.
+              transmissões estão no ar, o maior número ao mesmo tempo e os minutos por layout e por anúncio. A conexão entra só como um código
+              misturado a um valor aleatório, na memória, para limitar abusos. Quando um bot de chat de transmissão pede o placar em texto,
+              contamos só quantos canais diferentes pediram: o nome do canal não é guardado nem publicado, e quem digitou o comando nunca é lido.
+              Quem assiste à transmissão não envia nada ao Sintonia.
             </>,
             <>
               <strong>Nada sobre a sua opinião.</strong> O sinal não diz nada sobre as suas respostas do Teste Cego nem sobre candidatos.
             </>,
             <>
-              <strong>“Não rastrear” respeitado.</strong> Com o Global Privacy Control ou o Do Not Track ligados no navegador, o sinal não é enviado.
+              <strong>“Não rastrear” respeitado.</strong> Com o Global Privacy Control ou o Do Not Track (“Não rastrear”) ligados no navegador,
+              nada é enviado: nem o sinal das páginas, nem o aviso do modo streamer.
             </>,
           ]}
         />

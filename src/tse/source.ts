@@ -48,6 +48,7 @@
  */
 import type {
   FrescorCorrida,
+  ModoPausaTse,
   MunicipioResumo,
   MunicipioSnapshot,
   MunicipiosNacionalSnapshot,
@@ -124,6 +125,8 @@ export interface TseSourceOptions {
   nomeMunicipio?: (uf: UF, cod: string) => string | undefined;
   /** Histórico salvo por `exportarHistorico()` (sobrevive a reinícios). */
   historico?: HistoricoSerializado[];
+  /** Quando pausar por bloqueio do TSE (chave 'pausa-tse'; ver `TseClientOptions.modoPausa`). Padrão 'auto'. */
+  modoPausa?: () => ModoPausaTse;
 }
 
 export interface TseCorridaHealth {
@@ -440,6 +443,7 @@ export class TseSource {
         concorrencia: opts.concorrencia ?? 6,
         limitePorSeg: this.config.limitePorSeg,
         now: this.now,
+        modoPausa: opts.modoPausa,
         // User-Agent identificável só no servidor (no navegador o cabeçalho é proibido/gera preflight)
         headers: ehNode() ? { 'User-Agent': 'Sintonia/1.0 (apuracao 2o turno 2026)' } : {},
       });

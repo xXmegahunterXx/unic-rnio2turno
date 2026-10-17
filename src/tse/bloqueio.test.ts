@@ -165,6 +165,40 @@ describe('bloqueio do TSE (TseBloqueioError)', () => {
     expect(c.stats().bloqueios).toBe(1);
   });
 
+  it("chave 'pausa-tse': 'restrita' ignora o 403 em arquivo já lido; 'off' nunca pausa (429 = erro comum, 403 = ausente)", async () => {
+    let modo: 'auto' | 'restrita' | 'off' = 'restrita';
+    let n = 0;
+    const jaLido: FetchLike = async () =>
+      ++n === 1 ? new Response('{}', { status: 200, headers: { etag: '"a"' } }) : new Response(NO_SUCH_KEY, { status: 403 });
+    const r = new TseClient({ baseUrl: BASE, fetch: jaLido, sleep: async () => undefined, modoPausa: () => modo });
+    expect((await r.getJson('a.json')).status).toBe('ok');
+    expect(await r.getJson('a.json')).toMatchObject({ status: 'ausente', httpStatus: 403 });
+    expect(r.bloqueio()).toBeNull();
+    // 'restrita' continua pausando com sinal claro (borda do TSE)
+    const ak = new TseClient({ baseUrl: BASE, fetch: resposta(403, 'x', { server: 'AkamaiGHost' }), sleep: async () => undefined, modoPausa: () => 'restrita' });
+    await expect(ak.getJson('a.json')).rejects.toMatchObject({ motivo: 'akamai' });
+    // 'off': nada pausa
+    modo = 'off';
+    const t429 = new TseClient({ baseUrl: BASE, fetch: resposta(429), sleep: async () => undefined, modoPausa: () => modo });
+    const e = await t429.getJson('a.json').catch((x: unknown) => x);
+    expect(e).not.toBeInstanceOf(TseBloqueioError);
+    expect(e).toMatchObject({ status: 429 });
+    expect(t429.bloqueio()).toBeNull();
+    const off403 = new TseClient({ baseUrl: BASE, fetch: resposta(403, 'x', { server: 'AkamaiGHost' }), sleep: async () => undefined, modoPausa: () => 'off' });
+    expect(await off403.getJson('a.json')).toMatchObject({ status: 'ausente' });
+    expect(off403.bloqueio()).toBeNull();
+    // leitura com erro: vale o padrão ('auto')
+    const quebrado = new TseClient({
+      baseUrl: BASE,
+      fetch: resposta(429),
+      sleep: async () => undefined,
+      modoPausa: () => {
+        throw new Error('x');
+      },
+    });
+    await expect(quebrado.getJson('a.json')).rejects.toBeInstanceOf(TseBloqueioError);
+  });
+
   it('Retry-After em segundos ou data HTTP, dentro de 5 s–60 min', () => {
     const r = (v: string) => new Response('', { status: 429, headers: { 'retry-after': v } });
     expect(retryAfterDe(r('120'), INICIO)).toBe(120_000);

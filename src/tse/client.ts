@@ -25,6 +25,7 @@
  * Isomórfico: só usa fetch, AbortController e setTimeout.
  */
 import { TSE_LIMITE_POR_SEG } from '../shared/constants';
+import type { ModoPausaTse } from '../shared/types';
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -76,6 +77,11 @@ export interface TseClientOptions {
   semTeto?: boolean;
   /** Pausa quando o TSE bloqueia sem Retry-After (ms). Padrão 11 min. */
   pausaPadraoMs?: number;
+  /**
+   * Quando pausar (chave 'pausa-tse' do painel), lido a cada 429/403: 'auto' (padrão) = 429, borda do TSE ou 403 num
+   * arquivo já lido; 'restrita' = só 429 e borda do TSE; 'off' = nunca (429 vira erro comum; 403, "ausente").
+   */
+  modoPausa?: () => ModoPausaTse;
   /** Envia If-None-Match/If-Modified-Since. Padrão true. */
   condicional?: boolean;
   /** Cabeçalhos extras (ex.: User-Agent identificável no servidor). */
@@ -269,6 +275,7 @@ export class TseClient {
   private readonly pausaPadraoMs: number;
   private readonly balde: BaldeFichas;
   private readonly semTeto: boolean;
+  private readonly modoPausaFn: () => ModoPausaTse;
   private readonly relogioBalde: () => number;
 
   private ativos = 0;
@@ -313,6 +320,17 @@ export class TseClient {
     this.relogioBalde = opts.relogioBalde ?? (() => Date.now());
     this.balde = new BaldeFichas(opts.limitePorSeg ?? TSE_LIMITE_POR_SEG.padrao, this.relogioBalde);
     this.semTeto = !!opts.semTeto;
+    this.modoPausaFn = opts.modoPausa ?? (() => 'auto');
+  }
+
+  /** Modo da pausa por bloqueio agora (nunca lança; erro = 'auto'). */
+  private modoPausa(): ModoPausaTse {
+    try {
+      const m = this.modoPausaFn();
+      return m === 'restrita' || m === 'off' ? m : 'auto';
+    } catch {
+      return 'auto';
+    }
   }
 
   get baseUrl() {
@@ -518,11 +536,16 @@ export class TseClient {
       }
       if (res.status === 429) {
         await descartar(res);
+        // chave 'pausa-tse' em 'off': erro comum (não repetido: < 500), sem pausa — o comportamento de antes da leva 3
+        if (this.modoPausa() === 'off') throw new TseHttpError('HTTP 429 (pausa por bloqueio desligada no painel)', url, 429);
         const b = this.pausar('http-429', 429, url, retryAfterDe(res, this.now()));
         throw new TseBloqueioError(`HTTP 429 (${MOTIVO_BLOQUEIO_TEXTO['http-429']})`, url, 429, b.ate, 'http-429', false);
       }
       if (res.status === 403) {
-        const motivo = await motivo403(res, !!(opts.validadores?.etag || opts.validadores?.lastModified) || this.lidos.has(url));
+        const modo = this.modoPausa();
+        const lido = await motivo403(res, !!(opts.validadores?.etag || opts.validadores?.lastModified) || this.lidos.has(url));
+        // 'restrita': o "403 num arquivo já lido" deixa de pausar; 'off': nenhum 403 pausa (vira "ausente", como antes)
+        const motivo = modo === 'off' || (modo === 'restrita' && lido === 'arquivo-ja-lido') ? null : lido;
         if (motivo) {
           const b = this.pausar(motivo, 403, url, retryAfterDe(res, this.now()));
           throw new TseBloqueioError(`HTTP 403 (${MOTIVO_BLOQUEIO_TEXTO[motivo]})`, url, 403, b.ate, motivo, false);

@@ -101,7 +101,7 @@ function Cabecalho({ acoes }: { acoes?: React.ReactNode }) {
     <CabecalhoSecao
       titulo="Lives"
       icone="play"
-      descricao="Quantas lives exibem o Sintonia agora (a /live como fonte de navegador do OBS), minutos no ar e bots de chat. Só contagens: nenhum canal ou pessoa é identificado."
+      descricao="Quantas lives exibem o Sintonia agora (a /live como fonte de navegador do OBS, contada depois de 1 minuto no ar), minutos no ar e bots de chat. Só contagens, nenhum canal ou pessoa é identificado; é uma estimativa (um batimento pode ser forjado) — use assim no material de venda."
       acoes={acoes}
     />
   );

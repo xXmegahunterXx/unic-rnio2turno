@@ -158,8 +158,36 @@ export function consultaNormalizada(q: URLSearchParams): string {
   return p.toString();
 }
 
-/** Meta da rota `path` (sem query) com os parâmetros de busca `q`. */
+/**
+ * Prévia genérica do dia da votação (0h–17h de 25/10): a imagem de convite de og-audiencia.ts sem número (`?m=0`):
+ * "Eleições 2026 · 2º turno / Apuração ao vivo", sem foto, nome, número ou percentual de candidato.
+ */
+export const OG_GENERICA_DIA_VOTACAO = '/api/og/audiencia.png?m=0';
+export const ALT_GENERICA_DIA_VOTACAO = 'Sintonia · apuração do 2º turno de 2026 ao vivo';
+/** Imagens de prévia que mostram candidato (foto, nome, número ou percentual): genéricas no dia da votação, antes das 17h. */
+const OG_COM_CANDIDATO = ['/api/og/apuracao.png', '/api/og/municipio.png', '/api/og/secao.png', '/api/og/governadores.png', '/api/og/candidato.png'];
+
+/**
+ * Meta da rota `path` (sem query) com os parâmetros de busca `q`. No dia da votação (0h–17h de 25/10), além das
+ * descrições sem nomes, a IMAGEM de prévia (a que aparece no WhatsApp e no X) também sai sem candidato: é a que circula
+ * com o link. Para desfazer, basta mudar `diaDeVotacao`.
+ */
 export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta): MetaPagina {
+  const m = metaDaRotaBase(path, q, ctx);
+  let agora: number;
+  try {
+    agora = ctx.agora?.() ?? Date.now();
+  } catch {
+    agora = Date.now();
+  }
+  if (!diaDeVotacao(agora)) return m;
+  const caminhoImg = m.imagem.split('?')[0];
+  if (!OG_COM_CANDIDATO.includes(caminhoImg)) return m;
+  const { imagemVersao: _v, ...resto } = m;
+  return { ...resto, imagem: OG_GENERICA_DIA_VOTACAO, imagemAlt: ALT_GENERICA_DIA_VOTACAO };
+}
+
+function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): MetaPagina {
   const seg = path.split('/').filter(Boolean).map((s) => {
     try {
       return decodeURIComponent(s);
@@ -498,7 +526,10 @@ export function metaDaRota(path: string, q: URLSearchParams, ctx: ContextoMeta):
       const res = r ? ` No 1º turno de 2026: ${fmtInt(r.votos)} votos (${fmtPct(r.pct)} dos válidos)${sit ? `, ${sit}` : ''}.` : '';
       return pagina({
         titulo: `${f.nomeUrna} (${f.partido}) · ${cargo}${f.uf === 'BR' ? '' : ` · ${onde}`} · Ficha do candidato · ${APP_NAME}`,
-        descricao: `${cargo} · ${onde} · ${f.partido} ${f.numero}.${res} Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`,
+        // dia da votação (0h–17h): sem o número de urna nem o resultado na descrição
+        descricao: comNomes
+          ? `${cargo} · ${onde} · ${f.partido} ${f.numero}.${res} Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`
+          : `${cargo} · ${onde} · ${f.partido}. Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`,
         imagem: `/api/og/candidato.png?sq=${f.sqcand}`,
         imagemAlt: `Ficha de ${f.nomeUrna} (${f.partido}), ${cargo}`,
         imagemVersao: fx?.lida?.versao,

@@ -24,7 +24,7 @@ import { createJsonStore } from './state-store';
 const NOITE = Date.UTC(2026, 9, 25, 22, 0, 0);
 const UA = (i: number) => `Mozilla/5.0 (Linux; Android 14; Aparelho ${i}) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36`;
 
-function montar(o: { agora?: number; servidor?: number; dir?: string; medirLocal?: boolean } = {}) {
+function montar(o: { agora?: number; servidor?: number; dir?: string; medirLocal?: boolean | (() => boolean) } = {}) {
   const relogio = { t: o.agora ?? NOITE, servidor: o.servidor ?? 0 };
   const store = o.dir ? createJsonStore(o.dir, 'audiencia.json', { debounceMs: 0 }) : null;
   const a = new Audiencia({ now: () => relogio.t, pessoasServidor: () => relogio.servidor, store, medirLocal: o.medirLocal });
@@ -357,6 +357,18 @@ describe('I14: UF, país e aparelho pelos cabeçalhos', () => {
     expect(adm.porUf).toEqual([]);
     expect(adm.porPais).toEqual([]);
     expect(adm.porAparelho).toEqual([]);
+  });
+
+  it("chave 'medir-local' do painel (função): vale na hora; o resto da audiência segue contando", () => {
+    let ligado = false;
+    const { a } = montar({ medirLocal: () => ligado });
+    a.sinal('r1', UA(1), { g: 'inicio' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'SP' }));
+    expect(a.paraAdmin().porUf).toEqual([]);
+    ligado = true;
+    a.sinal('r2', UA(2), { g: 'inicio' }, cab({ 'cf-ipcountry': 'BR', 'cf-region-code': 'RJ' }));
+    const adm = a.paraAdmin();
+    expect(adm.dias.at(-1)!.paginas).toBe(2);
+    expect(adm.porUf![0].n).toEqual({ RJ: 1 });
   });
 
   it('países distintos por dia têm teto (cabeçalho forjado direto na origem não enche o arquivo)', () => {
