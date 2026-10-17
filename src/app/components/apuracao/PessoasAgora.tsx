@@ -6,21 +6,11 @@
  * Não é enquete nem preferência: é só audiência do site (ARCHITECTURE §1.2).
  */
 import type { LiveStatus } from '@/shared/types';
-import { fmtCompact, fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
+import { pessoasAgora, textoPessoas } from './pessoasTexto';
 
-/** "1 pessoa", "842 pessoas", "12,3 mil pessoas", "1,2 mi pessoas". */
-export function textoPessoas(n: number): string {
-  const v = n >= 10_000 ? fmtCompact(n) : fmtInt(n);
-  return `${v} ${n === 1 ? 'pessoa' : 'pessoas'}`;
-}
-
-/** Número válido de pessoas agora (ou null para não mostrar). */
-export function pessoasAgora(status: Pick<LiveStatus, 'pessoasAgora'> | undefined | null): number | null {
-  const n = status?.pessoasAgora;
-  return typeof n === 'number' && Number.isFinite(n) && n > 0 ? Math.round(n) : null;
-}
+export { pessoasAgora, textoPessoas };
 
 export function PessoasAgora({
   status,

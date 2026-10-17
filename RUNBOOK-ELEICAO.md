@@ -68,6 +68,15 @@ usam a senha do `.env` por dentro do contêiner, sem passar pela internet.
 | Restaurar o estado do painel | `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>` |
 | Reiniciar só o app (≈ 2–4 s; o proxy segura as requisições) | `docker compose restart app` |
 | Atualização automática: situação e congelamento | `deploy/auto-update.sh estado` · desligar: `deploy/auto-update.sh desligar` |
+| **Chaves da noite** (leva 3): todas, e o que está fora do padrão | `deploy/painel.sh chaves` (tabela e padrões: seção 3.10) |
+| **Freio de carga**: puxar · com modo leve · soltar | `deploy/painel.sh freio 2` (ou 3, 5) · `deploy/painel.sh freio 3 leve` · `deploy/painel.sh freio 1` |
+| HTML guardado na Cloudflare (só no congelamento, depois do ensaio) | `deploy/painel.sh html-borda ligar` · `deploy/painel.sh html-borda desligar` |
+| TSE: retomar já as leituras pausadas por bloqueio (falso positivo) | `deploy/painel.sh tse-retomar` · se a pausa recomeçar a cada vez: `deploy/painel.sh pausa-tse restrita` |
+| Aviso "arquivo nacional do TSE parado": automático · desligado | `deploy/painel.sh aviso-nacional auto` · `deploy/painel.sh aviso-nacional off` |
+| Alertas no celular: mandar uma mensagem de teste | `deploy/painel.sh alerta-teste` |
+| Saúde da noite (o mesmo que o monitor externo lê) | `curl -s https://seu-dominio/api/saude-noite` → `{"noite":"ok"}` |
+| Cloudflare: conferir a borda (sem chave) | `node deploy/cloudflare.mjs --conferir` (DEPLOY §5.4); a linha "Borda" do `deploy/status.sh` resume |
+| Limites de CPU e processos do app (VPS compartilhada) | `deploy/limites.sh` · depois de aumentar a VPS: `deploy/limites.sh aplicar` |
 
 `deploy/painel.sh --help` lista tudo. A simulação **não** pode ser ligada por esse script, e em produção o servidor
 também a recusa. O `painel.sh` faz login com a senha do `.env` e está sujeito ao **mesmo limite de tentativas** do painel
@@ -89,7 +98,11 @@ Simulação:        bloqueada (correto no site público)
 Códigos do TSE:   pleito 3221 · Presidente 6258 · Governador 6260 · a cada 15 s
 Chat ao vivo:     fechada · modo lento 10 s · sem mensagem fixada
 Anúncios:         4 no ar: Lynx, UPdePix, Vulpix, Café Aurora
+Freio de carga:   solto (ritmo normal)
+Chaves da noite:  todas no padrão (painel.sh chaves)
 ```
+
+(A partir de 24/10, 12h, com o "HTML na borda" ligado depois do ensaio, o normal é `Chaves da noite: 1 fora do padrão`.)
 
 (Em produção a sala só recebe mensagens a partir das 17h de 25/10: aberta antes disso, o `chat-estado` diz "ABERTA no
 painel, mas ainda sem receber mensagens".)
@@ -99,6 +112,18 @@ Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar c
 ---
 
 ## 2. Linha do tempo
+
+### Antes da véspera (leva 3, de 18 a 23/10)
+
+| Quando | O quê | Como conferir |
+|---|---|---|
+| até 18/10 | **Cloudflare aplicada** pela chave temporária (DEPLOY §5.1, `node deploy/cloudflare.mjs --aplicar`; a chave só no ambiente de quem aplica, nunca na VPS) ou pelo passo a passo do celular (§5.2). **Revogue a chave** logo depois | `node deploy/cloudflare.mjs --conferir` → "Tudo certo"; `deploy/status.sh` → "Borda: guardando" |
+| até 20/10 | **Alertas no celular**: bot do Telegram e healthchecks.io no `.env` (DEPLOY §16.1), `docker compose up -d` | `deploy/painel.sh alerta-teste` chega no celular; healthchecks.io "up"; monitor externo em `/api/saude-noite` com a palavra-chave `"noite":"ok"` |
+| 21/10, 12h | **Publicar a leva 3** (`update.sh`; commit `[deploy]`). Depois: tirar da borda `/robots.txt` e `/sitemap.xml` (a borda guardava os antigos por 1 dia): `node deploy/cloudflare.mjs --purgar /robots.txt /sitemap.xml` com a chave, ou, sem ela, pelo celular: Cloudflare → Caching → Configuration → Purge Cache → Custom Purge, os dois endereços completos | `deploy/status.sh` (imagem nova `healthy`, linha "Borda", limites); `deploy/limites.sh` → "em vigor" = "configurado"; `deploy/painel.sh chaves` → todas no padrão |
+| 21/10 | Search Console e Bing: domínio verificado (registro TXT na Cloudflare) e `https://seu-dominio/sitemap.xml` enviado | o Search Console lê o índice com 4 arquivos |
+| 22/10, 2h–6h | **Ensaio pela borda** (autorizado pelo dono): `SINTONIA_ADMIN_SENHA=… npx tsx scripts/ensaio-borda.ts --base=https://seu-dominio --usuarios=100` (depois 1000; 3000 só se passar) `--duracao=300`; dia de jogo numa cópia local com `SINTONIA_ENSAIO=1` e o TSE falso (bloqueio, arquivo nacional parado, placar parado); **6h na produção**: `painel.sh html-borda ligar`, `docker compose stop app` por 60 s (`/` e `/apuracao` abrem pelo celular, com a faixa "Conexão instável"), `docker compose start app`, `painel.sh html-borda desligar`; `painel.sh freio 2` e `freio 5` derrubam o req/s na origem; `freio 1` | relatório "APROVADO" (origem < 300 req/s, ≥ 95% HIT/UPDATING na API, p95 < 300 ms, zero 5xx); alertas de reinício, saúde da noite e homem-morto chegaram. **Anote os resultados aqui** |
+| 22/10, depois do ensaio | **Zerar a medição** (painel → Audiência → "Zerar medição") e **zerar as lives** (painel → Lives → "Zerar contagem"): o tráfego de teste infla o pico | painel → Audiência e Lives zerados |
+| 23/10 | Só correções (commit `[deploy]` com a correção, conferida como acima) | — |
 
 ### Sábado, 24/10 (véspera)
 
@@ -110,7 +135,8 @@ Qualquer coisa diferente disso **antes das 17h de 25/10** é motivo para olhar c
 | 14h00 | **Aumentar a VPS** para 4 vCPU / 8 GB, se ainda não estiver (o provedor reinicia a máquina: ≈ 1–2 min fora do ar; tudo volta sozinho) | depois: `deploy/status.sh` (tudo `healthy`) e `deploy/painel.sh chat-estado` (a configuração da sala voltou) |
 | 15h00 | (Opcional) **ensaio da troca**: `deploy/painel.sh marcar HH:MM` (daqui a 3 min). No horário, `deploy/painel.sh estado` deve mostrar "feita". As páginas continuam no 1º turno (a fase depende da data da eleição) | `deploy/painel.sh estado` |
 | logo depois do ensaio | **Desfazer o ensaio** (obrigatório se ensaiou): `deploy/painel.sh fonte pre` e `deploy/painel.sh horario-padrao` | `painel.sh estado` = **"agendada para 25/10 17:00:00"** |
-| 18h00 | Cloudflare conferida (cache `HIT` na API, nuvem laranja, "Sempre usar HTTPS" desligado); monitor de uptime verde; relógio sincronizado | DEPLOY §5 item 7; `timedatectl` → *synchronized: yes* |
+| 12h00, depois da última atualização | **Ligar o "HTML na borda"**, só se o ensaio de 22/10 passou: `deploy/painel.sh html-borda ligar` (a partir daqui, nenhum deploy sem antes desligá-lo e esperar 30 s) | `deploy/painel.sh chaves` → "1 fora do padrão"; `deploy/status.sh` → "páginas (HTML): guardadas" |
+| 18h00 | Cloudflare conferida (cache `HIT` na API, nuvem laranja, "Sempre usar HTTPS" desligado); monitor de uptime verde; relógio sincronizado; `deploy/painel.sh alerta-teste` chega no celular | DEPLOY §5.4 (`node deploy/cloudflare.mjs --conferir`); `timedatectl` → *synchronized: yes* |
 | 20h00 | Backup **copiado para fora da VPS** (só o mais recente, **cifrado**: leva pedidos de anunciantes e o `.env`; apague as cópias antigas em até 30 dias); escala do domingo confirmada (inclusive o moderador do chat); textos de aviso (seção 5) aprovados pelo editorial | DEPLOY §7 (`scp` do mais recente + `gpg -c`) |
 
 ### Domingo, 25/10 (eleição)
@@ -134,6 +160,8 @@ Cloudflare, nenhum reinício da VPS, salvo pelo plano de contingência (seção 
 5. Entre no painel `/admin` no navegador agora: a sessão vale 12 h (até ~4h da manhã).
 6. Do seu computador, duas vezes: `curl -sI https://seu-dominio/api/status | grep -iE 'cf-cache-status|cache-control'`
    → `HIT`/`EXPIRED`/`REVALIDATED` e `s-maxage=1`.
+7. `deploy/painel.sh chaves`: freio solto, todas no padrão menos o "HTML na borda" (ligado só se o ensaio passou);
+   `curl -s https://seu-dominio/api/saude-noite` → `{"noite":"ok"}`; `deploy/painel.sh alerta-teste` chega no celular.
 
 **16h30 — conferência T−30:**
 
@@ -195,9 +223,14 @@ Presidente ficou matematicamente definido por volta das 20h; é aí que o tráfe
 | chat (`deploy/painel.sh chat-estado`) | aberta, denúncias sendo revisadas | muitas recusadas por "fraude"/"ofensa" ou denúncias acumulando: reforce a moderação; em último caso, `chat-fechar` |
 | 429 nas imagens (comando da seção 1) | 0 a poucos | dezenas a cada 15 min: seção 3.3, "cartões sem imagem" |
 | Cloudflare → Analytics → Cache | maioria servida pela Cloudflare | a maioria indo para a VPS: confira as regras de cache (DEPLOY §5) |
+| painel → Monitor → "Freio de carga" (p99, 5xx, event loop) | sem sinal de aperto | p99 > 1 s, 5xx > 1% ou event loop > 300 ms: "Puxar 2×" (seção 3.3) |
+| Telegram (alertas) e `/api/saude-noite` | nenhum alerta; `"noite":"ok"` | qualquer alerta: leia a mensagem e vá à seção indicada (placar parado → 3.1; TSE limitando → 3.1; erros/lento → 3.3; reinício → 3.4) |
+| selo de atualização na `/apuracao` | "Atualizado às…" | "O TSE está limitando leituras…" ou "O arquivo nacional do TSE não atualiza…": seção 3.1 |
 
 "Pessoas agora" no site é o maior entre quem chega à VPS e a presença pelo sinal das páginas (que atravessa a
-Cloudflare); continua sendo uma estimativa por baixo. É normal.
+Cloudflare); continua sendo uma estimativa por baixo, e por isso sai com "· estimativa" e só a partir de 500 pessoas
+(chave `contador-publico`). É normal. A medição da noite (curva por minuto, estados, aparelho) guarda só 24 h de curva:
+**baixe o CSV da curva** (painel → Audiência) até 26/10 às 17h.
 
 **Resultado matematicamente definido.** O site mostra sozinho o evento ("matematicamente definida", texto neutro). Não
 publique aviso sobre isso e não poste projeções: o site só mostra o que o TSE divulga.
@@ -218,6 +251,8 @@ da TV). Seções retardatárias podem levar horas.
 |---|---|
 | manhã | `deploy/painel.sh estado` (fonte TSE, fase "apuração encerrada") e `deploy/painel.sh tse` (100% ou perto disso); compare os totais finais com o TSE |
 | manhã | backup copiado para fora da VPS |
+| até 17h | **Baixar os CSVs da noite** (a curva por minuto guarda só 24 h): painel → Audiência → CSV da curva, por hora e estados/aparelhos; painel → Lives → CSV. É o material de venda ("a noite em números") |
+| manhã | Chaves da noite de volta ao padrão: `deploy/painel.sh html-borda desligar` (antes de qualquer atualização de código) e `deploy/painel.sh chaves` |
 | depois do almoço | reduzir a VPS de volta, se quiser (reinício de 1–2 min, num horário de pouco acesso); `deploy/status.sh` depois |
 | semana seguinte | o site continua de pé como registro. Se o TSE retotalizar, o feed continua sendo lido; nada a fazer. Mudanças de código voltam a ser permitidas com `update.sh` |
 
@@ -253,6 +288,25 @@ totalizada, mas **não** avisa da queda sozinho.
   (`deploy/painel.sh alerta "…"`). Se o próprio TSE estiver parado, o aviso também ajuda o visitante.
 - Quando o feed voltar (o servidor se recupera sozinho em segundos): `deploy/painel.sh sem-aviso`.
 
+**O TSE está limitando as leituras (leva 3)** — alerta "TSE limitando" no Telegram, selo "O TSE está limitando
+leituras; nova tentativa às HH:MM" na `/apuracao`, `deploy/painel.sh tse` com a pausa: o servidor recebeu 429, um 403 da
+borda do TSE ou um 403 num arquivo que já tinha lido, e **parou de pedir** pelo tempo do `Retry-After` (ou 11 min)
+para não piorar o bloqueio. O site mostra o último dado bom.
+
+1. Confira o site do TSE no navegador. Se o TSE está no ar e o bloqueio parece real (muitos sites reclamando, 429),
+   **espere**: no fim da pausa o servidor faz 1 pedido de prova e volta sozinho.
+2. Se parecer falso positivo (o TSE responde normal no navegador): `deploy/painel.sh tse-retomar` (ou painel → Fonte →
+   "Retomar agora"). Se a pausa **recomeçar a cada "Retomar"** (o log mostra "403 num arquivo já lido" de novo):
+   `deploy/painel.sh pausa-tse restrita` — pausa só com sinal claro (429 ou borda do TSE) e encerra a pausa em curso.
+   `pausa-tse off` (nunca pausa, como antes da leva 3) só por decisão do dono: o risco de um bloqueio mais longo aumenta.
+   Depois da noite: `deploy/painel.sh pausa-tse auto`.
+3. Para reduzir a pressão no TSE sem pausar: painel → Fonte → "Teto de pedidos ao TSE" (padrão 40/s; de 5 a 90).
+
+**O arquivo nacional do TSE parou e os estados andam** (como em 04/10) — selo automático "O arquivo nacional do TSE
+não atualiza desde HH:MM · veja os estados" e alerta no Telegram. O site **nunca soma os estados** no lugar do número
+nacional (seria um número diferente do oficial). Nada a fazer além de conferir no TSE; o selo some sozinho quando o
+arquivo volta. Se o aviso estiver errado: `deploy/painel.sh aviso-nacional off` (o painel e os alertas continuam vendo).
+
 ### 3.2 Números do site diferentes dos do TSE
 
 Diferença de alguns segundos é normal (o feed é lido a cada 15 s e a CDN guarda 1–2 s). Diferença que **persiste**
@@ -266,6 +320,16 @@ por minutos, ou números claramente errados:
 
 ### 3.3 VPS sobrecarregada (site lento, 502/504, CPU em 100%)
 
+0. **Freio de carga (leva 3, o primeiro passo, vale em segundos e sem publicar):** `deploy/painel.sh freio 2` (todo
+   mundo consulta 2× mais espaçado); se o painel → Monitor continuar com sinais de aperto, `freio 3` e depois
+   `freio 5 leve` (o modo leve para o mapa por município e o "desde o 1º turno" e deixa o chat 2× mais lento). Solte
+   quando normalizar: `deploy/painel.sh freio 1`. Com o servidor fora, o app recua sozinho (até 30 s) e mostra "Conexão
+   instável — mostrando o último dado recebido às HH:MM:SS".
+   **"Borda: NÃO guardando"** no `deploy/status.sh` (ou `node deploy/cloudflare.mjs --conferir` falhando): as regras da
+   Cloudflare não valem — reaplique (`--aplicar` com a chave, ou o passo a passo do celular, DEPLOY §5.2) e puxe o freio
+   enquanto isso. **A borda guardou algo errado** (número velho que não muda): `node deploy/cloudflare.mjs --desligar` (ou
+   desative as 4 regras "Sintonia…" no celular) + `deploy/painel.sh freio 3`; se a origem não aguentar sem a borda,
+   `CDN_CC=0` no `.env` e `docker compose up -d app` volta ao formato de cache de antes da leva 3.
 1. **Sem Cloudflare na frente?** É a primeira coisa a fazer, e funciona em minutos **se o domínio já estiver na
    Cloudflare** com a nuvem cinza: no DNS, mude o registro A (e o `www`) para **nuvem laranja**. Confira que o modo
    SSL é *Full (strict)* e que as regras de cache existem (DEPLOY §5). Em ~5 min a VPS passa a receber uma fração do
@@ -323,6 +387,17 @@ O rollback troca só o código; os arquivos do estado continuam os mesmos — ma
 conhece (veja o aviso logo abaixo para a volta dos anunciantes v2 à leva 2). Se o estado também precisar voltar (ex.:
 alguém mexeu no que não devia), use `deploy/restore.sh --listar` e `deploy/restore.sh <arquivo>`. O app fica parado
 ~5 s; o restore faz um backup do estado atual antes (e preserva o registro cifrado do chat).
+
+**Rollback com o "HTML na borda" ligado (leva 3):** primeiro `deploy/painel.sh html-borda desligar` e espere 30 s (o
+HTML guardado na Cloudflare aponta para os arquivos `/assets` da versão que está no ar); depois o rollback. O mesmo vale
+para qualquer `update.sh`.
+
+**Atenção — voltar da leva 3 para os anunciantes v2** (o `:anterior` logo depois da publicação da leva 3): a v2 não
+conhece as chaves da noite nem o teto de pedidos ao TSE. O site funciona como antes da leva 3 (sem freio, sem faixa
+"Conexão instável", sem pausa por bloqueio, sem `!apuracao` nem contagem de lives, `/sitemap.xml` como lista simples) e,
+na 1ª gravação dela, as chaves podem voltar ao padrão — ao subir a leva 3 de novo, confira `deploy/painel.sh chaves`. A
+audiência (`audiencia.json`) e as lives (`lives.json`) ficam intactas: a v2 ignora as chaves novas e a leva 3 lê o
+arquivo regravado pela v2 (só a curva, os estados e as horas de tela desse intervalo faltam).
 
 **Atenção — voltar dos anunciantes v2 para a leva 2** (com a publicação desta leva, o `:anterior` do rollback rápido É
 a leva 2). A leva 2 não conhece nada do v2, e isso tem efeito na hora e efeito permanente:
@@ -438,6 +513,32 @@ corrija o anúncio logo em seguida.
 `LOGO_NATURAL` e `OG_LOGO_OFERECIMENTO` exigem código novo: na semana da eleição, prefira o interruptor geral ou pausar o
 anúncio e deixe a troca de código para depois da noite (seção 4: nada de atualizar depois das 14h do domingo).
 
+### 3.10 Chaves da noite: desligar uma peça nova da leva 3
+
+Tudo o que a leva 3 pôs na noite tem chave no painel (Controle → **Chaves da noite**) e no `deploy/painel.sh`. Valem
+na hora, para todos, **sem publicar nada**, e sobrevivem a reinícios. `deploy/painel.sh chaves` mostra o que está fora
+do padrão. Na dúvida sobre uma peça, desligue-a e avise o dono.
+
+| Peça | Padrão | Desligar (e voltar) | Efeito desligada |
+|---|---|---|---|
+| Freio de carga | solto | `painel.sh freio 2\|3\|5 [leve]` · `freio 1` solta | consultas de todos N× mais espaçadas |
+| "N pessoas agora" no site | ligado (≥ 500) | `painel.sh contador-publico desligar` | some do site, da /live, da /tv e da imagem de audiência |
+| HTML na borda | **desligado** | `painel.sh html-borda ligar` (24/10, 12h, depois do ensaio) · `desligar` | páginas não ficam guardadas na Cloudflare |
+| Medição dos anúncios | ligada | `painel.sh medir-anuncios desligar` | impressões não contam (o relatório fica sem esse período) |
+| Aviso do arquivo nacional parado | automático | `painel.sh aviso-nacional off` · `auto` | o público não vê o aviso (painel e alertas veem) |
+| `!apuracao` dos bots de chat | ligado | `painel.sh texto-bots desligar` | o bot responde só o endereço do site |
+| Contagem de lives | ligada | `painel.sh contar-lives desligar` | lives não contadas; a /streamers não mostra "N lives" |
+| Faixa "Conexão instável" | ligada | `painel.sh faixa-conexao desligar` | sem a faixa (o recuo do status continua) |
+| Carimbo nos mapas e no placar | ligado | `painel.sh carimbo-print desligar` | mapas e placar sem "domínio · % apurado · hora" |
+| Placar na prévia dos links | ligado | `painel.sh meta-placar desligar` | descrições no WhatsApp/X sem números |
+| Medição por estado, país e aparelho | ligada | `painel.sh medir-local desligar` | essa parte da audiência para (o resto continua) |
+| Pausa quando o TSE bloqueia | automática | `painel.sh pausa-tse restrita` (só 429/borda do TSE) · `off` (nunca pausa) · `auto` | seção 3.1 |
+| Alertas no Telegram / vigia externo | desligados até configurar | `ALERTAS=0` no `.env` e `docker compose up -d app` | nada é enviado |
+| Cabeçalho da borda | ligado | `CDN_CC=0` no `.env` e `docker compose up -d app` | cache como antes da leva 3 (seção 3.3) |
+
+Sem chave (só o aparelho de quem usa; a saída é reverter o commit antes do congelamento): o WhatsApp primeiro e os
+links com origem no kit de compartilhar, os títulos por fase, o sitemap e o "Siga o Sintonia" no resultado.
+
 ---
 
 ## 4. O que NUNCA fazer
@@ -461,7 +562,12 @@ anúncio e deixe a troca de código para depois da noite (seção 4: nada de atu
 - Nunca ligar na Cloudflare: "Estou sob ataque", Rocket Loader, "Sempre usar HTTPS" ou cache das rotas `/api/admin`.
 - Nunca "Limpar tudo" no cache da Cloudflare durante o pico (tudo cai de uma vez na VPS). Se precisar limpar, use o
   prefixo do que mudou.
-- Nunca criar registro AAAA (IPv6) para a VPS.
+- Nunca criar registro AAAA (IPv6) para a VPS (o `www` com AAAA `100::` e proxy laranja, criado pelo
+  `cloudflare.mjs`, não aponta para a VPS: é só o redirecionamento da Cloudflare).
+- Nunca publicar código (`update.sh`, rollback) com o "HTML na borda" ligado: desligue e espere 30 s antes.
+- Nunca rodar o ensaio de carga (`scripts/ensaio-borda.ts`) contra a produção em 24 ou 25/10 (o script recusa), e nunca
+  deixar a chave da Cloudflare (`CF_API_TOKEN`) na VPS ou num arquivo: revogue-a depois de aplicar.
+- Nunca usar `pausa-tse off` sem decisão do dono: sem a pausa, um bloqueio do TSE tende a ficar mais longo.
 - Nunca mandar a senha do painel por chat ou e-mail. Se vazar, troque (DEPLOY §9): derruba todas as sessões.
 - Nunca pagar impulsionamento de post com nome ou número de candidato (só candidatos e partidos podem impulsionar
   conteúdo eleitoral; ver o checklist jurídico).

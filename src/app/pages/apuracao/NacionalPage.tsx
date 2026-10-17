@@ -154,6 +154,7 @@ export default function NacionalPage() {
   const resumo = data.resumo;
   const definido = race.turno === 2 && resumo.eleito !== null;
   const semApuracao = resumo.secoesTotalizadas === 0;
+  const nativo1 = <AnuncioNativo posicao={1} className="order-5 my-5 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:my-2" />;
   const vivo = qVivo.data && qVivo.data.race === raceId ? qVivo.data : undefined;
   const caminhoShare = t1 && !pre ? '/apuracao?race=pres-t1' : comInstante('/apuracao', t);
   const tvQs = raceParam !== 'pres' && !raceParam.endsWith('-t1') ? `?race=${raceParam}` : '';
@@ -289,12 +290,16 @@ export default function NacionalPage() {
             )}
           </div>
 
-          {/* publicidade: depois do placar, do mapa e do "para virar" (celular: antes da corrida; desktop largo: linha inteira) */}
-          <AnuncioNativo posicao={1} className="order-3 my-5 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:my-2" />
+          {/* publicidade: depois do placar, do mapa e do "para virar". Celular e notebook (ordem 5, a do feed): depois da
+              corrida, nunca logo abaixo do banner do eleito ou do "o que falta apurar". Desktop largo: linha inteira — e,
+              com o resultado definido, só depois do feed e das regiões, nunca colada ao banner "X é eleito" (regra dos
+              anúncios: nunca colado a nome ou número de candidato) */}
+          {!definido ? nativo1 : null}
 
           {/* Antes da 1ª seção totalizada as regiões não têm o que mostrar: o feed ocupa a linha inteira. */}
           <FeedPanel className={cn('order-5 min-[1360px]:order-none', semApuracao ? 'min-[1360px]:col-span-12' : 'min-[1360px]:col-span-5')} eventos={data.eventos} race={race} largo={semApuracao} />
           {!semApuracao ? <RegioesCard className="order-7 min-[1360px]:order-none min-[1360px]:col-span-7" race={race} regioes={data.regioes} /> : null}
+          {definido ? nativo1 : null}
 
           <ParticipacaoSecao className="order-8 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" t={resumo} />
           <GovernadoresFaixa className="order-9 pt-2 min-[1360px]:order-none min-[1360px]:col-span-12 min-[1360px]:pt-4" races={races} t1={false} />

@@ -25,6 +25,7 @@ import type { AnuncioPublico } from '@/shared/anuncios';
 import { pctTotalizadas } from '@/shared/calc';
 import { fmtHoraSeg, fmtPct } from '@/shared/format';
 import { UF_NOMES } from '@/shared/constants';
+import { emUf } from '@/engine/events';
 import { cn } from '@/app/lib/cn';
 import { corSlot, fillMargem } from '@/app/lib/raceUi';
 import { hachuraStyle } from '@/app/components/apuracao/MapHatch';
@@ -118,6 +119,9 @@ function CabecalhoLive({ q, anuncio, previa, vista, pessoas }: Pick<PropsLayoutL
 // =============================================================================================
 
 /** "N pessoas agora" a mostrar (null = não mostra: `?pessoas=0` ou o servidor não mandou). */
+/** " em São Paulo" / " na Bahia" com o estado fixo (`?uf=`, I25) — quem assiste numa rádio ou TV regional não confunde com o Brasil. */
+const ondeQ = (q: QuadroLive): string => (q.uf ? ` ${emUf(q.uf, UF_NOMES[q.uf])}` : '');
+
 const pessoasDe = (q: QuadroLive, opcoes: OpcoesLive): number | null => (opcoes.pessoas !== false && q.pessoasAgora ? q.pessoasAgora : null);
 
 function LayoutPlacar({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
@@ -140,7 +144,7 @@ function LayoutPlacar({ q, opcoes, anuncio, previa, vista }: PropsLayoutLive) {
         </div>
         <div className="relative flex items-center justify-between gap-[calc(var(--u)*2)]">
           <span className="text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">
-            {q.t1 ? 'Resultado oficial do 1º turno · 4 de outubro' : 'Votos válidos'}
+            {q.t1 ? `Resultado oficial do 1º turno${ondeQ(q)} · 4 de outubro` : `Votos válidos${ondeQ(q)}`}
           </span>
           {eleito ? <SeloEleito c={eleito} encerrada={q.resumo.status === 'encerrada'} /> : null}
         </div>
@@ -226,7 +230,7 @@ function LayoutPlacarVertical({ q, opcoes, anuncio, previa, vista }: PropsLayout
           ))}
         </div>
         <div className="relative flex items-center justify-between gap-[calc(var(--u)*1.5)]">
-          <span className="text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">{q.t1 ? 'Oficial · 1º turno' : 'Votos válidos'}</span>
+          <span className="text-[length:calc(var(--u)*1.5)] font-semibold uppercase tracking-[0.14em] text-fg-muted">{q.t1 ? `Oficial · 1º turno${ondeQ(q)}` : `Votos válidos${ondeQ(q)}`}</span>
           {eleito ? <SeloEleito c={eleito} encerrada={q.resumo.status === 'encerrada'} /> : null}
         </div>
 

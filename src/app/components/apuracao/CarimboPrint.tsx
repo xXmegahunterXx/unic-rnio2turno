@@ -24,7 +24,7 @@
  * Chave 'carimbo-print' no painel (Chaves da noite): desligada, o status traz `semCarimbo` e nenhum carimbo aparece.
  */
 import { useInRouterContext, useSearchParams } from 'react-router-dom';
-import { useStatus } from '@/app/data/hooks';
+import { useSemCarimbo } from '@/app/data/hooks';
 import type { Tally } from '@/shared/types';
 import { pctTotalizadas } from '@/shared/calc';
 import { fmtHoraSeg, fmtPct } from '@/shared/format';
@@ -116,7 +116,7 @@ export interface CarimboPrintProps {
 }
 
 export function CarimboPrint(props: CarimboPrintProps) {
-  const desligado = useStatus().data?.semCarimbo === true;
+  const desligado = useSemCarimbo();
   const comRota = useInRouterContext();
   if (desligado) return null;
   // Fora de um Router (testes, widgets isolados) não há `?t=`: só o `instante` explícito vale.

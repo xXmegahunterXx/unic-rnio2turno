@@ -76,6 +76,11 @@ let faixa: FaixaConexaoEstado = { instavel: false, ultimoDado: null };
 const ouvintesFaixa = new Set<() => void>();
 /** Chave 'faixa-conexao' desligada no painel (`LiveStatus.semFaixaConexao`, do último status recebido): sem faixa. */
 let semFaixa = false;
+/**
+ * Chave 'carimbo-print' desligada no painel (`LiveStatus.semCarimbo`, do último status recebido). Estado de módulo como
+ * a faixa: o `CarimboPrint` lê por `useSemCarimbo()` sem depender do QueryClient (renderiza também fora do provedor).
+ */
+let semCarimbo = false;
 
 function mudarConexao(e: EstadoConexao) {
   conexao = e;
@@ -99,6 +104,11 @@ async function buscarStatus(): Promise<LiveStatus> {
   }
   definirCargaVigente(s.carga);
   semFaixa = s.semFaixaConexao === true;
+  // os ouvintes são os da faixa (um conjunto só, menos código no JS inicial): a faixa não muda e não renderiza de novo
+  if ((s.semCarimbo === true) !== semCarimbo) {
+    semCarimbo = !semCarimbo;
+    for (const f of ouvintesFaixa) f();
+  }
   mudarConexao(registrarSucesso(conexao, s.wallNow, Date.now(), s.simNow));
   return s;
 }
@@ -138,15 +148,18 @@ function agendarInvalidacao(qc: QueryClient) {
 const comRecuo = (ms: number | false): number | false => (ms === false || conexao.falhas === 0 ? ms : Math.max(ms, atrasoStatus));
 
 /** Faixa "Conexão instável" (FaixaConexao): 3 falhas seguidas ou relógio do servidor parado há 60 s. */
+function ouvirFaixa(f: () => void) {
+  ouvintesFaixa.add(f);
+  return () => ouvintesFaixa.delete(f);
+}
+
 export function useConexaoInstavel(): FaixaConexaoEstado {
-  return useSyncExternalStore(
-    (f) => {
-      ouvintesFaixa.add(f);
-      return () => ouvintesFaixa.delete(f);
-    },
-    () => faixa,
-    () => faixa,
-  );
+  return useSyncExternalStore(ouvirFaixa, () => faixa, () => faixa);
+}
+
+/** Chave 'carimbo-print' desligada no painel? (do último status recebido nesta aba; antes dele, false = ligado) */
+export function useSemCarimbo(): boolean {
+  return useSyncExternalStore(ouvirFaixa, () => semCarimbo, () => semCarimbo);
 }
 
 /** Instante pedido, truncado ao segundo (chave estável, igual ao `?t=` do cliente HTTP), ou undefined (agora). */

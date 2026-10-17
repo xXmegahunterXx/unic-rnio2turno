@@ -10,7 +10,9 @@
  *    story); X e Telegram, durante a apuração, também `h=HHMM` (relógio do servidor do status em cache, a cada 5 min),
  *    para o cartão de prévia não sair velho. Na apuração, WhatsApp/Telegram/Status terminam com "Acompanhe seção por
  *    seção:" antes do link (`sufixoDoCaminho`).
- *  - Depois de "Copiado", aparece o "Siga o Sintonia" (some sem redes configuradas).
+ *  - Depois de "Copiado", aparece o "Siga o Sintonia" (some sem redes configuradas; chunk próprio).
+ *  - A caixa de texto mostra o que a ação principal envia: no celular, a mensagem do WhatsApp (sem hashtags; é também o
+ *    que "Copiar texto" copia); no computador, o post do X com a contagem de caracteres.
  *
  * No navegador embutido (X, Instagram, Facebook, TikTok, LinkedIn, WebViews) e dentro de iframes, o download vira um
  * modal com a imagem para "tocar e segurar" (WebViews costumam bloquear downloads em silêncio).
@@ -19,7 +21,7 @@
  * existe e o `navigator.share` sai dentro do gesto do usuário — o Safari recusa o compartilhamento se houver espera.
  * Os dados ficam "congelados" do momento em que o sheet abriu (texto e imagem sempre batem).
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { LiveStatus } from '@/shared/types';
 import { cn } from '@/app/lib/cn';
@@ -57,8 +59,10 @@ import { toast } from '@/app/ui/Toast';
 import { PreviaCartao } from './PreviaCartao';
 import { gerarPngCartao } from './png';
 import { comPrefixoSimulacao, comSufixoLink, sufixoDoCaminho } from './textos';
-import { SigaSintonia } from '@/app/components/crescimento/SigaSintonia';
 import { DIMENSOES_CARTAO, FORMATOS_PADRAO, type ConteudoCompartilhavel, type FormatoCartao } from './tipos';
+
+/** "Siga o Sintonia" só depois de "Copiado": chunk próprio, fora do JS inicial das páginas com o kit (ARCHITECTURE §11.9). */
+const SigaSintonia = lazy(() => import('@/app/components/crescimento/SigaSintonia'));
 
 export interface CompartilharSheetProps extends ConteudoCompartilhavel {
   aberto: boolean;
@@ -342,7 +346,9 @@ export function CompartilharSheet({
   async function copiar(o: 'link' | 'texto' | 'tudo') {
     if (!snap) return;
     const link = snap.links.copiar;
-    const ok = o === 'link' ? await copiarLink(link) : await copiarTexto(textoComLink(snap.texto, link, snap.tags));
+    // no celular, o texto copiado é o mesmo da caixa: a mensagem do WhatsApp (sem hashtags), que é o destino mais comum
+    const texto = ambiente.celular ? `${snap.mensagem}\n${link}` : textoComLink(snap.texto, link, snap.tags);
+    const ok = o === 'link' ? await copiarLink(link) : await copiarTexto(texto);
     toast(ok ? (o === 'link' ? 'Link copiado' : 'Texto e link copiados') : 'Não foi possível copiar', {
       tone: ok ? 'ok' : 'alert',
       icon: ok ? (o === 'link' ? 'link' : 'copiar') : undefined,
@@ -521,21 +527,32 @@ export function CompartilharSheet({
           </>
         ) : null}
 
+        {/* no celular a caixa mostra o que o botão principal envia (a mensagem do WhatsApp); no computador, o post do X */}
         <div className="mt-4 rounded-xl border border-line bg-surface-2 px-3.5 py-3">
           <div className="mb-1.5 flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
-            <span>Texto do post</span>
-            <span className={cn('num normal-case tracking-normal', peso > LIMITE_X ? 'text-alert-fg' : '')} title="Caracteres no X (o link conta 23)">
-              {peso}/{LIMITE_X}
-            </span>
+            <span>{celular ? 'Mensagem' : 'Texto do post'}</span>
+            {celular ? null : (
+              <span className={cn('num normal-case tracking-normal', peso > LIMITE_X ? 'text-alert-fg' : '')} title="Caracteres no X (o link conta 23)">
+                {peso}/{LIMITE_X}
+              </span>
+            )}
           </div>
-          <p className="text-pretty text-[13.5px] leading-snug text-fg">
-            {snap?.texto}
-            {snap?.tags.length ? <span className="text-brand-fg"> {snap.tags.map((t) => `#${t}`).join(' ')}</span> : null}
-          </p>
+          {celular ? (
+            <p className="whitespace-pre-line text-pretty text-[13.5px] leading-snug text-fg">{snap?.mensagem}</p>
+          ) : (
+            <p className="text-pretty text-[13.5px] leading-snug text-fg">
+              {snap?.texto}
+              {snap?.tags.length ? <span className="text-brand-fg"> {snap.tags.map((t) => `#${t}`).join(' ')}</span> : null}
+            </p>
+          )}
           <p className="mt-1 truncate text-[12.5px] text-fg-muted">{snap?.url}</p>
         </div>
         {/* depois de "Copiado": quem copia o link é quem volta — "Siga o Sintonia" (some sem redes configuradas) */}
-        {copiou ? <SigaSintonia variante="linha" className="mt-4 rounded-xl border border-line px-3.5 py-3" /> : null}
+        {copiou ? (
+          <Suspense fallback={null}>
+            <SigaSintonia variante="linha" className="mt-4 rounded-xl border border-line px-3.5 py-3" />
+          </Suspense>
+        ) : null}
         {temImagem ? (
           <p className="mt-2.5 flex items-start gap-1.5 text-[12px] leading-snug text-fg-subtle">
             <Icon name="info" size={13} className="mt-px shrink-0" />

@@ -1477,7 +1477,7 @@ export function createApp(deps: AppDeps) {
     relatorio: relatorioDe,
   });
 
-  registrarStreamers(app, admin, { now, log, dados, noite, clienteDe, origemPermitida, stateDir: config.stateDir, borda: cdnCc, dominio: config.publicUrl ? new URL(config.publicUrl).host : null }); // I22/I23 (frente G): texto para bots, lives
+  const streamers = registrarStreamers(app, admin, { now, log, dados, noite, clienteDe, origemPermitida, stateDir: config.stateDir, borda: cdnCc, dominio: config.publicUrl ? new URL(config.publicUrl).host : null }); // I22/I23 (frente G): texto para bots, lives
   app.route('/api/admin', admin);
 
   app.all('/api/*', () => {
@@ -1633,9 +1633,13 @@ export function createApp(deps: AppDeps) {
     metricas.pararEventLoop();
   };
 
-  /** Grava as métricas dos anúncios (se houver contagem nova) e os links de relatório pendentes, e espera terminar. */
+  /**
+   * Grava as métricas dos anúncios (se houver contagem nova), os links de relatório pendentes e a contagem de lives
+   * (I23; sem isto um reinício perdia até 15 s dela), e espera terminar. main.ts: a cada 60 s e no encerramento.
+   */
   const persistirMetricasAnuncios = async (): Promise<void> => {
     await relatorios.persistir();
+    await streamers.persistir().catch((e: unknown) => log.erro('Falha ao gravar a contagem de lives', e));
     const store = deps.metricasAnunciosStore;
     if (!store) return;
     if (metricasAnuncios.sujo) {

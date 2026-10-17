@@ -369,6 +369,23 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     fase = 'pre';
   });
 
+  it('dia da votação (0h–17h de 25/10): curiosidades e cenários sem nomes nem percentuais na descrição e na imagem', () => {
+    const manha = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 15, 0, 0) }; // 12h de Brasília
+    const fato = metaDaRota('/curiosidades', q('fato=finalistas-menor-diferenca'), manha);
+    expect(fato.descricao).not.toMatch(/Lula|Flávio|%/);
+    expect(fato.imagem).toBe(OG_GENERICA_DIA_VOTACAO);
+    const d = new DadosEstaticos(join(RAIZ, 'public/data')).presidenteT1()!.valor;
+    const cod = codificarCenario(cenarioDoPreset('metade', d));
+    const cen = metaDaRota('/cenarios', q(`c=${cod}`), manha);
+    expect(cen.descricao).not.toMatch(/Lula|Flávio|%/);
+    expect(cen.imagem).toBe(OG_GENERICA_DIA_VOTACAO);
+    expect(cen.imagemAlt).not.toMatch(/Lula|Flávio|%/);
+    // às 17h volta tudo
+    const noite = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 20, 0, 0) };
+    expect(metaDaRota('/cenarios', q(`c=${cod}`), noite).descricao).toMatch(/Neste cenário: /);
+    expect(metaDaRota('/curiosidades', q('fato=finalistas-menor-diferenca'), noite).imagem).toBe('/api/og/curiosidade.png?f=finalistas-menor-diferenca');
+  });
+
   it('simulação: o placar da descrição leva a marca SIMULAÇÃO', () => {
     const c = comPlacarFixo(ctx);
     const sim: ContextoMeta = { ...c, placar: (race) => ({ ...c.placar!(race)!, simulacao: true }) };

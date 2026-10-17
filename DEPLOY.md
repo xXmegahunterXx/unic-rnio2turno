@@ -785,6 +785,11 @@ todas e o que está fora do padrão.
 | Aviso nacional | automático | "o arquivo nacional do TSE não atualiza desde HH:MM · veja os estados" quando o Brasil para e os estados andam | `painel.sh aviso-nacional auto\|off` |
 | Texto para bots | ligada | o `!apuracao` dos bots de chat das lives; desligada, responde só o endereço do site | `painel.sh texto-bots ligar\|desligar` |
 | Contar lives | ligada | contagem anônima de lives com a /live aberta | `painel.sh contar-lives ligar\|desligar` |
+| Faixa "Conexão instável" | ligada | o site avisa quando o servidor não responde; desligada, só espera (o recuo continua) | `painel.sh faixa-conexao ligar\|desligar` |
+| Carimbo do print | ligada | "domínio · % apurado · hora" dentro dos mapas e no pé do placar | `painel.sh carimbo-print ligar\|desligar` |
+| Placar na prévia | ligada | o placar entra na descrição dos links (WhatsApp, X); desligada, descrições sem números | `painel.sh meta-placar ligar\|desligar` |
+| Medição por estado | ligada | páginas por estado, país e aparelho (só siglas); `AUDIENCIA_LOCAL=0` no `.env` desliga de vez | `painel.sh medir-local ligar\|desligar` |
+| Pausa do TSE | automática | quando o TSE bloqueia: `restrita` = só com 429 ou a borda do TSE (use se a pausa recomeçar a cada "Retomar"); `off` = nunca pausa (risco maior de bloqueio). Trocar encerra a pausa em curso | `painel.sh pausa-tse auto\|restrita\|off` |
 
 Também: `deploy/painel.sh tse-retomar` (retoma na hora as leituras do TSE pausadas por um bloqueio que foi falso
 positivo; o mesmo que "Retomar agora" no painel → Fonte) e o teto de pedidos ao TSE por segundo (painel → Fonte,

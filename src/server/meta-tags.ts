@@ -165,7 +165,16 @@ export function consultaNormalizada(q: URLSearchParams): string {
 export const OG_GENERICA_DIA_VOTACAO = '/api/og/audiencia.png?m=0';
 export const ALT_GENERICA_DIA_VOTACAO = 'Sintonia · apuração do 2º turno de 2026 ao vivo';
 /** Imagens de prévia que mostram candidato (foto, nome, número ou percentual): genéricas no dia da votação, antes das 17h. */
-const OG_COM_CANDIDATO = ['/api/og/apuracao.png', '/api/og/municipio.png', '/api/og/secao.png', '/api/og/governadores.png', '/api/og/candidato.png'];
+const OG_COM_CANDIDATO = [
+  '/api/og/apuracao.png',
+  '/api/og/municipio.png',
+  '/api/og/secao.png',
+  '/api/og/governadores.png',
+  '/api/og/candidato.png',
+  // fatos do 1º turno com os nomes e os percentuais dos finalistas; cenário hipotético com nomes e percentuais
+  '/api/og/curiosidade.png',
+  '/api/og/cenario.png',
+];
 
 /**
  * Meta da rota `path` (sem query) com os parâmetros de busca `q`. No dia da votação (0h–17h de 25/10), além das
@@ -560,7 +569,8 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
     if (fato) {
       return pagina({
         titulo: `${fato.titulo} · Curiosidades do 1º turno · ${APP_NAME}`,
-        descricao: cortar(`${fato.texto} Fonte: TSE.`, 280),
+        // dia da votação (0h–17h): sem o texto do fato (vários citam os finalistas com nome e percentual)
+        descricao: comNomes ? cortar(`${fato.texto} Fonte: TSE.`, 280) : `${fato.titulo}: fato do 1º turno calculado com os dados oficiais do TSE.`,
         imagem: `/api/og/curiosidade.png?f=${fato.id}`,
         imagemAlt: `${fato.titulo} · curiosidade do 1º turno de 2026`,
         imagemVersao: lido?.versao,
@@ -583,7 +593,10 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
     if (cen) {
       return pagina({
         titulo: `Cenário hipotético do 2º turno · E se…? · ${APP_NAME}`,
-        descricao: `Cenário hipotético montado a partir do resultado oficial do 1º turno · não é pesquisa nem previsão. Neste cenário: ${cen.placar}. Monte o seu.`,
+        // dia da votação (0h–17h): sem o placar hipotético (nomes e percentuais)
+        descricao: comNomes
+          ? `Cenário hipotético montado a partir do resultado oficial do 1º turno · não é pesquisa nem previsão. Neste cenário: ${cen.placar}. Monte o seu.`
+          : 'Cenário hipotético montado a partir do resultado oficial do 1º turno · não é pesquisa nem previsão. Monte o seu.',
         imagem: `/api/og/cenario.png?c=${cen.codigo}`,
         imagemAlt: `Cenário hipotético do 2º turno: ${cen.placar}`,
         imagemVersao: cen.versao,

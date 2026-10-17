@@ -288,6 +288,18 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
   stale-while-revalidate=10`; ETag por (versão, bucket de `simNow`). Comprime com gzip/br. Na fonte `tse`: ETag pela
   MARCA dos números (hash do conteúdo da corrida, muda no instante em que o TSE publica), `s-maxage=1,
   stale-while-revalidate=1, stale-if-error=60`, e o placar nacional com `?d=<marca atual>` com `s-maxage=60` (§12.2).
+- **Cabeçalho só da borda** (leva 3, I04; `CC_BORDA` em `app.ts`, `CC_OG_BORDA` em `og-rotas.ts`, `http-cache.ts`): além
+  do `Cache-Control` do navegador (igual ao de antes, com o `s-maxage` como rede de segurança), cada rota manda
+  `Cloudflare-CDN-Cache-Control` — status `max-age=1, stale-while-revalidate=2, stale-if-error=600`; Brasil e UF ao vivo
+  `max-age=1, stale-while-revalidate=1, stale-if-error=600`; município, zona, seção e mapa por município na fonte TSE
+  `max-age=10, stale-while-revalidate=10, stale-if-error=600`; `?d=<marca>` `max-age=300, stale-if-error=600`; meta, 1º
+  turno, histórico e imagens OG com o TTL de antes + `stale-if-error`. `CDN_CC=0` volta ao formato antigo (reinício). As
+  regras da Cloudflare têm fonte única em `deploy/cloudflare.mjs` (4 regras `sintonia_*`, modo "Cache-Control se
+  presente, senão não guarda" — nunca TTL fixo), conferidas contra o DEPLOY §5.3 por `scripts/cloudflare.test.ts`.
+- **HTML na borda** (I05): só com a chave `html-borda` ligada (padrão desligada; plano: 24/10, 12h, depois do ensaio) o
+  HTML ganha `Cloudflare-CDN-Cache-Control: max-age=15, stale-while-revalidate=15, stale-if-error=86400`; o navegador
+  continua com `no-cache`. Nunca em `/admin`, `/embed/*`, 404 ou erro; `/duelo/*` e `/relatorio` saem com
+  `Cloudflare-CDN-Cache-Control: no-store` e ficam fora da regra 4 da Cloudflare (o código do Duelo vai no caminho).
 - **Admin**:
   - senha no env `ADMIN_PASSWORD`; em dev, se ausente, o padrão é `sintonia` com aviso no log;
   - cookie de sessão HMAC (`ADMIN_SECRET`), httpOnly, SameSite=Strict;
@@ -304,6 +316,13 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 - **Operação**: `GET /healthz` (vivo; usado pelo healthcheck do Docker), `GET /readyz` (pronto: dataset, modelo e build
   do app presentes; 503 durante o encerramento), `GET /api/versao` (commit/data do build, também no cabeçalho
   `x-sintonia-versao`), `GET /sitemap.xml` e `GET /robots.txt` (gerados com `PUBLIC_URL`).
+  Leva 3: `GET /api/saude-noite` (`saude-noite.ts`; sempre 200 e `no-store`, `{noite:'ok'|'atencao', motivo?}` — servidor
+  encerrando, TSE limitando ou parado, placar nacional parado > 3 min, troca automática atrasada, 5xx > 1% ou p99 > 1 s
+  por 2 min, mais o que os alertas conferem; é o endereço do monitor externo, palavra-chave `"noite":"ok"`).
+  `/sitemap.xml` virou índice de 4 arquivos (`sitemap.ts`: páginas, 5.757 municípios e cidades do exterior, 1.922 fichas,
+  Senado/Câmara por UF), montados na subida, `lastmod` real, cache de 1 h. `robots.txt`: `Allow` para `/api/og/`,
+  `/api/status`, `/api/meta` e `/api/apuracao/` antes do `Disallow: /api/`; `X-Robots-Tag: noindex` em toda `/api/*`
+  menos `/api/og/`; borda guarda o robots por 1 h.
 - **Anúncios** (`anuncios.ts`, §10.2 item 10): `/api/status` com as imagens por `/api/anuncio/img?h=<hash>` e o link
   por `/api/anuncio/ir/<id>`; clique contado + 302; `POST /api/anuncio/evento` (impressão visível); relatório no admin.
 - **Chat ao vivo** (`chat.ts`, §11.11): `GET /api/chat` com `s-maxage=1` (mesma URL para todos); POSTs do próprio site;
@@ -593,6 +612,22 @@ de usuários; as respostas do Teste Cego nunca saem do aparelho (exceto o link d
 - **URL pública** (`VITE_SITE_URL`, no build): `urlAbsoluta`, `hostExibicao`/`siteExibicao`, o código de incorporação e
   o rodapé das imagens passam a apontar para o site público. Sem ela vale o endereço da página — no demo, o do iframe,
   que não abre fora do claude.ai. Terminada em `#`, gera rotas de HashRouter (`https://exemplo.org/sintonia/#/teste`).
+- **Leva 3 (I08, I20, I10, I26)**: links compartilhados levam `utm_source` (`urlCompartilhada(url, canal, agora?)`:
+  whatsapp, x, telegram, copiar, story; agenda, embed, tv, live, sintonia nos outros pontos) e, no X/Telegram durante a
+  apuração, `h=HHMM` (hora de Brasília em passos de 5 min, para o cartão de prévia não sair velho); os parâmetros entram
+  antes do `#` (o código do Duelo fica intacto) e `PARAMS_ORIGEM` (`utm_*`, `h`, `via`) fica fora do canônico, da chave
+  do cache do HTML e da URL da imagem. **No celular o WhatsApp é o principal** (`prefereWhatsapp`): "Enviar no WhatsApp"
+  com o PNG pelo Web Share (ou o wa.me), depois "Status / Stories" (9:16) e "Postar no X"; a caixa de texto mostra a
+  mensagem do WhatsApp (sem hashtags, com "Acompanhe seção por seção:" nas páginas de apuração), que é também o que
+  "Copiar texto" copia; no computador nada muda. Depois de "Copiado", "Siga o Sintonia" (`variante="linha"`, chunk
+  próprio). **Carimbo do print** (`CarimboPrint`): "sintonia2026.com.br · 63,21% apurado · 18:47:12 (Brasília)" dentro
+  dos mapas (abaixo do desenho no celular e no mapa da UF; pílula no canto sudoeste do Brasil a partir de 640 px;
+  empilhado no cartograma) e no pé do placar, com % e hora do MESMO resumo da tela (nunca do relógio do aparelho);
+  simulação = selo e sem hora; chave `carimbo-print`. **Painel → Postar** (`SecaoPostar`, `admin/postar.ts`): cartões
+  prontos (convite sem nome, audiência por marco de 10/50/100 mil, até 12 momentos nacionais) com texto ≤ 220, link com
+  origem e imagens 16:9/9:16 do servidor; nomes só a partir das 17h de 25/10 pelo relógio do SERVIDOR (antes, só na
+  simulação com nomes ocultos). Imagem de audiência genérica `/api/og/audiencia.png` (`og-audiencia.ts`; número do
+  servidor arredondado para baixo ao marco, `?m=` só baixa, `?m=0` = convite sem número; obedece ao `contador-publico`).
 
 ### 11.2 Cartões por tela
 
@@ -693,6 +728,15 @@ meio; só se nem uma couber inteira ela vai em linha única com reticências.
   pesada). Cache LRU 256 imagens / 64 MB, fila limitada (503 + `Retry-After`); dado oficial com cache longo e `v=` =
   versão do dataset. `robots.txt` libera `/api/og/` (o robô do X respeita o robots também para a imagem).
 - `/cenarios?c=` e `/duelo/*` ficam fora dos buscadores (`noindex`); o código do Duelo não aparece no HTML nem no canônico.
+- **Leva 3 (I07)**: títulos por fase com fonte única em `src/shared/titulos.ts` (servidor e aba do app dizem o mesmo:
+  "Eleição 2026 em Campinas (SP): 1º turno e apuração do 2º turno" → "Apuração ao vivo em Campinas (SP) · 2º turno 2026"
+  → "Resultado do 2º turno 2026 em Campinas (SP)"; `?race=…-t1` = "1º turno 2026 …: resultado oficial"); nomes só na
+  descrição, na ordem da urna. Placar da fonte TSE na descrição durante a noite (`meta-placar.ts`): lê SÓ o cache do
+  TseSource (nunca baixa nada, renova no máximo a cada 10 s, cópia vale 15 min; erro = sem placar); chave `meta-placar`.
+  **Dia da votação (0h–17h de 25/10, `diaDeVotacao`)**: nenhuma descrição leva nome, número ou percentual de candidato
+  (apuração, município, ficha, curiosidades, cenários) e as imagens que mostram candidato (apuração — inclusive `/`,
+  `/live` e `/tv` —, município, seção, governadores, ficha, curiosidades, cenários) viram a prévia genérica
+  `/api/og/audiencia.png?m=0` ("Eleições 2026 · 2º turno / Apuração ao vivo"). Às 17h tudo volta.
 
 ### 11.8 Cores de identificação (decisão do dono, depois dos QAs)
 
@@ -704,9 +748,14 @@ nos cartões, nas imagens de prévia, na TV e nos widgets.
 
 ### 11.9 Desempenho e limites conhecidos
 
-- JS inicial (build de produção, gzip, revisão final de out/2026 com chat, modo streamer, audiência e palpite): entrada
-  **171,1 kB**; com os chunks da rota de entrada pré-carregados `/` ≈ **197,9 kB**, `/teste` ≈ **196,8 kB** (meta: < 200) e
-  `/apuracao` ≈ **289,9 kB**. Para caber: o "frescor" do selo de atualização, o índice da busca da Home (`BuscaInline`
+- JS inicial (build de produção, gzip -9, integração da leva 3 em 17/10/2026): entrada **173,7 kB**; com os chunks da
+  rota de entrada pré-carregados `/` ≈ **199,85 kB** (no limite: a próxima coisa no JS inicial precisa sair de outro
+  lugar), `/teste` ≈ **198,1 kB** (meta: < 200) e `/apuracao` ≈ **298,7 kB** (ff63fb7: 172,6 / 198,1 / 197,0 / 291,9).
+  A leva 3 pôs na entrada só o freio e o recuo do status (`carga.ts`, `hooks.ts`, ~1,2 kB); a faixa "Conexão instável"
+  (`FaixaConexao`) é chunk carregado quando a conexão fica instável (pré-carregado 8 s depois da abertura), `carga.ts`
+  não importa `chaves-noite.ts`, o cabeçalho lê "N pessoas" de `pessoasTexto.ts` (a pílula `PessoasAgora` fica no chunk
+  da página nacional) e o "Siga o Sintonia" do kit de compartilhar é chunk só depois de "Copiado". A Home paga ainda
+  ~0,6 kB por o `BotaoLembrete` (I29) ser chunk compartilhado com o Teste Cego e o Palpite. Para caber: o "frescor" do selo de atualização, o índice da busca da Home (`BuscaInline`
   carrega índice/recentes só ao ativar), a `ChamadaPalpite` e o "Desde o 1º turno" da página nacional (montado perto da
   tela, `useNaTela`, com altura reservada) são chunks sob demanda. Curiosidades, cenários,
   widgets e o kit de compartilhar são chunks sob demanda. Anúncios no JS inicial: só o provedor, as regras puras
@@ -767,7 +816,8 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   1280×720 reduzido, `loading=lazy`, `color-scheme` igual ao da página de dentro para o iframe ficar transparente),
   opções, "Copiar URL" (`urlAbsoluta` → endereço público com `VITE_SITE_URL`), passo a passo do OBS/Streamlabs, regras
   (créditos "via sintonia2026.com.br", não editar números, apartidário, simulação não é resultado) e contato de parceria
-  (`status.anuncie`, mensagem pronta para streamers). Sem número de audiência.
+  (`status.anuncie`, mensagem pronta para streamers). Sem número de audiência do site; desde a leva 3, só a pílula "O
+  Sintonia está em N lives agora" a partir de 5 lives (`/api/live/agora`).
 - **Live em pé** (TikTok, Shorts, Kick no celular): com a fonte em retrato (1080×1920 ou 720×1280; media query
   `orientation: portrait`), a `/live` troca `--u` para `min(1,8vw, 1vh)` e o layout `placar` vira `LayoutPlacarVertical`
   (um candidato em cima do outro, barra e "apurado · diferença" numa linha, mesmo rodapé com QR e o anúncio no
@@ -777,6 +827,32 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   iframe, sem recarregar a página toda) e `previa=1`: sem polling, sem medição de audiência e sem impressão de anúncio
   (números do momento em que abriu). Medido: ~8 consultas a `/api/status` em 15 s com a página parada (as da própria
   página), nenhuma das prévias.
+
+- **Leva 3 (I22, I23, I25, I09, I08)**:
+  - **`!apuracao`** (`src/shared/texto-placar.ts` + `src/server/texto-placar.ts`): `GET /api/texto/placar?race=pres&uf=sp`,
+    texto puro, sempre 200, ≤ 380 caracteres (mira 200, o chat do YouTube), sempre com o endereço; candidatos na ordem
+    da urna, mesmo formato para os dois, sem "lidera"; fase `pre` = contagem regressiva sem nomes; 0h–17h de 25/10
+    (relógio real) = "A apuração do 2º turno começa hoje, às 17h"; simulação = "[SIMULAÇÃO]" e SEMPRE "Candidato A/B",
+    mesmo com os nomes reais no painel (o texto colado num chat circula sem o prefixo); Presidente numa UF nunca diz
+    "eleito"; `uf` aceita sigla ou nome. Borda 5 s, montado no máximo a cada 2 s, 20 pedidos/min por canal de bot e
+    6.000/min no total (nunca por IP); dos canais só a contagem (hash com sal do processo; `Nightbot-User` nunca é lido).
+    Chave `texto-bots` (desligada: só o endereço). A `/streamers` traz as linhas prontas do Nightbot, StreamElements e
+    Fossabot, o timer e a prévia da resposta real.
+  - **Contagem de lives** (`src/server/lives.ts`, `live/batimento.ts`, painel → Lives): a `/live` manda
+    `POST /api/live/batimento` a cada 60 s com id aleatório da carga, layout e anúncios na tela (nunca na prévia
+    `?previa=1`, no demo, com automação, DNT/GPC ou a página escondida). Conta só com `Origin` do site (sem Origin — curl
+    — é 204 sem contar; outro site, 403); uma fonte só entra em "agora", no pico e nos quadros depois de confirmada (2
+    batimentos com ≥ 45 s entre eles); ativa = batimento nos últimos 150 s; no máximo 10 fontes por rede (hash com sal,
+    só na memória) e 120 batimentos/min por rede. `STATE_DIR/lives.json` (só contagens: minutos por layout e por anúncio,
+    pico, detalhe por hora de 14 dias, maior número de canais de bot), gravado a cada 15 s, a cada 60 s e no
+    encerramento; nada no ensaio. `GET /api/live/agora` só com N ≥ 5 (borda 30 s). É **estimativa** (um batimento pode
+    ser forjado com Origin falso): o painel diz isso e o material de venda deve dizer também. Chave `contar-lives`.
+  - **Estado fixo** `?uf=pe` na `/live` e na `/tv` (só Presidente, 27 UFs): placar da UF ("Votos válidos em
+    Pernambuco"), nunca "eleito", mapa do estado por município, QR para `/apuracao/<uf>`; na `/tv`, sem rodízio nem
+    seletor de mapa e letreiro só da UF. No mapa da UF o rótulo da capital nunca sai pela borda e o de Fernando de Noronha
+    vai sob o quadro tracejado.
+  - "N pessoas no site agora · estimativa" na `/live` e na `/tv` (fora do placar; `?pessoas=0` esconde; só com o número
+    que o servidor manda, ≥ 500 e chave `contador-publico`). QR com `utm_source=live` / `tv`.
 
 ### 11.11 Chat ao vivo moderado ("Sala da apuração")
 
@@ -897,6 +973,22 @@ pedidos de anunciantes. Contratos em `src/shared/audiencia.ts` e `src/shared/lea
   marcar respondido, apagar, CSV com `csvCampo`/`csvTexto` (neutraliza fórmula também depois de vírgula, ponto e vírgula,
   tab ou quebra de linha; colunas de consentimento e quarentena), selo com o número de não respondidos no menu.
 
+- **Medição da noite (leva 3, I14)**: curva por minuto das últimas 24 h (maior presença de cada minuto, da amostra de
+  10 s; minuto sem amostra = servidor fora), horas de tela (pessoas × tempo real entre amostras, até 20 s) por hora e
+  por dia, e páginas por UF (`cf-region-code`, só com país BR), país (`cf-ipcountry`; `XX`/`T1`/ausente = `ND`; até 250
+  por dia, o resto em `ZZ`) e aparelho (`Sec-CH-UA-Mobile`, senão o User-Agent, senão `nd`; tablet = computador) — só
+  siglas, em chaves opcionais do `audiencia.json` (`curva`, `local`, `telaHoras`); cidade, CEP, coordenadas e IP nunca
+  são lidos. Detalhe por hora guardado 14 dias. Painel → Audiência: "Curva minuto a minuto" (com a linha das 17h),
+  "Aparelho, estado e país" (Hoje/7/14 dias), cartões "Horas de tela hoje" e "No celular hoje" e 4 CSVs. Chave
+  `medir-local` (painel, na hora) e `AUDIENCIA_LOCAL=0` (ambiente, de vez). Depende da transformação "Add visitor
+  location headers" da Cloudflare (ligada pelo `cloudflare.mjs --aplicar`); um acesso direto à origem (sem a Cloudflare)
+  consegue forjar as siglas — só afeta os totais por UF/país e esbarra nos limites por pessoa.
+- **"Siga o Sintonia" no resultado (I28)**: variantes `faixa` (NacionalPage e UfPage, só com a fase `encerrada`, longe do
+  placar e do banner do eleito) e `linha` (fim da reprise da `LinhaDoTempo` e depois de "Copiado"), com
+  `utm_source=sintonia`; sem rede configurada, nada aparece. **Lembrete (I29)**: `BotaoLembrete` (extraído do
+  `AcoesHome`, prop `caminho` sem query nem `#`) no fim do Teste Cego e depois de cravar o palpite (evento em
+  `/palpite?utm_source=agenda`); nada do palpite nem do resultado do Teste vai no link do Google/Outlook/.ics.
+
 ### 11.13 Palpite do 2º turno (`/palpite`)
 
 Motor viral INDIVIDUAL: até as 23h59 de 24/10 (véspera; `FIM_PALPITES`) a pessoa crava o % dos votos válidos de cada finalista de Presidente e
@@ -976,14 +1068,14 @@ ambiente do servidor", "CDN", "Segurança", "Admin").
 ### 12.1 Topologia e deploy
 
 ```
-visitante ──HTTPS──▶ Cloudflare (opcional, recomendada: cache de borda de 1–2 s na API, dias nos dados)
+visitante ──HTTPS──▶ Cloudflare (leva 3: regras de deploy/cloudflare.mjs; borda pelo Cloudflare-CDN-Cache-Control, §6)
                         │  (só IPs da Cloudflare são aceitos como CF-Connecting-IP)
                         ▼
 VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; segura 20 s durante reinícios)
                         │  rede interna do Docker (porta do app não publicada)
                         ▼
                app: 1 processo Node 22 (dist/ + dist-server/main.js): SPA, API, motor, adaptador do TSE, imagens OG
-                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json + audiencia.json + leads.json + divulgacao.json + chat.json [+ chat-registro/ e a chave pública, se ligado]
+                        │  volume "estado" (/var/lib/sintonia): admin.json + tse-historico.json + anuncios-metricas.json + audiencia.json + leads.json + divulgacao.json + chat.json + lives.json [+ chat-registro/ e a chave pública, se ligado]
 ```
 
 - **Imagem** (`Dockerfile`): multi-stage em `node:22-bookworm-slim` (glibc, por causa do binário do resvg); a final leva
@@ -1031,6 +1123,24 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
   (máx. 19 s; 32,6 s com pouco tráfego, pelo `stale-while-revalidate=10`) para 3,6 s (máx. 6,4 s). O cache do CDN do
   próprio TSE (`max-age` de até ~60 s) fica fora do nosso alcance; o atraso TSE → servidor medido aparece no
   `/api/admin/tse/health` (`prioritario.atrasoMs`).
+- **Limite e bloqueio do TSE (leva 3, I03; `src/tse/client.ts`, `source.ts`, `src/server/tse.ts`, README do `src/tse`
+  §3.1)**: teto global de pedidos por segundo (`tse.limitePorSeg`, padrão 40, de 5 a 90, painel → Fonte), contando toda
+  tentativa, com folga reservada e prioridade para os arquivos Brasil/UF. `TseBloqueioError` com 429, 403 da borda do
+  TSE (`Server: AkamaiGHost` ou HTML "Access Denied") ou 403 num arquivo que já deu 200/304; 404 e 403 XML de arquivo
+  nunca lido continuam "ausente" (cache negativo de 60 s dobrando até 10 min, zerado quando o `-ab.json` da UF mostra o
+  município andando). No bloqueio, **pausa total** pelo `Retry-After` (5 s–60 min) ou 11 min: nenhum pedido sai
+  (laços, fila de municípios e consultas de visitantes respondem com o último dado bom); ao fim, 1 pedido de prova;
+  log uma vez; `health().ok=false` com `bloqueadoAte`; `frescor.tseBloqueadoAte` no status (selo neutro "O TSE está
+  limitando leituras; nova tentativa às HH:MM"); "Retomar agora" (`tse-retomar`) para falso positivo. Chave
+  `pausa-tse`: `auto` (padrão), `restrita` (só 429 e borda do TSE — o "403 num arquivo já lido" volta a ser ausente; use
+  se a pausa recomeçar sozinha a cada "Retomar") e `off` (nunca pausa, como antes; risco maior de bloqueio). Trocar para
+  `restrita`/`off` encerra uma pausa em curso. A pausa não sobrevive a um reinício. `conferidoEm` só avança com 200/304
+  do arquivo principal.
+- **Arquivo nacional parado (I18, só o aviso)**: o arquivo Brasil de Presidente na mesma geração `dg/hg` por mais de 90 s
+  (pelo relógio do TSE e pelo nosso) enquanto a soma das seções totalizadas das UFs e do exterior passa a dele →
+  `frescor.nacionalParadoDesde` e o selo "O arquivo nacional do TSE não atualiza desde HH:MM · veja os estados" (rola até
+  a tabela de UFs). **Nunca soma votos** (um número diferente do arquivo oficial vira munição de "fraude"). Chave
+  `aviso-nacional` (`auto`/`off`; `off` tira só do público — painel e alertas continuam vendo).
 
 ### 12.3 Segurança
 
@@ -1067,6 +1177,27 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
   VPS é tarefa humana (checklist A5).
 - **Painel**: Fonte (troca automática, feed, teste de conexão), Comunicação (aviso global) e Monitor (req/s, p50/p99,
   5xx/429, event loop, memória, imagens OG). Pelo terminal: `deploy/painel.sh`.
+- **Alertas da noite (leva 3, I16; `src/server/alertas.ts`, ligado no `main.ts`)**: confere a cada 15 s e manda ao
+  Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`; sem eles, desligado): placar parado há mais de 3 min (ou sem
+  leitura boa), TSE limitando, erros seguidos do TSE, 5xx > 1% ou p99 > 1 s por 2 min, reinício do processo (também a
+  cada deploy) e, como extras, arquivo nacional parado, troca automática atrasada, laço de eventos lento e memória > 80%.
+  Mensagens ≤ 200 caracteres sem dado de visitante, cada tipo no máximo 1×/10 min com "resolvido" na volta, ≤ 20 por
+  10 min, envio com tempo-limite de 3 s; token e URL nunca no log. Batimento a cada 60 s em `HC_PING_URL` (vigia
+  externo, homem-morto). `ALERTAS=0` desliga; o contêiner de ensaio do `update.sh` nunca manda. Painel → Fonte →
+  "Enviar alerta de teste" ou `painel.sh alerta-teste`.
+- **Freios (I37) e emergência no app (I05)**: Controle → Chaves da noite (ou `painel.sh freio 2|3|5 [leve]`; `freio 1`
+  solta) espaça as consultas de todos em segundos, sem publicar (`LiveStatus.carga`; `pollMs` e o status × fator); o
+  modo leve para o mapa por município e o "desde o 1º turno", deixa o chat 2× mais lento e faz as imagens ao vivo valerem
+  120 s. O Monitor mostra os sinais de aperto (p99 > 1 s, 5xx > 1%, event loop > 300 ms) com "Puxar 2×"/"Soltar". O app
+  recua o status quando o servidor falha (4, 8, 16… até 30 s, ±25%, volta a 2 s no 1º sucesso; o placar não consulta
+  mais rápido que o status) e mostra "Conexão instável — mostrando o último dado recebido às HH:MM:SS" depois de 3
+  falhas ou com o relógio do status parado 60 s (status velho servido pela borda); chave `faixa-conexao` (o recuo
+  continua). Uma única invalidação por aba quando a versão muda (reconsulta espalhada em até 2 s).
+- **Vigia do `admin.json`** (`vigia-admin.ts`): adota o estado gravado por OUTRA instância (mesmo `STATE_DIR`); a própria
+  gravação (atrasada pelo debounce do `state-store`) é reconhecida pelo hash das últimas 20 (`lembrar: 20`) e nunca
+  adotada — antes, com 2–3 chaves trocadas em menos de ~1 s (as chaves não sobem a versão), uma delas voltava atrás
+  sozinha (corrigido na integração da leva 3; teste em `vigia-admin.test.ts`).
+- **Log**: `/api/texto/` e `/api/live/` entram nas rotas quentes (amostragem), como o status.
 
 ### 12.5 Capacidade (medida em 12/10/2026)
 
@@ -1093,3 +1224,31 @@ VPS Ubuntu ── Caddy 2 (80/443 + HTTP/3; Let's Encrypt; X-Real-IP calculado; 
   endereço sozinhas (versão do dataset no `&v=`).
 - Retotalizações do TSE no 1º turno: `cargos_build.ts --refresh` e o pipeline; os scripts param com a explicação quando
   o feed e o quadro divergem.
+
+### 12.7 Chaves da noite (leva 3)
+
+Gravadas em `AdminState.noite` (`src/shared/chaves-noite.ts`, `CHAVES_NOITE_PADRAO`): valem na hora para todas as
+instâncias, sobrevivem a reinícios, **não sobem a versão** do estado (não invalidam o cache de ninguém) e aparecem em
+Painel → Controle → "Chaves da noite" e em `deploy/painel.sh chaves`. Estado salvo sem um campo = o padrão.
+
+| Chave (comando) | Padrão | Desligada / outro valor |
+|---|---|---|
+| `freio` (`freio 1\|2\|3\|5 [leve]`) | 1, sem leve | consultas × fator; leve = mapa municipal e "desde o 1º turno" parados, chat 2× |
+| `contador-publico` | ligado (≥ 500) | "N pessoas agora" some do site, da /live, da /tv e da imagem de audiência |
+| `html-borda` | **desligada** | ligada: HTML guardado 15 s na borda (só no congelamento, depois do ensaio) |
+| `medir-anuncios` | ligada | `/api/anuncio/evento` responde 204 sem contar |
+| `aviso-nacional` (`auto\|off`) | `auto` | `off`: sem o aviso do arquivo nacional parado no público |
+| `texto-bots` | ligado | `!apuracao` responde só o endereço |
+| `contar-lives` | ligada | batimento 204 sem contar; `/api/live/agora` = null |
+| `faixa-conexao` | ligada | sem a faixa "Conexão instável" (`LiveStatus.semFaixaConexao`; o recuo continua) |
+| `carimbo-print` | ligado | mapas e placar sem o carimbo (`LiveStatus.semCarimbo`) |
+| `meta-placar` | ligado | descrições dos links sem placar |
+| `medir-local` | ligada | sem a contagem por estado, país e aparelho (`AUDIENCIA_LOCAL=0` desliga de vez) |
+| `pausa-tse` (`auto\|restrita\|off`) | `auto` | `restrita`: só 429/borda do TSE; `off`: nunca pausa (encerra a pausa em curso) |
+
+Ações (não são chaves): `tse-retomar` e `alerta-teste`. Variáveis de ambiente da leva 3 (exigem reinício): `CDN_CC`,
+`TELEGRAM_BOT_TOKEN`/`TELEGRAM_CHAT_ID`, `HC_PING_URL`, `ALERTAS`, `AUDIENCIA_LOCAL` e, na VPS compartilhada,
+`LIMITE_RECURSOS`/`APP_CPUS`/`APP_CPU_SHARES`/`APP_PIDS` (I19: `gerar_compose_vps` escreve `cpu_shares: 512`, CPU = núcleos
+− 1 e `pids: 512` no `docker-compose.vps.yml`, só o que o Docker da máquina aplica; `deploy/limites.sh` mostra e muda na
+hora com `docker update`). Ensaio de carga: `scripts/ensaio-borda.ts` (visitantes virtuais, relatório por
+`cf-cache-status`, recusa a produção em 24 e 25/10) e a Cloudflare falsa `scripts/cloudflare-falso.ts` (API + mini-CDN).

@@ -52,6 +52,13 @@
  *                     Erros 5xx, 429, respostas lentas (≥ 1 s) e o admin são SEMPRE registrados
  *   LOG_AMOSTRA_PAGINAS fração das páginas (HTML) registradas (padrão 0.1); as demais rotas (OG, meta…): todas
  *
+ * Leva 3 (lidas direto de process.env pelo módulo que as usa; exigem reinício; README "Variáveis de ambiente"):
+ *   CDN_CC            '0' tira o cabeçalho só da borda (Cloudflare-CDN-Cache-Control) e volta ao cache de antes (app.ts)
+ *   TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID  alertas da noite no Telegram (alertas.ts); ausentes = desligados
+ *   HC_PING_URL       batimento a cada 60 s para um vigia externo (só https); ALERTAS='0' desliga os dois
+ *   AUDIENCIA_LOCAL   '0' desliga de vez a contagem por estado, país e aparelho (audiencia.ts; a chave do painel
+ *                     'medir-local' desliga na hora)
+ *
  * Versão do build (cabeçalho x-sintonia-versao, /api/versao e /healthz):
  *   SINTONIA_COMMIT   commit do build (a imagem Docker grava a partir do build-arg GIT_COMMIT); GIT_COMMIT também vale
  *   SINTONIA_BUILD_DATE data do build (ISO; BUILD_DATE também vale)

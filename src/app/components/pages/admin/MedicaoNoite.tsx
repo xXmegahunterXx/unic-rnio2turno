@@ -8,7 +8,7 @@
 import { useMemo, useState, type PointerEvent } from 'react';
 import { INICIO_APURACAO } from '@/shared/constants';
 import type { AudienciaAdmin, Aparelho } from '@/shared/audiencia';
-import { fmtDataHora, fmtHora, fmtInt, fmtPct } from '@/shared/format';
+import { fmtDataHora, fmtDecimal, fmtHora, fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Button, Segmented } from '@/app/ui';
 import { baixarArquivo } from './anunciosAdmin';
@@ -252,9 +252,9 @@ function Grafico({ curva, agora }: { curva: NonNullable<AudienciaAdmin['curvaMin
 function fmtEixo(n: number): string {
   if (n >= 1000) {
     const k = n / 1000;
-    return `${Number.isInteger(k) ? fmtInt(k) : k.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`;
+    return `${Number.isInteger(k) ? fmtInt(k) : fmtDecimal(k, 1)} mil`;
   }
-  return Number.isInteger(n) ? fmtInt(n) : n.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+  return Number.isInteger(n) ? fmtInt(n) : fmtDecimal(n, 1);
 }
 
 // ---- aparelho, UF e país ------------------------------------------------------------------------------------------------

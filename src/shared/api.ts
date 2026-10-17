@@ -38,8 +38,11 @@
  *   POST /api/live/batimento   BatimentoLive                → 204; contagem anônima de lives; chave 'contar-lives' (G)
  *   GET  /api/live/agora                                    → LivesPublico (s-maxage=30; número só com N ≥ 5) (G)
  *   GET  /api/admin/lives                                   → LivesResumo (src/shared/lives.ts) (G)
+ *   POST /api/admin/lives      { acao: 'zerar' }            → LivesResumo zerado (painel → Lives, depois do ensaio) (G)
  *   GET  /api/saude-noite                                   → { noite: 'ok' | 'atencao'; motivo? } (no-store) (B)
- *   GET  /api/og/audiencia.png                              → imagem genérica "N pessoas acompanhando" (s-maxage=60) (F)
+ *   GET  /api/og/audiencia.png[?m=]                         → imagem genérica "N pessoas acompanhando" (s-maxage=60; `?m=` só
+ *                                                             baixa o número; `?m=0` = convite sem número, a prévia do dia
+ *                                                             da votação) (F)
  *   GET  /sitemap.xml                                       → índice de sitemaps (páginas, municípios, candidatos, cargos) (E)
  *
  *   POST /api/admin/login            { senha }                → { ok: true } + cookie httpOnly

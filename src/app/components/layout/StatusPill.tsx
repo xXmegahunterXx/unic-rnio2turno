@@ -1,7 +1,7 @@
 /**
  * Pílula de status da apuração no header: AO VIVO / SIMULAÇÃO + horário (relógio da apuração),
  * "Começa em …" antes das 17h e "Encerrada" no fim. Funciona sem API (cai na contagem local).
- * Na versão completa (desktop largo), "N pessoas agora" quando `status.pessoasAgora` existir (só no servidor;
+ * Na versão completa (desktop ≥ 1360 px), "≈ N pessoas" (estimativa) quando `status.pessoasAgora` existir (só no servidor;
  * no demo não vem e não aparece — nunca inventamos número).
  */
 import { useStatus } from '@/app/data/hooks';
@@ -13,7 +13,7 @@ import type { LiveStatus } from '@/shared/types';
 import { fmtFaltam, partesTempo } from '@/app/ui/Countdown';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
-import { pessoasAgora, textoPessoas } from '@/app/components/apuracao/PessoasAgora';
+import { pessoasAgora, textoPessoas } from '@/app/components/apuracao/pessoasTexto';
 
 export type StatusVisual =
   | { tipo: 'pre'; faltaMs: number }
@@ -42,14 +42,22 @@ function fmtFaltamCurto(ms: number): string {
   return p.min > 0 ? `${p.min}min` : `${p.seg}s`;
 }
 
-/** Segmento "· 12,3 mil pessoas agora" (só ≥ 1280 px, na pílula completa). */
+/**
+ * Segmento "≈ 12,3 mil pessoas" (só ≥ 1360 px, na pílula completa). Em 1280 px um número de 4+ dígitos (o normal na
+ * noite: o servidor só manda a partir de 500) fazia a página rolar de lado. A marca de estimativa vai sempre junto (I09):
+ * aqui, por falta de espaço no cabeçalho, como "≈" visível (no lugar do ícone) + "agora · estimativa" para leitor de tela e no `title`
+ * (`PessoasAgora`, a /live e a /tv escrevem "· estimativa").
+ */
 function SegmentoPessoas({ n }: { n: number | null | undefined }) {
   if (!n) return null;
   return (
-    <span className="num hidden items-center gap-1.5 border-l border-line pl-2 text-fg-muted xl:inline-flex" title="Pessoas acompanhando o Sintonia agora (estimativa)">
-      <Icon name="usuarios" size={14} />
+    <span
+      className="num hidden items-center gap-1.5 border-l border-line pl-2 text-fg-muted min-[1360px]:inline-flex"
+      title="Pessoas acompanhando o Sintonia agora (estimativa)"
+    >
+      <span aria-hidden className="text-fg-subtle">≈</span>
       {textoPessoas(n)}
-      <span className="sr-only"> agora</span>
+      <span className="sr-only"> agora · estimativa</span>
     </span>
   );
 }

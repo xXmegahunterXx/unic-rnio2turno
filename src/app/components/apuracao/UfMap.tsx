@@ -63,6 +63,22 @@ export interface UfMapProps {
   ariaLabel?: string;
 }
 
+/** Altura (px de tela) reservada sob o desenho para o rótulo de um encarte ("Fernando de Noronha (fora de escala)"). */
+const ROTULO_ENCARTE_PX = 20;
+
+/**
+ * Deslocamento horizontal (px de tela) que mantém um rótulo centrado em `px` inteiro dentro de [0, W], com 4 px de
+ * folga (ex.: "Recife", no litoral, cortado na borda direita da /tv?uf=pe em 390 px). Largura estimada pelo número de
+ * letras (~0,58 em da fonte em semibold). Puro.
+ */
+export function deslocarRotulo(px: number, texto: string, fontePx: number, W: number): number {
+  const meia = (texto.length * fontePx * 0.58) / 2 + 4;
+  if (W <= 2 * meia) return W / 2 - px;
+  if (px - meia < 0) return meia - px;
+  if (px + meia > W) return W - meia - px;
+  return 0;
+}
+
 export function UfMap({
   uf,
   municipios,
@@ -84,12 +100,21 @@ export function UfMap({
   const geo = geoProp ?? geoLoaded;
   const uid = useId().replace(/:/g, '');
   const [sizeRef, size, boxEl] = useElementSize<HTMLDivElement>();
-  const vb = useMemo(() => parseViewBox(geo?.viewBox ?? '0 0 1000 1000'), [geo]);
-  const ar = vb.h / vb.w;
+  const vbGeo = useMemo(() => parseViewBox(geo?.viewBox ?? '0 0 1000 1000'), [geo]);
   const W = size.w;
   // Altura da janela lida uma vez: no celular ela muda quando a barra de endereço some/aparece.
   const [hJanela] = useState(() => (typeof window !== 'undefined' ? window.innerHeight : 900));
   const hMax = alturaMax ?? Math.min(680, Math.max(320, hJanela * 0.7));
+  // Encartes (Fernando de Noronha): faixa a mais embaixo do desenho para o rótulo "(fora de escala)" ir SOB o quadro
+  // tracejado — em cima ele caía sobre os municípios (visto na /tv?uf=pe em 390 px).
+  const vb = useMemo(() => {
+    if (!geo?.encartes?.length || W <= 0) return vbGeo;
+    const s0e = Math.min(W / vbGeo.w, hMax / vbGeo.h);
+    const baixo = Math.max(...geo.encartes.map((e) => e.y + e.h));
+    const falta = baixo + ROTULO_ENCARTE_PX / s0e - (vbGeo.y + vbGeo.h);
+    return falta > 0 ? { ...vbGeo, h: vbGeo.h + falta } : vbGeo;
+  }, [vbGeo, geo, W, hMax]);
+  const ar = vb.h / vb.w;
   const H = W > 0 ? Math.min(W * ar, hMax) : 0;
   const s0 = W > 0 ? Math.min(W / vb.w, H / vb.h) : 1;
   const ox = (W - vb.w * s0) / 2;
@@ -273,7 +298,7 @@ export function UfMap({
                       />
                       <text
                         x={enc.x + enc.w / 2}
-                        y={enc.y - 6 * upx}
+                        y={enc.y + enc.h + 13 * upx}
                         textAnchor="middle"
                         className="font-sans"
                         style={{
@@ -350,6 +375,9 @@ export function UfMap({
                       if (!m) return null;
                       const f = geo.municipios[m.ibge];
                       if (!f) return null;
+                      // posição do ponto na tela (viewBox → grupo com zoom → px) para o rótulo não sair pela borda
+                      const pxPonto = (f.cx * view.k + (view.x + (view.k - 1) * ox) / s0 - vb.x) * s0 + ox;
+                      const dx = deslocarRotulo(pxPonto, m.nome, 11.5, W) * upx;
                       return (
                         <g key={m.ibge}>
                           <circle
@@ -359,7 +387,7 @@ export function UfMap({
                             style={{ fill: 'rgb(var(--fg))', stroke: 'rgb(var(--bg))', strokeWidth: 1.5 * upx }}
                           />
                           <text
-                            x={f.cx}
+                            x={f.cx + dx}
                             y={f.cy - 7 * upx}
                             textAnchor="middle"
                             style={{

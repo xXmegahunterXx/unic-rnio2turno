@@ -81,6 +81,7 @@ ignorados com aviso no log da subida.
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | desligado | alertas da noite no Telegram (placar parado, TSE limitando, erros, reinício…; `src/server/alertas.ts`, DEPLOY.md §16.1). Os dois juntos; formato errado = desligado com aviso no log. Nunca vão ao log |
 | `HC_PING_URL` | desligado | batimento a cada 60 s para um vigia externo (healthchecks.io): se o processo morrer ou travar, o serviço avisa. Só `https` |
 | `ALERTAS` | ligado | `0` desliga o Telegram e o batimento sem apagar os códigos. O contêiner de ensaio do `update.sh` (`SINTONIA_ENSAIO=1`) nunca manda |
+| `AUDIENCIA_LOCAL` | ligado | `0` desliga de vez a contagem de páginas por estado, país e aparelho (I14; cabeçalhos `cf-region-code`/`cf-ipcountry` da Cloudflare e `Sec-CH-UA-Mobile`, só siglas). A chave "Medição por estado, país e aparelho" do painel desliga na hora, sem reiniciar |
 | `SINTONIA_COMMIT` / `SINTONIA_BUILD_DATE` | `.git` local ou `dev` | versão do build mostrada em `x-sintonia-versao`, `/api/versao`, `/healthz` e no painel (a imagem Docker grava o commit a partir do build-arg `GIT_COMMIT`; `GIT_COMMIT`/`BUILD_DATE` também valem) |
 
 ---

@@ -253,9 +253,13 @@ describe('SPA com meta tags por rota', () => {
 
   it('HTML na borda (I05): só com a chave "html-borda"; nunca admin, widgets, Duelo, relatório, 404', async () => {
     const paginas = ['/', '/apuracao', '/apuracao/sp', '/teste', '/live'];
-    const fora = ['/admin', '/embed/placar', '/duelo/abc123', '/relatorio', '/rota-que-nao-existe'];
+    const fora = ['/admin', '/embed/placar', '/rota-que-nao-existe'];
+    // Duelo (código das respostas no caminho) e relatório do anunciante: SEMPRE `no-store` na borda (com a origem
+    // respeitada, a Cloudflare guardaria até o `no-cache`, "sempre revalidando")
+    const nuncaGuardar = ['/duelo/abc123', '/relatorio'];
     // padrão: desligada — só o no-cache do navegador
     for (const p of [...paginas, ...fora]) expect((await get(p)).headers.get(CABECALHO_BORDA), p).toBeNull();
+    for (const p of nuncaGuardar) expect((await get(p)).headers.get(CABECALHO_BORDA), p).toBe('no-store');
     const cookie = await login(m);
     expect((await comando(m, cookie, { tipo: 'html-borda', ligado: true })).status).toBe(200);
     try {
@@ -268,6 +272,7 @@ describe('SPA com meta tags por rota', () => {
       }
       expect(CC_BORDA.html).toBe('max-age=15, stale-while-revalidate=15, stale-if-error=86400');
       for (const p of fora) expect((await get(p)).headers.get(CABECALHO_BORDA), p).toBeNull();
+      for (const p of nuncaGuardar) expect((await get(p)).headers.get(CABECALHO_BORDA), p).toBe('no-store');
       expect((await get('/rota-que-nao-existe')).status).toBe(404);
       // arquivos do build e a API seguem com o próprio cache
       expect((await get('/assets/index-abc123.js')).headers.get(CABECALHO_BORDA)).toBeNull();
