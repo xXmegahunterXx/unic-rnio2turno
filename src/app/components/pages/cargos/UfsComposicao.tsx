@@ -79,14 +79,15 @@ export function UfsComposicao({
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
-      <section className="min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5">
+      {/* resultado por partido: nenhuma peça fixa por cima (§1.5) */}
+      <section data-sem-anuncio-fixo className="min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5">
         <h3 className="font-display text-[17px] font-semibold tracking-[-0.01em] text-fg">Maior bancada em cada estado</h3>
         <p className="mt-1 text-[12.5px] leading-snug text-fg-muted">
           Cor do partido com mais cadeiras (listrado em caso de empate). Toque numa UF para ver a composição.
         </p>
         <MapaUfs celulas={celulas} onSelect={onSelect} ariaLabel="Maior bancada por estado" className="mt-4" />
       </section>
-      <section className="min-w-0 rounded-2xl border border-line bg-surface p-2 shadow-card sm:p-3 lg:col-span-7">
+      <section data-sem-anuncio-fixo className="min-w-0 rounded-2xl border border-line bg-surface p-2 shadow-card sm:p-3 lg:col-span-7">
         <ul className="grid grid-cols-1 sm:grid-cols-2">
           {ls.map((l) => (
             <li key={l.uf}>

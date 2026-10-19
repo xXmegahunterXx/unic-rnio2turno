@@ -1,16 +1,21 @@
 /**
  * Chat ao vivo — estado compartilhado do navegador (um só por aba): consulta `GET /api/chat` enquanto alguém tem
- * interesse (sala na tela = rápido; só o botão com o contador = devagar; ninguém = parado; aba escondida = parado),
+ * interesse (sala na tela = rápido; só a pílula minimizada com o contador = devagar; sala fechada = raramente, acordando
+ * na hora da abertura; ninguém = parado; aba escondida = parado — `proximaConsulta` em nucleo.ts, vezes o freio da noite),
  * junta por id, conta as novas, envia mensagens, denúncias, reações (em lotes) e o sinal de presença (só com a sala na
- * tela e aberta). No build demo (sem servidor) nada é consultado: a sala aparece desligada.
+ * tela e aberta E depois de a pessoa USAR o chat nesta visita — `marcarParticipacao`). No build demo (sem servidor)
+ * nada é consultado: a sala aparece desligada.
  *
  * Privacidade: vai ao servidor só o texto que a pessoa publica, o apelido e um token aleatório do navegador (para os
- * limites; o servidor guarda só um hash dele em memória). Apelido e token ficam no localStorage deste navegador.
+ * limites; o servidor guarda só um hash dele em memória). Apelido e token ficam no localStorage deste navegador. O token
+ * só nasce quando a pessoa usa o chat (abre pelo botão, mexe no popup, abre a folha ou a página /ao-vivo, envia, reage
+ * ou denuncia): o popup que aparece aberto sozinho no computador apenas LÊ a sala (GET sem nada da pessoa). O rascunho
+ * da mensagem fica só na memória da aba (sobrevive ao popup recolher; nunca é gravado).
  */
 import { useEffect, useId, useSyncExternalStore } from 'react';
 import type { ChatPublico, MensagemChat, ReacaoId, RespostaEnvio } from '@/shared/chat';
 import { REACOES } from '@/shared/chat';
-import { contarNovas, gerarToken, intervaloConsulta, juntarMensagens, type Interesse } from './nucleo';
+import { contarNovas, gerarToken, juntarMensagens, proximaConsulta, type Interesse } from './nucleo';
 import { fatorChatVigente } from '@/app/data/carga';
 
 export interface EstadoSala {
@@ -55,6 +60,20 @@ let timerReacao = 0;
 let enviadasDesde = 0;
 /** hora da última consulta bem-sucedida (depois de muito tempo parada, a aba recomeça a lista do zero) */
 let ultimaConsultaOk = 0;
+/** relógio do servidor − relógio do aparelho (ms), da última resposta (`agora`): a contagem até as 17h e a fase da sala */
+let deslocamento = 0;
+/**
+ * A pessoa usou o chat nesta visita (abriu pelo botão, mexeu no popup, abriu a folha ou a /ao-vivo)? Só então vai o sinal
+ * de presença ("N na sala") e nasce o token do navegador. O popup que abre sozinho no computador não conta.
+ */
+let participando = false;
+/** Rascunho da mensagem (só na memória da aba): o popup pode recolher e desmontar o campo no meio da digitação. */
+let rascunho = '';
+
+/** Agora pelo relógio do SERVIDOR (o do aparelho pode estar errado). */
+export function agoraServidor(): number {
+  return Date.now() + deslocamento;
+}
 
 function emitir(parcial: Partial<EstadoSala>) {
   estado = { ...estado, ...parcial };
@@ -121,7 +140,8 @@ function agendar(imediato = false) {
   if (estado.indisponivel) return;
   const i = interesseAtual();
   if (!i || document.visibilityState === 'hidden') return;
-  const ms = imediato ? 0 : intervaloConsulta(estado.pub, i, falhas) * fatorChatVigente(); // freio leve (I37): 2× mais espaçado
+  // freio leve (I37): 2× mais espaçado
+  const ms = imediato ? 0 : proximaConsulta(estado.pub, i, falhas, agoraServidor(), Math.random()) * fatorChatVigente();
   timer = window.setTimeout(() => void consultar(), ms);
 }
 
@@ -135,6 +155,7 @@ async function consultar() {
     const pub = (await r.json()) as ChatPublico;
     falhas = 0;
     const agoraLocal = Date.now();
+    if (typeof pub.agora === 'number' && Number.isFinite(pub.agora)) deslocamento = pub.agora - agoraLocal;
     const mensagens = juntarMensagens(estado.mensagens, pub, undefined, ultimaConsultaOk ? agoraLocal - ultimaConsultaOk : 0);
     ultimaConsultaOk = agoraLocal;
     const ultima = mensagens.length ? mensagens[mensagens.length - 1].em : 0;
@@ -151,14 +172,17 @@ async function consultar() {
   }
 }
 
-/** Sinal de presença: só com a sala na tela e aberta, no intervalo que o servidor pede. */
+/** Sinal de presença: só depois de a pessoa usar o chat, com a sala na tela e aberta, no intervalo que o servidor pede. */
 function presencaSeDevida() {
   const pub = estado.pub;
-  if (!pub?.aberta || interesseAtual() !== 'tela' || document.visibilityState === 'hidden') return;
+  if (!participando || !pub?.aberta || interesseAtual() !== 'tela' || document.visibilityState === 'hidden') return;
   const agora = Date.now();
   if (agora - ultimaPresenca < Math.max(30, pub.presencaS) * 1000) return;
   ultimaPresenca = agora;
-  postar('/presenca', { token: tokenDoNavegador() }).catch(() => undefined);
+  // lê a resposta (204, vazia): sem isso o navegador registra a requisição como "abortada" ao descartar o corpo
+  postar('/presenca', { token: tokenDoNavegador() })
+    .then((r) => r.text())
+    .catch(() => undefined);
 }
 
 if (typeof document !== 'undefined') {
@@ -169,6 +193,22 @@ if (typeof document !== 'undefined') {
       timer = 0;
     }
   });
+}
+
+/**
+ * A pessoa usou o chat (clicou, rolou, digitou, abriu a folha ou a /ao-vivo): a partir de agora vale o sinal de presença
+ * (e o token do navegador nasce no primeiro sinal). Idempotente.
+ */
+export function marcarParticipacao() {
+  if (participando) return;
+  participando = true;
+  presencaSeDevida();
+}
+
+/** Rascunho da mensagem desta aba (memória; nunca gravado). */
+export const lerRascunho = () => rascunho;
+export function guardarRascunho(t: string) {
+  rascunho = t;
 }
 
 /** Marca tudo como visto (a sala está na tela). */
@@ -192,6 +232,7 @@ async function postar(caminho: string, corpo: unknown): Promise<Response> {
 /** Publica uma mensagem. A resposta traz o motivo da recusa (exibido como veio do servidor). */
 export async function enviarMensagem(apelido: string, texto: string): Promise<RespostaEnvio> {
   if (estado.indisponivel) return { ok: false, motivo: 'fechada', erro: 'Chat desligado nesta prévia.' };
+  marcarParticipacao();
   try {
     const r = await postar('', { apelido, texto, token: tokenDoNavegador() });
     const j = (await r.json()) as RespostaEnvio;
@@ -210,6 +251,7 @@ export async function enviarMensagem(apelido: string, texto: string): Promise<Re
 /** Denuncia uma mensagem (3 redes diferentes escondem até a moderação decidir). */
 export async function denunciarMensagem(id: string): Promise<boolean> {
   if (estado.indisponivel) return false;
+  marcarParticipacao();
   try {
     const r = await postar('/denuncia', { id, token: tokenDoNavegador() });
     return r.ok;
@@ -221,6 +263,7 @@ export async function denunciarMensagem(id: string): Promise<boolean> {
 /** Reação local (a animação é do componente); vai ao servidor em lotes a cada ~4 s. */
 export function reagir(r: ReacaoId) {
   if (estado.indisponivel || !estado.pub?.aberta) return;
+  marcarParticipacao();
   const pendentes = { ...estado.pendentes, [r]: Math.min(20, estado.pendentes[r] + 1) };
   emitir({ pendentes });
   if (!timerReacao) timerReacao = window.setTimeout(enviarReacoes, 4000);
@@ -232,7 +275,9 @@ function enviarReacoes() {
   if (!REACOES.some((r) => lote[r] > 0)) return;
   for (const r of REACOES) enviadasDesde += lote[r];
   emitir({ pendentes: zerar() });
-  postar('/reacao', { token: tokenDoNavegador(), r: lote }).catch(() => undefined);
+  postar('/reacao', { token: tokenDoNavegador(), r: lote })
+    .then((r) => r.text())
+    .catch(() => undefined);
 }
 
 /**
@@ -253,7 +298,7 @@ function assinar(f: () => void) {
 }
 
 /**
- * Estado da sala. `interesse`: 'tela' (sala visível: consulta rápida + presença), 'fundo' (só o botão com o contador)
+ * Estado da sala. `interesse`: 'tela' (sala visível: consulta rápida + presença), 'fundo' (só a pílula com o contador)
  * ou null (não consulta por causa deste componente).
  */
 export function useSala(interesse: Interesse | null): EstadoSala {
@@ -263,8 +308,9 @@ export function useSala(interesse: Interesse | null): EstadoSala {
     const antes = interesseAtual();
     interesses.set(id, interesse);
     if (interesse === 'tela') marcarVisto();
-    // chegou o 1º interessado, ou o painel abriu: consulta já
-    if (!antes || (interesse === 'tela' && antes !== 'tela')) agendar(true);
+    // chegou o 1º interessado, ou o painel abriu: consulta já — salvo se a última resposta tem menos de 2,5 s (o popup
+    // recolhe e volta ao rolar a página: cada volta não vira uma consulta)
+    if (!antes || (interesse === 'tela' && antes !== 'tela')) agendar(Date.now() - ultimaConsultaOk >= 2500);
     return () => {
       interesses.delete(id);
       if (!interesseAtual()) agendar();

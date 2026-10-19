@@ -49,8 +49,13 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
    (presa ao cabeçalho ou ao rodapé) passando por cima ou colada a resultado ao rolar: a faixa do topo rola com a página
    em todas as larguras, e a barra do rodapé (celular) e a pílula do chat se recolhem diante de qualquer bloco
    `[data-sem-anuncio-fixo]` (placar, gráfico da corrida, participação, 1º × 2º turno, mapas, tabela de estados, ficha
-   do candidato inteira, que nem tem a barra) — e, como rede de segurança, diante de qualquer elemento com cor de
-   candidato (`cand-*`, `--cand-*` ou `[data-candidato]`) na faixa de baixo da tela. Imagem animada (APNG, WebP animado,
+   do candidato inteira, que nem tem a barra, fatos do tema "Os dois finalistas" das curiosidades, hemiciclo, bancadas e
+   mapas por partido de Câmara, Senado e Assembleias) — e, como rede de segurança, diante de qualquer elemento com cor de
+   candidato (`cand-*`, `--cand-*` ou `[data-candidato]`; brilhos decorativos `aria-hidden` + `pointer-events-none` não
+   contam no chat) na faixa de baixo da tela. Chat ao vivo (§11.11): o popup do computador recolhe com um bloco a menos
+   de 16 px; a faixa "Sala oferecida por" some com um bloco a menos de 48 px (popup, doca e folha central) e nunca
+   aparece na ficha do candidato nem na /anuncie; a doca (≥ 1760 px) empurra a página (nada fica embaixo dela); a folha
+   central do computador/tablet vai de lado a lado do conteúdo (cobre os dois lados por igual, nunca um só). Imagem animada (APNG, WebP animado,
    SVG com animação) é recusada. Categorias recusadas além do político-eleitoral: apostas/bets, cassino e mercados de
    previsão; bebida alcoólica fica fora do ar em 25/10 até as 17h (`anuncios-categorias.ts`). Interruptor geral "Tirar
    todos do ar" (painel e `deploy/painel.sh anuncios-suspender`): nenhum anúncio em ~5 s, nada apagado.
@@ -873,8 +878,12 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   antes de todos os filtros; link também com espaço antes do ponto, ponto largo ou vírgula ("golpe , com"). CAIXA ALTA
   vira minúscula; repetições são encurtadas. Listas SIMÉTRICAS entre os finalistas (`chat.test.ts` confere os pares).
   Apelido 2–20, só letras latinas (acentos do português incluídos), sem candidato (dataset + fixos, em par: Lula/Bolsonaro,
-  Jair, os vices pelo nome completo, Janja/Michelle…), partido, 13/22 (também por extenso) ou nome reservado (moderador, TSE, STF, tribunal,
-  juiz, ministro, Justiça Eleitoral, Sintonia…, também com leet e espaços). Texto 1–140.
+  Jair, os vices pelo nome completo, Janja/Michelle…; também com "I"/"1" no lugar de "l" — "Iula", "FIávio" — e letras
+  soltas ou partidas — "L u l a", "Lu la", inclusive nos nomes de 4 letras), partido ou termo de campo (em par: lulinha ×
+  bolsonarinho, lulão × bolso, barba/barbudo × mito, presidiário × inelegível, condenado × descondenado), 13/22 (também
+  por extenso), fraude nas urnas ("Urna fraudada") ou nome reservado (moderador, TSE, STF, tribunal, juiz, ministro,
+  Justiça Eleitoral, Sintonia…, também com leet e espaços). Mensagens: coxinha × mortadela; "fora Bolso"/"nunca mais
+  Bolso"/"Bolso lá" × os mesmos com Lula/PT. Texto 1–140.
 - **Servidor** (`src/server/chat.ts`, `SalaChat` + `registrarChatPublico`/`registrarChatAdmin`, 2 linhas em `app.ts`):
   FECHADA por padrão; a CONFIGURAÇÃO (aberta, modo lento, fixada) fica em `STATE_DIR/chat.json` e volta igual depois
   de um reinício (update, vigia, VPS); mensagens, silenciados e limites são só da memória. Em produção a sala só recebe
@@ -902,24 +911,43 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   fora do backup; o servidor não consegue ler; a sala e a /privacidade avisam (`registro` no GET). Ligar é decisão do dono
   com o advogado; abrir: `scripts/chat-registro-abrir.ts` com a chave privada, fora da VPS.
 - **App** (`src/app/components/chat`): estado único por aba (`sala.ts`: consulta só com interesse — sala na tela a cada
-  `intervaloS`, só o botão a cada ≥ 10 s, sala fechada 15–30 s, aba escondida parado —, junta por id, `removidas` e
-  `limpaEm`). `SalaDaApuracao` (montada pelo AppShell só em `/apuracao` e `/apuracao/:uf`; aparece com a sala aberta):
-  desktop = aba vertical na borda + painel que empurra a página (`--sala-lateral`, padding do `main` e do rodapé) quando
-  o layout continua o mesmo (`modoPainelDesktop` → `doca`: nacional em 1200–1359 e ≥ 1760 px; UF ≥ 1100), gaveta NÃO
-  modal abaixo do cabeçalho (nacional 1360–1759; Esc fecha) ou, em tela estreita (nacional < 1200, UF < 1100), `folha`
-  centralizada embaixo (até 440 px de altura: os dois percentuais do placar continuam à vista);
-  celular = botão flutuante acima da tab bar e da barra de anúncio (recolhe para uma alça na margem, com o rótulo
-  vertical "Chat", quando há bloco `data-sem-anuncio-fixo` na faixa de baixo — quase sempre na /apuracao) e folha
-  inferior NÃO modal que começa logo abaixo da linha dos % do placar (rola o placar para ficar à vista acima; altura
-  medida na abertura, entre 300 px e 58% da tela — `alturaFolhaCelular`; a folha leva `data-sem-anuncio-fixo`, então a
-  barra de anúncio some; o anúncio da sala fica no PÉ da folha). Portas visíveis para a sala: a chamada "Chat ao vivo"
-  na 1ª dobra da /apuracao e da UF (ao lado de "N pessoas agora"; só com a sala aberta — `chat/chamada.ts` liga a página
-  à sala sem puxar o chat para o JS inicial) e o item "Chat ao vivo" do menu Mais (/ao-vivo). Regras
-  compactas no pé (popover com as regras inteiras e "Trocar apelido"); quem digita antes de ter apelido escreve a mensagem
-  e o apelido é pedido no envio. Mensagem enviada que o servidor não devolveu some depois da janela de consulta (não fica
-  "fantasma" na tela). Demo: sala desligada com aviso.
+  `intervaloS` (mín. 2,5 s), só a pílula minimizada a cada ≥ 12 s (4× o sugerido), sala fechada 20 s com a contagem na
+  tela e 90 s minimizada, acordando na hora da abertura (17h de 25/10 + sorteio de até 15 s), aba escondida parado; ao
+  reabrir com resposta de menos de 2,5 s não consulta de novo —, junta por id, `removidas` e `limpaEm`). **Widget global**
+  `ChatFlutuante` (chunk próprio, montado pelo AppShell quando o navegador fica ocioso; fora de /ao-vivo, do Teste Cego e
+  do Duelo — `chat/rotas.ts`; /admin, /tv, /live, /embed/* e /relatorio já ficam fora do AppShell):
+  - **computador ≥ 1760 px: doca** — coluna de 380 px à direita, abaixo do cabeçalho, que EMPURRA a página
+    (`--sala-lateral` no padding do `main`, do rodapé e da faixa do topo; `modoComputador`): sempre aberta com a sala
+    aberta, sem cobrir nada (1760 − 380 = 1380 ≥ 1360, o layout da apuração em duas colunas não muda);
+  - **computador 1024–1759 px: popup** no canto inferior direito (360 × 540; até 420 de altura em janela de até 800 px;
+    "Aumentar" = 420 de largura e a altura toda), ABERTO por padrão com a sala aberta (escolha lembrada em
+    `sintonia:chat-painel`, só a feita com a sala aberta); recolhe sozinho para a pílula quando a área dele, com 16 px de
+    respiro, cruza um bloco `[data-sem-anuncio-fixo]`, um elemento com cor de candidato (brilhos decorativos não contam)
+    ou um `[data-chat-evita]` (anúncio nativo, avisos legais do /palpite, faixa do palpite na apuração, seletor de zona) —
+    salvo enquanto a pessoa mexe nele e por 3 s depois (`popupAberto`). A pílula perto de um bloco vira a alça estreita
+    NO MESMO CANTO (a entrada não pula de lugar). Ficha do candidato e /anuncie contam como canto ocupado;
+  - **pedido com o canto ocupado** (pílula, alça, chamada "Chat ao vivo" da página): folha CENTRAL embaixo, de lado a lado
+    do conteúdo (até 1440 px, a conversa numa coluna de até 880 px) — cobre os dois lados por igual. Na apuração com o
+    placar na tela, o placar rola para o topo e a folha começa no fim da barra dos dois lados; em outro bloco marcado
+    (o topo da apuração antes das 17h, com os retratos; o placar da home), se ele cabe inteiro acima de uma folha de
+    ≥ 280 px, rola para ficar à vista acima dela (`prepararFolhaCentral`). Sem anúncio com bloco a menos de 48 px;
+  - **celular < 768 px**: alça de 14 px na borda acima da tab bar (a pílula discreta só sem a barra de anúncio do rodapé e
+    com a faixa de baixo livre — pílula + barra + tab bar tomavam ~1/4 da tela); folha inferior NÃO modal que começa logo
+    abaixo da linha dos % do placar nas páginas da apuração (`alturaFolhaCelular`), alta nas outras; anúncio da sala no PÉ;
+    **tablet 768–1023 px**: a folha central. A folha leva `data-sem-anuncio-fixo` (a barra de anúncio some).
+  - Antes das 17h de 25/10 (sala fechada): pílula "Chat ao vivo · abre domingo, 17h"; aberta, a contagem (nas páginas da
+    apuração só a frase, o topo já tem a contagem) e as regras. Portas: a chamada "Chat ao vivo" na 1ª dobra da apuração
+    (`chat/chamada.ts`) e o item do menu Mais (/ao-vivo).
+  - **Presença e token só com USO** (`marcarParticipacao`): o popup que aparece aberto sozinho só LÊ a sala (GET sem nada
+    da pessoa); o sinal "estou na sala" e o token do navegador nascem quando a pessoa abre pelo botão, clica, rola ou
+    digita dentro do chat, abre a folha ou a /ao-vivo (ou envia, reage, denuncia). "N na sala" conta quem usou.
+  - Rascunho da mensagem na memória da aba (`lerRascunho`/`guardarRascunho`): o popup recolher não apaga o texto; nunca é
+    gravado. Regras compactas no pé (popover com as regras inteiras e "Trocar apelido"); quem digita antes de ter apelido
+    escreve a mensagem e o apelido é pedido no envio. Mensagem enviada que o servidor não devolveu some depois da janela de
+    consulta. Demo: sala desligada (pílula "prévia", nenhuma consulta).
 - **Anúncio `chat`** (`anuncios/OferecimentoChat.tsx`, contrato inalterado): "Sala oferecida por <marca>" no topo da
-  sala (no pé, na folha do celular), só com a sala aberta, faixa própria fora das mensagens; rotação pelo peso fixa na visita, evitando
+  sala (no pé, nas folhas), só com a sala aberta, faixa própria fora das mensagens; some com bloco com candidato a menos de
+  48 px (popup, doca, folha central) e nunca na ficha do candidato nem na /anuncie; rotação pelo peso fixa na visita, evitando
   o anunciante do topo/rodapé; impressão visível e clique (`?f=chat`) como os demais. Vitrine: `MolduraChatVitrine`.
 - **Admin**: seção "Chat ao vivo" (`SecaoChat.tsx`, pensada para 390 px).
 
@@ -1029,6 +1057,26 @@ cartão do resultado. Código em `src/app/components/palpite` (`nucleo.ts` puro 
   "Como funciona". Cartões "Meu palpite"/resultado (nomes + percentuais): faixa "Oferecimento" só com
   `OFERECIMENTO_COM_CANDIDATOS` (hoje DESLIGADO, §1.5). A imagem-convite genérica `/api/og/palpite.png` (sem candidato)
   continua em `CARTOES_COM_OFERECIMENTO`/`imagemComOferecimento` (anunciante no `&v=`).
+- **Desafio do palpite entre amigos — SEM DINHEIRO** (`desafio.ts` puro e testado, `desafioEstado.ts`, `SecaoDesafio.tsx`,
+  `CartaoDesafio.tsx`; rota `/palpite/desafio`): nada de valor, prêmio, Pix ou fichas, e a palavra "aposta"/"apostar"/"bet"
+  não aparece no site (aposta em eleição não é autorizada pela Lei 14.790/2023 e jogo de azar é contravenção). Depois de
+  cravar, a pessoa escolhe um APELIDO e manda o seu link `/palpite/desafio#<código>` (apelido, id aleatório de 5
+  caracteres, palpite e minuto em que cravou, tudo depois do `#`: nada chega ao servidor). Quem abre vê "Fulano te
+  desafiou", crava e manda o seu link de volta; cada link aberto entra no "Meu desafio" DESTE aparelho
+  (`sintonia:desafio`, até 30 pessoas, removível; "Apagar meus dados" limpa). **Antes do resultado oficial a lista é
+  alfabética e mostra só "Cravou · data e hora"** — nenhum número de ninguém, soma, média, contagem por lado ou "quem
+  está à frente" (o item `ItemLista` nem tem o campo do palpite; teste confere). Com a apuração oficial do TSE concluída
+  (100% ou `encerrada`, nunca simulação): ranking por erro (1 casa), desempate por quem cravou antes, "Na mosca" e o
+  cartão do ranking (só apelidos e diferenças, gerado no navegador). Link de quem já está no desafio não muda depois das
+  23h59 de 24/10; link aberto depois do prazo ganha a marca do relógio. Links só são criados até o prazo; das 0h às 17h
+  de 25/10, sem compartilhar. **Apelido**: o filtro do chat (`avaliarApelido`: sem candidato — também com letras
+  parecidas "Iula"/"1ula"/"FIávio" e letras soltas "L u l a" —, partido e termos de campo em par, 13/22, nome reservado,
+  palavrão, propaganda e fraude nas urnas) e ainda o filtro das mensagens (`avaliarTexto`): no desafio não há moderação
+  e o apelido vira o título e o texto do convite. **Anúncios**: nenhum dentro da seção; a rota `/palpite/desafio` fica
+  SEM o "Palpite oferecido por"; o cartão do ranking fica sem "Oferecimento" (`OFERECIMENTO_RANKING_DESAFIO`, hoje
+  DESLIGADO: "desafio + ranking + oferecido por" lembraria bolão patrocinado — ligar é decisão do dono com o advogado).
+  Prévia do link: `/api/og/desafio.png` genérica (sem candidato, número ou apelido; texto que vale em todas as fases),
+  meta tags próprias, noindex, fora do sitemap. O item "Ou desafie os amigos" do "Como funciona" some depois do prazo.
 - **Chamadas**: `ChamadaPalpite` (chunk sob demanda) na home (1ª seção abaixo da dobra, fora do hero) e na apuração na fase
   `pre` (faixa entre a contagem e o 1º turno); some na janela da votação; depois das 17h só aparece para quem cravou. Menu
   "Mais" e sitemap.

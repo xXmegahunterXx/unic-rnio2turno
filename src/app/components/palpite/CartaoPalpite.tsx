@@ -66,18 +66,34 @@ export function CartaoPalpite(props: CartaoPalpiteProps) {
       titulo={formato === 'x' ? undefined : modo === 'resultado' ? 'Como foi o meu palpite' : 'Meu palpite para o 2º turno'}
       brilho={[finalistas[0].cor, finalistas[1].cor]}
       rodape={siteExibicao() ? undefined : 'Faça o seu palpite no Sintonia'}
-      className={marca ? '![height:var(--cartao-alt)] ![padding-bottom:var(--cartao-pb)]' : undefined}
+      className={marca ? CLASSE_CARTAO_COM_FAIXA : undefined}
     >
       {modo === 'resultado' ? <MioloResultado {...props} /> : <MioloPalpite {...props} />}
     </CartaoBase>
   );
-  if (!marca) return base;
+  return (
+    <ComOferecimento formato={formato} marca={marca}>
+      {base}
+    </ComOferecimento>
+  );
+}
+
+/** Classe do `CartaoBase` quando há a faixa do anúncio: o cartão encolhe pela altura da faixa (e do espaço abaixo). */
+export const CLASSE_CARTAO_COM_FAIXA = '![height:var(--cartao-alt)] ![padding-bottom:var(--cartao-pb)]';
+
+/**
+ * Faixa "Oferecimento: <marca>" no PÉ do cartão (separada por linha, depois do rodapé com domínio e data); sem `marca`,
+ * o cartão sai como está. Quem usa decide se o cartão pode ter anúncio (regra em src/shared/oferecimento.ts) e passa
+ * `CLASSE_CARTAO_COM_FAIXA` ao `CartaoBase`. Usada também pelo cartão do ranking do Desafio (sem candidato).
+ */
+export function ComOferecimento({ formato, marca, children }: { formato: FormatoCartao; marca: string | null; children: ReactNode }) {
+  if (!marca) return <>{children}</>;
   const { w, h } = DIMENSOES_CARTAO[formato];
   const f = FAIXA[formato];
   const estilo = { width: w, height: h, '--cartao-alt': `${h - f.alt - f.abaixo}px`, '--cartao-pb': `${f.pb}px` } as CSSProperties;
   return (
     <div style={estilo} className="relative flex flex-col overflow-hidden bg-bg font-sans text-fg antialiased">
-      {base}
+      {children}
       <FaixaOferecimento marca={marca} altura={f.alt} fonte={f.fonte} />
       {f.abaixo ? <div aria-hidden className="bg-bg" style={{ height: f.abaixo }} /> : null}
     </div>

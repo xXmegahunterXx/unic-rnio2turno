@@ -294,7 +294,7 @@ const OFENSAS_EXATAS = [
   'viado', 'viados', 'veado', 'veados', 'bicha', 'bichas', 'boiola', 'baitola', 'sapatao', 'traveco', 'macaco', 'macacos',
   'macaca', 'crioulo', 'crioula', 'tiziu', 'baianada', 'nordestinada', 'aleijado', 'judeuzinho',
   // xingamentos partidários (os dois campos)
-  'gado', 'mortadela', 'mortadelas', 'petralha', 'petralhas', 'bolsominion', 'bolsominions', 'minion', 'minions',
+  'gado', 'mortadela', 'mortadelas', 'coxinha', 'coxinhas', 'petralha', 'petralhas', 'bolsominion', 'bolsominions', 'minion', 'minions',
   'esquerdopata', 'esquerdopatas', 'direitopata', 'bolsonazi', 'bolsonazis', 'bozo', 'bozonaro', 'luladrao', 'lularapio',
   'molusco', 'cachaceiro', 'presidiario', 'bolsonero', 'familicia', 'rachadinha', 'mamata', 'isentao',
   'comunopata', 'fascistoide', 'nove dedos', 'apedeuta', 'analfabeto', 'analfabeta', 'analfabetos', 'analfabetas',
@@ -332,10 +332,10 @@ const PROPAGANDA: readonly RegExp[] = [
   // "Lula e 13" / "PL e 22" = nome + "é" + número.
   /\b(lula|flavio|bolsonaro|pt|pl)\s+e\s+(13|22|treze|vinte e dois)\b/,
   /\b(lula|flavio|bolsonaro|pt|pl)\s*(13|22)\b|\b(13|22)\s*(lula|flavio|bolsonaro|pt|pl)\b/,
-  /\bfora\s+(lula|flavio|bolsonaro|pt|pl|petistas?|bolsonaristas?|lulistas?|flavistas?)\b/,
-  /\b(lula|flavio|bolsonaro)\s+(la|sim|presidente|neles|eleito ja|ja ganhou)\b/,
+  /\bfora\s+(lula|flavio|bolsonaro|bolso|pt|pl|petistas?|bolsonaristas?|lulistas?|flavistas?)\b/,
+  /\b(lula|flavio|bolsonaro|bolso)\s+(la|sim|presidente|neles|eleito ja|ja ganhou)\b/,
   /\b(eu )?(sou|somos) (lula|flavio|bolsonaro|petista|bolsonarista|lulista)\b/,
-  /\b(lula|flavio|bolsonaro|pt|pl) nunca mais\b|\bnunca mais (lula|flavio|bolsonaro|pt|pl)\b/,
+  /\b(lula|flavio|bolsonaro|bolso|pt|pl) nunca mais\b|\bnunca mais (lula|flavio|bolsonaro|bolso|pt|pl)\b/,
   /\b(petista|bolsonarista|lulista|flavista)s? (de verdade|raiz|unidos)\b/,
   // gestos de campanha, em par: "faz o L" × "faz arminha" (e "faz o 13" × "faz o 22")
   /\bfa(z|ca|cam|zem|zendo|ce)\s+(o\s+|um\s+)?(l|13|22)\b/,
@@ -350,7 +350,7 @@ const PROPAGANDA: readonly RegExp[] = [
 /** Hashtags e "chamadas" de campanha (texto original). */
 // "#PT"/"#PL" só como sigla (com número ou slogan colado): "#plantão" e "#ptbr" são outra coisa
 const RE_HASHTAG_CAMPANHA =
-  /#\s*((pt|pl)(13|22|sim|n[ãa]o|nunca\s*mais|l[áa]|presidente|neles)?(?![\p{L}\d])|(lula|flavio|fl[áa]vio|bolsonaro|13|22|elenao|ele\s*n[ãa]o|elesim|ele\s*sim|fora\s*(pt|pl|lula|flavio|fl[áa]vio|bolsonaro|petistas?|bolsonaristas?|lulistas?|flavistas?)|lulala|fazol|faz\s*o\s*l\b|faz\s*(a\s*)?arminha|arminha|vote|voto)\w*)/iu;
+  /#\s*((pt|pl)(13|22|sim|n[ãa]o|nunca\s*mais|l[áa]|presidente|neles)?(?![\p{L}\d])|(lula|flavio|fl[áa]vio|bolsonaro|13|22|elenao|ele\s*n[ãa]o|elesim|ele\s*sim|fora\s*(pt|pl|lula|flavio|fl[áa]vio|bolsonaro|bolso|petistas?|bolsonaristas?|lulistas?|flavistas?)|lulala|fazol|faz\s*o\s*l\b|faz\s*(a\s*)?arminha|arminha|vote|voto)\w*)/iu;
 
 /** Desinformação sobre o processo eleitoral (a fonte oficial é o TSE). */
 const FRAUDE: readonly RegExp[] = [
@@ -427,8 +427,13 @@ const APELIDO_RESERVADO_COMPACTO = /(admin|moderador|moderacao|sintonia|tseofici
 /** Só letras latinas (com acentos), números 0–9, espaço e . _ ' ’ - (sem misturar alfabetos: "TSЕ" com E cirílico). */
 const RE_APELIDO = /^[A-Za-z0-9À-ÖØ-öø-ÿĀ-ſḀ-ỿ][A-Za-z0-9À-ÖØ-öø-ÿĀ-ſḀ-ỿ ._'’-]*$/u;
 
-/** Partidos (qualquer caixa) e termos partidários em apelido. */
-const APELIDO_PARTIDARIO = /\b(pt|pl|psol|mdb|psdb|psd|pdt|psb|pcdob|pv|pp|novo|rede|uniao|uniao brasil|podemos|republicanos|cidadania|avante|solidariedade|agir|dc|pmb|prtb|pco|pstu|up|pcb|prd|mobiliza|missao|petista|petistas|bolsonarista|bolsonaristas|lulista|lulistas|flavista|esquerda|direita|lulinha|bolsonarinho)\b/;
+/**
+ * Partidos (qualquer caixa) e termos partidários em apelido, os de campo sempre EM PAR: "lulinha" × "bolsonarinho",
+ * "lulão" × "bolso" (forma curta de cada nome), "barba"/"barbudo" × "mito" (apelidos de cada campo para o seu nome),
+ * "presidiário" × "inelegível" e "condenado" × "descondenado" (rótulos usados como provocação; numa mensagem do chat,
+ * a situação jurídica continua podendo ser citada).
+ */
+const APELIDO_PARTIDARIO = /\b(pt|pl|psol|mdb|psdb|psd|pdt|psb|pcdob|pv|pp|novo|rede|uniao|uniao brasil|podemos|republicanos|cidadania|avante|solidariedade|agir|dc|pmb|prtb|pco|pstu|up|pcb|prd|mobiliza|missao|petista|petistas|bolsonarista|bolsonaristas|lulista|lulistas|flavista|esquerda|direita|lulinha|bolsonarinho|lulao|bolso|barba|barbudo|mito|presidiario|inelegivel|inelegiveis|descondenado|descondenada|condenado|condenada)\b/;
 
 /**
  * Nomes sempre recusados no apelido (os candidatos do dataset entram pelo parâmetro). SIMÉTRICO: o nome de urna e o
@@ -694,19 +699,60 @@ export function avaliarApelido(bruto: unknown, nomes: readonly string[] = NOMES_
   // leituras: sem leet, com leet ("M0derador", "Moder4dor") e compactas ("m o d e r a d o r", "JusticaEleitoral")
   const f = ` ${normalizarFiltro(a, false)} `;
   const fl = ` ${normalizarFiltro(a, true)} `;
+  // letras que se parecem com "l" na tela: "I" maiúsculo (na fonte do site, igual a "l") e "1" ("Iula", "1ula", "FIávio")
+  const fi = ` ${normalizarFiltro(a.replace(/[I1]/g, 'l'), false)} `;
   const semLeet = normalizarSemLeet(a);
-  const compactos = [f, fl].map((x) => x.replace(/ /g, ''));
-  if ([semLeet, f, fl, juntarLetrasSoltas(f), juntarLetrasSoltas(fl)].some((x) => APELIDO_RESERVADO.test(x)) || compactos.some((x) => APELIDO_RESERVADO_COMPACTO.test(x)))
+  const leituras = [f, fl, fi];
+  // letras soltas juntadas ("L u l a", "P T"): as mesmas leituras com as letras soltas viradas uma palavra
+  const juntadas = leituras.map(juntarLetrasSoltas);
+  const compactos = leituras.map((x) => x.replace(/ /g, ''));
+  if ([semLeet, ...leituras, ...juntadas].some((x) => APELIDO_RESERVADO.test(x)) || compactos.some((x) => APELIDO_RESERVADO_COMPACTO.test(x)))
     return erro('Esse apelido é reservado. Escolha outro.');
   for (const nome of nomes) {
     const nomeC = nome.replace(/ /g, '');
-    if ([f, fl].some((x) => x.includes(` ${nome} `)) || (nomeC.length >= 5 && compactos.some((x) => x.includes(nomeC)))) return erro('O apelido não pode ter nome de candidato.');
+    if (
+      [...leituras, ...juntadas].some((x) => x.includes(` ${nome} `)) ||
+      (nomeC.length >= 5 && compactos.some((x) => x.includes(nomeC))) ||
+      // nomes curtos ("lula"): partidos entre palavras ("Lu la", "L.u.la") — dentro de uma palavra maior ("Talula") não
+      leituras.some((x) => nomeQuebrado(x, nomeC))
+    )
+      return erro('O apelido não pode ter nome de candidato.');
   }
-  if (APELIDO_PARTIDARIO.test(semLeet)) return erro('O apelido não pode ter nome ou sigla de partido nem termo partidário.');
+  if ([semLeet, fi, ...juntadas].some((x) => APELIDO_PARTIDARIO.test(x))) return erro('O apelido não pode ter nome ou sigla de partido nem termo partidário.');
   // número de urna colado ao apelido ("joao22", "ana_13"), não parte de um número maior ("ana2013")
   if (/(^|[^0-9])(13|22)([^0-9]|$)/.test(a) || / (treze|vinte e dois|vintedois) /.test(f)) return erro('O apelido não pode ter número de candidato.');
   if (temOfensa(a) || temPropaganda(a)) return erro('Escolha um apelido sem ofensa nem propaganda.');
+  // desinformação sobre a urna e a apuração ("Urna fraudada", "Fraude"): o apelido aparece em destaque (desafio do palpite)
+  if (temFraude(a)) return erro('O apelido não pode falar de fraude nas urnas ou na apuração.');
   return { ok: a };
+}
+
+/**
+ * O nome (compacto, sem espaços) aparece na leitura PARTIDO em pedaços inteiros ("lu la", "l u la", "lu.la")? Só conta
+ * quando a ocorrência cobre palavras inteiras: dentro de uma palavra maior ("Talula") ou pegando só o começo de outra
+ * ("Lu Lacerda") não conta (a palavra inteira igual ao nome já é pega pela busca por palavra).
+ */
+function nomeQuebrado(leitura: string, nomeC: string): boolean {
+  if (nomeC.length < 3) return false;
+  const palavras = leitura.trim().split(' ').filter(Boolean);
+  if (palavras.length < 2) return false;
+  const inicio: number[] = [];
+  const fim: number[] = [];
+  let pos = 0;
+  for (const p of palavras) {
+    inicio.push(pos);
+    pos += p.length;
+    fim.push(pos - 1);
+  }
+  const comp = palavras.join('');
+  for (let i = comp.indexOf(nomeC); i >= 0; i = comp.indexOf(nomeC, i + 1)) {
+    const j = i + nomeC.length - 1;
+    // começa no início de uma palavra, termina no fim de OUTRA
+    const a = inicio.indexOf(i);
+    const b = fim.indexOf(j);
+    if (a >= 0 && b > a) return true;
+  }
+  return false;
 }
 
 /** Token aleatório do navegador (base64url). */

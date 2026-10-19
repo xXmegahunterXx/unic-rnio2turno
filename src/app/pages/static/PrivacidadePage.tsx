@@ -83,7 +83,7 @@ export default function PrivacidadePage() {
       icone="olho-fechado"
       titulo="Sua opinião é só sua"
       lead="O Sintonia foi feito para funcionar sem saber quem você é. As respostas do Teste Cego nunca saem do seu aparelho, e não usamos cookies de rastreamento."
-      atualizado="16 de outubro de 2026"
+      atualizado="19 de outubro de 2026"
       sumario={SUMARIO}
       destaque={
         <Resumo
@@ -126,6 +126,28 @@ export default function PrivacidadePage() {
             <>Para apagar, use “Apagar meus dados”, abaixo.</>,
           ]}
         />
+        <p>
+          <strong>Desafio do palpite entre amigos</strong> (sem dinheiro, só pela graça): funciona do mesmo jeito, sem passar pelo Sintonia.
+        </p>
+        <Lista
+          itens={[
+            <>
+              O seu link de desafio leva o <strong>apelido</strong> que você escolher, um código aleatório (para o aparelho de quem recebe saber que é
+              você de novo), o seu palpite e a hora em que você cravou, tudo depois do “#”. Quem tiver o link consegue ler essas informações, mesmo
+              que a página só mostre os números com o resultado oficial.
+            </>,
+            <>
+              Cada link de desafio que você abre fica guardado <strong>só neste aparelho</strong> (“Meu desafio”, até 30 pessoas): o apelido, o
+              palpite e a hora de quem mandou, e a hora em que você abriu o link. Dá para remover alguém ou apagar o desafio inteiro na própria
+              página, ou usar “Apagar meus dados”, abaixo.
+            </>,
+            <>
+              Antes do resultado oficial, a lista do desafio mostra só quem cravou e quando, sem o palpite de ninguém e sem somar nada. O
+              cartão do ranking, que você pode compartilhar depois do resultado, é gerado no seu aparelho e leva os apelidos e as diferenças de
+              quem está no seu desafio: mostre a quem participou.
+            </>,
+          ]}
+        />
       </Secao>
 
       <Secao id="navegador" titulo="O que fica no seu navegador">
@@ -148,11 +170,12 @@ export default function PrivacidadePage() {
             ['Marca de que o resultado de um Teste Cego já foi revelado nesta aba', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
             ['Horário da última recarga automática depois de uma atualização do site', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
             ['Seu palpite do 2º turno (o percentual e a hora em que você cravou)', 'Armazenamento local', 'Até você apagar'],
+            ['Seu desafio do palpite (o seu apelido e código aleatório, e o apelido, o palpite e as horas de cada link de desafio que você abriu)', 'Armazenamento local', 'Até você apagar'],
             ['Número aleatório que alterna os anúncios entre as visitas (não identifica você e nunca é enviado)', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
             ['Se você fechou a barra de anúncio do celular', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
             ['Apelido que você escolheu no chat ao vivo', 'Armazenamento local', 'Até você apagar'],
-            ['Código aleatório do chat ao vivo (vai junto com as suas mensagens, denúncias, reações e o sinal de presença, só para os limites contra abuso)', 'Armazenamento local', 'Até você apagar'],
-            ['Se o painel do chat ficou aberto no computador', 'Armazenamento local', 'Até você apagar'],
+            ['Código aleatório do chat ao vivo (criado só quando você usa o chat; vai junto com as suas mensagens, denúncias, reações e o sinal de presença, só para os limites contra abuso)', 'Armazenamento local', 'Até você apagar'],
+            ['Se o chat ficou aberto ou minimizado no computador', 'Armazenamento local', 'Até você apagar'],
             ['Marca de que a entrada desta aba já foi contada na medição de audiência (só “sim”, sem código nenhum)', 'Armazenamento da aba (sessionStorage)', 'Some ao fechar a aba'],
           ]}
         />
@@ -312,11 +335,18 @@ export default function PrivacidadePage() {
           Na noite da apuração, a <LinkInterno to="/ao-vivo">Sala da apuração</LinkInterno> é um chat público e moderado. O que você escreve
           ali fica <strong>visível para todo mundo</strong>: não publique dados pessoais nem nada que não queira tornar público.
         </p>
+        <p className="mt-3">
+          O chat aparece em todas as páginas: no computador, aberto num canto (ou numa coluna ao lado da página, em telas largas); no celular,
+          recolhido numa alça na borda da tela. Enquanto você só olha, o navegador apenas <strong>lê</strong> as mensagens, sem enviar nada seu.
+          O código aleatório e o sinal de “estou na sala” só começam quando você <strong>usa</strong> o chat nesta visita: abre pelo botão, clica,
+          rola ou digita dentro dele, ou abre a página da sala.
+        </p>
         <Lista
           itens={[
             <>
               <strong>O que recebemos.</strong> O apelido, o texto da mensagem e um código aleatório gerado pelo seu navegador (não tem seu nome,
-              e-mail ou telefone). Denúncias, reações e o sinal de “estou na sala” levam só esse código.
+              e-mail ou telefone), criado só quando você usa o chat. Denúncias, reações e o sinal de “estou na sala” levam só esse código. O
+              rascunho de uma mensagem que você ainda não enviou fica só na memória da aba e nunca é enviado.
             </>,
             <>
               <strong>Por quanto tempo.</strong> As mensagens ficam só na memória do servidor, nunca em disco: no máximo as 300 mais recentes e por

@@ -12,3 +12,12 @@
  * marca aparece nessas imagens (o servidor, o app e os textos nunca divergem).
  */
 export const OFERECIMENTO_COM_CANDIDATOS = false as boolean;
+
+/**
+ * Faixa "Oferecimento: <marca>" no cartão do RANKING do Desafio do palpite entre amigos (app, CartaoDesafio.tsx). O cartão
+ * não mostra candidato (só apelidos e diferenças em p.p.), mas é derivado do resultado e lista pessoas reais de um grupo:
+ * com uma marca no pé (hoje o master é uma carteira de Pix), "desafio + ranking + oferecido por" lembraria bolão
+ * patrocinado — e o desafio é SEM dinheiro. DESLIGADO até o advogado decidir; a página /palpite/desafio também fica sem
+ * o "Palpite oferecido por" (ARCHITECTURE §11.13). Ligar = decisão escrita do dono com o advogado.
+ */
+export const OFERECIMENTO_RANKING_DESAFIO = false as boolean;

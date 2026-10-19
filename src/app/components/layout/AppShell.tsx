@@ -33,6 +33,7 @@ import { ProvedorAnuncios } from '../anuncios/contexto';
 import { FaixaTopo } from '../anuncios/FaixaTopo';
 import { rodapePermitido } from '../anuncios/nucleo';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
+import { chatNaRota } from '../chat/rotas';
 import { instalarBarrasMoveis, mostrarTabBar } from '@/app/lib/barrasMoveis';
 
 export function AppShell({ children }: { children?: ReactNode }) {
@@ -42,13 +43,14 @@ export function AppShell({ children }: { children?: ReactNode }) {
     <div className="relative flex min-h-dvh flex-col bg-bg">
       <FundoNoite />
       <Header />
-      {/* --sala-lateral: largura do chat ao vivo quando ele está aberto ao lado da página (desktop; chat/SalaDaApuracao) */}
+      {/* --sala-lateral: largura da doca do chat ao vivo quando ela está aberta ao lado da página (computador ≥ 1760 px;
+          chat/ChatFlutuante.tsx) — o conteúdo, o rodapé e a faixa do topo ganham o espaço, nada fica embaixo dela */}
       <main id="conteudo" tabIndex={-1} className="relative flex-1 pr-[var(--sala-lateral,0px)] outline-none">
         {children ?? <Outlet />}
       </main>
       <Footer />
       <RodapeAnuncio />
-      <SalaChatApuracao />
+      <ChatAoVivo />
       <TabBar />
       <BarrasMoveis />
       <BuscaRapida />
@@ -110,15 +112,24 @@ function RodapeAnuncio() {
   );
 }
 
-/** Chat ao vivo moderado nas páginas da apuração (/apuracao e /apuracao/:uf): chunk próprio, carregado só nelas. */
-const SalaDaApuracao = lazy(() => import('../chat/SalaDaApuracao'));
+/**
+ * Chat ao vivo moderado em todas as páginas (popup no computador, alça/folha no celular; fora de /ao-vivo e do Teste
+ * Cego — chat/rotas.ts): chunk próprio, montado só quando o navegador fica ocioso depois da 1ª pintura.
+ */
+const ChatFlutuante = lazy(() => import('../chat/ChatFlutuante'));
 const SigaSintonia = lazy(() => import('../crescimento/SigaSintonia').then((m) => ({ default: m.SigaSintonia })));
-function SalaChatApuracao() {
+function ChatAoVivo() {
   const { pathname } = useLocation();
-  if (!/^\/apuracao(\/[a-z]{2})?\/?$/i.test(pathname)) return null;
+  const [ocioso, setOcioso] = useState(false);
+  useEffect(() => {
+    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
+    const t = setTimeout(() => (ric ? ric(() => setOcioso(true), { timeout: 2500 }) : setOcioso(true)), 1200);
+    return () => clearTimeout(t);
+  }, []);
+  if (!ocioso || !chatNaRota(pathname)) return null;
   return (
     <Suspense fallback={null}>
-      <SalaDaApuracao />
+      <ChatFlutuante />
     </Suspense>
   );
 }
@@ -263,8 +274,10 @@ function Header() {
         {/* I05: "Conexão instável" (status falhando ou relógio do servidor parado), presa sob o cabeçalho em toda página */}
         <FaixaConexaoSobDemanda />
       </div>
-      <FaixaTopo />
-      <AvisoBanner aviso={status.data?.aviso ?? null} />
+      <div className="pr-[var(--sala-lateral,0px)]">
+        <FaixaTopo />
+        <AvisoBanner aviso={status.data?.aviso ?? null} />
+      </div>
     </>
   );
 }

@@ -85,7 +85,9 @@ export function AnuncioNativoPeca({
   );
 
   return (
-    <aside aria-label="Publicidade" className={cn('relative', className)}>
+    // data-chat-evita: o popup do chat não fica por cima de um anúncio (um anunciante não tapa o de outro; a impressão
+    // visível contaria coberta) — chat/regiao.ts
+    <aside aria-label="Publicidade" data-chat-evita className={cn('relative', className)}>
       <LinkAnuncio
         ref={ref}
         anuncio={a}
@@ -166,7 +168,7 @@ export function AnuncioNativoPeca({
 /** Anúncio da casa: o espaço está disponível. Leva a /anuncie (link interno, sem contagem). */
 export function AnuncioDaCasa({ className }: { className?: string }) {
   return (
-    <aside aria-label="Espaço publicitário" className={cn('relative', className)}>
+    <aside aria-label="Espaço publicitário" data-chat-evita className={cn('relative', className)}>
       <Link
         to="/anuncie"
         className="group relative isolate block overflow-hidden rounded-3xl border border-dashed border-line/[2.5] bg-surface/70 p-4 transition-colors hover:border-brand/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand sm:p-6"

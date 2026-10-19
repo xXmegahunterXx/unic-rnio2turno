@@ -1,7 +1,7 @@
 /**
- * Ponte mínima entre a sala do chat (SalaDaApuracao, chunk próprio) e as chamadas "Chat ao vivo" das páginas da
- * apuração (1ª dobra): a sala avisa se está disponível (aberta pela moderação); a chamada só aparece nessa hora e, no
- * clique, pede para a sala abrir (a folha no celular, o painel no computador). Sem dependências: não puxa o chat para o
+ * Ponte mínima entre o chat flutuante (ChatFlutuante, chunk próprio) e as chamadas "Chat ao vivo" das páginas da
+ * apuração (1ª dobra): o chat avisa se a sala está disponível (aberta pela moderação); a chamada só aparece nessa hora e,
+ * no clique, pede para o chat abrir (a folha no celular, o popup no computador). Sem dependências: não puxa o chat para o
  * JS inicial da página.
  */
 import { useSyncExternalStore } from 'react';

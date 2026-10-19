@@ -66,8 +66,10 @@ export function ChamadaPalpite({ variante = 'secao', className }: { variante?: '
 
   if (variante === 'faixa') {
     return (
+      // data-chat-evita: a pílula/o popup do chat não tapam o botão da faixa (fica no canto direito, como eles)
       <section
         aria-labelledby="chamada-palpite-faixa"
+        data-chat-evita
         className={cn('relative isolate overflow-hidden rounded-2xl border border-line bg-surface p-4 shadow-card sm:flex sm:items-center sm:gap-5 sm:p-5', className)}
       >
         <div aria-hidden className="pointer-events-none absolute -right-16 -top-20 -z-10 h-56 w-56 rounded-full bg-brand/[0.12] blur-3xl" />

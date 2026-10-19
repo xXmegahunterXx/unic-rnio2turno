@@ -1,7 +1,7 @@
 /**
  * Chamada "Chat ao vivo" na 1ª dobra das páginas da apuração (ao lado de "N pessoas agora"). Só aparece com a sala
- * aberta pela moderação (chamada.ts) e abre a sala da própria página (folha no celular, painel no computador). No
- * celular, a pílula flutuante recolhe numa alça diante de placares e mapas: esta chamada é a porta visível.
+ * aberta pela moderação (chamada.ts) e abre o chat flutuante (folha no celular, popup no computador). Perto de placares
+ * e mapas a pílula vira uma alça discreta na borda (e o popup do computador se recolhe): esta chamada é a porta visível.
  */
 import { cn } from '@/app/lib/cn';
 import { pedirAbrirChat, useChatDisponivel } from './chamada';

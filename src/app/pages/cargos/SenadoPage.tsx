@@ -174,7 +174,8 @@ export default function SenadoPage() {
       </PageHeader>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
-        <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5" aria-labelledby="mapa-senado">
+        {/* resultado por partido (PT no vermelho de Lula, PL no azul de Flávio): nenhuma peça fixa por cima (§1.5) */}
+        <section data-sem-anuncio-fixo className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5" aria-labelledby="mapa-senado">
           <h2 id="mapa-senado" className="font-display text-[19px] font-semibold tracking-[-0.01em] text-fg">
             Quem ganhou em cada estado
           </h2>
@@ -192,6 +193,7 @@ export default function SenadoPage() {
         </section>
 
         <section
+          data-sem-anuncio-fixo
           className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-7"
           aria-labelledby="composicao-senado"
         >

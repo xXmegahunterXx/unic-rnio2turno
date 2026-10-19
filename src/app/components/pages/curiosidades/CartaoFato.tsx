@@ -42,9 +42,10 @@ export const CartaoFato = forwardRef<HTMLElement, CartaoFatoProps>(function Cart
     nomeArquivo: nomeArquivoFato(fato.id),
     cartao: (formato: FormatoCartao) => <CartaoCuriosidade fato={fato} finalistas={finalistas} formato={formato} />,
   };
-  // com os finalistas (par lado a lado) ou com a ficha de um candidato (nome, número e votos): a barra fixa do rodapé
-  // não passa por cima (ARCHITECTURE §1.5)
-  const comCandidato = !!fato.par || fato.rotuloRota.startsWith('Ver a ficha');
+  // com os finalistas (par lado a lado, ou qualquer fato do tema "Os dois finalistas" — o de empates traz o placar de uma
+  // seção com nomes e números) ou com a ficha de um candidato (nome, número e votos): a barra fixa do rodapé e o popup do
+  // chat não passam por cima (ARCHITECTURE §1.5)
+  const comCandidato = !!fato.par || fato.tema === 'finalistas' || fato.rotuloRota.startsWith('Ver a ficha');
   return (
     <article
       ref={ref}

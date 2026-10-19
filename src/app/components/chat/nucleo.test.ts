@@ -1,6 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import type { MensagemChat } from '@/shared/chat';
-import { alturaFolhaCelular, contarNovas, gerarToken, intervaloConsulta, juntarMensagens, modoPainelDesktop, paginaDaSala, textoPessoasSala } from './nucleo';
+import { INICIO_APURACAO } from '@/shared/constants';
+import {
+  GRACA_INTERACAO_MS,
+  LARGURA_DOCA,
+  LARGURA_MIN_DOCA,
+  POPUP,
+  RESPIRO_ANUNCIO,
+  RESPIRO_POPUP,
+  alturaFolhaCelular,
+  contagemAbertura,
+  contarNovas,
+  cruza,
+  faseChat,
+  geometriaDoca,
+  geometriaPopup,
+  gerarToken,
+  inflar,
+  modoComputador,
+  regiaoAnuncioSala,
+  intervaloConsulta,
+  juntarMensagens,
+  lerPrefGuardada,
+  ondeAbrir,
+  paginaDaSala,
+  popupAberto,
+  prefEfetiva,
+  proximaConsulta,
+  regiaoPilula,
+  textoAbertura,
+  textoPessoasSala,
+} from './nucleo';
+import { chatNaRota } from './rotas';
 
 const msg = (id: string, em: number, texto = id): MensagemChat => ({ id, apelido: 'Ana', texto, em });
 const vazio = { mensagens: [], removidas: [], limpaEm: 0 };
@@ -59,18 +90,144 @@ describe('contarNovas', () => {
   });
 });
 
-describe('intervaloConsulta', () => {
-  it('rápido só com a sala na tela; devagar no botão; mais devagar fechada; recuo com falhas', () => {
+describe('ritmo de consulta', () => {
+  it('rápido só com a sala na tela; minimizado só para o contador (12 s+); fechada raramente; recuo com falhas', () => {
     const aberta = { aberta: true, intervaloS: 2.5 };
     expect(intervaloConsulta(aberta, 'tela')).toBe(2500);
     expect(intervaloConsulta({ aberta: true, intervaloS: 6 }, 'tela')).toBe(6000);
-    expect(intervaloConsulta(aberta, 'fundo')).toBe(10_000);
-    expect(intervaloConsulta({ aberta: false, intervaloS: 2.5 }, 'tela')).toBe(15_000);
-    expect(intervaloConsulta({ aberta: false, intervaloS: 2.5 }, 'fundo')).toBe(30_000);
+    // minimizado: 12 s com o servidor folgado; 4× o intervalo adaptativo quando ele sobe (origem cheia)
+    expect(intervaloConsulta(aberta, 'fundo')).toBe(12_000);
+    expect(intervaloConsulta({ aberta: true, intervaloS: 6 }, 'fundo')).toBe(24_000);
+    // fechada: 20 s com a contagem na tela, 90 s minimizada (o chat está em todas as páginas)
+    expect(intervaloConsulta({ aberta: false, intervaloS: 2.5 }, 'tela')).toBe(20_000);
+    expect(intervaloConsulta({ aberta: false, intervaloS: 2.5 }, 'fundo')).toBe(90_000);
     expect(intervaloConsulta(aberta, 'tela', 2)).toBe(10_000);
     expect(intervaloConsulta(aberta, 'tela', 20)).toBe(60_000);
     // o servidor nunca leva o navegador a consultar mais rápido que 2,5 s
     expect(intervaloConsulta({ aberta: true, intervaloS: 0.1 }, 'tela')).toBe(2500);
+  });
+  it('fechada antes das 17h de 25/10: acorda na hora da abertura (com sorteio de até 15 s), nunca antes do normal', () => {
+    const fechada = { aberta: false, intervaloS: 2.5 };
+    // longe da abertura: o normal
+    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO - 3_600_000, 0.5)).toBe(90_000);
+    // 30 s antes: acorda 1 s depois da hora + sorteio
+    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(31_000);
+    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO - 30_000, 0.999)).toBe(31_000 + 14_985);
+    expect(proximaConsulta(fechada, 'tela', 0, INICIO_APURACAO - 5_000, 1)).toBe(20_000);
+    // aberta, depois da hora ou com falhas: o normal (o recuo não é furado)
+    expect(proximaConsulta({ aberta: true, intervaloS: 2.5 }, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(12_000);
+    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO + 1, 0)).toBe(90_000);
+    expect(proximaConsulta(fechada, 'fundo', 1, INICIO_APURACAO - 30_000, 0)).toBe(60_000);
+    expect(proximaConsulta(null, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(8000);
+  });
+});
+
+describe('fase da sala e abertura', () => {
+  it('demo, conectando, aberta, antes da hora e fechada depois dela', () => {
+    expect(faseChat(null, true, 0)).toBe('demo');
+    expect(faseChat(null, false, 0)).toBe('conectando');
+    expect(faseChat({ aberta: true }, false, INICIO_APURACAO - 1)).toBe('aberta');
+    expect(faseChat({ aberta: false }, false, INICIO_APURACAO - 1)).toBe('antes');
+    expect(faseChat({ aberta: false }, false, INICIO_APURACAO)).toBe('fechada');
+  });
+  it('texto curto da pílula pelo dia em Brasília', () => {
+    // hoje (19/10, segunda) → domingo; 24/10 → amanhã; 25/10 de manhã → hoje; mais de 6 dias → data
+    expect(textoAbertura(Date.UTC(2026, 9, 19, 15, 0))).toBe('abre domingo, 17h');
+    expect(textoAbertura(Date.UTC(2026, 9, 25, 2, 59))).toBe('abre amanhã, 17h'); // 23h59 de 24/10 em Brasília
+    expect(textoAbertura(Date.UTC(2026, 9, 25, 3, 0))).toBe('abre hoje, 17h');
+    expect(textoAbertura(INICIO_APURACAO - 1)).toBe('abre hoje, 17h');
+    expect(textoAbertura(Date.UTC(2026, 9, 18, 15, 0))).toBe('abre 25/10, 17h');
+    expect(textoAbertura(INICIO_APURACAO)).toBeNull();
+  });
+  it('contagem até a abertura', () => {
+    expect(contagemAbertura(INICIO_APURACAO - (2 * 86_400 + 3 * 3600 + 4 * 60 + 5) * 1000)).toMatchObject({ dias: 2, horas: 3, minutos: 4, segundos: 5 });
+    expect(contagemAbertura(INICIO_APURACAO + 10)).toMatchObject({ dias: 0, horas: 0, minutos: 0, segundos: 0, ms: 0 });
+  });
+});
+
+describe('popup do computador', () => {
+  it('canto inferior direito, ~360×540, responsivo à altura; aumentar = mais largo e alto', () => {
+    const g = geometriaPopup({ largura: 1280, altura: 900 }, 64);
+    expect(g).toMatchObject({ largura: 360, altura: 540, right: 1260, bottom: 880, left: 900, top: 340 });
+    // janela baixa (até 800 px): no máximo 420 de altura — não toma 3/4 da tela de um notebook
+    expect(geometriaPopup({ largura: 1280, altura: 640 }, 64).altura).toBe(POPUP.alturaBaixa);
+    expect(geometriaPopup({ largura: 1280, altura: 720 }, 64).altura).toBe(420);
+    expect(geometriaPopup({ largura: 1280, altura: 500 }, 64).altura).toBe(500 - 64 - 16 - 20);
+    // nunca abaixo do mínimo, mesmo em janela muito baixa (até onde cabe)
+    expect(geometriaPopup({ largura: 1024, altura: 300 }, 64).altura).toBe(200);
+    expect(geometriaPopup({ largura: 1366, altura: 768 }, 64).altura).toBe(420);
+    expect(geometriaPopup({ largura: 1366, altura: 801 }, 64).altura).toBe(540);
+    // "aumentar" ignora o teto da janela baixa (a pessoa pediu)
+    expect(geometriaPopup({ largura: 1280, altura: 720 }, 64, true).altura).toBe(720 - 64 - 16 - 20);
+    const grande = geometriaPopup({ largura: 1920, altura: 1080 }, 64, true);
+    expect(grande).toMatchObject({ largura: POPUP.larguraGrande, altura: POPUP.alturaGrande, right: 1896, bottom: 1056 });
+    expect(geometriaPopup({ largura: 1440, altura: 900 }, 64, true).altura).toBe(900 - 64 - 16 - 24);
+    expect(regiaoPilula({ largura: 1280, altura: 900 })).toEqual({ left: 960, top: 836, right: 1260, bottom: 880 });
+  });
+  it('respiro: a área vigiada cresce dos quatro lados (popup 16 px; anúncio 48 px)', () => {
+    const r = { top: 100, left: 100, right: 200, bottom: 200 };
+    expect(inflar(r, RESPIRO_POPUP)).toEqual({ top: 84, left: 84, right: 216, bottom: 216 });
+    expect(RESPIRO_ANUNCIO).toBe(48);
+    // um bloco a 10 px do popup: sem respiro não cruzaria; com respiro, recolhe
+    const bloco = { top: 100, left: 210, right: 400, bottom: 200 };
+    expect(cruza(bloco, r)).toBe(false);
+    expect(cruza(bloco, inflar(r, RESPIRO_POPUP))).toBe(true);
+    // a faixa do anúncio fica no topo da caixa (abaixo do cabeçalho da sala)
+    expect(regiaoAnuncioSala({ top: 340, left: 900, right: 1260, bottom: 880 })).toEqual({ top: 396, bottom: 460, left: 900, right: 1260 });
+  });
+  it('doca só em janela larga (a página espremida não muda de cara)', () => {
+    expect(LARGURA_MIN_DOCA - LARGURA_DOCA).toBeGreaterThanOrEqual(1360);
+    expect(modoComputador(1920)).toBe('doca');
+    expect(modoComputador(LARGURA_MIN_DOCA)).toBe('doca');
+    expect(modoComputador(LARGURA_MIN_DOCA - 1)).toBe('popup');
+    expect(modoComputador(1280)).toBe('popup');
+    expect(geometriaDoca({ largura: 1920, altura: 1080 }, 64)).toEqual({ top: 64, bottom: 1080, right: 1920, left: 1920 - LARGURA_DOCA });
+  });
+  it('cruza só com área de verdade', () => {
+    const r = { top: 100, left: 100, right: 200, bottom: 200 };
+    expect(cruza({ top: 150, left: 150, right: 300, bottom: 300 }, r)).toBe(true);
+    expect(cruza({ top: 200, left: 100, right: 200, bottom: 300 }, r)).toBe(false); // só encosta
+    expect(cruza({ top: 0, left: 0, right: 0, bottom: 0 }, r)).toBe(false); // elemento escondido
+  });
+  it('preferência: padrão aberto com a sala aberta; lembrada; escolha com a sala fechada não vale quando ela abre', () => {
+    expect(lerPrefGuardada('1')).toBe('aberto');
+    expect(lerPrefGuardada('0')).toBe('minimizado');
+    expect(lerPrefGuardada(null)).toBeNull();
+    expect(lerPrefGuardada('x')).toBeNull();
+    expect(prefEfetiva({ sessao: null, guardada: null, aberta: true })).toBe('aberto');
+    expect(prefEfetiva({ sessao: null, guardada: 'minimizado', aberta: true })).toBe('minimizado');
+    expect(prefEfetiva({ sessao: null, guardada: 'aberto', aberta: false })).toBe('minimizado');
+    expect(prefEfetiva({ sessao: { pref: 'aberto', aberta: false }, guardada: null, aberta: false })).toBe('aberto');
+    // abriu para ver a contagem e minimizou; às 17h a sala abre: vale o padrão (aberto)
+    expect(prefEfetiva({ sessao: { pref: 'minimizado', aberta: false }, guardada: null, aberta: true })).toBe('aberto');
+    expect(prefEfetiva({ sessao: { pref: 'minimizado', aberta: true }, guardada: 'aberto', aberta: true })).toBe('minimizado');
+  });
+  it('recolhe sozinho perto de candidato, salvo interação em curso ou recente', () => {
+    const base = { pref: 'aberto' as const, ocupada: false, interagindo: false, msDesdeInteracao: Number.POSITIVE_INFINITY };
+    expect(popupAberto(base)).toBe(true);
+    expect(popupAberto({ ...base, pref: 'minimizado' })).toBe(false);
+    // em cima de bloco com candidato, sem ninguém mexer: recolhe
+    expect(popupAberto({ ...base, ocupada: true })).toBe(false);
+    // mouse em cima ou digitando: fica
+    expect(popupAberto({ ...base, ocupada: true, interagindo: true })).toBe(true);
+    // acabou de mexer: fica a folga (curta) e depois recolhe
+    expect(popupAberto({ ...base, ocupada: true, msDesdeInteracao: GRACA_INTERACAO_MS - 1 })).toBe(true);
+    expect(popupAberto({ ...base, ocupada: true, msDesdeInteracao: GRACA_INTERACAO_MS })).toBe(false);
+    expect(GRACA_INTERACAO_MS).toBeLessThanOrEqual(3000);
+  });
+  it('pedido para abrir com o canto em cima de candidato: folha central (nunca por cima de um lado só do placar)', () => {
+    expect(ondeAbrir(false)).toBe('canto');
+    expect(ondeAbrir(true)).toBe('central');
+  });
+});
+
+describe('rotas com o chat flutuante', () => {
+  it('todas as páginas do site menos /ao-vivo, o Teste Cego e o Duelo', () => {
+    for (const p of ['/', '/apuracao', '/apuracao/sp', '/apuracao/sp/71072', '/governadores', '/palpite', '/candidato/123', '/privacidade', '/streamers', '/cenarios', '/anuncie'])
+      expect(chatNaRota(p)).toBe(true);
+    for (const p of ['/ao-vivo', '/ao-vivo/', '/teste', '/teste/resultado', '/duelo/abc']) expect(chatNaRota(p)).toBe(false);
+    // só o começo do caminho decide
+    expect(chatNaRota('/curiosidades/teste')).toBe(true);
   });
 });
 
@@ -94,18 +251,6 @@ describe('utilidades', () => {
     expect(paginaDaSala('/apuracao/consulta')).toBeNull();
     expect(paginaDaSala('/apuracao/sp/71072')).toBeNull();
     expect(paginaDaSala('/')).toBeNull();
-  });
-  it('painel do desktop: empurra a página só onde o layout continua o mesmo', () => {
-    // estreito (< 1200): folha inferior centralizada — empurrar encavala o placar e uma gaveta cobriria só um lado dele
-    expect(modoPainelDesktop(1024, 'nacional')).toBe('folha');
-    expect(modoPainelDesktop(1100, 'nacional')).toBe('folha');
-    expect(modoPainelDesktop(1280, 'nacional')).toBe('doca');
-    // duas colunas: a gaveta (não modal) fica por cima da coluna do mapa
-    expect(modoPainelDesktop(1440, 'nacional')).toBe('gaveta');
-    expect(modoPainelDesktop(1920, 'nacional')).toBe('doca');
-    expect(modoPainelDesktop(1100, 'uf')).toBe('doca');
-    expect(modoPainelDesktop(1440, 'uf')).toBe('doca');
-    expect(modoPainelDesktop(1024, 'uf')).toBe('folha');
   });
 });
 

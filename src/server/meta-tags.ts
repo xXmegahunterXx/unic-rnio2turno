@@ -403,6 +403,22 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       canonico: '/palpite',
     });
   }
+  // Desafio do palpite entre amigos (sem dinheiro): apelido e palpite vão depois do "#" e nunca chegam aqui; link pessoal
+  if (s0 === 'palpite' && seg.length === 2 && s1 === 'desafio') {
+    const encerrados = (tentar(() => ctx.agora?.()) ?? Date.now()) >= INICIO_DIA_VOTACAO;
+    return pagina({
+      titulo: `Desafio do palpite · 2º turno · ${APP_NAME}`,
+      descricao: encerrados
+        ? 'Desafio do palpite entre amigos: com o resultado oficial do TSE, veja quem chegou mais perto. Os palpites ficam nos aparelhos e nos links de cada um. Sem dinheiro, só pela graça.'
+        : 'Te desafiaram no palpite do 2º turno: crave o percentual dos votos válidos de cada candidato até as 23h59 de 24/10 e mande o seu link de volta. Com o resultado oficial do TSE, sai quem chegou mais perto. Sem dinheiro, só pela graça.',
+      imagem: '/api/og/desafio.png',
+      imagemAlt: 'Desafio do palpite · Sintonia',
+      // v2: texto da imagem neutro de fase (correção final); a versão nova fura o cache de 24 h da CDN
+      imagemVersao: 'v2',
+      noindex: true,
+      canonico: '/palpite/desafio',
+    });
+  }
   // ---- chat ao vivo moderado (src/app/pages/chat/AoVivoPage.tsx) ------------------------------------------------------
   if (s0 === 'ao-vivo' && seg.length === 1) {
     return pagina({

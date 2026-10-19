@@ -132,6 +132,12 @@ describe('chat: neutralidade (os dois lados têm o mesmo tratamento)', () => {
     ['Lula e 13', 'Flávio e 22', 'propaganda'],
     ['agora e Lula, nunca Flávio', 'agora e Flávio, nunca Lula', 'propaganda'],
     ['é Lula', 'é Flávio', 'propaganda'],
+    // correção final: os pares que faltavam
+    ['seu mortadela', 'seu coxinha', 'ofensa'],
+    ['fora Lula', 'fora Bolso', 'propaganda'],
+    ['nunca mais PT', 'nunca mais Bolso', 'propaganda'],
+    ['Lula lá', 'Bolso lá', 'propaganda'],
+    ['Lula descondenado', 'Bolsonaro inelegível', 'ok'],
   ];
   it.each(pares)('%s × %s', (a, b, m) => {
     expect(motivo(a)).toBe(m);
@@ -171,6 +177,32 @@ describe('chat: apelido', () => {
   it('sem candidato, partido, número de urna, moderação ou link', () => {
     for (const a of ['Lula fan', 'bolsonaro2026', 'PT de coração', 'pl', 'Petista raiz', 'joao22', 'Maria_13', 'Moderador', 'TSE oficial', 'site.com', 'Fulano Gado'])
       expect(ok(a), a).toBe(false);
+  });
+  it('fraude nas urnas não vira apelido (aparece em destaque no desafio do palpite)', () => {
+    for (const a of ['Urna fraudada', 'Fraude', 'Eleição roubada', 'Urna hackeada', 'Fr4ude']) expect(ok(a), a).toBe(false);
+    for (const a of ['Urna 2026', 'Apuração SP', 'Mesária']) expect(ok(a), a).toBe(true);
+  });
+  it('letras parecidas e letras soltas com o nome dos finalistas (os dois lados igual)', () => {
+    const pares: [string, string][] = [
+      ['Iula', 'FIávio Bolsonaro'],
+      ['1ula', 'B0lsonar0'],
+      ['L u l a', 'B o l s o n a r o'],
+      ['Lu la', 'Bolso naro'],
+      ['L.u.l.a', 'B.o.l.s.o.n.a.r.o'],
+      ['Lulão', 'Bolso'],
+      ['Barba', 'Mito'],
+      ['Presidiário', 'Inelegível'],
+      ['Descondenado', 'Condenado'],
+      ['Mortadela', 'Coxinha'],
+      ['Nunca mais PT', 'Fora Bolso'],
+      ['Lula fan', 'Fla vio Bolso'],
+    ];
+    for (const [x, y] of pares) {
+      expect(ok(x), x).toBe(false);
+      expect(ok(y), y).toBe(false);
+    }
+    // nomes comuns que só contêm as letras continuam passando
+    for (const a of ['Talula', 'Lu Lacerda', 'Tia Lu', 'Isa', 'Ivo', 'Iara', 'Paula', 'Luana', 'Ana Lu', 'Raul']) expect(ok(a), a).toBe(true);
   });
   it('nomes do dataset (passados pelo servidor)', () => {
     const nomes = prepararNomesApelido(['Omar Aziz', 'Celina Leão']);

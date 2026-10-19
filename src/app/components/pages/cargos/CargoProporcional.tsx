@@ -101,7 +101,11 @@ export function VisaoComposicao({
   const maioria = Math.floor(comp.total / 2) + 1;
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-5">
-      <section className="min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)] lg:col-span-7">
+      {/* resultado por partido (PT no vermelho de Lula, PL no azul de Flávio): nenhuma peça fixa por cima (§1.5) */}
+      <section
+        data-sem-anuncio-fixo
+        className="min-w-0 self-start rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)] lg:col-span-7"
+      >
         <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <h2 className="font-display text-[19px] font-semibold tracking-[-0.01em] text-fg">{titulo}</h2>
           <span className="text-[12.5px] text-fg-muted">Uma bolinha por cadeira · maior bancada à esquerda</span>
@@ -131,7 +135,7 @@ export function VisaoComposicao({
           <AvisoTse className="mt-4">{textoReprocessamento(comp.avisos[0].uf, comp.avisos[0].aviso)}</AvisoTse>
         ) : null}
       </section>
-      <section className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5">
+      <section data-sem-anuncio-fixo className="min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-6 lg:col-span-5">
         <h2 className="mb-3 font-display text-[19px] font-semibold tracking-[-0.01em] text-fg">Bancadas</h2>
         <Bancadas
           bancadas={comp.bancadas}

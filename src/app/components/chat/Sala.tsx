@@ -1,28 +1,44 @@
 /**
  * "Sala da apuração": o chat ao vivo moderado (mensagens, fixada, reações, envio e regras sempre à vista). Usada no
- * painel lateral do desktop, na folha inferior do celular e na página /ao-vivo — a moldura (posição, altura, fechar)
- * é de quem usa; aqui fica o conteúdo, ocupando a altura toda que receber.
+ * popup do computador (variante 'painel'), na folha inferior do celular e na página /ao-vivo — a moldura (posição,
+ * altura, minimizar) é de quem usa (ChatFlutuante, AoVivoPage); aqui fica o conteúdo, ocupando a altura toda que receber.
+ * Antes de abrir (fechada antes das 17h de 25/10), a sala mostra a contagem até a abertura e as regras.
  *
  * Regras de neutralidade: nada aqui usa cor de candidato (apelidos em tons neutros); reações são neutras e nunca
  * ligadas a candidato; a única publicidade é "Sala oferecida por" (OferecimentoChat), numa faixa própria: no topo da sala
- * (painel e página) ou, na folha do celular, no PÉ, logo acima do campo — longe do placar que fica à vista acima da folha.
+ * (popup e página) ou, na folha do celular, no PÉ, logo acima do campo — longe do placar que fica à vista acima da folha.
+ * `semAnuncio`: o popup aberto por cima de um bloco com candidato (a pessoa acabou de abri-lo ali) fica sem a faixa.
  *
  * Folha do celular (meta: ≥ 6 mensagens à vista em 390×844): subtítulo curto, campo "Comentar…" sempre à mostra (o
  * apelido é pedido só no 1º envio), reações e "Regras da sala" numa linha só, ajuda do apelido só com erro.
  */
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AVISO_REGISTRO_CHAT, EMOJI_REACAO, LIMITES_CHAT, REACOES, REGRAS_CHAT, REGRAS_CHAT_CURTA, ROTULO_REACAO, avaliarApelido, type MensagemChat, type ReacaoId } from '@/shared/chat';
-import { fmtHora } from '@/shared/format';
+import { fmtHora, fmtInt } from '@/shared/format';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
 import { Spinner } from '@/app/ui/Button';
 import { OferecimentoChat } from '@/app/components/anuncios/OferecimentoChat';
-import { fmtReacao, textoPessoasSala } from './nucleo';
-import { apelidoSalvo, deltaReacoes, denunciarMensagem, enviarMensagem, marcarVisto, reagir, salvarApelido, useSala, type EstadoSala } from './sala';
+import { contagemAbertura, faseChat, fmtReacao, paginaDaSala, textoAbertura, textoPessoasSala } from './nucleo';
+import {
+  agoraServidor,
+  apelidoSalvo,
+  deltaReacoes,
+  denunciarMensagem,
+  enviarMensagem,
+  guardarRascunho,
+  lerRascunho,
+  marcarParticipacao,
+  marcarVisto,
+  reagir,
+  salvarApelido,
+  useSala,
+  type EstadoSala,
+} from './sala';
 
 export type VarianteSala = 'painel' | 'folha' | 'pagina';
 
@@ -47,42 +63,64 @@ function IconeAlfinete({ size = 15, className }: { size?: number; className?: st
 export function Sala({
   variante,
   acoes,
+  compacta = false,
+  semAnuncio = false,
   className,
 }: {
   variante: VarianteSala;
-  /** botões do canto do cabeçalho (expandir, fechar…) */
+  /** botões do canto do cabeçalho (expandir, minimizar, fechar…) */
   acoes?: ReactNode;
+  /** pé compacto (campo + reações + "Regras da sala" numa linha): popup em janela baixa */
+  compacta?: boolean;
+  /** sem a faixa "Sala oferecida por" (popup aberto por cima de bloco com candidato) */
+  semAnuncio?: boolean;
   className?: string;
 }) {
   const s = useSala('tela');
+  // folha (aberta pelo toque) e página /ao-vivo: a pessoa escolheu ver a sala → sinal de presença. O popup do computador,
+  // que aparece aberto sozinho, só conta quando a pessoa mexe nele (ChatFlutuante)
+  useEffect(() => {
+    if (variante !== 'painel') marcarParticipacao();
+  }, [variante]);
   // /ao-vivo em tela pequena (celular, ou altura ≤ 800): o mesmo pé compacto da folha — campo sempre à vista, apelido
   // pedido no envio, regras numa linha e fixada em 1 linha — para sobrarem mensagens à vista (eram 1–2 em 360×740)
-  const compactaPagina = useMediaQuery('(max-width: 639px), (max-height: 800px)') && variante === 'pagina';
+  const compactaPagina = (useMediaQuery('(max-width: 639px), (max-height: 800px)') && variante === 'pagina') || compacta;
   const pagina = variante === 'pagina';
   const folha = variante === 'folha';
+  // fechada antes das 17h de 25/10: contagem e regras no lugar das mensagens (e o pé sem a linha de regras repetida)
+  const antes = faseChat(s.pub, s.indisponivel, agoraServidor()) === 'antes';
+  const anuncio = !!s.pub?.aberta && !semAnuncio;
   return (
     <section aria-label="Sala da apuração: chat ao vivo" className={cn('relative flex h-full min-h-0 flex-col bg-surface', className)}>
-      <Cabecalho s={s} variante={variante} acoes={acoes} />
+      <Cabecalho s={s} variante={variante} acoes={acoes} antes={antes} />
       {s.indisponivel ? (
         <Desligada pagina={pagina} />
       ) : (
         <>
-          {s.pub?.aberta && !folha ? <OferecimentoChat compacta={variante !== 'pagina'} /> : null}
+          {anuncio && !folha ? <OferecimentoChat compacta={variante !== 'pagina'} /> : null}
           {s.pub?.fixada ? <Fixada texto={s.pub.fixada.texto} variante={variante} umaLinha={compactaPagina} /> : null}
-          <Lista s={s} pagina={pagina} />
-          {s.pub?.aberta && folha ? <OferecimentoChat compacta noPe /> : null}
-          <Rodape s={s} variante={variante} compacta={compactaPagina} />
+          {antes ? (
+            // contagem e regras do topo (fora da lista de mensagens, que acompanha o fim)
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+              <AntesDeAbrir pagina={pagina} />
+            </div>
+          ) : (
+            <Lista s={s} pagina={pagina} />
+          )}
+          {anuncio && folha ? <OferecimentoChat compacta noPe /> : null}
+          {antes && !pagina ? null : <Rodape s={s} variante={variante} compacta={compactaPagina} />}
         </>
       )}
     </section>
   );
 }
 
-function Cabecalho({ s, variante, acoes }: { s: EstadoSala; variante: VarianteSala; acoes?: ReactNode }) {
+function Cabecalho({ s, variante, acoes, antes }: { s: EstadoSala; variante: VarianteSala; acoes?: ReactNode; antes: boolean }) {
   const pessoas = s.pub?.aberta ? textoPessoasSala(s.pub.pessoas) : null;
   const aberta = !!s.pub?.aberta;
   const folha = variante === 'folha';
-  const sub = s.indisponivel ? 'Chat ao vivo' : !s.pub ? 'Conectando…' : aberta ? (
+  const abre = antes ? textoAbertura(agoraServidor()) : null;
+  const sub = s.indisponivel ? 'Chat ao vivo' : !s.pub ? 'Conectando…' : abre ? `${abre[0].toUpperCase()}${abre.slice(1)}` : aberta ? (
     folha ? (
       // celular: só o número (a linha é curta; "moderada" está nas regras)
       pessoas ? <span className="num">{pessoas}</span> : 'ao vivo'
@@ -129,10 +167,10 @@ function Cabecalho({ s, variante, acoes }: { s: EstadoSala; variante: VarianteSa
   );
 }
 
-/** Mensagem fixada pela moderação (na folha do celular, recolhida em 1 linha; toque abre). */
+/** Mensagem fixada pela moderação (na folha do celular e no popup, recolhida em 1 linha; toque abre). */
 function Fixada({ texto, variante, umaLinha }: { texto: string; variante: VarianteSala; umaLinha?: boolean }) {
   const [aberta, setAberta] = useState(false);
-  const folha = variante === 'folha' || !!umaLinha;
+  const folha = variante !== 'pagina' || !!umaLinha;
   const conteudo = (
     <>
       <IconeAlfinete className="mt-0.5 text-brand-fg" />
@@ -298,6 +336,71 @@ function Vazia({ fechada, bloqueio, falhou }: { fechada: boolean; bloqueio: stri
             Comente a apuração com quem está acompanhando agora. Sala moderada.
           </p>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Sala fechada antes das 17h de 25/10: a contagem até a abertura (relógio do servidor) e, fora da página /ao-vivo (que
+ * tem as regras ao lado), as regras da sala inteiras. Nas páginas da apuração, o topo da página já tem a contagem grande:
+ * aqui fica só a frase (duas contagens lado a lado não ajudam).
+ */
+function AntesDeAbrir({ pagina }: { pagina: boolean }) {
+  const { pathname } = useLocation();
+  const semCaixas = !pagina && !!paginaDaSala(pathname);
+  const [agora, setAgora] = useState(agoraServidor);
+  const c = contagemAbertura(agora);
+  // menos de 1 hora: segundos; antes, minutos bastam (atualiza a cada 10 s)
+  const perto = c.ms < 3_600_000;
+  useEffect(() => {
+    const t = window.setInterval(() => setAgora(agoraServidor()), perto ? 1000 : 10_000);
+    return () => window.clearInterval(t);
+  }, [perto]);
+  const abre = textoAbertura(agora);
+  const partes: [number, string][] = perto
+    ? [
+        [c.minutos, 'min'],
+        [c.segundos, 's'],
+      ]
+    : [
+        [c.dias, c.dias === 1 ? 'dia' : 'dias'],
+        [c.horas, 'h'],
+        [c.minutos, 'min'],
+      ];
+  return (
+    <div className={cn('flex min-h-full flex-col justify-center text-center', pagina ? 'px-6 py-10' : 'px-4 py-5')}>
+      <p className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-fg-subtle">{semCaixas ? 'A sala abre no domingo' : 'A sala abre em'}</p>
+      <div className={cn('mt-2.5 flex items-stretch justify-center gap-2', semCaixas && 'hidden')} role="timer" aria-live="off" aria-label={abre ? `A sala ${abre}` : 'A sala abre em instantes'}>
+        {partes.map(([n, rotulo]) => (
+          <span key={rotulo} className="flex min-w-[64px] flex-col items-center rounded-2xl border border-line bg-surface-2/70 px-2.5 py-2">
+            <span className="num font-display text-[26px] font-semibold leading-none tracking-[-0.02em] text-fg">{fmtInt(n)}</span>
+            <span className="mt-1 text-[11px] font-medium text-fg-muted">{rotulo}</span>
+          </span>
+        ))}
+      </div>
+      <p className="mx-auto mt-3 max-w-[19rem] text-pretty text-[13px] leading-relaxed text-fg-muted">
+        Domingo, 25 de outubro, às 17h (horário de Brasília), quando terminar a votação. Antes disso, a sala não recebe
+        mensagens.
+      </p>
+      {pagina ? null : (
+        <div className="mt-4 rounded-2xl border border-line bg-surface p-3.5 text-left">
+          <p className="text-[12.5px] font-semibold text-fg">Regras da sala</p>
+          <ul className="mt-1.5 space-y-1 text-[12.5px] leading-snug text-fg-muted">
+            {REGRAS_CHAT.map((r) => (
+              <li key={r} className="flex gap-2">
+                <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-fg-subtle" />
+                <span className="text-pretty">{r}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[12px] leading-snug text-fg-subtle">
+            Reações (🔥 😮 👏 👀) só do momento, sem relação com candidato. Mensagem errada? Denuncie em ⋯.{' '}
+            <Link to="/ao-vivo" className="font-medium text-fg-muted underline decoration-line underline-offset-2 hover:text-fg">
+              Página do chat
+            </Link>
+          </p>
+        </div>
       )}
     </div>
   );
@@ -476,6 +579,9 @@ function useContagem(): [number, (s: number) => void] {
 function Rodape({ s, variante, compacta }: { s: EstadoSala; variante: VarianteSala; compacta?: boolean }) {
   const pagina = variante === 'pagina';
   const aberta = !!s.pub?.aberta;
+  // popup do computador: o pé da folha (campo sempre à vista, apelido pedido no envio — sobra altura para as mensagens)
+  // e, com altura, as regras curtas sempre à vista
+  if (variante === 'painel') return <RodapeFolha s={s} aberta={aberta} regras={!compacta} />;
   if (variante === 'folha' || compacta) return <RodapeFolha s={s} aberta={aberta} semTelaCheia={pagina} />;
   return (
     <div className={cn('shrink-0 border-t border-line bg-surface', pagina ? 'px-5 pb-4 pt-3' : 'px-3 pb-[max(0.625rem,env(safe-area-inset-bottom))] pt-2')}>
@@ -496,8 +602,11 @@ function Rodape({ s, variante, compacta }: { s: EstadoSala; variante: VarianteSa
   );
 }
 
-/** Pé da folha do celular: campo de mensagem e, numa linha só, reações + "Regras da sala" + tela cheia. */
-function RodapeFolha({ s, aberta, semTelaCheia }: { s: EstadoSala; aberta: boolean; semTelaCheia?: boolean }) {
+/**
+ * Pé da folha do celular (e do popup do computador): campo de mensagem e, numa linha só, reações + "Regras da sala" +
+ * tela cheia. `regras`: as regras curtas também por extenso, embaixo (popup com altura).
+ */
+function RodapeFolha({ s, aberta, semTelaCheia, regras }: { s: EstadoSala; aberta: boolean; semTelaCheia?: boolean; regras?: boolean }) {
   const [trocar, setTrocar] = useState(0);
   return (
     <div className="relative shrink-0 border-t border-line bg-surface px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
@@ -506,6 +615,12 @@ function RodapeFolha({ s, aberta, semTelaCheia }: { s: EstadoSala; aberta: boole
         {aberta ? <Reacoes s={s} compacta /> : null}
         <RegrasCompactas registro={!!s.pub?.registro} onTrocarApelido={aberta ? () => setTrocar((n) => n + 1) : undefined} semTelaCheia={semTelaCheia} />
       </div>
+      {regras ? (
+        <p className="mt-1.5 text-pretty text-[11px] leading-snug text-fg-subtle">
+          {REGRAS_CHAT_CURTA}
+          {s.pub?.registro ? ` ${AVISO_REGISTRO_CHAT}` : null}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -574,7 +689,12 @@ function Compositor({ s, lentoS, compacto = false, trocarApelido = 0 }: { s: Est
     setEditandoApelido(true);
   }, [trocarApelido]);
   const [rascunhoApelido, setRascunhoApelido] = useState(apelido);
-  const [texto, setTexto] = useState('');
+  // rascunho na memória da aba: o popup recolhe sozinho perto de candidato (e desmonta o campo) — o texto volta igual
+  const [texto, setTextoLocal] = useState(lerRascunho);
+  const setTexto = (t: string) => {
+    guardarRascunho(t);
+    setTextoLocal(t);
+  };
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [resta, esperar] = useContagem();

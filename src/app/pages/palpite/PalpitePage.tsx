@@ -8,16 +8,20 @@
  *    e o cartão do resultado. Números simulados nunca entram na comparação.
  *  - Link recebido (`/palpite#<código>`): mostra o palpite de quem mandou e compara com o seu (só os dois — como o
  *    Duelo do Teste Cego). O código vai depois do "#": não chega a servidor algum.
+ *  - Desafio do palpite entre amigos, SEM DINHEIRO (`SecaoDesafio`, núcleo em components/palpite/desafio.ts): apelido +
+ *    link de desafio; quem abre `/palpite/desafio#<código>` vê "Fulano te desafiou", crava o seu e manda o link de volta.
+ *    Antes do resultado oficial, a lista do desafio não mostra número de ninguém; com a apuração concluída, o ranking.
  *
  * Regras (ARCHITECTURE §1): nada é enviado ao servidor nem somado ao de outras pessoas (agregado de palpites = enquete,
  * Lei 9.504/97, art. 33, § 5º); textos neutros e simétricos, ordem da urna, cores dos dados, sem foto (números
  * hipotéticos; o número de urna não vai nos cartões nem no texto). Publicidade: "Palpite oferecido por" (formato 'teste') no
  * FIM da página, longe do divisor e dos números; nos cartões, nada (OFERECIMENTO_COM_CANDIDATOS desligado).
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
+import type { Candidate } from '@/shared/types';
 import { escolherAnuncio } from '@/shared/anuncios-escolha';
-import { OFERECIMENTO_COM_CANDIDATOS } from '@/shared/oferecimento';
+import { OFERECIMENTO_COM_CANDIDATOS, OFERECIMENTO_RANKING_DESAFIO } from '@/shared/oferecimento';
 import { fmtDataHora, fmtPct } from '@/shared/format';
 import { useMeta, useNacional, useStatus } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
@@ -35,6 +39,7 @@ import { OferecimentoPalpite } from '@/app/components/anuncios/OferecimentoPalpi
 import { BotaoCompartilhar } from '@/app/components/share/BotaoCompartilhar';
 import { BotaoLembrete, lembreteDisponivel } from '@/app/components/pages/home/BotaoLembrete';
 import { CartaoPalpite } from '@/app/components/palpite/CartaoPalpite';
+import { RANKING_TEM_CANDIDATO } from '@/app/components/palpite/CartaoDesafio';
 import { useAgoraServidor, useFinalistas, usePalpiteSalvo } from '@/app/components/palpite/estado';
 import {
   FIM_PALPITES,
@@ -54,6 +59,9 @@ import {
   type ResultadoOficial,
 } from '@/app/components/palpite/nucleo';
 import { BarraPalpite, LadosPalpite, type FinalistasPalpite } from '@/app/components/palpite/Pecas';
+import { SecaoDesafio, irParaDesafio } from '@/app/components/palpite/SecaoDesafio';
+import { useDesafio, type DesafioApp } from '@/app/components/palpite/desafioEstado';
+import { CAMINHO_DESAFIO, SEM_DINHEIRO, avisoInclusao, desafioDoHash, hashDesafioInvalido, type Participante } from '@/app/components/palpite/desafio';
 import { SliderPalpite } from '@/app/components/palpite/SliderPalpite';
 import {
   HASHTAGS_PALPITE,
@@ -67,22 +75,41 @@ import {
   textoResultadoPalpite,
 } from '@/app/components/palpite/textos';
 
+/** Nomes dos finalistas para o filtro de apelido do desafio (além dos fixos do chat). */
+const nomesFinalistas = (f: readonly Candidate[] | null) => (f ? f.flatMap((c) => [c.nomeUrna, c.nome]) : []);
+
 export default function PalpitePage() {
-  useTitulo('Palpite do 2º turno');
+  const { pathname, hash } = useLocation();
+  // /palpite/desafio (com ou sem o código depois do "#"): a mesma página, com a chamada do desafio
+  const emDesafio = pathname.replace(/\/+$/, '').toLowerCase() === CAMINHO_DESAFIO;
+  useTitulo(emDesafio ? 'Desafio do palpite' : 'Palpite do 2º turno');
   const metaQ = useMeta();
   const finalistas = useFinalistas();
   const agora = useAgoraServidor();
   const aberto = prazoPalpite(agora) === 'aberto';
   const votacao = fasePalpite(agora) === 'votacao';
   const [salvo, gravar] = usePalpiteSalvo();
+  const desafio = useDesafio();
+  const nomes = useMemo(() => nomesFinalistas(finalistas), [finalistas]);
+  const convite = useMemo(() => (emDesafio ? desafioDoHash(hash, nomes) : null), [emDesafio, hash, nomes]);
   return (
     <>
-      <Hero finalistas={finalistas} aberto={aberto} temPalpite={!!salvo} />
+      <Hero finalistas={finalistas} aberto={aberto} temPalpite={!!salvo} desafio={emDesafio ? { de: convite?.apelido ?? null } : null} />
       <Container className="pb-10">
         {metaQ.isError ? (
           <ErrorState onRetry={() => metaQ.refetch()} className="py-8" />
         ) : finalistas ? (
-          <Conteudo finalistas={finalistas} agora={agora} aberto={aberto} votacao={votacao} salvo={salvo} gravar={gravar} />
+          <Conteudo
+            finalistas={finalistas}
+            agora={agora}
+            aberto={aberto}
+            votacao={votacao}
+            salvo={salvo}
+            gravar={gravar}
+            desafio={desafio}
+            emDesafio={emDesafio}
+            convite={convite}
+          />
         ) : (
           <LoadingState variant="placar" className="pt-2" />
         )}
@@ -117,7 +144,19 @@ function AvisoIndividual() {
   );
 }
 
-function Hero({ finalistas, aberto, temPalpite }: { finalistas: FinalistasPalpite | null; aberto: boolean; temPalpite: boolean }) {
+function Hero({
+  finalistas,
+  aberto,
+  temPalpite,
+  desafio,
+}: {
+  finalistas: FinalistasPalpite | null;
+  aberto: boolean;
+  temPalpite: boolean;
+  /** rota do desafio: `de` = apelido de quem mandou o link (null: sem código válido) */
+  desafio: { de: string | null } | null;
+}) {
+  if (desafio) return <HeroDesafio finalistas={finalistas} aberto={aberto} de={desafio.de} />;
   return (
     <section aria-labelledby="palpite-titulo" className="relative isolate overflow-hidden">
       {finalistas ? (
@@ -166,6 +205,100 @@ function Hero({ finalistas, aberto, temPalpite }: { finalistas: FinalistasPalpit
   );
 }
 
+/** Topo de /palpite/desafio: "Fulano te desafiou" (ou o convite geral, sem código válido). */
+function HeroDesafio({ finalistas, aberto, de }: { finalistas: FinalistasPalpite | null; aberto: boolean; de: string | null }) {
+  return (
+    <section aria-labelledby="palpite-titulo" className="relative isolate overflow-hidden">
+      {finalistas ? (
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10" style={{ background: brilhoDuplo([finalistas[0].cor, finalistas[1].cor], 0.1, '55% 70%') }} />
+      ) : null}
+      <Container className="pb-4 pt-4 sm:pb-8 sm:pt-10">
+        <span className="inline-flex h-8 items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-fg">
+          <Icon name="usuarios" size={15} className="text-brand-fg" />
+          Desafio do palpite
+        </span>
+        <h1
+          id="palpite-titulo"
+          // tela baixa: como no /palpite, o divisor e os "+0,1" precisam caber na 1ª tela
+          className="mt-3 text-balance break-words font-display text-[30px] font-semibold leading-[1.02] tracking-[-0.045em] text-fg min-[400px]:text-[34px] sm:mt-5 sm:text-[52px] lg:text-[60px] [@media(max-height:760px)_and_(max-width:639px)]:text-[26px] [@media(max-height:700px)_and_(max-width:639px)]:mt-2.5 [@media(max-height:700px)_and_(max-width:639px)]:text-[24px]"
+        >
+          {de ? (
+            <>
+              <span className="text-grad">{de}</span> te desafiou no palpite do 2º turno
+            </>
+          ) : (
+            <>
+              <span className="text-grad">Desafio</span> do palpite entre amigos
+            </>
+          )}
+        </h1>
+        <p
+          className={cn(
+            'mt-2.5 max-w-[44rem] text-pretty text-[15px] leading-relaxed text-fg-muted sm:mt-4 sm:text-[18px]',
+            aberto && '[@media(max-height:760px)_and_(max-width:639px)]:hidden',
+          )}
+        >
+          {aberto ? (
+            <>
+              {/* celular: a versão curta (o divisor precisa aparecer logo); a partir de 640 px, a inteira */}
+              <span className="sm:hidden">Crave o seu palpite até as 23h59 de 24/10 e mande o seu link de volta. {SEM_DINHEIRO}.</span>
+              <span className="hidden sm:inline">
+                Crave o % dos votos válidos de cada candidato a presidente até as 23h59 de 24/10 e mande o seu link de volta. Com o resultado oficial
+                do TSE, aparece quem chegou mais perto. {SEM_DINHEIRO}.
+              </span>
+            </>
+          ) : (
+            `Os palpites fecharam às 23h59 de 24/10, véspera da votação. Com o resultado oficial do TSE, o ranking do desafio aparece neste aparelho. ${SEM_DINHEIRO}.`
+          )}
+        </p>
+        <AvisoIndividual />
+      </Container>
+    </section>
+  );
+}
+
+/**
+ * Abre o link de desafio UMA vez por código (o efeito do StrictMode roda duas vezes): inclui quem mandou no "Meu
+ * desafio" deste aparelho e devolve o aviso. Espera o status (relógio do servidor) para decidir o prazo; sem status
+ * (erro de rede), o relógio do aparelho.
+ */
+function useAbrirConvite(convite: Participante | null, desafio: DesafioApp, agora: number, relogioPronto: boolean) {
+  const [aviso, setAviso] = useState<ReturnType<typeof avisoInclusao> | null>(null);
+  const feito = useRef<string | null>(null);
+  const chave = convite ? `${convite.id}|${convite.a}|${convite.em}|${convite.apelido}` : null;
+  useEffect(() => {
+    if (!convite || !chave || !relogioPronto || feito.current === chave) return;
+    feito.current = chave;
+    const jaTinha = !!desafio.estado.eu;
+    const r = desafio.incluir(convite, agora);
+    setAviso(avisoInclusao(r, convite.apelido, agora >= FIM_PALPITES, jaTinha));
+    // só quando chega um código novo (ou o relógio do servidor): `agora` muda a cada segundo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chave, relogioPronto]);
+  return aviso;
+}
+
+function AvisoDesafio({ aviso }: { aviso: ReturnType<typeof avisoInclusao> }) {
+  const alerta = aviso.tom === 'alerta';
+  const ok = aviso.tom === 'ok';
+  return (
+    <p
+      role="status"
+      className={cn(
+        'flex items-start gap-2.5 rounded-2xl border px-3.5 py-2.5 text-[13.5px] leading-snug text-fg sm:py-3 sm:text-[14px]',
+        alerta ? 'border-alert/40 bg-alert/10' : ok ? 'border-ok/40 bg-ok/10' : 'border-brand/30 bg-brand/[0.06]',
+      )}
+    >
+      <Icon
+        name={alerta ? 'alerta' : ok ? 'check-circulo' : 'usuarios'}
+        size={18}
+        className={cn('mt-px shrink-0', alerta ? 'text-alert-fg' : ok ? 'text-ok-fg' : 'text-brand-fg')}
+      />
+      {aviso.texto}
+    </p>
+  );
+}
+
 function Conteudo({
   finalistas,
   agora,
@@ -173,6 +306,9 @@ function Conteudo({
   votacao,
   salvo,
   gravar,
+  desafio,
+  emDesafio,
+  convite,
 }: {
   finalistas: FinalistasPalpite;
   agora: number;
@@ -181,11 +317,20 @@ function Conteudo({
   votacao: boolean;
   salvo: Palpite | null;
   gravar: (p: Palpite) => boolean;
+  desafio: DesafioApp;
+  /** rota /palpite/desafio */
+  emDesafio: boolean;
+  /** quem mandou o link de desafio (código válido depois do "#") */
+  convite: Participante | null;
 }) {
   const { hash } = useLocation();
-  const recebido = palpiteDoHash(hash);
-  const linkQuebrado = hashInvalido(hash);
-  const status = useStatus().data;
+  // no /palpite, o "#" é um palpite recebido; no /palpite/desafio, um link de desafio
+  const recebido = emDesafio ? null : palpiteDoHash(hash);
+  const linkQuebrado = emDesafio ? false : hashInvalido(hash);
+  const desafioQuebrado = emDesafio && !convite && hashDesafioInvalido(hash);
+  const statusQ = useStatus();
+  const status = statusQ.data;
+  const aviso = useAbrirConvite(convite, desafio, agora, statusQ.data !== undefined || statusQ.isError);
   const { data: meta } = useMeta();
   const pres = meta?.races.find((r) => r.id === 'pres');
   const q = useNacional('pres');
@@ -198,6 +343,16 @@ function Conteudo({
     () => (OFERECIMENTO_COM_CANDIDATOS ? (escolherAnuncio(anuncios, 'compartilhamento', 'og|palpite')?.marca ?? null) : null),
     [anuncios],
   );
+  // cartão do ranking do desafio: interruptor próprio, DESLIGADO (src/shared/oferecimento.ts: "desafio + ranking +
+  // oferecido por" lembraria bolão patrocinado); se um dia mostrar candidato (RANKING_TEM_CANDIDATO), também exige a
+  // chave dos cartões com candidatos
+  const oferecimentoRanking = useMemo(
+    () =>
+      OFERECIMENTO_RANKING_DESAFIO && (!RANKING_TEM_CANDIDATO || OFERECIMENTO_COM_CANDIDATOS)
+        ? (escolherAnuncio(anuncios, 'compartilhamento', 'og|desafio')?.marca ?? null)
+        : null,
+    [anuncios],
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] lg:gap-10">
@@ -208,22 +363,34 @@ function Conteudo({
             Este link de palpite não é válido (pode ter sido cortado ao copiar).
           </p>
         ) : null}
+        {desafioQuebrado ? (
+          <p role="alert" className="flex items-start gap-2.5 rounded-2xl border border-alert/40 bg-alert/10 px-3.5 py-3 text-[14px] leading-snug text-fg">
+            <Icon name="alerta" size={18} className="mt-px shrink-0 text-alert-fg" />
+            Este link de desafio não é válido (pode ter sido cortado ao copiar). Peça o link de novo a quem mandou.
+          </p>
+        ) : null}
+        {aviso ? <AvisoDesafio aviso={aviso} /> : null}
         {recebido !== null ? <Recebido finalistas={finalistas} a={recebido} salvo={salvo} aberto={aberto} oficial={oficial} /> : null}
         {aberto ? (
-          <Editor finalistas={finalistas} salvo={salvo} gravar={gravar} agora={agora} oferecimento={oferecimento} />
+          <Editor finalistas={finalistas} salvo={salvo} gravar={gravar} agora={agora} oferecimento={oferecimento} desafioPrimeiro={emDesafio} />
         ) : salvo ? (
           <Travado finalistas={finalistas} salvo={salvo} oficial={oficial} simulacao={!!status?.simulacao} votacao={votacao} oferecimento={oferecimento} />
         ) : (
           <SemPalpite votacao={votacao} fase={status?.simulacao ? 'apurando' : status?.fase} />
         )}
+        {/* Desafio entre amigos (sem dinheiro): até o prazo, sempre; depois, só com algo guardado neste aparelho */}
+        {aberto || emDesafio || desafio.estado.eu || desafio.estado.participantes.length > 0 ? (
+          <SecaoDesafio finalistas={finalistas} desafio={desafio} salvo={salvo} aberto={aberto} oficial={oficial} oferecimento={oferecimentoRanking} />
+        ) : null}
         {/* I29: depois de cravar, o lembrete da apuração (o evento abre /palpite; o palpite nunca vai no link) */}
         {salvo ? <LembretePalpite agora={agora} /> : null}
       </div>
       <aside className="min-w-0 lg:pt-1">
-        <ComoFunciona />
+        <ComoFunciona aberto={aberto} />
       </aside>
-      {/* publicidade: no fim, longe do divisor e dos números (a marca fica com a ferramenta, nunca com um palpite) */}
-      <OferecimentoPalpite className="border-t border-line pt-8 sm:pt-10 lg:col-span-2" />
+      {/* publicidade: no fim, longe do divisor e dos números (a marca fica com a ferramenta, nunca com um palpite). Na
+          rota do desafio entre amigos, nenhuma: "desafio + oferecido por" lembraria bolão patrocinado (§11.13) */}
+      {emDesafio ? null : <OferecimentoPalpite className="border-t border-line pt-8 sm:pt-10 lg:col-span-2" />}
     </div>
   );
 }
@@ -268,12 +435,15 @@ function Editor({
   gravar,
   agora,
   oferecimento,
+  desafioPrimeiro,
 }: {
   finalistas: FinalistasPalpite;
   salvo: Palpite | null;
   gravar: (p: Palpite) => boolean;
   agora: number;
   oferecimento: string | null;
+  /** vindo de um link de desafio: depois de cravar, "Mandar meu link de desafio" é a ação principal */
+  desafioPrimeiro?: boolean;
 }) {
   const [a, setA] = useState(salvo?.a ?? PALPITE_INICIAL);
   // outra aba cravou: acompanha (só se esta não estiver no meio de uma mudança)
@@ -345,11 +515,16 @@ function Editor({
         <AjusteFino c={c1} onClick={() => mudar(a - 1)} desabilitado={p1 >= 70} alinhar="dir" />
       </div>
 
-      <div className="mt-5 flex flex-col gap-2.5 border-t border-line pt-5 sm:flex-row sm:items-center">
+      <div className="mt-5 flex flex-col gap-2.5 border-t border-line pt-5 sm:flex-row sm:flex-wrap sm:items-center">
+        {cravado && desafioPrimeiro ? (
+          <Button variant="primary" size="lg" icon="usuarios" onClick={irParaDesafio} className="w-full sm:w-auto">
+            Mandar meu link de desafio
+          </Button>
+        ) : null}
         {cravado ? (
           <BotaoCompartilhar
             label="Compartilhar meu palpite"
-            variant="primary"
+            variant={desafioPrimeiro ? 'secondary' : 'primary'}
             size="lg"
             className="w-full sm:w-auto"
             titulo="Compartilhar meu palpite"
@@ -365,7 +540,12 @@ function Editor({
             {salvo ? 'Cravar o novo palpite' : 'Cravar meu palpite'}
           </Button>
         )}
-        <p className="text-pretty text-[13px] leading-snug text-fg-muted sm:ml-1">
+        {cravado && !desafioPrimeiro ? (
+          <Button variant="outline" size="lg" icon="usuarios" onClick={irParaDesafio} className="w-full sm:w-auto">
+            Desafiar amigos
+          </Button>
+        ) : null}
+        <p className={cn('text-pretty text-[13px] leading-snug text-fg-muted sm:ml-1', cravado && 'sm:basis-full sm:ml-0')}>
           {cravado ? 'Dá para mudar' : 'Depois de cravar, dá para mudar'} até as <strong className="font-semibold text-fg">23h59 de 24/10</strong> (Brasília) ·{' '}
           faltam <span className="num">{fmtFaltam(FIM_PALPITES - agora)}</span>
         </p>
@@ -694,20 +874,24 @@ function Recebido({
 
 // ---- como funciona -------------------------------------------------------------------------------------------------------
 
-function ComoFunciona() {
+function ComoFunciona({ aberto }: { aberto: boolean }) {
   const itens = [
     'Arraste o divisor na direção de um candidato para aumentar a parte dele, ou use os botões de 0,1 ponto. Os dois somam 100% dos votos válidos.',
     'Crave o palpite. Até as 23h59 de 24/10 (Brasília) dá para mudar; depois, ele fica travado neste aparelho. No dia da votação, até as 17h, o palpite não é compartilhado.',
     `Quando o TSE concluir a apuração, a página mostra a diferença entre o seu palpite e o resultado oficial, em pontos percentuais. Menos de ${fmtDiferenca(NA_MOSCA_PP)}: na mosca.`,
     'Compartilhe a imagem e o link: quem abrir vê o seu palpite e pode comparar com o dele.',
+    // o convite para desafiar só vale até o prazo (depois, o desafio só mostra o que já está neste aparelho)
+    ...(aberto ? ['Ou desafie os amigos: cada um manda o próprio link e, com o resultado oficial, aparece neste aparelho quem chegou mais perto.'] : []),
   ];
   const naoE = [
     'Não é pesquisa nem enquete. O Sintonia não recebe, não guarda e não soma palpites: não existe "palpite da maioria".',
     'O palpite fica só no seu aparelho. Ele vai no link depois do "#", parte do endereço que o navegador não envia a servidor algum.',
     'Comparação só com o resultado oficial do TSE: números simulados nunca contam.',
+    'Não vale dinheiro nem prêmio: o desafio entre amigos é só pela graça.',
   ];
   return (
-    <section aria-labelledby="como-palpite" className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)]">
+    // os avisos legais ("O que o Palpite não é"): o popup do chat não fica por cima deles (chat/regiao.ts)
+    <section aria-labelledby="como-palpite" data-chat-evita className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)]">
       <h2 id="como-palpite" className="flex items-center gap-2 font-display text-[19px] font-semibold tracking-[-0.02em] text-fg">
         <Icon name="info" size={19} className="text-brand-fg" />
         Como funciona
