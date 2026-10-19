@@ -890,8 +890,7 @@ function ComoFunciona({ aberto }: { aberto: boolean }) {
     'Não vale dinheiro nem prêmio: o desafio entre amigos é só pela graça.',
   ];
   return (
-    // os avisos legais ("O que o Palpite não é"): o popup do chat não fica por cima deles (chat/regiao.ts)
-    <section aria-labelledby="como-palpite" data-chat-evita className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)]">
+    <section aria-labelledby="como-palpite" className="rounded-2xl border border-line bg-surface p-5 shadow-card sm:p-6 lg:sticky lg:top-[calc(var(--app-header-h,64px)+16px)]">
       <h2 id="como-palpite" className="flex items-center gap-2 font-display text-[19px] font-semibold tracking-[-0.02em] text-fg">
         <Icon name="info" size={19} className="text-brand-fg" />
         Como funciona

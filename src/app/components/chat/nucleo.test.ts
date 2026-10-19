@@ -2,21 +2,35 @@ import { describe, expect, it } from 'vitest';
 import type { MensagemChat } from '@/shared/chat';
 import { INICIO_APURACAO } from '@/shared/constants';
 import {
+  ALCANCE_MAX_PX,
+  ANTECIPA_MAX_PX,
+  ANTECIPA_MIN_PX,
+  CONTEUDO_LARGO,
+  ESPERA_REABRIR_MS,
   GRACA_INTERACAO_MS,
+  HISTERESE_POPUP,
   LARGURA_DOCA,
   LARGURA_MIN_DOCA,
   POPUP,
   RESPIRO_ANUNCIO,
   RESPIRO_POPUP,
+  alcanceReabrir,
   alturaFolhaCelular,
+  antecipar,
+  cantoSempreOcupado,
   contagemAbertura,
   contarNovas,
   cruza,
+  decidirOcupacao,
+  estender,
   faseChat,
   geometriaDoca,
   geometriaPopup,
   gerarToken,
   inflar,
+  larguraAba,
+  larguraAbaNaMargem,
+  margemConteudo,
   modoComputador,
   regiaoAnuncioSala,
   intervaloConsulta,
@@ -28,6 +42,7 @@ import {
   prefEfetiva,
   proximaConsulta,
   regiaoPilula,
+  reguaFixa,
   textoAbertura,
   textoPessoasSala,
 } from './nucleo';
@@ -162,7 +177,55 @@ describe('popup do computador', () => {
     const grande = geometriaPopup({ largura: 1920, altura: 1080 }, 64, true);
     expect(grande).toMatchObject({ largura: POPUP.larguraGrande, altura: POPUP.alturaGrande, right: 1896, bottom: 1056 });
     expect(geometriaPopup({ largura: 1440, altura: 900 }, 64, true).altura).toBe(900 - 64 - 16 - 24);
-    expect(regiaoPilula({ largura: 1280, altura: 900 })).toEqual({ left: 960, top: 836, right: 1260, bottom: 880 });
+    // pílula da doca minimizada (≥ 1760)
+    expect(regiaoPilula({ largura: 1920, altura: 1080 })).toEqual({ left: 1596, top: 1012, right: 1896, bottom: 1056 });
+  });
+  it('aba recolhida: na margem direita que o conteúdo deixa livre, sem cobrir nada (1024–1759)', () => {
+    // conteúdo largo: 32 px de respiro (lg:px-8) até 1440 px; depois, centralizado
+    expect(margemConteudo(1024)).toBe(32);
+    expect(margemConteudo(1366)).toBe(32);
+    expect(margemConteudo(CONTEUDO_LARGO)).toBe(32);
+    expect(margemConteudo(1536)).toBe(80);
+    expect(margemConteudo(1600)).toBe(112);
+    // notebooks comuns (1024–1440): 28 px, a 4 px do conteúdo; com ≥ 48 px de margem, 32 px
+    for (const w of [1024, 1280, 1366, 1440, 1455]) expect(larguraAba(w)).toBe(28);
+    for (const w of [1472, 1536, 1600, 1759]) expect(larguraAba(w)).toBe(32);
+    // nunca passa da margem (sempre ≥ 4 px de folga) nem fica ilegível
+    for (let w = 1024; w < LARGURA_MIN_DOCA; w++) {
+      expect(larguraAba(w)).toBeLessThanOrEqual(margemConteudo(w) - 4);
+      expect(larguraAba(w)).toBeGreaterThanOrEqual(28);
+    }
+    // numa margem menor (hipotética), encolhe só ali — sempre a 4 px do conteúdo — e nunca abaixo de 20 px
+    expect(larguraAbaNaMargem(32)).toBe(28);
+    expect(larguraAbaNaMargem(30)).toBe(26);
+    expect(larguraAbaNaMargem(26)).toBe(22);
+    expect(larguraAbaNaMargem(12)).toBe(20);
+    expect(larguraAbaNaMargem(47)).toBe(28);
+    expect(larguraAbaNaMargem(48)).toBe(32);
+  });
+  it('histerese: ocupa na hora, libera só com folga e depois da espera', () => {
+    const d = (ocupada: boolean, perto: boolean, naFolga: boolean, primeira = false) => decidirOcupacao({ ocupada, perto, naFolga, primeira });
+    // um bloco a menos do respiro: ocupa, esteja como estiver
+    expect(d(false, true, true)).toBe('ocupa');
+    expect(d(true, true, true)).toBe('ocupa');
+    // livre e o bloco só na faixa da histerese: continua livre (o popup aberto não se recolhe à toa)
+    expect(d(false, false, true)).toBe('livre');
+    expect(d(false, false, false)).toBe('livre');
+    // ocupada e o bloco ainda na faixa da histerese: continua ocupada (o popup não pisca na borda do bloco)
+    expect(d(true, false, true)).toBe('ocupa');
+    // ocupada e livre com folga: espera para liberar
+    expect(d(true, false, false)).toBe('espera');
+    // 1ª medição: vale só o respiro (o popup nasce aberto com a área livre), sem espera
+    expect(d(true, false, true, true)).toBe('livre');
+    expect(d(true, true, true, true)).toBe('ocupa');
+    expect(HISTERESE_POPUP).toBeGreaterThanOrEqual(4);
+    expect(HISTERESE_POPUP).toBeLessThanOrEqual(16);
+    expect(ESPERA_REABRIR_MS).toBeGreaterThanOrEqual(300);
+    expect(ESPERA_REABRIR_MS).toBeLessThanOrEqual(1000);
+  });
+  it('canto sempre ocupado só na ficha do candidato (a /anuncie é demonstração: o popup abre lá)', () => {
+    for (const p of ['/candidato/280002551544', '/candidato/280002551544/', '/candidato']) expect(cantoSempreOcupado(p), p).toBe(true);
+    for (const p of ['/', '/anuncie', '/apuracao', '/palpite', '/candidatos', '/sobre']) expect(cantoSempreOcupado(p), p).toBe(false);
   });
   it('respiro: a área vigiada cresce dos quatro lados (popup 16 px; anúncio 48 px)', () => {
     const r = { top: 100, left: 100, right: 200, bottom: 200 };
@@ -208,12 +271,66 @@ describe('popup do computador', () => {
     expect(popupAberto({ ...base, pref: 'minimizado' })).toBe(false);
     // em cima de bloco com candidato, sem ninguém mexer: recolhe
     expect(popupAberto({ ...base, ocupada: true })).toBe(false);
-    // mouse em cima ou digitando: fica
+    // mouse em cima: fica (a página mudou por baixo dele, não rolou)
     expect(popupAberto({ ...base, ocupada: true, interagindo: true })).toBe(true);
-    // acabou de mexer: fica a folga (curta) e depois recolhe
+    // acabou de mexer (mouse saiu, tecla digitada): fica a folga (curta) e depois recolhe
     expect(popupAberto({ ...base, ocupada: true, msDesdeInteracao: GRACA_INTERACAO_MS - 1 })).toBe(true);
     expect(popupAberto({ ...base, ocupada: true, msDesdeInteracao: GRACA_INTERACAO_MS })).toBe(false);
     expect(GRACA_INTERACAO_MS).toBeLessThanOrEqual(3000);
+  });
+  it('a página rolou com a área ocupada: recolhe na hora, mesmo com o foco no campo ou o mouse em cima', () => {
+    const base = { pref: 'aberto' as const, ocupada: true, interagindo: false, msDesdeInteracao: Number.POSITIVE_INFINITY };
+    // digitou há 1 s, tirou o mouse e rolou a página com a roda: o bloco que entrou é visto — recolhe (o foco no campo
+    // não conta como interação; o rascunho fica guardado)
+    expect(popupAberto({ ...base, msDesdeInteracao: 1000 })).toBe(true);
+    expect(popupAberto({ ...base, msDesdeInteracao: 1000, paginaRolou: true })).toBe(false);
+    // a página andou depois da última mexida mesmo com o mouse parado em cima (teclado, rolagem programada): recolhe
+    expect(popupAberto({ ...base, interagindo: true, paginaRolou: true })).toBe(false);
+    // área livre: rolar não recolhe nada
+    expect(popupAberto({ ...base, ocupada: false, paginaRolou: true })).toBe(true);
+    // minimizado continua minimizado
+    expect(popupAberto({ ...base, pref: 'minimizado', ocupada: false })).toBe(false);
+  });
+  it('rolando, a área vigiada cresce na direção de onde os blocos vêm', () => {
+    const r = { top: 300, left: 900, right: 1300, bottom: 760 };
+    expect(antecipar(r, 0)).toEqual(r);
+    // para baixo: os blocos sobem pelo pé da tela — a área desce (4× o passo, entre o mínimo e o máximo)
+    expect(antecipar(r, 10)).toEqual({ ...r, bottom: 760 + ANTECIPA_MIN_PX });
+    expect(antecipar(r, 40)).toEqual({ ...r, bottom: 760 + 160 });
+    expect(antecipar(r, 900)).toEqual({ ...r, bottom: 760 + ANTECIPA_MAX_PX });
+    // para cima: os blocos descem pelo topo — a área sobe
+    expect(antecipar(r, -30)).toEqual({ ...r, top: 300 - 120 });
+    expect(antecipar(r, -5000)).toEqual({ ...r, top: 300 - ANTECIPA_MAX_PX });
+    expect(antecipar(r, Number.NaN)).toEqual(r);
+  });
+  it('rolando, só reabre com o caminho à frente livre por ~0,7 s na velocidade atual (sem abre-e-fecha)', () => {
+    expect(alcanceReabrir(0)).toBe(0);
+    expect(alcanceReabrir(-1)).toBe(0);
+    expect(alcanceReabrir(Number.NaN)).toBe(0);
+    // lendo devagar (0,3 px/ms ≈ 300 px/s): ~210 px à frente; roda rápida (1,7 px/ms): ~1.190 px; acima disso, o teto
+    expect(alcanceReabrir(0.3)).toBe(210);
+    expect(alcanceReabrir(1.7)).toBe(1190);
+    expect(alcanceReabrir(5)).toBe(ALCANCE_MAX_PX);
+    const r = { top: 300, left: 900, right: 1300, bottom: 760 };
+    expect(estender(r, 1, 500)).toEqual({ ...r, bottom: 1260 });
+    expect(estender(r, -1, 500)).toEqual({ ...r, top: -200 });
+    expect(estender(r, 0, 500)).toEqual(r);
+    expect(estender(r, 1, 0)).toEqual(r);
+  });
+  it('barra de rolagem clássica: a área vigiada usa a largura útil (a régua do position: fixed)', () => {
+    // Windows, 1366 px com barra de 15 px: clientWidth = 1351
+    const tela = reguaFixa({ largura: 1366, altura: 768, util: 1351 });
+    expect(tela).toEqual({ largura: 1351, altura: 768 });
+    const g = geometriaPopup(tela, 64);
+    // o popup real (right: 20 px da borda útil) termina em 1331 — a área vigiada também
+    expect(g.right).toBe(1331);
+    expect(inflar(g, RESPIRO_POPUP).right).toBe(1347);
+    expect(regiaoPilula(reguaFixa({ largura: 1920, altura: 1080, util: 1903 })).right).toBe(1903 - 24);
+    expect(geometriaDoca(reguaFixa({ largura: 1920, altura: 1080, util: 1903 }), 64)).toMatchObject({ right: 1903, left: 1903 - LARGURA_DOCA });
+    // sem barra (ou sem medida), a largura da janela
+    expect(reguaFixa({ largura: 1366, altura: 768, util: 1366 }).largura).toBe(1366);
+    expect(reguaFixa({ largura: 1366, altura: 768 }).largura).toBe(1366);
+    expect(reguaFixa({ largura: 1366, altura: 768, util: 0 }).largura).toBe(1366);
   });
   it('pedido para abrir com o canto em cima de candidato: folha central (nunca por cima de um lado só do placar)', () => {
     expect(ondeAbrir(false)).toBe('canto');

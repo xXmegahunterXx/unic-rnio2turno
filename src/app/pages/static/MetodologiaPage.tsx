@@ -201,7 +201,8 @@ export default function MetodologiaPage() {
           Com os nomes ocultos, a simulação não usa vermelho nem azul: a cor diria quem é quem. Os pares vermelho × azul e turquesa × âmbar
           também se distinguem para quem tem daltonismo, e a identidade nunca depende só da cor (sempre há nome ao lado).
         </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {/* legenda com nome e cor de identificação dos candidatos: bloco com candidato */}
+        <div data-sem-anuncio-fixo className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Amostra cor="vermelho" titulo="Lula · Presidente" texto="Vermelho · cor de identificação" />
           <Amostra cor="azul" titulo="Flávio Bolsonaro · Presidente" texto="Azul · cor de identificação" />
           <Amostra cor="a" titulo="Menor número na urna" texto="Turquesa · governadores e simulação com nomes ocultos" />
@@ -317,7 +318,8 @@ export default function MetodologiaPage() {
           {CANDIDATOS.map((n) => {
             const d = DOCUMENTOS[n];
             return (
-              <li key={n} className="rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
+              // número na urna e nome do candidato no título do programa: bloco com candidato
+              <li key={n} data-sem-anuncio-fixo className="rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5">
                 <div className="flex items-start gap-3.5">
                   <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-3 text-fg-muted">
                     <Icon name="lista" size={19} />

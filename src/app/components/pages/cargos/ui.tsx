@@ -132,7 +132,9 @@ export function CandidatoLinha({
   className?: string;
 }) {
   return (
-    <div className={cn('flex min-w-0 items-center gap-3', className)}>
+    // a linha inteira (nome, número, partido, % e votos) é bloco com candidato: a barra de anúncio do celular e o chat ao
+    // vivo não ficam por cima nem encostados nela, não só na foto
+    <div data-sem-anuncio-fixo className={cn('flex min-w-0 items-center gap-3', className)}>
       {posicao !== undefined ? (
         <span className="num w-6 shrink-0 text-right text-[12px] font-medium text-fg-subtle">{posicao}º</span>
       ) : null}

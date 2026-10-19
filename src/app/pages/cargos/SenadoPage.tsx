@@ -335,6 +335,8 @@ function CartaoUf({
         {eleitos.map((c) => (
           <li
             key={c.sqcand}
+            // bloco com candidato inteiro (foto, nome, número, % e votos): anúncio e chat ao vivo não ficam por cima
+            data-sem-anuncio-fixo
             // foto ao lado do nome só quando a coluna tem largura para a sigla inteira (1100–1279 com 2 cartões por linha e
             // ≥ 1500 com 3); com 3 cartões entre 1280 e 1499, foto em cima (REPUBLICANOS era cortado)
             className="relative z-[1] flex min-w-0 flex-col items-start gap-2 min-[1100px]:flex-row min-[1100px]:items-center xl:flex-col xl:items-start min-[1500px]:flex-row min-[1500px]:items-center"

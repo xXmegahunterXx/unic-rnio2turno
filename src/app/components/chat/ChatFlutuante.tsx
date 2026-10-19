@@ -7,47 +7,59 @@
  *  - Computador largo (≥ 1760 px): DOCA — coluna à direita, abaixo do cabeçalho, que EMPURRA a página (`--sala-lateral`):
  *    sempre aberta com a sala aberta, sem cobrir nada (`modoComputador`).
  *  - Computador (1024–1759 px): popup no canto inferior direito (~360×540; até 420 de altura em janela de até 800 px;
- *    "Aumentar" = mais largo e com a altura toda abaixo do cabeçalho), ABERTO por padrão com a sala aberta; "Minimizar"
- *    vira a pílula "Chat ao vivo · N novas". A escolha fica lembrada neste navegador (só a feita com a sala aberta). Com
- *    a sala fechada antes das 17h de 25/10, nasce minimizado ("Chat ao vivo · abre domingo, 17h").
+ *    "Aumentar" = mais largo e com a altura toda abaixo do cabeçalho), ABERTO por padrão com a sala aberta, em todas as
+ *    páginas com chat. Recolhido — pela escolha "Minimizar" (lembrada neste navegador, só a feita com a sala aberta) ou
+ *    sozinho perto de candidato — vira a ABA VERTICAL "Chat ao vivo" na margem direita (ponto ao vivo e contador de
+ *    novas), dentro dos 32 px que o conteúdo deixa livres: não cobre nada. Com a sala fechada antes das 17h de 25/10,
+ *    nasce minimizado (a aba diz "abre domingo, 17h").
  *  - Celular e tablet (< 1024 px): escondido — alça estreita na borda (ou, sem barra de anúncio no rodapé e com a faixa
  *    de baixo livre, a pílula discreta acima da tab bar), com o contador de novas; o toque abre a folha inferior (nas
  *    páginas da apuração, com o placar à vista acima), que fecha pelo botão, arrastando para baixo ou com Esc. No tablet
  *    a folha vai de lado a lado do conteúdo.
  *
- * Regra de ouro (ARCHITECTURE §1.5): o popup e a pílula nunca ficam por cima de número, nome ou foto de candidato — nem
- * encostados (respiro de 16 px). O popup aberto se recolhe sozinho quando a área dele chega perto de um bloco com
- * candidato (regiao.ts) e volta quando ela fica livre — salvo enquanto a pessoa mexe nele (mouse em cima, digitando) e por
- * 3 s depois (`popupAberto`). A faixa "Sala oferecida por" some com um bloco com candidato a menos de 48 px (popup, doca
- * e folha central) e nunca aparece na ficha do candidato nem na /anuncie. A pílula, perto de um bloco, vira a alça NO
- * MESMO CANTO (a entrada não pula de lugar). Pedir o chat (pílula, alça, chamada da página) com o canto ocupado abre a
- * folha CENTRAL embaixo, de lado a lado do conteúdo — cobre os DOIS lados por igual, nunca um só — e, quando dá, rola
- * o bloco de cima (placar, retratos) para ficar inteiro à vista acima dela (`prepararFolhaCentral`).
+ * Regra de ouro (ARCHITECTURE §1.5): o popup nunca fica por cima de número, nome ou foto de candidato — nem encostado
+ * (respiro de 16 px). O popup aberto se recolhe sozinho para a aba quando a área dele chega perto de um bloco com
+ * candidato ou de um anúncio nativo real (regiao.ts) e volta sozinho quando ela fica livre — com histerese de 8 px e
+ * meio segundo de espera, sem pisca-pisca —, salvo com o mouse em cima e por 3 s depois da última mexida (mouse saiu,
+ * tecla) — e só enquanto a página não rolar: rolou ou trocou de página com a área ocupada, recolhe na hora (o foco no
+ * campo não segura nada; o rascunho fica guardado) (`popupAberto`). A roda do mouse sobre o popup não rola a página por
+ * baixo. Recolher sozinho é instantâneo: a peça some direto no elemento no quadro em que a área fica ocupada, antes da
+ * pintura (`aoOcupar`), e a área cresce na direção da rolagem (`antecipar`). A régua das peças fixas é a largura útil,
+ * sem a barra de rolagem (`reguaFixa`). Vitrine e prévias de anúncio (/anuncie, painel) não recolhem o popup. A faixa "Sala oferecida
+ * por" some com um bloco com candidato a menos de 48 px (popup, doca e folha central) e nunca aparece na ficha do
+ * candidato nem na /anuncie. Pedir o chat (aba, chamada da página) com o canto ocupado abre a folha CENTRAL embaixo, de
+ * lado a lado do conteúdo — cobre os DOIS lados por igual, nunca um só — e, quando dá, rola o bloco de cima (placar,
+ * retratos) para ficar inteiro à vista acima dela (`prepararFolhaCentral`).
  *
  * Privacidade: o popup que abre sozinho só LÊ a sala; o sinal de presença e o token nascem quando a pessoa usa o chat
  * (`marcarParticipacao`, sala.ts).
  */
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation } from 'react-router-dom';
-import { AnimatePresence, motion, useDragControls, useReducedMotion, type PanInfo } from 'framer-motion';
+import { AnimatePresence, motion, useDragControls, useReducedMotion, type PanInfo, type Variants } from 'framer-motion';
 import { cn } from '@/app/lib/cn';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { Icon } from '@/app/ui/Icon';
 import { LiveDot } from '@/app/ui/LiveDot';
 import { useFaixaLivre } from '@/app/components/anuncios/faixaLivre';
 import { rodapePermitido } from '@/app/components/anuncios/nucleo';
+import { fmtInt } from '@/shared/format';
 import {
   ALTURA_FOLHA_ALTA,
+  ESPERA_REABRIR_MS,
   GRACA_INTERACAO_MS,
+  HISTERESE_POPUP,
   LARGURA_DOCA,
   RESPIRO_ANUNCIO,
   RESPIRO_POPUP,
   alturaFolhaCelular,
+  cantoSempreOcupado,
   faseChat,
   geometriaDoca,
   geometriaPopup,
   inflar,
+  larguraAba,
   lerPrefGuardada,
   modoComputador,
   ondeAbrir,
@@ -56,6 +68,7 @@ import {
   prefEfetiva,
   regiaoAnuncioSala,
   regiaoPilula,
+  reguaFixa,
   textoAbertura,
   type FaseChat,
   type PrefPopup,
@@ -129,7 +142,7 @@ function BotaoAcao({ icone, rotulo, onClick, children }: { icone?: Parameters<ty
   );
 }
 
-/** Pílula "Chat ao vivo · …" (computador: canto inferior direito; celular: acima da tab bar). */
+/** Pílula "Chat ao vivo · …" (celular e tablet: acima da tab bar / no canto; doca minimizada: canto inferior direito). */
 function Pilula({
   fase,
   novas,
@@ -185,9 +198,10 @@ function Pilula({
 }
 
 /**
- * Alça estreita na borda direita (14 px no celular: cabe na margem de 16 px da página, fora dos números; 16 px no
- * computador: dentro da margem de 32 px do conteúdo, com 16 px de respiro até ele), com o rótulo vertical "Chat" e o ponto de novas. Celular: acima da
- * tab bar; computador: no canto de baixo, no MESMO lugar da pílula, quando ela ficaria perto de um bloco com candidato.
+ * Alça estreita na borda direita (14 px no celular: cabe na margem de 16 px da página, fora dos números; 16 px na doca
+ * minimizada, ≥ 1760 px), com o rótulo vertical "Chat" e o ponto de novas. Celular: acima da tab bar; doca minimizada:
+ * no canto de baixo, no MESMO lugar da pílula, quando ela ficaria perto de um bloco com candidato. No popup do
+ * computador (1024–1759 px), a forma recolhida é a `AbaChat`.
  */
 function Alca({ fase, novas, onAbrir, className, botaoRef }: { fase: FaseChat; novas: number; onAbrir: () => void; className?: string; botaoRef?: React.Ref<HTMLButtonElement> }) {
   return (
@@ -214,13 +228,85 @@ function Alca({ fase, novas, onAbrir, className, botaoRef }: { fase: FaseChat; n
   );
 }
 
+/**
+ * Computador (1024–1759 px): a forma recolhida do popup — pela escolha "Minimizar" ou sozinho perto de candidato. ABA
+ * VERTICAL presa à borda direita, no canto de baixo (onde o popup fica), DENTRO da margem que o conteúdo deixa livre
+ * (`larguraAba`: 28 px numa margem de 32; 32 px a partir de 48), então não cobre nada e não precisa fugir de bloco
+ * nenhum. "Chat ao vivo" em texto vertical (de baixo para cima, como as abas de canto), o ponto ao vivo e, com
+ * mensagens novas, o contador; antes da abertura, "abre domingo, 17h". Sem a área de toque ampliada (`.toque`): ela
+ * passaria da margem.
+ */
+function AbaChat({
+  fase,
+  novas,
+  onAbrir,
+  largura,
+  baixo,
+  botaoRef,
+}: {
+  fase: FaseChat;
+  novas: number;
+  onAbrir: () => void;
+  largura: number;
+  baixo: number;
+  botaoRef?: React.Ref<HTMLButtonElement>;
+}) {
+  const aberta = fase === 'aberta';
+  // sala aberta: as novas vão no contador (no topo da aba); fechada/demo: "abre domingo, 17h" / "prévia" no texto
+  const detalhe = aberta ? null : detalhePilula(fase, novas);
+  const reduzir = useReducedMotion();
+  return (
+    <div {...marca} data-chat-forma="aba" className="fixed right-0 z-40" style={{ bottom: baixo }}>
+      <motion.button
+        ref={botaoRef}
+        type="button"
+        onClick={onAbrir}
+        initial={reduzir ? { opacity: 0 } : { opacity: 0, x: 10 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={reduzir ? { opacity: 0 } : { opacity: 0, x: 10 }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        aria-label={rotuloAbrir(fase, novas)}
+        title="Abrir o chat ao vivo"
+        style={{ width: largura }}
+        className="group relative flex flex-col items-center gap-2 rounded-l-xl border border-r-0 border-line bg-surface pb-2.5 pt-3 text-fg shadow-[-10px_10px_28px_-14px_rgb(0_0_0/0.55),0_2px_6px_-3px_rgb(0_0_0/0.2)] transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand"
+      >
+        {/* filete da marca na beira de dentro: a aba se destaca do fundo nos dois temas sem cor de candidato */}
+        <span aria-hidden className={cn('absolute inset-y-3 left-0 w-[3px] rounded-r-full', aberta ? 'bg-brand' : 'bg-fg-subtle/60')} />
+        {aberta ? (
+          novas > 0 ? (
+            <span aria-hidden className="num inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10.5px] font-bold leading-none text-brand-ink">
+              {novas > 99 ? '99+' : fmtInt(novas)}
+            </span>
+          ) : (
+            <LiveDot size={7} className="my-[5px]" />
+          )
+        ) : null}
+        <span aria-hidden className="rotate-180 whitespace-nowrap text-[12.5px] font-semibold leading-none tracking-[0.01em] [writing-mode:vertical-rl]">
+          Chat ao vivo
+          {detalhe ? (
+            <span className="font-medium text-fg-muted">
+              <span className="me-1 ms-1 text-fg-subtle">·</span>
+              <span className="num">{detalhe}</span>
+            </span>
+          ) : null}
+        </span>
+        <span className={cn('transition-transform duration-200 group-hover:-translate-x-px', aberta ? 'text-brand-fg' : 'text-fg-muted')}>
+          <IconeChat size={17} />
+        </span>
+      </motion.button>
+    </div>
+  );
+}
+
 // ---- computador ---------------------------------------------------------------------------------------------------------
 
-function useJanela(): { largura: number; altura: number; cabecalho: number } {
+function useJanela(): { largura: number; altura: number; cabecalho: number; util: number } {
   const ler = () => ({
     largura: window.innerWidth,
     altura: window.innerHeight,
     cabecalho: alturaCabecalho(),
+    // sem a barra de rolagem: a régua do `position: fixed` e da margem do conteúdo (largura da aba)
+    util: document.documentElement.clientWidth || window.innerWidth,
   });
   const [j, setJ] = useState(ler);
   useEffect(() => {
@@ -230,16 +316,20 @@ function useJanela(): { largura: number; altura: number; cabecalho: number } {
         q = window.requestAnimationFrame(() => {
           q = 0;
           const n = ler();
-          setJ((a) => (a.largura === n.largura && a.altura === n.altura && a.cabecalho === n.cabecalho ? a : n));
+          setJ((a) => (a.largura === n.largura && a.altura === n.altura && a.cabecalho === n.cabecalho && a.util === n.util ? a : n));
         });
     };
     window.addEventListener('resize', f);
     // o cabeçalho muda de altura (faixa de simulação, conexão instável): o AppShell atualiza --app-header-h
     const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(f) : null;
     mo?.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    // a barra de rolagem clássica aparece/some (página curta ↔ longa) sem `resize`: a largura útil muda
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(f) : null;
+    ro?.observe(document.documentElement);
     return () => {
       window.removeEventListener('resize', f);
       mo?.disconnect();
+      ro?.disconnect();
       window.cancelAnimationFrame(q);
     };
   }, []);
@@ -257,13 +347,57 @@ const usoDoChat = {
   onKeyDownCapture: () => marcarParticipacao(),
 };
 
+/**
+ * Popup (1024–1759): histerese e espera para reabrir e a antecipação na rolagem (nucleo.ts, regiao.ts). Constante fora
+ * do componente: a vigilância não reinicia.
+ */
+const OPCOES_POPUP = { histerese: HISTERESE_POPUP, esperaMs: ESPERA_REABRIR_MS, antecipar: true } as const;
+
+/**
+ * A roda do mouse sobre o popup rola a lista dele enquanto ela ainda puder rolar nessa direção — nunca a página por
+ * baixo (o cabeçalho, o campo e o rodapé do popup não rolam nada; no fim da lista, para ali). Sem isso, a página andava
+ * por baixo do popup com o mouse em cima dele e o popup ficava aberto sobre o placar.
+ */
+function rolaPorDentro(e: WheelEvent, raiz: HTMLElement): boolean {
+  const vertical = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+  const d = vertical ? e.deltaY : e.deltaX;
+  if (!d) return true;
+  for (let el = e.target instanceof Element ? e.target : null; el && el !== raiz; el = el.parentElement) {
+    if (!(el instanceof HTMLElement)) continue;
+    const cs = getComputedStyle(el);
+    const ov = vertical ? cs.overflowY : cs.overflowX;
+    if (ov !== 'auto' && ov !== 'scroll') continue;
+    const pos = vertical ? el.scrollTop : el.scrollLeft;
+    const max = vertical ? el.scrollHeight - el.clientHeight : el.scrollWidth - el.clientWidth;
+    if (max > 1 && (d > 0 ? pos < max - 1 : pos > 0)) return true;
+  }
+  return false;
+}
+
+/**
+ * Esconde a peça já, direto no elemento (antes da próxima pintura); o React desmonta em seguida. `display: none`: o
+ * framer-motion reescreve opacidade e transform a cada quadro em que desenha o elemento, nunca o `display`.
+ */
+function esconderJa(el: HTMLElement | null | undefined) {
+  if (el && el.style.display !== 'none') el.style.display = 'none';
+}
+/** Desfaz `esconderJa` (o React decidiu manter a peça na tela). */
+function mostrarDeNovo(el: HTMLElement | null | undefined) {
+  if (el && el.style.display === 'none') el.style.display = '';
+}
+
+/** A faixa "Sala oferecida por" dentro do popup (OferecimentoChat). */
+const SELETOR_FAIXA_ANUNCIO = 'aside[aria-label="Publicidade"]';
+
 function ChatComputador({ pathname }: { pathname: string }) {
   const s = useSala('fundo');
   const fase = useFase(s);
   const aberta = fase === 'aberta';
   const janela = useJanela();
+  // estilos de computador valem pela largura da JANELA (com a barra de rolagem); as peças fixas, pela largura útil
   const modo = modoComputador(janela.largura);
   const emDoca = modo === 'doca';
+  const tela = reguaFixa(janela);
   const [grande, setGrande] = useState(false);
   const [guardada, setGuardada] = useState(lerPref);
   const [sessao, setSessao] = useState<{ pref: PrefPopup; aberta: boolean } | null>(null);
@@ -271,17 +405,29 @@ function ChatComputador({ pathname }: { pathname: string }) {
   /** folha central embaixo: pedido para abrir com o canto em cima de candidato (`ondeAbrir`), até minimizar */
   const [central, setCentral] = useState<{ altura: string } | null>(null);
 
-  // interação com o popup do canto: mouse em cima / digitando no campo, e a última mexida
+  // interação com o popup do canto: o MOUSE em cima (`dentro`; o foco no campo não segura nada), a última mexida (mouse
+  // saiu, tecla, clique: a folga de 3 s) e, nos refs, quando a pessoa mexeu e quando a página rolou por último
   const [dentro, setDentro] = useState(false);
   const [interacao, setInteracao] = useState(0);
   const [, redesenhar] = useState(0);
-  const mexeu = useCallback(() => setInteracao(Date.now()), []);
+  const ultimaInteracao = useRef(0);
+  const ultimaRolagem = useRef(0);
+  const mexeu = useCallback(() => {
+    const t = Date.now();
+    ultimaInteracao.current = t;
+    setInteracao(t);
+  }, []);
+  const mouseDentro = useCallback((v: boolean) => {
+    ultimaInteracao.current = Date.now();
+    setDentro(v);
+  }, []);
 
-  const g = geometriaPopup(janela, janela.cabecalho, grande);
-  const gd = geometriaDoca(janela, janela.cabecalho);
-  const pil = regiaoPilula(janela);
-  // áreas vigiadas: [0] o popup (com respiro), [1] a pílula (com respiro), [2] a faixa do anúncio (respiro de 48 px: o
-  // popup inteiro; na doca, a faixa do topo dela — a página fica ao lado, nunca embaixo)
+  const g = geometriaPopup(tela, janela.cabecalho, grande);
+  const gd = geometriaDoca(tela, janela.cabecalho);
+  const pil = regiaoPilula(tela);
+  // áreas vigiadas: [0] o popup (com respiro), [1] a pílula da doca minimizada (com respiro), [2] a faixa do anúncio
+  // (respiro de 48 px: o popup inteiro; na doca, a faixa do topo dela — a página fica ao lado, nunca embaixo). A aba do
+  // popup recolhido (1024–1759) fica na margem lateral (não cobre nada): não é vigiada.
   const regioes = useMemo(() => {
     const caixa = { top: g.top, left: g.left, right: g.right, bottom: g.bottom };
     const doca = { top: gd.top, left: gd.left, right: gd.right, bottom: gd.bottom };
@@ -292,18 +438,66 @@ function ChatComputador({ pathname }: { pathname: string }) {
     ];
   }, [g.top, g.left, g.right, g.bottom, gd.top, gd.left, gd.right, gd.bottom, pil.top, pil.left, pil.right, pil.bottom, emDoca]);
   const mostrarAlgo = fase !== 'conectando';
-  const { ocupadas, medido } = useRegioesOcupadas(regioes, mostrarAlgo);
-  // páginas sem a barra de anúncio do celular (`rodapePermitido`: ficha do candidato — a página inteira é foto, nome,
-  // número e votos de um candidato — e a /anuncie): o canto conta sempre como ocupado (pílula vira alça; pedir o chat
-  // abre a folha central) e a sala nunca leva anúncio
-  const paginaToda = !rodapePermitido(pathname);
-  const ocupada = ocupadas[0] || paginaToda;
-  const pilulaOcupada = ocupadas[1] || paginaToda;
-  const anuncioOcupado = ocupadas[2] || paginaToda;
+
+  const botao = useRef<HTMLButtonElement>(null);
+  const caixa = useRef<HTMLElement>(null);
+  const emDocaRef = useRef(emDoca);
+  emDocaRef.current = emDoca;
+  const dentroRef = useRef(dentro);
+  dentroRef.current = dentro;
+  const interacaoRef = useRef(interacao);
+  interacaoRef.current = interacao;
+  /** o popup do canto continua aberto com a área ocupada (exceção de interação, `popupAberto`)? */
+  const seguraAberto = useCallback(
+    () =>
+      popupAberto({
+        pref: 'aberto',
+        ocupada: true,
+        interagindo: dentroRef.current,
+        msDesdeInteracao: interacaoRef.current ? Date.now() - interacaoRef.current : Number.POSITIVE_INFINITY,
+        paginaRolou: ultimaRolagem.current > ultimaInteracao.current,
+      }),
+    [],
+  );
+  // a área passou a ocupada (regiao.ts, dentro do quadro): esconde o popup — ou só a faixa do anúncio — direto no
+  // elemento, antes da pintura; o React desmonta em seguida (sem a saída animada)
+  const aoOcupar = useCallback(
+    (i: number) => {
+      if (emDocaRef.current) return;
+      const el = caixa.current;
+      if (!el) return;
+      if (i === 0 && !seguraAberto()) esconderJa(el);
+      if (i === 2) esconderJa(el.querySelector<HTMLElement>(SELETOR_FAIXA_ANUNCIO));
+    },
+    [seguraAberto],
+  );
+  // popup: ocupa na hora (e antes, rolando: a área cresce na direção da rolagem); libera com 8 px a mais de folga e
+  // meio segundo depois (sem pisca-pisca na borda de um bloco). Troca de página: mede de novo antes de pintar. A doca
+  // (≥ 1760) segue como antes
+  const { ocupadas, medido, conferirAgora } = useRegioesOcupadas(regioes, mostrarAlgo, emDoca ? undefined : OPCOES_POPUP, { chave: pathname, aoOcupar });
+  // páginas sem a barra de anúncio do celular (`rodapePermitido`: ficha do candidato e /anuncie): a sala nunca leva
+  // anúncio. O canto do popup conta sempre como ocupado só na ficha do candidato (a página inteira é foto, nome, número e
+  // votos de um candidato: pedir o chat abre a folha central); a /anuncie não — a vitrine é demonstração e pode ficar
+  // sob o popup. Doca minimizada: a pílula vira a alça nas duas, como antes
+  const semAnuncioNaPagina = !rodapePermitido(pathname);
+  const ocupada = ocupadas[0] || cantoSempreOcupado(pathname);
+  const pilulaOcupada = ocupadas[1] || semAnuncioNaPagina;
+  const anuncioOcupado = ocupadas[2] || semAnuncioNaPagina;
   const msDesde = interacao ? Date.now() - interacao : Number.POSITIVE_INFINITY;
   // doca: não cobre nada (a página vai para o lado), fica como a pessoa escolheu
   const aberto =
-    mostrarAlgo && medido && !central && (emDoca ? pref === 'aberto' : popupAberto({ pref, ocupada, interagindo: dentro, msDesdeInteracao: msDesde }));
+    mostrarAlgo &&
+    medido &&
+    !central &&
+    (emDoca
+      ? pref === 'aberto'
+      : popupAberto({ pref, ocupada, interagindo: dentro, msDesdeInteracao: msDesde, paginaRolou: ultimaRolagem.current > ultimaInteracao.current }));
+  /** recolheu sozinho (candidato perto, página rolou ou trocou), não pela escolha da pessoa: some sem a saída animada */
+  const saidaRapida = pref === 'aberto' && !central;
+  const ocupadaRef = useRef(ocupada);
+  ocupadaRef.current = ocupada;
+  const popupVisivel = useRef(false);
+  popupVisivel.current = aberto && !emDoca;
   // fim da folga depois da interação: redesenha para reavaliar
   useEffect(() => {
     if (!ocupada || dentro || !interacao) return;
@@ -312,6 +506,60 @@ function ChatComputador({ pathname }: { pathname: string }) {
     const t = window.setTimeout(() => redesenhar((n) => n + 1), resta + 30);
     return () => window.clearTimeout(t);
   }, [ocupada, dentro, interacao]);
+  // a página rolou: com a área ocupada, o popup aberto pela exceção de interação recolhe NA HORA (a pessoa voltou a ler
+  // a página; o rascunho fica guardado — guardarRascunho, sala.ts). Na CAPTURA: roda antes da vigilância (regiao.ts),
+  // que já encontra a rolagem registrada quando a área passa a ocupada neste mesmo evento
+  useEffect(() => {
+    if (emDoca) return;
+    const f = (e: Event) => {
+      // só a rolagem da PÁGINA (na captura chegam também as das listas — a do próprio chat, tabelas)
+      if (e.target !== document && e.target !== document.documentElement) return;
+      ultimaRolagem.current = Date.now();
+      if (popupVisivel.current && ocupadaRef.current) {
+        esconderJa(caixa.current);
+        redesenhar((n) => n + 1);
+      }
+    };
+    window.addEventListener('scroll', f, { passive: true, capture: true });
+    return () => window.removeEventListener('scroll', f, { capture: true });
+  }, [emDoca]);
+  // trocou de página: conta como a página ter andado (sem a exceção de interação sobre a página nova); a área é medida
+  // de novo antes da 1ª pintura (regiao.ts, `chave`)
+  const paginaAntes = useRef(pathname);
+  useLayoutEffect(() => {
+    if (paginaAntes.current === pathname) return;
+    paginaAntes.current = pathname;
+    ultimaRolagem.current = Date.now();
+    if (popupVisivel.current && ocupadaRef.current) redesenhar((n) => n + 1);
+  }, [pathname]);
+  // o elemento do popup: visível quando aberto (pode ter sido escondido direto no elemento e o React decidiu mantê-lo);
+  // escondido já ao recolher sozinho (a saída não fica nem um quadro sobre o bloco)
+  useLayoutEffect(() => {
+    const el = caixa.current;
+    if (!el || emDoca) return;
+    if (aberto) {
+      mostrarDeNovo(el);
+      if (!anuncioOcupado) mostrarDeNovo(el.querySelector<HTMLElement>(SELETOR_FAIXA_ANUNCIO));
+    } else if (saidaRapida) esconderJa(el);
+  });
+  // o popup acabou de (re)abrir: confere a área de novo antes de ele ser pintado (a página pode ter andado desde a
+  // decisão de liberar)
+  const popupAntes = useRef(false);
+  useLayoutEffect(() => {
+    const agora = aberto && !emDoca;
+    if (agora && !popupAntes.current) conferirAgora();
+    popupAntes.current = agora;
+  }, [aberto, emDoca, conferirAgora]);
+  // roda do mouse sobre o popup: rola só a lista dele, nunca a página por baixo
+  useEffect(() => {
+    const el = caixa.current;
+    if (!aberto || emDoca || !el) return;
+    const f = (e: WheelEvent) => {
+      if (!e.ctrlKey && !rolaPorDentro(e, el)) e.preventDefault();
+    };
+    el.addEventListener('wheel', f, { passive: false });
+    return () => el.removeEventListener('wheel', f);
+  }, [aberto, emDoca]);
 
   // doca aberta: a página ganha o espaço à direita (AppShell: conteúdo, rodapé e faixa do topo usam --sala-lateral)
   const docaAberta = emDoca && aberto;
@@ -335,12 +583,6 @@ function ChatComputador({ pathname }: { pathname: string }) {
     faseAntes.current = fase;
   }, [fase, aberto, central]);
 
-  const botao = useRef<HTMLButtonElement>(null);
-  const caixa = useRef<HTMLElement>(null);
-  const ocupadaRef = useRef(ocupada);
-  ocupadaRef.current = ocupada;
-  const emDocaRef = useRef(emDoca);
-  emDocaRef.current = emDoca;
   const escolher = useCallback(
     (p: PrefPopup) => {
       setSessao({ pref: p, aberta });
@@ -361,8 +603,8 @@ function ChatComputador({ pathname }: { pathname: string }) {
       return;
     }
     mexeu();
-    // quem abriu pelo teclado/clique continua no chat: o foco vai para o popup (não para o campo — o teclado não abre
-    // sozinho e o foco no campo seguraria o popup aberto)
+    // quem abriu pelo teclado/clique continua no chat: o foco vai para o popup (não para o campo — o teclado virtual
+    // não abre sozinho)
     window.setTimeout(() => caixa.current?.focus({ preventScroll: true }), 60);
   }, [escolher, mexeu]);
   const minimizar = useCallback(() => {
@@ -381,14 +623,17 @@ function ChatComputador({ pathname }: { pathname: string }) {
   return (
     <>
       <AnimatePresence initial={false}>
-        {aberto || central ? null : pilulaOcupada ? (
-          // perto de um bloco com candidato: a alça estreita na borda, NO MESMO CANTO da pílula (a entrada não pula)
+        {aberto || central ? null : !emDoca ? (
+          // popup minimizado pela pessoa ou recolhido perto de candidato: a MESMA aba, na margem direita, no canto do popup
+          <AbaChat key="aba" fase={fase} novas={s.novas} onAbrir={abrir} botaoRef={botao} largura={larguraAba(janela.util)} baixo={g.margem} />
+        ) : pilulaOcupada ? (
+          // doca minimizada perto de um bloco com candidato: a alça estreita na borda, NO MESMO CANTO da pílula
           <Alca key="alca" fase={fase} novas={s.novas} onAbrir={abrir} botaoRef={botao} className={canto} />
         ) : (
           <Pilula key="pilula" fase={fase} novas={s.novas} onAbrir={abrir} botaoRef={botao} className={cn(canto, 'right-5 min-[1440px]:right-6')} />
         )}
       </AnimatePresence>
-      <AnimatePresence>
+      <AnimatePresence custom={saidaRapida}>
         {aberto ? (
           emDoca ? (
             <CaixaDoca key="doca" ref={caixa} top={gd.top} altura={gd.bottom - gd.top} semAnuncio={anuncioOcupado} onMinimizar={minimizar} />
@@ -404,7 +649,7 @@ function ChatComputador({ pathname }: { pathname: string }) {
                 mexeu();
               }}
               onMinimizar={minimizar}
-              onDentro={setDentro}
+              onDentro={mouseDentro}
               onMexer={mexeu}
             />
           )
@@ -421,15 +666,25 @@ interface PropsCaixa {
   semAnuncio: boolean;
   onGrande: () => void;
   onMinimizar: () => void;
+  /** o mouse entrou (true) ou saiu (false) do popup */
   onDentro: (v: boolean) => void;
+  /** a pessoa mexeu (mouse saiu, tecla, clique): renova a folga de 3 s */
   onMexer: () => void;
 }
 
+/**
+ * Entrada leve (só opacidade e um deslocamento curto). Saída: "Minimizar" anima; recolher sozinho (`custom` = true,
+ * vindo do AnimatePresence) some na hora — com a animação, o popup ficava ~180 ms por cima do bloco que chegava. Na
+ * saída rápida o elemento já foi escondido direto no DOM (`esconderJa`) e o framer-motion não anima nada: só desmonta.
+ */
+const VARIANTES_POPUP: Variants = {
+  fora: { opacity: 0, y: 12 },
+  dentro: { opacity: 1, y: 0, transition: { duration: 0.18, ease: 'easeOut' } },
+  saida: (rapida: boolean) => (rapida ? { transition: { duration: 0 } } : { opacity: 0, y: 12, transition: { duration: 0.18, ease: 'easeOut' } }),
+};
+
 /** O popup aberto (sem modal: a página continua usável; Esc minimiza). */
 function CaixaPopup({ g, grande, semAnuncio, onGrande, onMinimizar, onDentro, onMexer, ref }: PropsCaixa & { ref?: React.Ref<HTMLElement> }) {
-  const mouse = useRef(false);
-  const foco = useRef(false);
-  const avisar = () => onDentro(mouse.current || foco.current);
   return (
     <motion.aside
       ref={ref}
@@ -437,35 +692,27 @@ function CaixaPopup({ g, grande, semAnuncio, onGrande, onMinimizar, onDentro, on
       {...usoDoChat}
       aria-label="Chat ao vivo"
       tabIndex={-1}
-      // entrada leve (só opacidade e um deslocamento curto): sem escala nem largura/altura animadas ao mesmo tempo
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 12 }}
-      transition={{ duration: 0.18, ease: 'easeOut' }}
+      variants={VARIANTES_POPUP}
+      initial="fora"
+      animate="dentro"
+      exit="saida"
       style={{ width: g.largura, height: g.altura, right: g.margem, bottom: g.margem }}
       className="fixed z-40 flex flex-col overflow-hidden rounded-[22px] border border-line bg-surface shadow-[0_28px_70px_-24px_rgb(0_0_0/0.6),0_6px_18px_-8px_rgb(0_0_0/0.25)] outline-none"
-      onPointerEnter={() => {
-        mouse.current = true;
-        avisar();
-      }}
+      onPointerEnter={() => onDentro(true)}
       onPointerLeave={() => {
-        mouse.current = false;
-        avisar();
+        onDentro(false);
         onMexer();
       }}
-      // digitando: foco num campo de texto do popup (o foco no próprio popup, ao abrir, não segura nada)
+      onPointerDown={() => {
+        marcarParticipacao();
+        onMexer();
+      }}
+      // foco num campo de texto: só marca o uso (presença). Não segura o popup aberto: digitar renova a folga de 3 s
       onFocus={(e) => {
-        foco.current = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-        if (foco.current) marcarParticipacao();
-        avisar();
-      }}
-      onBlur={(e) => {
-        const prox = e.relatedTarget as Node | null;
-        foco.current = !!prox && e.currentTarget.contains(prox) && (prox instanceof HTMLInputElement || prox instanceof HTMLTextAreaElement);
-        avisar();
-        onMexer();
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) marcarParticipacao();
       }}
       onKeyDown={(e) => {
+        onMexer();
         if (e.key !== 'Escape') return;
         e.stopPropagation();
         onMinimizar();

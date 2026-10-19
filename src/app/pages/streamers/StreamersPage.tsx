@@ -694,7 +694,8 @@ function BotsDeChat() {
           </ol>
         </div>
         <div className="flex min-w-0 flex-col gap-3">
-          <div className="rounded-3xl border border-line bg-surface p-5 shadow-card">
+          {/* a prévia traz o placar do momento (na noite, nomes e %): bloco com candidato */}
+          <div data-sem-anuncio-fixo className="rounded-3xl border border-line bg-surface p-5 shadow-card">
             <h3 className="flex items-center gap-2 text-[15.5px] font-semibold leading-snug text-fg">
               <Icon name="lista" size={17} className="text-fg-muted" />
               O que o bot responde agora

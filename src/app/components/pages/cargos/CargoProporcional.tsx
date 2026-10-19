@@ -227,7 +227,8 @@ export function EleitosUf({
           {lista.slice(0, corte).map((c) => {
             const f = fichas.porSq.get(c.sqcand);
             return (
-              <li key={c.sqcand} className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
+              // o cartão inteiro do eleito é bloco com candidato (anúncio e chat ao vivo não ficam por cima nem encostados)
+              <li key={c.sqcand} data-sem-anuncio-fixo className="flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-surface p-3 shadow-card">
                 <FotoOficial sqcand={c.sqcand} fotoGrupo={visto ? grupo : undefined} nome={c.nomeUrna} tamanho="xl" />
                 <div className="min-w-0 flex-1">
                   <NomeLink
@@ -272,7 +273,7 @@ function MaisVotadosNaoEleitos({ lista }: { lista: CandUf[] }) {
       <p className="mt-0.5 text-[12.5px] text-fg-muted">Suplentes e não eleitos, por votos. A vaga depende do quociente partidário, não só dos votos individuais.</p>
       <ol className="mt-3 divide-y divide-line">
         {vis.map((c, i) => (
-          <li key={c.sqcand} className="flex items-center gap-3 py-2">
+          <li key={c.sqcand} data-sem-anuncio-fixo className="flex items-center gap-3 py-2">
             <span className="num w-6 shrink-0 text-right text-[12px] text-fg-subtle">{i + 1}º</span>
             <div className="min-w-0 flex-1">
               <span className="block truncate text-[14px] font-medium text-fg">{c.nomeUrna}</span>

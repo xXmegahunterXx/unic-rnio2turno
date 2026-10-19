@@ -160,9 +160,8 @@ export function ZonasExplorer({ race, uf, cod, nomeMunicipio, zonas, zona, onZon
 
 function SemZona({ zonas, onZona }: { zonas: ZonaResumo[]; onZona: (z: number) => void }) {
   return (
-    // No celular a própria lista de zonas é o seletor (o detalhe aparece logo abaixo ao tocar). data-chat-evita: o popup
-    // do chat não tapa o seletor (chat/regiao.ts).
-    <section data-chat-evita className="hidden min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-line px-6 py-10 text-center lg:flex">
+    // No celular a própria lista de zonas é o seletor (o detalhe aparece logo abaixo ao tocar).
+    <section className="hidden min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-line px-6 py-10 text-center lg:flex">
       <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-surface-2 text-fg-muted">
         <Icon name="lista" size={22} />
       </span>

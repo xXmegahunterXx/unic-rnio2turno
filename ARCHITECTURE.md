@@ -47,14 +47,17 @@ regra é **neutralidade, precisão dos números e beleza, nesta ordem**.
    seguem). Ligar é decisão do dono com o advogado: a imagem circula sem o site em volta, com foto e número de candidato.
    Métricas de anúncio só agregadas, sem cookie, sem IP e sem dado pessoal (§10.2, item 10). Nada de peça FIXA na tela
    (presa ao cabeçalho ou ao rodapé) passando por cima ou colada a resultado ao rolar: a faixa do topo rola com a página
-   em todas as larguras, e a barra do rodapé (celular) e a pílula do chat se recolhem diante de qualquer bloco
+   em todas as larguras, e a barra do rodapé (celular) e o chat (popup do computador, pílula do celular) se recolhem diante de qualquer bloco
    `[data-sem-anuncio-fixo]` (placar, gráfico da corrida, participação, 1º × 2º turno, mapas, tabela de estados, ficha
    do candidato inteira, que nem tem a barra, fatos do tema "Os dois finalistas" das curiosidades, hemiciclo, bancadas e
-   mapas por partido de Câmara, Senado e Assembleias) — e, como rede de segurança, diante de qualquer elemento com cor de
-   candidato (`cand-*`, `--cand-*` ou `[data-candidato]`; brilhos decorativos `aria-hidden` + `pointer-events-none` não
-   contam no chat) na faixa de baixo da tela. Chat ao vivo (§11.11): o popup do computador recolhe com um bloco a menos
-   de 16 px; a faixa "Sala oferecida por" some com um bloco a menos de 48 px (popup, doca e folha central) e nunca
-   aparece na ficha do candidato nem na /anuncie; a doca (≥ 1760 px) empurra a página (nada fica embaixo dela); a folha
+   mapas por partido de Câmara, Senado e Assembleias, os CARTÕES e LINHAS de candidato inteiros dessas páginas — eleitos
+   no 1º turno de governador, finalistas do 2º turno, eleitos do Senado, da Câmara e das Assembleias, mais votados,
+   `CandidatoLinha` —, a prévia do bot da /streamers e a legenda de cores e os programas da /metodologia) — e, como rede
+   de segurança, diante de qualquer elemento com cor de candidato (`cand-*`, `--cand-*` ou `[data-candidato]`; brilhos
+   decorativos `aria-hidden` + `pointer-events-none` não contam no chat) na faixa de baixo da tela; no chat, também a
+   linha (li/tr de até 240 px) de cada link para a ficha de um candidato. Chat ao vivo (§11.11): o popup do computador recolhe (para a aba da
+   margem direita, que não cobre nada) com um bloco a menos de 16 px; a faixa "Sala oferecida por" some com um bloco a
+   menos de 48 px (popup, doca e folha central) e nunca aparece na ficha do candidato nem na /anuncie; a doca (≥ 1760 px) empurra a página (nada fica embaixo dela); a folha
    central do computador/tablet vai de lado a lado do conteúdo (cobre os dois lados por igual, nunca um só). Imagem animada (APNG, WebP animado,
    SVG com animação) é recusada. Categorias recusadas além do político-eleitoral: apostas/bets, cassino e mercados de
    previsão; bebida alcoólica fica fora do ar em 25/10 até as 17h (`anuncios-categorias.ts`). Interruptor geral "Tirar
@@ -918,15 +921,30 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
   do Duelo — `chat/rotas.ts`; /admin, /tv, /live, /embed/* e /relatorio já ficam fora do AppShell):
   - **computador ≥ 1760 px: doca** — coluna de 380 px à direita, abaixo do cabeçalho, que EMPURRA a página
     (`--sala-lateral` no padding do `main`, do rodapé e da faixa do topo; `modoComputador`): sempre aberta com a sala
-    aberta, sem cobrir nada (1760 − 380 = 1380 ≥ 1360, o layout da apuração em duas colunas não muda);
+    aberta, sem cobrir nada (1760 − 380 = 1380 ≥ 1360, o layout da apuração em duas colunas não muda); minimizada (ou
+    com a sala fechada), a pílula do canto, que perto de um bloco com candidato vira a alça estreita no mesmo canto;
   - **computador 1024–1759 px: popup** no canto inferior direito (360 × 540; até 420 de altura em janela de até 800 px;
-    "Aumentar" = 420 de largura e a altura toda), ABERTO por padrão com a sala aberta (escolha lembrada em
-    `sintonia:chat-painel`, só a feita com a sala aberta); recolhe sozinho para a pílula quando a área dele, com 16 px de
-    respiro, cruza um bloco `[data-sem-anuncio-fixo]`, um elemento com cor de candidato (brilhos decorativos não contam)
-    ou um `[data-chat-evita]` (anúncio nativo, avisos legais do /palpite, faixa do palpite na apuração, seletor de zona) —
-    salvo enquanto a pessoa mexe nele e por 3 s depois (`popupAberto`). A pílula perto de um bloco vira a alça estreita
-    NO MESMO CANTO (a entrada não pula de lugar). Ficha do candidato e /anuncie contam como canto ocupado;
-  - **pedido com o canto ocupado** (pílula, alça, chamada "Chat ao vivo" da página): folha CENTRAL embaixo, de lado a lado
+    "Aumentar" = 420 de largura e a altura toda), ABERTO por padrão com a sala aberta em todas as páginas com chat
+    (escolha lembrada em `sintonia:chat-painel`, só a feita com a sala aberta); recolhe sozinho quando a área dele, com
+    16 px de respiro, cruza um bloco `[data-sem-anuncio-fixo]`, um elemento com cor de candidato (brilhos decorativos não
+    contam) ou um `[data-chat-evita]` — hoje SÓ o anúncio nativo REAL em posição (um anunciante não tapa o de outro; a
+    impressão contaria coberta) —, salvo com o MOUSE em cima e por 3 s depois da última mexida (mouse saiu, tecla
+    digitada), e só enquanto a página não rolar: rolou (ou trocou de página) com a área ocupada, recolhe na hora — o foco
+    no campo não segura nada e o rascunho fica guardado (`popupAberto`, `paginaRolou`). A roda do mouse sobre o popup rola
+    só a lista dele, nunca a página por baixo. Recolher sozinho não tem animação de saída: a peça some direto no elemento
+    no mesmo quadro em que a área fica ocupada (`aoOcupar`, antes da pintura); rolando, a área vigiada cresce 96–240 px na
+    direção de onde os blocos vêm (`antecipar`); nó novo que pode ser candidato (página nova, lista que cresceu) é varrido
+    na hora (microtarefa do MutationObserver) e, na troca de página, a área é medida de novo antes da 1ª pintura. A régua
+    das peças fixas é a largura útil (`reguaFixa`: sem a barra de rolagem clássica do Windows). Vitrine e prévias
+    de anúncio (/anuncie, painel), o anúncio da casa, os avisos do /palpite, a faixa do palpite e o seletor de zona podem
+    ficar sob o popup. Reabre sozinho sem pisca-pisca: ocupa na hora, mas só libera com 8 px a mais de folga
+    (`HISTERESE_POPUP`) e depois de 500 ms livre (`ESPERA_REABRIR_MS`, conferido de novo no fim; `decidirOcupacao`).
+    **Recolhido** (pela escolha "Minimizar" ou perto de candidato) vira a **ABA VERTICAL** "Chat ao vivo" presa à borda
+    direita, no canto de baixo (ponto ao vivo e contador de novas; antes da abertura, "abre domingo, 17h"), DENTRO da
+    margem que o conteúdo deixa livre (`Container` largo: 32 px até 1440 px de conteúdo): 28 px de largura, 32 px a
+    partir de 48 px de margem (`larguraAba`), sempre ≥ 4 px do conteúdo — não cobre nada e não é vigiada. Só a ficha do
+    candidato conta como canto sempre ocupado (`cantoSempreOcupado`); a /anuncie, não;
+  - **pedido com o canto ocupado** (aba, chamada "Chat ao vivo" da página): folha CENTRAL embaixo, de lado a lado
     do conteúdo (até 1440 px, a conversa numa coluna de até 880 px) — cobre os dois lados por igual. Na apuração com o
     placar na tela, o placar rola para o topo e a folha começa no fim da barra dos dois lados; em outro bloco marcado
     (o topo da apuração antes das 17h, com os retratos; o placar da home), se ele cabe inteiro acima de uma folha de
@@ -935,7 +953,8 @@ das transmissões — e um espaço de anúncio próprio (formato `live`).
     com a faixa de baixo livre — pílula + barra + tab bar tomavam ~1/4 da tela); folha inferior NÃO modal que começa logo
     abaixo da linha dos % do placar nas páginas da apuração (`alturaFolhaCelular`), alta nas outras; anúncio da sala no PÉ;
     **tablet 768–1023 px**: a folha central. A folha leva `data-sem-anuncio-fixo` (a barra de anúncio some).
-  - Antes das 17h de 25/10 (sala fechada): pílula "Chat ao vivo · abre domingo, 17h"; aberta, a contagem (nas páginas da
+  - Antes das 17h de 25/10 (sala fechada): nasce minimizado — aba (computador até 1759 px) ou pílula/alça (doca e
+    celular) "Chat ao vivo · abre domingo, 17h"; aberta, a contagem (nas páginas da
     apuração só a frase, o topo já tem a contagem) e as regras. Portas: a chamada "Chat ao vivo" na 1ª dobra da apuração
     (`chat/chamada.ts`) e o item do menu Mais (/ao-vivo).
   - **Presença e token só com USO** (`marcarParticipacao`): o popup que aparece aberto sozinho só LÊ a sala (GET sem nada

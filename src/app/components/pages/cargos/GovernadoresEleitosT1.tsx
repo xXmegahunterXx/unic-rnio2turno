@@ -179,9 +179,12 @@ export function GovernadoresEleitosT1({
         <div className="min-w-0 lg:col-span-7">
           <ul className="grid grid-cols-1 gap-2 min-[560px]:grid-cols-2">
             {eleitos.map(({ uf, c }) => (
+              // data-sem-anuncio-fixo: o cartão inteiro (foto, nome, número, % e votos) — nem a barra de anúncio do celular nem
+              // o chat ao vivo ficam por cima ou encostados nele, não só na foto
               <li
                 key={uf}
                 id={`gov-t1-${uf}`}
+                data-sem-anuncio-fixo
                 className={cn(
                   'flex min-w-0 scroll-mt-28 items-center gap-3 rounded-2xl border bg-surface p-3 shadow-card transition-colors',
                   sel === uf ? 'border-brand/50 ring-2 ring-brand/30' : 'border-line',
@@ -245,7 +248,8 @@ export function GovernadoresEleitosT1({
               const cls =
                 'block h-full rounded-2xl border border-brand/30 bg-surface p-3.5 shadow-card transition-colors hover:border-brand/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
               return (
-                <li key={uf} id={`gov-t1-${uf}`} className="scroll-mt-28">
+                // com os finalistas à vista (nome, partido e %), o cartão é bloco com candidato
+                <li key={uf} id={`gov-t1-${uf}`} data-sem-anuncio-fixo={verFinalistas ? '' : undefined} className="scroll-mt-28">
                   {onSelectUf2t ? (
                     <button type="button" onClick={() => onSelectUf2t(uf)} className={cn(cls, 'w-full text-left')}>
                       {conteudo}

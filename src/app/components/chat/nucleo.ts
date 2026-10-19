@@ -216,12 +216,68 @@ export function inflar(r: Retangulo, px: number): Retangulo {
 }
 
 /**
- * Respiros das áreas vigiadas (px de cada lado): o popup aberto e a pílula recolhem com um bloco com candidato a menos de
- * `RESPIRO_POPUP` (nunca encostados nele); a faixa "Sala oferecida por" some com um bloco a menos de `RESPIRO_ANUNCIO`
+ * Respiros das áreas vigiadas (px de cada lado): o popup aberto recolhe com um bloco com candidato a menos de
+ * `RESPIRO_POPUP` (nunca encostado nele); a faixa "Sala oferecida por" some com um bloco a menos de `RESPIRO_ANUNCIO`
  * (o mesmo respiro da barra de anúncio do celular — ARCHITECTURE §1.5: anúncio nunca colado a resultado).
  */
 export const RESPIRO_POPUP = 16;
 export const RESPIRO_ANUNCIO = 48;
+
+/**
+ * Sem pisca-pisca na borda de um bloco (rolagem lenta, bloco que cresce um pouco): a área OCUPA na hora em que cruza um
+ * bloco com o respiro de sempre, mas só LIBERA quando fica livre com `HISTERESE_POPUP` px a mais de folga e assim
+ * continua por `ESPERA_REABRIR_MS` (o popup reabre sozinho um instante depois de o bloco sair de baixo, não no meio da
+ * rolagem).
+ */
+export const HISTERESE_POPUP = 8;
+export const ESPERA_REABRIR_MS = 500;
+
+/**
+ * Próximo passo de uma área vigiada: 'ocupa' (fica ou passa a ocupada, na hora), 'espera' (estava ocupada e agora está
+ * livre com folga: libera depois da espera) ou 'livre' (continua livre). `perto` = um bloco cruza a área com o respiro;
+ * `naFolga` = cruza a área com o respiro + a histerese. Na 1ª medição vale só o respiro (sem histerese: o popup nasce
+ * aberto se a área dele está livre) e não há espera.
+ */
+export function decidirOcupacao(e: { ocupada: boolean; perto: boolean; naFolga: boolean; primeira?: boolean }): 'ocupa' | 'espera' | 'livre' {
+  if (e.perto) return 'ocupa';
+  if (e.primeira) return 'livre';
+  if (!e.ocupada) return 'livre';
+  return e.naFolga ? 'ocupa' : 'espera';
+}
+
+/**
+ * Rolagem em curso: os blocos chegam ao popup pelo lado de onde a página vem (rolando para baixo, sobem pelo pé da tela;
+ * para cima, descem pelo topo). A detecção vem depois do quadro (o navegador rola a página antes de o script saber), então
+ * a área vigiada do popup CRESCE nessa direção — 4× o passo do último quadro, entre `ANTECIPA_MIN_PX` e
+ * `ANTECIPA_MAX_PX` — enquanto houver rolagem há menos de `ANTECIPA_JANELA_MS`: o popup recolhe antes de o bloco chegar.
+ * `dy` = quanto a página rolou no último quadro (px; > 0 para baixo; 0 = parada).
+ */
+export const ANTECIPA_MIN_PX = 96;
+export const ANTECIPA_MAX_PX = 240;
+export const ANTECIPA_JANELA_MS = 220;
+export function antecipar(r: Retangulo, dy: number): Retangulo {
+  if (!dy || !Number.isFinite(dy)) return r;
+  return estender(r, dy, Math.min(ANTECIPA_MAX_PX, Math.max(ANTECIPA_MIN_PX, Math.abs(dy) * 4)));
+}
+
+/**
+ * Sem pisca-pisca na rolagem: com a página rolando, o popup recolhido só REABRE se o caminho à frente estiver livre por
+ * `PERMANENCIA_MIN_MS` na velocidade atual — a folga da histerese cresce, na direção da rolagem, `velocidade ×
+ * PERMANENCIA_MIN_MS` (até `ALCANCE_MAX_PX`). Rolando rápido por uma página cheia de blocos, ele espera a rolagem
+ * acalmar; rolando devagar (lendo), reabre nos trechos livres. `vPxMs` = velocidade da rolagem (px/ms).
+ */
+export const PERMANENCIA_MIN_MS = 700;
+export const ALCANCE_MAX_PX = 1200;
+export function alcanceReabrir(vPxMs: number): number {
+  if (!Number.isFinite(vPxMs) || vPxMs <= 0) return 0;
+  return Math.round(Math.min(ALCANCE_MAX_PX, vPxMs * PERMANENCIA_MIN_MS));
+}
+
+/** O retângulo estendido `px` na direção da rolagem (`dy` > 0: para baixo; < 0: para cima). */
+export function estender(r: Retangulo, dy: number, px: number): Retangulo {
+  if (!dy || !(px > 0)) return r;
+  return dy > 0 ? { ...r, bottom: r.bottom + px } : { ...r, top: r.top - px };
+}
 
 /** Os dois retângulos se cruzam (área > 0)? */
 export function cruza(a: Retangulo, b: Retangulo): boolean {
@@ -244,7 +300,7 @@ export const POPUP = {
   margem: 20,
   /** respiro entre o cabeçalho do site e o topo do popup */
   folgaTopo: 16,
-  /** pílula minimizada: área vigiada no canto (cabe "Chat ao vivo · abre domingo, 17h") */
+  /** pílula da doca minimizada (≥ 1760 px): área vigiada no canto (cabe "Chat ao vivo · abre domingo, 17h") */
   pilulaLargura: 300,
   pilulaAltura: 44,
 } as const;
@@ -265,13 +321,53 @@ export function geometriaPopup(janela: { largura: number; altura: number }, cabe
   return { largura, altura, margem, right, bottom, left: right - largura, top: bottom - altura };
 }
 
-/** Área da pílula minimizada (canto inferior direito). */
+/**
+ * Régua das peças `position: fixed` (popup, pílula, doca): a largura da janela SEM a barra de rolagem
+ * (`documentElement.clientWidth`, `util`). Com a barra clássica (Windows, 15–17 px), `innerWidth` poria a área vigiada
+ * à direita do popup real e o respiro esquerdo cairia para ~1 px. Sem medida útil, a largura da janela.
+ */
+export function reguaFixa(j: { largura: number; altura: number; util?: number }): { largura: number; altura: number } {
+  const u = typeof j.util === 'number' && j.util > 0 ? Math.min(j.util, j.largura) : j.largura;
+  return { largura: u, altura: j.altura };
+}
+
+/** Área da pílula da doca minimizada (canto inferior direito; ≥ 1760 px). */
 export function regiaoPilula(janela: { largura: number; altura: number }): Retangulo {
   const margem = janela.largura >= 1440 ? 24 : POPUP.margem;
   const right = janela.largura - margem;
   const bottom = janela.altura - margem;
   return { right, bottom, left: right - POPUP.pilulaLargura, top: bottom - POPUP.pilulaAltura };
 }
+
+/**
+ * Margem lateral que o conteúdo deixa livre no computador (`Container` largo: `lg:px-8` = 32 px, até 1440 px de
+ * conteúdo; depois disso, centralizado). `larguraUtil` = largura da janela sem a barra de rolagem
+ * (`documentElement.clientWidth`), a mesma régua do `position: fixed`.
+ */
+export const CONTEUDO_LARGO = 1440;
+export const RESPIRO_LATERAL_CONTEUDO = 32;
+export function margemConteudo(larguraUtil: number): number {
+  return RESPIRO_LATERAL_CONTEUDO + Math.max(0, (larguraUtil - CONTEUDO_LARGO) / 2);
+}
+
+/**
+ * Largura da ABA recolhida (computador 1024–1759): a aba vertical "Chat ao vivo" fica NA MARGEM DIREITA, sem cobrir
+ * conteúdo nenhum — 32 px quando a margem tem 48 px ou mais; senão até 28 px, sempre a ≥ 4 px do conteúdo (numa margem
+ * menor, encolhe só ali; nunca abaixo de 20 px).
+ */
+export function larguraAbaNaMargem(margem: number): number {
+  if (margem >= 48) return 32;
+  return Math.max(20, Math.min(28, Math.floor(margem - 4)));
+}
+export const larguraAba = (larguraUtil: number): number => larguraAbaNaMargem(margemConteudo(larguraUtil));
+
+/**
+ * Páginas em que o canto do popup conta SEMPRE como ocupado (pedir o chat abre a folha central): a ficha do candidato —
+ * a página inteira é foto, nome, número e votos de um candidato. A /anuncie NÃO entra (a vitrine e as prévias de
+ * anúncio são demonstração: podem ficar sob o popup); lá só a faixa "Sala oferecida por" nunca aparece
+ * (`rodapePermitido`, anuncios/nucleo.ts).
+ */
+export const cantoSempreOcupado = (pathname: string): boolean => /^\/candidato(\/|$)/.test(pathname);
 
 /**
  * Doca: em janela larga, o chat aberto vira uma COLUNA à direita que EMPURRA a página (`--sala-lateral` no padding do
@@ -317,24 +413,30 @@ export function prefEfetiva(e: { sessao: { pref: PrefPopup; aberta: boolean } | 
   return e.aberta ? (e.guardada ?? 'aberto') : 'minimizado';
 }
 
-/** Depois de a pessoa mexer no popup (mouse saiu, foco saiu do campo), por quanto tempo ele ainda não se recolhe. */
+/** Depois de a pessoa mexer no popup (mouse saiu, última tecla), por quanto tempo ele ainda não se recolhe. */
 export const GRACA_INTERACAO_MS = 3000;
 
 /**
  * O popup do canto aparece aberto? Regra de ouro: ele nunca fica por cima de bloco com candidato (`ocupada`: a área dele
- * cruza um bloco `data-sem-anuncio-fixo` ou com cor de candidato) — recolhe sozinho para a pílula e volta quando a área
- * fica livre. Exceção: a pessoa está mexendo nele — mouse em cima ou digitando no campo (`interagindo`) — ou acabou de
- * mexer (menos de `GRACA_INTERACAO_MS`): ele não some debaixo da mão dela quando a página muda por baixo. Sem interação
- * nenhuma (`msDesdeInteracao` = Infinity), recolhe.
+ * cruza um bloco `data-sem-anuncio-fixo` ou com cor de candidato, ou um anúncio real em posição) — recolhe sozinho para
+ * a aba da margem direita e volta quando a área fica livre (com histerese: `decidirOcupacao`).
+ *
+ * Exceção, só para a página que muda POR BAIXO dele (bloco que cresce, dado novo): o mouse está em cima
+ * (`interagindo` — só o ponteiro; o foco no campo não segura nada) ou a pessoa mexeu nele há menos de
+ * `GRACA_INTERACAO_MS` (mouse saiu, tecla digitada): ele não some debaixo da mão dela. Se a PÁGINA ROLOU depois da
+ * última mexida (`paginaRolou`: a pessoa voltou a ler a página), não há exceção — recolhe na hora (o rascunho fica
+ * guardado). Sem interação nenhuma (`msDesdeInteracao` = Infinity), recolhe.
  */
-export function popupAberto(e: { pref: PrefPopup; ocupada: boolean; interagindo: boolean; msDesdeInteracao: number }): boolean {
+export function popupAberto(e: { pref: PrefPopup; ocupada: boolean; interagindo: boolean; msDesdeInteracao: number; paginaRolou?: boolean }): boolean {
   if (e.pref !== 'aberto') return false;
-  if (!e.ocupada || e.interagindo) return true;
+  if (!e.ocupada) return true;
+  if (e.paginaRolou) return false;
+  if (e.interagindo) return true;
   return Number.isFinite(e.msDesdeInteracao) && e.msDesdeInteracao < GRACA_INTERACAO_MS;
 }
 
 /**
- * A pessoa pediu o chat (pílula, alça, chamada "Chat ao vivo" da página): onde ele abre no computador. Com o canto livre,
+ * A pessoa pediu o chat (aba da margem, chamada "Chat ao vivo" da página): onde ele abre no computador. Com o canto livre,
  * o popup do canto; com o canto em cima de um bloco com candidato, a folha CENTRAL embaixo (mesmas margens dos dois
  * lados: cobre a parte de baixo dos DOIS lados do placar, nunca um lado só — e nas páginas da apuração o placar rola para
  * ficar à vista acima dela), até a pessoa minimizar.
