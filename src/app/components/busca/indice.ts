@@ -52,6 +52,7 @@ export const PAGINAS: ItemBusca[] = [
   { id: 'p-teste', tipo: 'pagina', rotulo: 'Teste Cego', sub: 'Concorde ou discorde de ideias sem saber de quem são', to: '/teste', icone: 'olho-fechado', chave: 'teste cego afirmacoes ideias propostas quiz' },
   { id: 'p-curiosidades', tipo: 'pagina', rotulo: 'Curiosidades', sub: 'Recordes e fatos do 1º turno', to: '/curiosidades', icone: 'grafico', chave: 'curiosidades fatos recordes empate primeiro turno' },
   { id: 'p-cenarios', tipo: 'pagina', rotulo: 'E se…? Monte seu cenário', sub: 'Calculadora do 2º turno, não é previsão', to: '/cenarios', icone: 'troca', chave: 'e se cenario cenarios calculadora simulador transferencia votos' },
+  { id: 'p-pesquisas', tipo: 'pagina', rotulo: 'Pesquisas do 2º turno', sub: 'Registradas no TSE, com a fonte', to: '/pesquisas', icone: 'lista', chave: 'pesquisas pesquisa eleitoral intencao de voto instituto registro tse' },
   { id: 'p-metodologia', tipo: 'pagina', rotulo: 'Metodologia', sub: 'Fontes e como calculamos', to: '/metodologia', icone: 'info', chave: 'metodologia fontes como funciona tse ibge' },
 ];
 

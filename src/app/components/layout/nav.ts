@@ -33,5 +33,5 @@ export const NAV: NavItem[] = [
 export const NAV_TAB = NAV.filter((n) => n.tab !== false);
 
 /** Rotas que vivem no menu "Mais" (marca a aba "Mais" como ativa no celular). O conteúdo do menu está em mais.ts. */
-export const PREFIXOS_MAIS = ['/curiosidades', '/cenarios', '/governadores', '/senado', '/camara', '/assembleias', '/metodologia', '/privacidade', '/sobre', '/anuncie', '/streamers', '/palpite', '/ao-vivo'];
+export const PREFIXOS_MAIS = ['/curiosidades', '/cenarios', '/governadores', '/senado', '/camara', '/assembleias', '/metodologia', '/privacidade', '/sobre', '/anuncie', '/streamers', '/palpite', '/pesquisas', '/ao-vivo'];
 export const ativoNoMais = (pathname: string) => PREFIXOS_MAIS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

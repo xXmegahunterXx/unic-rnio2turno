@@ -28,6 +28,7 @@ export const MAIS: GrupoMais[] = [
   {
     titulo: 'Explore',
     itens: [
+      { to: '/pesquisas', label: 'Pesquisas do 2º turno', desc: 'Registradas no TSE, com a fonte de cada número', icon: 'lista', match: (p) => p.startsWith('/pesquisas') },
       { to: '/curiosidades', label: 'Curiosidades', desc: 'Recordes e fatos do 1º turno', icon: 'grafico', match: (p) => p.startsWith('/curiosidades') },
       { to: '/ao-vivo', label: 'Chat ao vivo', desc: 'Sala da apuração, moderada (abre às 17h de 25/10)', icon: 'chat', match: (p) => p.startsWith('/ao-vivo') },
       { to: '/palpite', label: 'Palpite do 2º turno', desc: 'Crave o % de cada um até as 17h de 25/10', icon: 'relogio', match: (p) => p.startsWith('/palpite') },

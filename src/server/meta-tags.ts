@@ -27,6 +27,8 @@ import type { Curiosidade } from '../shared/curiosidades';
 import type { Fase, Race, Summary, UF } from '../shared/types';
 import { UFS } from '../shared/types';
 import { ondeMunicipio, tituloApuracao, tituloNacional, type MomentoTitulo } from '../shared/titulos';
+import { AVISO_PESQUISAS, fmtDataPesquisa, fmtPctPesquisa, linhaObrigatoria, numerosDaPesquisa, rotuloCargoCurto, type Pesquisa } from '../shared/pesquisas';
+import { hashCurto } from './http-cache';
 import { emUf } from '../engine/events';
 import { cargoExibicao, ehEleito, situacaoTexto } from './dados-estaticos';
 
@@ -92,6 +94,8 @@ export interface ContextoMeta {
   cenario?(codigo: string): ResumoCenarioMeta | null;
   /** A vitrine /kit existe neste build (só dev/demo; no build de produção a rota é 404). Padrão: não. */
   kit?: boolean;
+  /** Pesquisa registrada publicada (`/pesquisas?p=<id>`); null = desconhecida, removida ou nomes ocultos. */
+  pesquisa?(id: string): Pesquisa | null;
 }
 
 const DESCRICAO_PADRAO =
@@ -130,7 +134,7 @@ function bancadasTexto(b: { sigla: string; eleitos: number }[], n: number): stri
 const cortar = (s: string, max: number) => (s.length <= max ? s : `${s.slice(0, max - 1).trimEnd()}…`);
 
 /** Parâmetros de busca que mudam o conteúdo da página (entram na chave do cache do HTML). */
-export const PARAMS_RELEVANTES = ['race', 'uf', 'fato', 'f', 'tema', 'c'] as const;
+export const PARAMS_RELEVANTES = ['race', 'uf', 'fato', 'f', 'tema', 'c', 'p'] as const;
 
 /**
  * Parâmetros de ORIGEM do link (I08): `utm_*` (canal), `h` (hora do compartilhamento no X e no Telegram, para o cartão não
@@ -179,6 +183,8 @@ export const OG_COM_CANDIDATO = [
   // fatos do 1º turno com os nomes e os percentuais dos finalistas; cenário hipotético com nomes e percentuais
   '/api/og/curiosidade.png',
   '/api/og/cenario.png',
+  // pesquisa registrada: nomes e percentuais dos candidatos (a capa sem id também vira o convite: some a área inteira)
+  '/api/og/pesquisa.png',
 ];
 
 /**
@@ -417,6 +423,37 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       imagemVersao: 'v2',
       noindex: true,
       canonico: '/palpite/desafio',
+    });
+  }
+  // ---- pesquisas registradas do 2º turno (src/app/pages/pesquisas/PesquisasPage.tsx) ------------------------------------
+  if (s0 === 'pesquisas' && seg.length === 1) {
+    const capa = pagina({
+      titulo: `Pesquisas do 2º turno · ${APP_NAME}`,
+      descricao: comNomes
+        ? `${AVISO_PESQUISAS} Cada pesquisa com instituto, contratante, registro, período da coleta, entrevistas, margem de erro e nível de confiança.`
+        : 'Pesquisas eleitorais registradas no TSE. No dia da votação, até as 17h, a área fica sem pesquisas.',
+      imagem: '/api/og/pesquisa.png',
+      imagemAlt: 'Pesquisas do 2º turno · Sintonia',
+      imagemVersao: 'v1',
+      canonico: '/pesquisas',
+    });
+    const id = (q.get('p') ?? '').slice(0, 64);
+    if (!id || !/^[a-z0-9][a-z0-9-]{2,63}$/.test(id) || !comNomes) return capa;
+    const p = tentar(() => ctx.pesquisa?.(id) ?? null);
+    if (!p) return capa;
+    const r = ctx.races.get(p.cargo);
+    const nome = (n: number) => r?.candidatos.find((c) => !c.agregado && c.numero === n)?.nomeUrna ?? `Candidato ${n}`;
+    const placar = numerosDaPesquisa(p)
+      .map((n) => `${nome(n)} ${fmtPctPesquisa(p.totais[String(n)])}`)
+      .join(' · ');
+    return pagina({
+      titulo: `Pesquisa ${p.instituto} · ${rotuloCargoCurto(p.cargo)} · 2º turno · ${APP_NAME}`,
+      descricao: cortar(`Votos totais, divulgada em ${fmtDataPesquisa(p.divulgadaEm)}: ${placar}. ${linhaObrigatoria(p)}. Pesquisa não é resultado.`, 400),
+      imagem: `/api/og/pesquisa.png?id=${encodeURIComponent(p.id)}`,
+      imagemAlt: `Pesquisa ${p.instituto} · ${rotuloCargoCurto(p.cargo)} · registro ${p.registro}`,
+      // conteúdo da pesquisa na URL da imagem: editada no painel → imagem nova (o X e o WhatsApp buscam de novo)
+      imagemVersao: `p${hashCurto(JSON.stringify(p))}`,
+      canonico: `/pesquisas?p=${encodeURIComponent(p.id)}`,
     });
   }
   // ---- chat ao vivo moderado (src/app/pages/chat/AoVivoPage.tsx) ------------------------------------------------------

@@ -41,6 +41,7 @@ import { imagemComOferecimento, tagOferecimento } from './og-oferecimento';
 import { SalaChat, registrarChatAdmin, registrarChatPublico } from './chat';
 import { RegistroEnvios } from './chat-registro';
 import { registrarCrescimento, type StoresCrescimento } from './crescimento';
+import { registrarPesquisas } from './pesquisas'; // pesquisas registradas do 2º turno
 import { createJsonStore, type JsonStore } from './state-store';
 import { COOKIE_SESSAO, LimiteTaxa, Sessoes, chaveCliente, redeDoCliente, senhaConfere } from './auth';
 import { motivoSemSimulacao, type ServerConfig } from './config';
@@ -124,6 +125,8 @@ export interface AppDeps {
   cdnCc?: boolean;
   /** Alertas da noite (I16, frente B). Também ligáveis depois da criação por `ligarAlertas` (ver AlertasApp). */
   alertas?: AlertasApp;
+  /** STATE_DIR/pesquisas.json (pesquisas incluídas/editadas/removidas pelo painel). Ausente = criado em `config.stateDir`. */
+  pesquisasStore?: JsonStore;
 }
 
 /**
@@ -1477,6 +1480,22 @@ export function createApp(deps: AppDeps) {
     relatorio: relatorioDe,
   });
 
+  // pesquisas registradas do 2º turno (src/server/pesquisas.ts): GET /api/pesquisas, /api/og/pesquisa.png e o painel
+  const pesquisas = registrarPesquisas(app, admin, {
+    now,
+    log,
+    dataDir: config.dataDir,
+    store:
+      deps.pesquisasStore ??
+      createJsonStore(config.stateDir, 'pesquisas.json', { debounceMs: 0, lembrar: 8, onErro: (e) => log.erro('Falha ao salvar as pesquisas', e) }),
+    races: () => races,
+    anonimizado: () => !!dados.status().anonimizado,
+    borda: cdnCc,
+    servicoOg,
+    limitarRender: limiteOg ? (c) => limiteOg.tentar(clienteDe(c)) : undefined,
+    dominio: config.publicUrl ? new URL(config.publicUrl).host : null,
+  });
+
   const streamers = registrarStreamers(app, admin, { now, log, dados, noite, clienteDe, origemPermitida, stateDir: config.stateDir, borda: cdnCc, dominio: config.publicUrl ? new URL(config.publicUrl).host : null }); // I22/I23 (frente G): texto para bots, lives
   app.route('/api/admin', admin);
 
@@ -1518,6 +1537,8 @@ export function createApp(deps: AppDeps) {
       ficha: (sq) => ({ lida: dadosEstaticos.ficha(sq), existe: dadosEstaticos.existeCandidato(sq) }),
       cargo: (nome) => dadosEstaticos.cargo(nome),
       curiosidades: () => dadosEstaticos.curiosidades(),
+      // pesquisas registradas: nunca com nomes ocultos (a área nem aparece na simulação anonimizada)
+      pesquisa: (id) => (dados.status().anonimizado ? null : pesquisas.porId(id)),
       cenario(codigo) {
         // tamanho e alfabeto conferidos antes de decodificar (códigos gigantes nunca chegam ao decodificador)
         if (codigo.length > MAX_CODIGO || !/^[A-Za-z0-9_-]+={0,2}$/.test(codigo)) return null;
@@ -1667,6 +1688,8 @@ export function createApp(deps: AppDeps) {
     verificarMetas,
     relatorios,
     crescimento,
+    /** Pesquisas registradas (src/server/pesquisas.ts): `persistir()` no encerramento. */
+    pesquisas,
     /** Chaves da noite em vigor (leitura guardada por 1 s; ver `noite` acima): para os módulos das outras frentes. */
     noite,
     /** Saúde da noite (a mesma do GET /api/saude-noite). */

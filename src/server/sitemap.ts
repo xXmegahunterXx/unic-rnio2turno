@@ -55,6 +55,7 @@ export function paginasSitemap(): string[] {
     '/anuncie',
     '/streamers',
     '/palpite',
+    '/pesquisas',
     '/ao-vivo',
   ];
 }

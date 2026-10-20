@@ -53,6 +53,7 @@ const routes: RouteObject[] = [
       { path: '/streamers', element: page(() => import('./pages/streamers/StreamersPage')) },
       { path: '/palpite', element: page(() => import('./pages/palpite/PalpitePage')) },
       { path: '/palpite/desafio', element: page(() => import('./pages/palpite/PalpitePage')) },
+      { path: '/pesquisas', element: page(() => import('./pages/pesquisas/PesquisasPage')) },
       // Vitrine do design system (QA visual): só no `npm run dev` e no build demo. Fora do build de produção, onde
       // seria uma URL pública com números fictícios ao lado de nomes reais (e o chunk nem é gerado).
       ...(import.meta.env.DEV || __DEMO__

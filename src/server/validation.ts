@@ -346,3 +346,47 @@ export function parseAdminCommand(body: unknown): AdminCommand {
 }
 
 export const loginSchema = z.object({ senha: z.string().min(1).max(1024) }).strict();
+
+// ---------------------------------------------------------------------------------------------
+// Pesquisas registradas (painel → Pesquisas; src/server/pesquisas.ts). O zod confere a FORMA do comando (tipos e
+// tamanhos); `validaPesquisa` (src/shared/pesquisas.ts) confere o conteúdo exigido pela Res. TSE 23.600/2019.
+// ---------------------------------------------------------------------------------------------
+
+const idPesquisaZ = z.string().regex(/^[a-z0-9][a-z0-9-]{2,63}$/, 'identificador inválido');
+const pctPesquisa = finito.min(0).max(100);
+const pesquisaEntrada = z
+  .object({
+    id: idPesquisaZ.optional(),
+    cargo: z.string().trim().regex(/^(pres|gov-[a-z]{2})$/, 'use "pres" ou "gov-xx"'),
+    instituto: z.string().max(200),
+    contratante: z.string().max(400),
+    registro: z.string().max(40),
+    coletaInicio: z.string().max(10),
+    coletaFim: z.string().max(10),
+    divulgadaEm: z.string().max(10),
+    entrevistas: finito,
+    margemPp: finito,
+    confiancaPct: finito,
+    modo: z.enum(['presencial', 'telefone', 'internet', 'misto']).optional(),
+    totais: z.record(z.string().max(16), pctPesquisa).refine((o) => Object.keys(o).length <= 4, 'chaves demais'),
+    validos: z.record(z.string().max(16), pctPesquisa).refine((o) => Object.keys(o).length <= 2, 'chaves demais').optional(),
+    fontes: z.array(z.string().max(600)).min(1, 'informe a fonte').max(6, 'no máximo 6 fontes'),
+  })
+  .strict();
+
+export const comandoPesquisaSchema = z.discriminatedUnion('acao', [
+  z.object({ acao: z.literal('salvar'), pesquisa: pesquisaEntrada, idAnterior: idPesquisaZ.optional() }).strict(),
+  z.object({ acao: z.literal('remover'), id: idPesquisaZ }).strict(),
+  z.object({ acao: z.literal('restaurar'), id: idPesquisaZ }).strict(),
+]);
+
+/** Valida a forma de um comando do painel de pesquisas (lança ErroValidacao com a 1ª mensagem legível). */
+export function parseComandoPesquisa(body: unknown): z.infer<typeof comandoPesquisaSchema> {
+  const r = comandoPesquisaSchema.safeParse(body);
+  if (!r.success) {
+    const i = r.error.issues[0];
+    const onde = i.path.length ? `${i.path.join('.')}: ` : '';
+    throw new ErroValidacao(`Comando inválido — ${onde}${i.message}`);
+  }
+  return r.data;
+}

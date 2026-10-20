@@ -41,7 +41,7 @@ export const ORDEM_ROTULO: Record<OrdemRegional, string> = {
   'sul-primeiro': 'Sul e Sudeste bem antes',
 };
 
-export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'chat' | 'fonte' | 'monitor' | 'interessados' | 'audiencia' | 'postar' | 'lives';
+export type SecaoId = 'controle' | 'cenario' | 'estados' | 'comunicacao' | 'anuncios' | 'chat' | 'fonte' | 'monitor' | 'interessados' | 'audiencia' | 'postar' | 'lives' | 'pesquisas';
 
 export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: string }[] = [
   { id: 'controle', rotulo: 'Controle', icone: 'ao-vivo', descricao: 'Relógio, linha do tempo e pré-visualização' },
@@ -58,6 +58,8 @@ export const SECOES: { id: SecaoId; rotulo: string; icone: IconName; descricao: 
   // leva 3 (SecaoPostar e SecaoLives, de outras frentes): o menu só mostra a entrada se o arquivo existir (SalaDeControle)
   { id: 'postar', rotulo: 'Postar', icone: 'compartilhar', descricao: 'Textos e imagens prontos para cada momento da noite' },
   { id: 'lives', rotulo: 'Lives', icone: 'play', descricao: 'Lives que exibem o Sintonia agora, minutos no ar e bots de chat (só contagens)' },
+  // pesquisas registradas do 2º turno (src/server/pesquisas.ts): no fim, para não mudar os atalhos das outras seções
+  { id: 'pesquisas', rotulo: 'Pesquisas', icone: 'check-circulo', descricao: 'Pesquisas registradas no TSE: incluir, editar e tirar do site, com prévia do cartão' },
 ];
 
 export const ehSecao = (s: string | null): s is SecaoId => !!s && SECOES.some((x) => x.id === s);

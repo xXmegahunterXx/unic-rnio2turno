@@ -54,6 +54,8 @@ import { useNaTela } from '@/app/lib/useNaTela';
 // Fora do pedaço da página (LCP e peso de /apuracao): a chamada do Palpite só existe na fase 'pre'; o "Desde o 1º turno"
 // fica no fim da página e só monta perto da tela.
 const ChamadaPalpite = lazy(() => import('@/app/components/palpite/ChamadaPalpite').then((m) => ({ default: m.ChamadaPalpite })));
+// pesquisas registradas (as 3 mais recentes de Presidente): só na fase 'pre', antes do dia da votação; chunk próprio
+const BlocoPesquisas = lazy(() => import('@/app/components/pesquisas/BlocoPesquisas'));
 const DesdePrimeiroTurnoBrasil = lazy(() => import('@/app/components/apuracao/DesdePrimeiroTurno').then((m) => ({ default: m.DesdePrimeiroTurnoBrasil })));
 // I28: "Siga o Sintonia" só com a apuração encerrada (chunk próprio; sem rede configurada, nada aparece)
 const SigaSintonia = lazy(() => import('@/app/components/crescimento/SigaSintonia'));
@@ -201,6 +203,9 @@ export default function NacionalPage() {
           <PreHeroVivo status={status} race={race2T} />
           <Suspense fallback={null}>
             <ChamadaPalpite variante="faixa" className="mt-6 sm:mt-8" />
+          </Suspense>
+          <Suspense fallback={null}>
+            <BlocoPesquisas className="mt-6 sm:mt-8" />
           </Suspense>
           <div id="primeiro-turno" className="mb-4 mt-8 scroll-mt-28 sm:mb-5 sm:mt-12">
             <Badge tone="brand" size="sm" icon="check-circulo" caps>

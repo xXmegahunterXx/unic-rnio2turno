@@ -27,6 +27,7 @@ import { SecaoAnuncios } from './SecaoAnuncios';
 import { SecaoChat } from './SecaoChat';
 import { SecaoAudiencia } from './SecaoAudiencia';
 import { SecaoInteressados, useInteressadosNovos } from './SecaoInteressados';
+import { SecaoPesquisas, usePesquisasAdmin } from './SecaoPesquisas';
 import { situacaoDe } from './anunciosAdmin';
 import { fmtHora } from '@/shared/format';
 import { chavesNoite } from '@/shared/chaves-noite';
@@ -108,6 +109,8 @@ function ConteudoSecao({ secao }: { secao: SecaoId }) {
       return <SecaoAudiencia />;
     case 'monitor':
       return <SecaoMonitor />;
+    case 'pesquisas':
+      return <SecaoPesquisas />;
     case 'postar':
     case 'lives': {
       const Extra = SECOES_EXTRAS[secao];
@@ -159,6 +162,7 @@ function useDicas(): Record<SecaoId, ReactNode> {
   const st = snap.state;
   const noAr = useAnunciosNoAr();
   const novos = useInteressadosNovos();
+  const pesquisas = useResumoPesquisas();
   const ajustes = new Set([...Object.keys(st.cenario.ufVies), ...Object.keys(st.cenario.ufAtraso)]).size;
   const freio = chavesNoite(st).freio;
   return {
@@ -205,6 +209,13 @@ function useDicas(): Record<SecaoId, ReactNode> {
     audiencia: null,
     postar: null,
     lives: null,
+    pesquisas: pesquisas.invalidas ? (
+      <Badge size="xs" tone="alert" caps>
+        semente
+      </Badge>
+    ) : pesquisas.noSite ? (
+      <span className="num text-[11px] text-fg-subtle">{pesquisas.noSite}</span>
+    ) : null,
   };
 }
 
@@ -229,7 +240,14 @@ function useAtencao(): Record<SecaoId, 'brand' | 'alert' | null> {
     audiencia: null,
     postar: null,
     lives: null,
+    pesquisas: useResumoPesquisas().invalidas ? 'alert' : null,
   };
+}
+
+/** Pesquisas no site e pesquisas da semente recusadas (selo do menu). 0 no demo. */
+function useResumoPesquisas(): { noSite: number; invalidas: number } {
+  const d = usePesquisasAdmin().data;
+  return { noSite: d?.itens.filter((i) => !i.removida).length ?? 0, invalidas: d?.semente.invalidas.length ?? 0 };
 }
 
 /**

@@ -480,6 +480,7 @@ function Footer() {
               { to: '/teste', label: 'Teste Cego' },
               { to: '/cenarios', label: 'E se…? Monte seu cenário' },
               { to: '/palpite', label: 'Palpite do 2º turno' },
+              { to: '/pesquisas', label: 'Pesquisas registradas' },
             ]}
           />
           <FooterCol

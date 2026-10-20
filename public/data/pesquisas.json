@@ -1,0 +1,4 @@
+{
+  "sobre": "Pesquisas eleitorais REGISTRADAS no TSE para o 2º turno de 2026 (Lei 9.504/97, art. 33; Res. TSE 23.600/2019). Contrato e validação: src/shared/pesquisas.ts. Cada número vem de uma fonte aberta (URL em fontes). Nunca inventar, estimar ou completar número.",
+  "pesquisas": []
+}

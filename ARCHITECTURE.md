@@ -399,6 +399,7 @@ Use typed arrays (Struct of Arrays) para as seções: `mun`, `zona`, `numero`, `
 | `/live?layout=&fundo=&tema=&race=&posicao=` | Modo streamer: fonte de navegador do OBS/Streamlabs (fora do AppShell, fundo transparente; §11.10) |
 | `/streamers` | "Use o Sintonia na sua live": layouts com prévia, URL para copiar, passo a passo do OBS, regras e contato (§11.10) |
 | `/palpite`, `/palpite#<código>` | Palpite do 2º turno: a pessoa crava o % dos válidos de cada finalista até as 17h de 25/10; depois, a diferença para o resultado oficial (§11.13) |
+| `/pesquisas`, `/pesquisas?cargo=gov-df`, `/pesquisas?p=<id>` | Pesquisas REGISTRADAS do 2º turno (§11.15): aviso fixo, filtro Presidente/Governador (UF), cartões com as informações obrigatórias e a fonte, gráfico por instituto; dia da votação = aviso; depois do resultado oficial, "Pesquisas × resultado" |
 | `/embed/placar`, `/embed/mapa`, `/embed/uf` | Widgets para incorporar em outros sites (§11.6) |
 | `/kit` | Vitrine do design system (QA visual): só no `npm run dev` e no build demo; em produção, 404 |
 
@@ -1133,6 +1134,39 @@ cartão do resultado. Código em `src/app/components/palpite` (`nucleo.ts` puro 
 - **Camada do mapa "Desde o 1º turno"** (`mapModes.ts`, modo `variacao`): `crescimentoDesdeT1` = (p0₂ − p0₁) − (p1₂ − p1₁),
   na cor de quem cresceu mais, saturando em ±10 p.p.; tooltip "Desde o 1º turno: Lula +5,1 · Flávio +2,0 p.p."; no mapa, a
   diferença (`rotuloCurto`). Mapa por UF, por município da UF e nacional por município (canvas).
+
+### 11.15 Pesquisas registradas do 2º turno (`/pesquisas`)
+
+Regra jurídica (Lei 9.504/97, art. 33; Res. TSE 23.600/2019): só pesquisa REGISTRADA no TSE, sempre com período da
+coleta, margem de erro, nível de confiança, entrevistas, quem realizou, quem contratou e o número de registro (art. 10);
+enquete é proibida. Nunca se inventa, estima ou completa um número: cada pesquisa traz a URL da fonte.
+
+- **Contrato** `src/shared/pesquisas.ts` (testado): `Pesquisa` (id estável = `idPesquisa(instituto, registro)`, cargo
+  `'pres' | 'gov-xx'` das UFs de `UFS_GOV_2T`, registro `BR-NNNNN/2026` para Presidente e `UF-NNNNN/2026` com a UF da
+  disputa, datas AAAA-MM-DD, `totais` por número de urna + `brancosNulos` + `indecisos`, `validos` só se o instituto
+  divulgou, `fontes` https). `validaPesquisa` exige tudo isso (contratante inclusive: o registro sempre o traz), confere os
+  números de urna contra o `meta.json`, uma casa decimal no máximo, soma ≤ 100,5, válidos coerentes com os totais, coleta a
+  partir de 05/10, início ≤ fim ≤ divulgação ≤ hoje. `mesclarPesquisas` (painel vence a semente por id ou registro),
+  `ordenarPesquisas` (mais recente primeiro), `seriesPorInstituto` (uma por instituto, nunca somadas),
+  `compararComResultado` (só com válidos divulgados), `fasePesquisas` ('lista' · 'votacao' 0h–17h de 25/10 · 'resultado'
+  com o TSE concluído · 'oculta' com nomes ocultos) e o texto das informações obrigatórias (`informacoesObrigatorias`).
+- **Servidor** `src/server/pesquisas.ts`: semente `DATA_DIR/pesquisas.json` (relida quando muda; recusadas aparecem no
+  painel) + painel em `STATE_DIR/pesquisas.json` (atômico; `removidas` tira uma da semente do site; outra instância relê).
+  `GET /api/pesquisas` (`PesquisasPublicas`; ETag; navegador e borda 30 s, cache que nunca atravessa a 0h nem as 17h de 25/10;
+  das 0h às 17h, lista vazia com `suspensas`). `GET /api/og/pesquisa.png?id=&formato=og|x|feed|story` (`og-pesquisa.ts`:
+  todas as informações obrigatórias no rodapé, sem anúncio, sem foto; sem id = capa genérica; na lista `OG_COM_CANDIDATO`,
+  vira o convite no dia da votação). Painel: `GET/POST /api/admin/pesquisas` (`ComandoPesquisa`: salvar, remover,
+  restaurar; forma por zod em `validation.ts`, conteúdo por `validaPesquisa`). Meta tags de `/pesquisas` e `?p=<id>` e
+  `/pesquisas` no sitemap. Para a borda guardar a lista, falta pôr `/api/pesquisas` nas regras `sintonia_api` e
+  `sintonia_sem_query` (`deploy/cloudflare.mjs`, DEPLOY §5.3); sem isso ela passa direto para a origem (barata: corpo
+  pronto + ETag).
+- **App** `src/app/pages/pesquisas/PesquisasPage.tsx` e `src/app/components/pesquisas/*`: cartões (`data-sem-anuncio-fixo`),
+  gráfico em pequenos múltiplos por instituto (mesma régua, margem de erro como traço, tabela equivalente), cartão de
+  compartilhar x/feed/story sobre `CartaoBase` (rodapé com as informações obrigatórias; sem "Oferecimento"). Bloco
+  "Pesquisas registradas" (3 mais recentes de Presidente, chunk próprio) na home (depois da chamada do Palpite) e na
+  `/apuracao` na fase 'pre', só antes do dia da votação. Menu "Mais", rodapé e busca rápida. Painel → Pesquisas
+  (`SecaoPesquisas.tsx`): lista, incluir/editar/tirar do site/restaurar, formulário com a mesma validação e prévia dos
+  cartões, conferência obrigatória antes de salvar.
 
 ## 12. Produção
 

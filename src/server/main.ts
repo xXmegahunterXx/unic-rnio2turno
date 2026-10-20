@@ -299,6 +299,7 @@ async function main() {
       // sobrescrever um estado mais novo escrito por outra instância no mesmo STATE_DIR
       await store.flush();
       await chatStore.flush();
+      await sintonia.pesquisas.persistir(); // pesquisas do painel (já gravadas a cada mudança; aqui só o pendente)
       sintonia.crescimento.parar();
       if (!ensaio) {
         await sintonia.persistirMetricasAnuncios();
