@@ -1144,16 +1144,21 @@ enquete é proibida. Nunca se inventa, estima ou completa um número: cada pesqu
 - **Contrato** `src/shared/pesquisas.ts` (testado): `Pesquisa` (id estável = `idPesquisa(instituto, registro)`, cargo
   `'pres' | 'gov-xx'` das UFs de `UFS_GOV_2T`, registro `BR-NNNNN/2026` para Presidente e `UF-NNNNN/2026` com a UF da
   disputa, datas AAAA-MM-DD, `totais` por número de urna + `brancosNulos` + `indecisos`, `validos` só se o instituto
-  divulgou, `fontes` https). `validaPesquisa` exige tudo isso (contratante inclusive: o registro sempre o traz), confere os
-  números de urna contra o `meta.json`, uma casa decimal no máximo, soma ≤ 100,5, válidos coerentes com os totais, coleta a
-  partir de 05/10, início ≤ fim ≤ divulgação ≤ hoje. `mesclarPesquisas` (painel vence a semente por id ou registro),
+  divulgou, `fontes` https). `validaPesquisa` exige tudo isso (contratante inclusive: o registro sempre o traz; pesquisa paga
+  pelo próprio instituto = "<Instituto> (recursos próprios)"), confere os números de urna contra o `meta.json`, até duas
+  casas decimais como o instituto divulgou (margem 2,19; confiança 95,45%; 39,65% — e a exibição nunca arredonda:
+  `fmtPctPesquisa`/`fmtMargem`/`fmtConfianca`), soma ≤ 101,5 (4 inteiros arredondados podem dar 101), válidos coerentes
+  com os totais, coleta a partir de 05/10, início ≤ fim ≤ divulgação ≤ hoje. `mesclarPesquisas` (painel vence a semente por id ou registro),
   `ordenarPesquisas` (mais recente primeiro), `seriesPorInstituto` (uma por instituto, nunca somadas),
   `compararComResultado` (só com válidos divulgados), `fasePesquisas` ('lista' · 'votacao' 0h–17h de 25/10 · 'resultado'
   com o TSE concluído · 'oculta' com nomes ocultos) e o texto das informações obrigatórias (`informacoesObrigatorias`).
+- **Semente** `public/data/pesquisas.json`: as pesquisas levantadas e conferidas fonte a fonte (cada uma com as URLs), na
+  ordem da página e com o id do contrato; `src/shared/pesquisas-semente.test.ts` valida o arquivo real contra o contrato e o
+  `meta.json` (a que não passar ficaria fora do site). Pesquisas novas entram pelo painel (não precisa de deploy).
 - **Servidor** `src/server/pesquisas.ts`: semente `DATA_DIR/pesquisas.json` (relida quando muda; recusadas aparecem no
   painel) + painel em `STATE_DIR/pesquisas.json` (atômico; `removidas` tira uma da semente do site; outra instância relê).
   `GET /api/pesquisas` (`PesquisasPublicas`; ETag; navegador e borda 30 s, cache que nunca atravessa a 0h nem as 17h de 25/10;
-  das 0h às 17h, lista vazia com `suspensas`). `GET /api/og/pesquisa.png?id=&formato=og|x|feed|story` (`og-pesquisa.ts`:
+  das 0h às 17h, lista vazia com `suspensas`; na simulação com nomes ocultos, lista vazia). `GET /api/og/pesquisa.png?id=&formato=og|x|feed|story` (`og-pesquisa.ts`:
   todas as informações obrigatórias no rodapé, sem anúncio, sem foto; sem id = capa genérica; na lista `OG_COM_CANDIDATO`,
   vira o convite no dia da votação). Painel: `GET/POST /api/admin/pesquisas` (`ComandoPesquisa`: salvar, remover,
   restaurar; forma por zod em `validation.ts`, conteúdo por `validaPesquisa`). Meta tags de `/pesquisas` e `?p=<id>` e

@@ -448,7 +448,11 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       .join(' · ');
     return pagina({
       titulo: `Pesquisa ${p.instituto} · ${rotuloCargoCurto(p.cargo)} · 2º turno · ${APP_NAME}`,
-      descricao: cortar(`Votos totais, divulgada em ${fmtDataPesquisa(p.divulgadaEm)}: ${placar}. ${linhaObrigatoria(p)}. Pesquisa não é resultado.`, 400),
+      // a linha das informações obrigatórias nunca é cortada: com contratante longo, sai o aviso (que está na imagem)
+      descricao: ((completa, sem) => (completa.length <= 400 ? completa : sem))(
+        `Votos totais, divulgada em ${fmtDataPesquisa(p.divulgadaEm)}: ${placar}. ${linhaObrigatoria(p)}. Pesquisa não é resultado.`,
+        `Votos totais: ${placar}. ${linhaObrigatoria(p)}.`,
+      ),
       imagem: `/api/og/pesquisa.png?id=${encodeURIComponent(p.id)}`,
       imagemAlt: `Pesquisa ${p.instituto} · ${rotuloCargoCurto(p.cargo)} · registro ${p.registro}`,
       // conteúdo da pesquisa na URL da imagem: editada no painel → imagem nova (o X e o WhatsApp buscam de novo)

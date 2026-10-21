@@ -11,7 +11,7 @@
  *  - `?cargo=pres|gov-xx` escolhe a disputa; `?p=<id>` (o link dos cartões compartilhados) abre a disputa da pesquisa,
  *    rola até ela e a realça.
  */
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Container } from '@/app/components/layout/Container';
 import { PageHeader } from '@/app/components/layout/PageHeader';
@@ -30,6 +30,8 @@ import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
 import { AVISO_DIA_VOTACAO, AVISO_PESQUISAS, ehCargoPesquisa, pesquisasDoCargo, ufDoCargo, type CargoPesquisa, type Pesquisa } from '@/shared/pesquisas';
 
 type Grupo = 'pres' | 'gov';
+/** Cartões abertos de início (mais recentes); as mais antigas ficam a um toque ("Ver as N mais antigas"). */
+const CARTOES_INICIAIS = 8;
 const CARGOS_GOV = UFS_GOV_2T.map((uf) => `gov-${uf.toLowerCase()}` as CargoPesquisa);
 
 export default function PesquisasPage() {
@@ -103,7 +105,7 @@ export default function PesquisasPage() {
               </Button>
             </AvisoNeutro>
           ) : (
-            <Disputa cargo={cargo} pesquisas={daDisputa} todas={lista} destaque={pedida?.id} resultado={resultado} />
+            <Disputa key={cargo} cargo={cargo} pesquisas={daDisputa} todas={lista} destaque={pedida?.id} resultado={resultado} />
           )}
           <ComoEscolhemos />
         </>
@@ -206,6 +208,11 @@ function Disputa({ cargo, pesquisas, todas, destaque, resultado }: { cargo: Carg
     return p ? Object.keys(p.totais).filter((k) => /^\d{2}$/.test(k)).map(Number).sort((a, b) => a - b) : [];
   }, [pesquisas]);
   const cands = useCandidatosPesquisa(cargo, nums);
+  const [todasAbertas, setTodasAbertas] = useState(false);
+  // o link de uma pesquisa (?p=) mais antiga abre a lista inteira
+  const iDestaque = destaque ? pesquisas.findIndex((p) => p.id === destaque) : -1;
+  const abertas = todasAbertas || iDestaque >= CARTOES_INICIAIS ? pesquisas : pesquisas.slice(0, CARTOES_INICIAIS);
+  const ocultas = pesquisas.length - abertas.length;
   const uf = ufDoCargo(cargo);
   const titulo = uf ? `Governador · ${UF_NOMES[uf]}` : 'Presidente';
   if (!pesquisas.length) {
@@ -228,10 +235,15 @@ function Disputa({ cargo, pesquisas, todas, destaque, resultado }: { cargo: Carg
         </h2>
         <p className="mt-1 text-[13px] text-fg-muted">Da mais recente para a mais antiga (data de divulgação). Votos totais incluem brancos, nulos e indecisos.</p>
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {pesquisas.map((p) => (
+          {abertas.map((p) => (
             <CartaoPesquisa key={p.id} p={p} destaque={p.id === destaque} acoes={<BotaoCompartilharPesquisa p={p} soIcone />} />
           ))}
         </div>
+        {ocultas > 0 ? (
+          <Button variant="secondary" icon="chevron" className="mt-4 w-full" onClick={() => setTodasAbertas(true)}>
+            Ver {ocultas === 1 ? 'a pesquisa mais antiga' : `as ${ocultas} pesquisas mais antigas`}
+          </Button>
+        ) : null}
       </section>
       <GraficoInstitutos pesquisas={pesquisas} cargo={cargo} cands={cands} />
       <p className="mt-3 text-[12.5px] text-fg-subtle">
@@ -244,7 +256,8 @@ function Disputa({ cargo, pesquisas, todas, destaque, resultado }: { cargo: Carg
 function ComoEscolhemos() {
   const itens = [
     'Só pesquisas registradas no TSE, com o número de registro (BR-…/2026 para Presidente; a sigla do estado para Governador). Enquete não entra.',
-    'Os números são os que o instituto ou quem contratou divulgou, com o link da fonte em cada cartão. Nada é estimado, arredondado de novo ou completado.',
+    'Os números são os que o instituto ou quem contratou divulgou, com o link de onde cada um foi conferido (relatório do instituto, página de quem contratou ou reportagem que publica os dados). Nada é estimado, arredondado de novo ou completado.',
+    'Quando o próprio instituto pagou a pesquisa, o contratante aparece como “recursos próprios”.',
     'Cada pesquisa aparece sozinha: o Sintonia não calcula média, projeção nem junta institutos.',
     'Votos válidos só aparecem quando o instituto divulgou.',
     'No dia da votação, das 0h às 17h (horário de Brasília), a área fica sem pesquisas.',

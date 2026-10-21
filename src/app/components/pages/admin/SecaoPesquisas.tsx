@@ -406,7 +406,7 @@ function Formulario({
               value={f.contratante}
               onChange={(e) => set('contratante', e.target.value)}
               erro={erroDe('contratante')}
-              dica="Como está no registro. Paga pelo próprio instituto: o nome dele + (recursos próprios), ex.: PoderData (recursos próprios)."
+              dica="Como no registro. Se o próprio instituto pagou: “Nome (recursos próprios)”."
             />
           </div>
           <Campo

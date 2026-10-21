@@ -11,6 +11,7 @@ import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Segmented } from '@/app/ui/Segmented';
 import {
+  fmtConfianca,
   fmtDataPesquisa,
   fmtMargem,
   fmtPctPesquisa,
@@ -21,7 +22,8 @@ import {
   type PontoSerie,
   type SerieInstituto,
 } from '@/shared/pesquisas';
-import type { CandidatoPesquisa } from './pecas';
+import { fmtInt } from '@/shared/format';
+import { LinhaObrigatoria, type CandidatoPesquisa } from './pecas';
 
 const W = 320;
 const H = 168;
@@ -49,6 +51,9 @@ function escalas(series: SerieInstituto[]): Escalas | null {
     x0 = meio - 2 * DIA;
     x1 = meio + 2 * DIA;
   }
+  // folga nas pontas: o ponto (e o traço da margem) da primeira e da última pesquisa não encostam nos rótulos
+  const folga = (x1 - x0) * 0.06;
+  const [e0, e1] = [x0 - folga, x1 + folga];
   const vals = pts.flatMap((p) => Object.values(p.valores).flatMap((v) => [v - p.margemPp, v + p.margemPp]));
   const lo = Math.max(0, Math.floor((Math.min(...vals) - 2) / 5) * 5);
   const hi = Math.min(100, Math.ceil((Math.max(...vals) + 2) / 5) * 5);
@@ -56,7 +61,7 @@ function escalas(series: SerieInstituto[]): Escalas | null {
   const ticksY: number[] = [];
   for (let v = Math.ceil(lo / passo) * passo; v <= hi; v += passo) ticksY.push(v);
   return {
-    x: (d) => M.l + ((diaDe(d) - x0) / (x1 - x0)) * (W - M.l - M.r),
+    x: (d) => M.l + ((diaDe(d) - e0) / (e1 - e0)) * (W - M.l - M.r),
     y: (v) => M.t + (1 - (v - lo) / (hi - lo || 1)) * (H - M.t - M.b),
     ticksY,
     dIni: new Date(x0).toISOString().slice(0, 10),
@@ -64,7 +69,7 @@ function escalas(series: SerieInstituto[]): Escalas | null {
   };
 }
 
-function Painel({ serie, cands, esc }: { serie: SerieInstituto; cands: CandidatoPesquisa[]; esc: Escalas }) {
+function Painel({ serie, cands, esc, porId }: { serie: SerieInstituto; cands: CandidatoPesquisa[]; esc: Escalas; porId: Map<string, Pesquisa> }) {
   const [ativo, setAtivo] = useState<number | null>(null);
   const tituloId = useId();
   const ultimo = serie.pontos[serie.pontos.length - 1];
@@ -97,10 +102,10 @@ function Painel({ serie, cands, esc }: { serie: SerieInstituto; cands: Candidato
             </text>
           </g>
         ))}
-        <text x={M.l} y={H - 6} className="num fill-fg-subtle" fontSize={10}>
+        <text x={esc.x(esc.dIni)} y={H - 6} textAnchor="middle" className="num fill-fg-subtle" fontSize={10}>
           {fmtDataPesquisa(esc.dIni)}
         </text>
-        <text x={W - M.r} y={H - 6} textAnchor="end" className="num fill-fg-subtle" fontSize={10}>
+        <text x={esc.x(esc.dFim)} y={H - 6} textAnchor="middle" className="num fill-fg-subtle" fontSize={10}>
           {fmtDataPesquisa(esc.dFim)}
         </text>
         {cands.map((c, ci) => {
@@ -155,17 +160,18 @@ function Painel({ serie, cands, esc }: { serie: SerieInstituto; cands: Candidato
         ))}
         {p ? <line x1={esc.x(p.data)} x2={esc.x(p.data)} y1={M.t - 4} y2={H - M.b} className="stroke-fg-subtle" strokeDasharray="3 3" strokeWidth={1} /> : null}
       </svg>
-      {p ? <Dica p={p} cands={cands} esquerda={esc.x(p.data) / W} /> : null}
+      {p ? <Dica p={p} pesquisa={porId.get(p.id)} cands={cands} esquerda={esc.x(p.data) / W} /> : null}
     </figure>
   );
 }
 
-function Dica({ p, cands, esquerda }: { p: PontoSerie; cands: CandidatoPesquisa[]; esquerda: number }) {
+/** Dica de um ponto: os valores e TODAS as informações obrigatórias da pesquisa (Res. TSE 23.600/2019, art. 10). */
+function Dica({ p, pesquisa, cands, esquerda }: { p: PontoSerie; pesquisa?: Pesquisa; cands: CandidatoPesquisa[]; esquerda: number }) {
   return (
     <div
       role="status"
-      className="pointer-events-none absolute top-11 z-10 w-[190px] rounded-xl border border-line bg-surface-2 p-2.5 text-[12px] shadow-card"
-      style={{ left: `clamp(8px, calc(${(esquerda * 100).toFixed(1)}% - 95px), calc(100% - 198px))` }}
+      className="pointer-events-none absolute top-11 z-10 w-[220px] rounded-xl border border-line bg-surface-2 p-2.5 text-[12px] shadow-card"
+      style={{ left: `clamp(8px, calc(${(esquerda * 100).toFixed(1)}% - 110px), calc(100% - 228px))` }}
     >
       <div className="num font-semibold text-fg">Coleta {fmtPeriodoColeta(p.coletaInicio, p.data)}</div>
       <div className="num text-fg-muted">{p.registro}</div>
@@ -180,7 +186,17 @@ function Dica({ p, cands, esquerda }: { p: PontoSerie; cands: CandidatoPesquisa[
           </li>
         ))}
       </ul>
-      <div className="num mt-1 text-fg-subtle">Margem: {fmtMargem(p.margemPp)} pontos</div>
+      <div className="num mt-1 leading-snug text-fg-subtle">
+        Margem ±{fmtMargem(p.margemPp)} {p.margemPp === 1 ? 'ponto' : 'pontos'}
+        {pesquisa ? (
+          <>
+            {' '}
+            · confiança {fmtConfianca(pesquisa.confiancaPct)}% · {fmtInt(pesquisa.entrevistas)} entrevistas
+            <br />
+            Contratante: {pesquisa.contratante ?? 'não informado'}
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -191,6 +207,7 @@ export function GraficoInstitutos({ pesquisas, cargo, cands }: { pesquisas: Pesq
   const b: BaseSerie = base === 'validos' && temValidos ? 'validos' : 'totais';
   const series = useMemo(() => seriesPorInstituto(pesquisas, cargo, b), [pesquisas, cargo, b]);
   const esc = useMemo(() => escalas(series), [series]);
+  const porId = useMemo(() => new Map(pesquisas.map((p) => [p.id, p])), [pesquisas]);
   if (!esc || cands.length !== 2) return null;
   return (
     <section aria-labelledby="pesq-tempo" data-sem-anuncio-fixo className="mt-10">
@@ -232,7 +249,7 @@ export function GraficoInstitutos({ pesquisas, cargo, cands }: { pesquisas: Pesq
       </ul>
       <div className={cn('mt-4 grid grid-cols-1 gap-3 sm:gap-4', series.length === 1 ? 'max-w-md' : series.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-3')}>
         {series.map((s) => (
-          <Painel key={s.chave} serie={s} cands={cands} esc={esc} />
+          <Painel key={s.chave} serie={s} cands={cands} esc={esc} porId={porId} />
         ))}
       </div>
       {b === 'validos' ? <p className="mt-2 text-[12.5px] text-fg-subtle">Só as pesquisas em que o instituto divulgou os votos válidos.</p> : null}
@@ -254,18 +271,27 @@ export function GraficoInstitutos({ pesquisas, cargo, cands }: { pesquisas: Pesq
             </thead>
             <tbody>
               {series.flatMap((s) =>
-                s.pontos.map((pt) => (
-                  <tr key={pt.id} className="border-t border-line">
-                    <td className="py-1.5 pr-3 text-fg">{s.instituto}</td>
-                    <td className="num py-1.5 pr-3 text-fg-muted">{fmtPeriodoColeta(pt.coletaInicio, pt.data, false)}</td>
-                    {cands.map((c) => (
-                      <td key={c.numero} className="num py-1.5 pr-3 text-right font-semibold text-fg">
-                        {fmtPctPesquisa(pt.valores[c.numero])}
+                s.pontos.flatMap((pt) => {
+                  const pq = porId.get(pt.id);
+                  return [
+                    <tr key={pt.id} className="border-t border-line">
+                      <td className="pt-1.5 pr-3 text-fg">{s.instituto}</td>
+                      <td className="num pt-1.5 pr-3 text-fg-muted">{fmtPeriodoColeta(pt.coletaInicio, pt.data, false)}</td>
+                      {cands.map((c) => (
+                        <td key={c.numero} className="num pt-1.5 pr-3 text-right font-semibold text-fg">
+                          {fmtPctPesquisa(pt.valores[c.numero])}
+                        </td>
+                      ))}
+                      <td className="num pt-1.5 text-right text-fg-muted">±{fmtMargem(pt.margemPp)}</td>
+                    </tr>,
+                    // a linha das informações obrigatórias de cada pesquisa, logo abaixo dos números dela
+                    <tr key={`${pt.id}-info`}>
+                      <td colSpan={cands.length + 3} className="pb-2 pt-0.5">
+                        {pq ? <LinhaObrigatoria p={pq} className="text-[11.5px]" /> : null}
                       </td>
-                    ))}
-                    <td className="num py-1.5 text-right text-fg-muted">±{fmtMargem(pt.margemPp)}</td>
-                  </tr>
-                )),
+                    </tr>,
+                  ];
+                }),
               )}
             </tbody>
           </table>

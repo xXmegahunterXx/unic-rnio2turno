@@ -299,7 +299,7 @@ function casas(n: number): number {
 }
 
 /** Casas para exibir um número exatamente como foi divulgado (0, 1 ou 2; nunca arredonda o que o instituto publicou). */
-const casasExibir = (n: number) => Math.min(2, casas(n));
+const casasExibir = (n: number): 0 | 1 | 2 => Math.min(2, casas(n)) as 0 | 1 | 2;
 
 /** Percentual como o instituto divulgou: "45%" · "45,5%" · "39,65%". */
 export function fmtPctPesquisa(n: number): string {

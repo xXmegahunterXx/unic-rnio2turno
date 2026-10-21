@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pesoTextoX } from '@/app/lib/share';
+import { pesoPostX, pesoTextoX } from '@/app/lib/share';
 import { validaPesquisa, type Pesquisa } from '@/shared/pesquisas';
 import { textoPesquisa } from './textos';
 
@@ -41,5 +41,25 @@ describe('texto de compartilhar da pesquisa', () => {
     expect(t).toContain('Associação Fictícia de Veículos de Comunicação de Algum Lugar Muito Distante');
     expect(t).toContain('confiança 95%');
     expect(t).not.toContain('…');
+    expect(pesoPostX(t, [], true)).toBeLessThanOrEqual(280);
+  });
+  it('sempre cabe no X com o link (a intenção do X nunca corta a informação obrigatória)', () => {
+    const longo = 'Federação Fictícia das Indústrias e do Comércio de Algum Estado Muito Distante Ltda.';
+    const nomes = [
+      { numero: 13, nome: 'Professora Fictícia de Tal' },
+      { numero: 22, nome: 'Vicentinho Fictício Júnior' },
+    ];
+    for (const contratante of ['Veículo', 'Federação Fictícia das Indústrias do Estado', longo, `${longo} ${longo}`.slice(0, 160)]) {
+      const t = textoPesquisa(p({ contratante, totais: { '13': 40.45, '22': 52.55, brancosNulos: 4.1, indecisos: 2.9 }, margemPp: 2.83, confiancaPct: 95.45 }), nomes);
+      expect(pesoPostX(t, [], true), t).toBeLessThanOrEqual(280);
+      expect(t).not.toContain('…');
+      // com número, sempre TODAS as informações; sem caber, nenhum número (remete ao link)
+      if (t.includes('40,45%')) {
+        for (const x of ['BR-09001/2026', contratante, 'coleta 14 a 16/10', '2.004 entrev', '±2,83 p.p.', 'confiança 95,45%']) expect(t, t).toContain(x);
+      } else {
+        expect(t).toMatch(/registro BR-09001\/2026: os números e todas as informações exigidas pelo TSE estão no link\.$/);
+        expect(t).not.toMatch(/\d%/);
+      }
+    }
   });
 });
