@@ -240,7 +240,7 @@ describe('rotas (servidor de verdade)', () => {
     const m = await montar({ agora: AGORA });
     const cookie = await login(m);
     const adm = (await (await pedir(m, cookie, { acao: 'salvar', pesquisa: exemplo() })).json()) as PesquisasAdmin;
-    const id = adm.itens[0].pesquisa.id;
+    const id = adm.itens.find((i) => i.origem === 'painel')!.pesquisa.id;
     const dims = { og: [1200, 630], x: [1200, 675], feed: [1080, 1350], story: [1080, 1920] } as const;
     for (const [f, [w, h]] of Object.entries(dims)) {
       const r = await m.app.request(`/api/og/pesquisa.png?id=${id}&formato=${f}`);
