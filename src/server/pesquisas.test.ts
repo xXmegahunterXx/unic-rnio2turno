@@ -51,7 +51,7 @@ function racesFicticias(): Map<string, Race> {
   ]);
 }
 
-function criar(o: { semente?: unknown; stateDir?: string; agora?: { t: number } } = {}) {
+function criar(o: { semente?: unknown; stateDir?: string; agora?: { t: number }; anon?: { v: boolean } } = {}) {
   const dataDir = mkdtempSync(join(tmpdir(), 'sintonia-pesq-dados-'));
   if (o.semente !== undefined) writeFileSync(join(dataDir, 'pesquisas.json'), JSON.stringify(o.semente));
   const stateDir = o.stateDir ?? mkdtempSync(join(tmpdir(), 'sintonia-pesq-estado-'));
@@ -59,7 +59,7 @@ function criar(o: { semente?: unknown; stateDir?: string; agora?: { t: number } 
   const races = racesFicticias();
   const log = { info: () => undefined, aviso: () => undefined, erro: () => undefined };
   const novo = () =>
-    new Pesquisas({ now: () => relogio.t, log, dataDir, store: createJsonStore(stateDir, 'pesquisas.json', { debounceMs: 0, lembrar: 8 }), races: () => races });
+    new Pesquisas({ now: () => relogio.t, log, dataDir, store: createJsonStore(stateDir, 'pesquisas.json', { debounceMs: 0, lembrar: 8 }), races: () => races, anonimizado: () => !!o.anon?.v });
   return { p: novo(), novo, dataDir, stateDir, relogio };
 }
 
@@ -170,6 +170,14 @@ describe('Pesquisas: semente + painel', () => {
     expect(p.publicas(INICIO_DIA_VOTACAO + 1).corpo).toEqual({ pesquisas: [], versao: 'dia-da-votacao', suspensas: true });
     expect(p.publicas(INICIO_APURACAO).corpo.pesquisas).toHaveLength(2);
   });
+
+  it('simulação com nomes ocultos: a lista pública sai vazia (nem a API entrega os números)', () => {
+    const anon = { v: true };
+    const { p } = criar({ semente, anon });
+    expect(p.publicas(AGORA).corpo).toEqual({ pesquisas: [], versao: 'oculta' });
+    anon.v = false;
+    expect(p.publicas(AGORA).corpo.pesquisas).toHaveLength(2);
+  });
 });
 
 describe('zod do comando do painel', () => {
@@ -217,10 +225,13 @@ describe('rotas (servidor de verdade)', () => {
     const ok = await pedir(m, cookie, { acao: 'salvar', pesquisa: exemplo() });
     expect(ok.status).toBe(200);
     const adm = (await ok.json()) as PesquisasAdmin;
-    expect(adm.itens).toHaveLength(1);
+    expect(adm.itens.filter((i) => i.origem === 'painel')).toHaveLength(1);
     expect(adm.candidatos['gov-df']?.length).toBe(2);
+    // a semente REAL (public/data/pesquisas.json) passa inteira na validação do servidor (meta.json real)
+    expect(adm.semente.invalidas).toEqual([]);
     const pub = (await (await m.app.request('/api/pesquisas')).json()) as PesquisasPublicas;
-    expect(pub.pesquisas.map((p) => p.registro)).toEqual(['BR-09001/2026']);
+    expect(pub.pesquisas).toHaveLength(adm.semente.total + 1);
+    expect(pub.pesquisas.map((p) => p.registro)).toContain('BR-09001/2026');
     await m.pesquisas.persistir();
     expect(JSON.parse(readFileSync(join(m.stateDir, 'pesquisas.json'), 'utf8')).pesquisas).toHaveLength(1);
   });
@@ -247,13 +258,14 @@ describe('rotas (servidor de verdade)', () => {
     const m = await montar({ agora: AGORA });
     const cookie = await login(m);
     const adm = (await (await pedir(m, cookie, { acao: 'salvar', pesquisa: exemplo() })).json()) as PesquisasAdmin;
+    const nova = adm.itens.find((i) => i.origem === 'painel')!;
     m.relogio.t = INICIO_DIA_VOTACAO + 3600_000;
     const pub = (await (await m.app.request('/api/pesquisas')).json()) as PesquisasPublicas;
     expect(pub).toMatchObject({ pesquisas: [], suspensas: true });
-    const img = await m.app.request(`/api/og/pesquisa.png?id=${adm.itens[0].pesquisa.id}`);
+    const img = await m.app.request(`/api/og/pesquisa.png?id=${nova.pesquisa.id}`);
     expect(img.headers.get('x-og-generica')).toBe('dia-da-votacao');
     m.relogio.t = INICIO_APURACAO + 1000;
-    expect(((await (await m.app.request('/api/pesquisas')).json()) as PesquisasPublicas).pesquisas).toHaveLength(1);
+    expect(((await (await m.app.request('/api/pesquisas')).json()) as PesquisasPublicas).pesquisas).toHaveLength(adm.semente.total + 1);
   }, 30_000);
 });
 

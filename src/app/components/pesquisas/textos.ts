@@ -1,7 +1,7 @@
 /** Texto de compartilhar de uma pesquisa (puro; testado em textos.test.ts). */
 import { pesoTextoX } from '@/app/lib/share';
-import { fmtDecimal, fmtInt } from '@/shared/format';
-import { fmtMargem, fmtPctPesquisa, fmtPeriodoColeta, rotuloCargoCurto, type Pesquisa } from '@/shared/pesquisas';
+import { fmtInt } from '@/shared/format';
+import { fmtConfianca, fmtMargem, fmtPctPesquisa, fmtPeriodoColeta, rotuloCargoCurto, type Pesquisa } from '@/shared/pesquisas';
 import type { CorCandidato } from '@/shared/types';
 
 export interface CandidatoTexto {
@@ -16,7 +16,7 @@ export interface CandidatoTexto {
  */
 export function textoPesquisa(p: Pesquisa, cands: CandidatoTexto[]): string {
   const placar = cands.map((c) => `${c.nome} ${fmtPctPesquisa(p.totais[String(c.numero)])}`).join(' × ');
-  const conf = fmtDecimal(p.confiancaPct, Number.isInteger(p.confiancaPct) ? 0 : 1);
+  const conf = fmtConfianca(p.confiancaPct);
   const base =
     `Pesquisa ${p.instituto} (${rotuloCargoCurto(p.cargo)}, 2º turno), votos totais: ${placar}. ` +
     `Registro ${p.registro}; contratante: ${p.contratante ?? 'não informado'}; coleta ${fmtPeriodoColeta(p.coletaInicio, p.coletaFim, false)}; ` +

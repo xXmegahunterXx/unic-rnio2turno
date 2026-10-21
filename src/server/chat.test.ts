@@ -293,16 +293,17 @@ describe('SalaChat: denúncias e moderação', () => {
 });
 
 describe('SalaChat: antes da eleição e reinício', () => {
-  it('produção antes de 25/10: o painel abre, mas a sala só recebe mensagens às 17h de 25/10 (CHAT_ENSAIO libera)', () => {
+  it('produção antes de 25/10: o painel abre e a sala já recebe mensagens; na manhã de 25/10 vale o bloqueio legal', () => {
     const { s, relogio } = sala({ producao: true }); // 09/10
     const r = s.comando({ acao: 'abrir' });
-    expect(r.ok && r.log).toMatch(/só depois do bloqueio/);
-    expect(s.publico().aberta).toBe(false);
-    expect(s.publico().bloqueio).toBe(BLOQUEIO_ANTES_DA_ELEICAO);
-    expect(s.paraAdmin().aberta).toBe(true);
-    const e = enviar(s, 1, 'teste do operador');
-    expect(!e.ok && e.motivo).toBe('fechada');
+    expect(r.ok && r.log).toBe('sala aberta');
+    expect(s.publico().aberta).toBe(true);
+    expect(s.publico().bloqueio).toBeNull();
+    expect(s.publico().bloqueio).not.toBe(BLOQUEIO_ANTES_DA_ELEICAO);
+    expect(enviar(s, 1, 'boa tarde, pessoal').ok).toBe(true);
     relogio.t = DIA_ELEICAO_INICIO + 3600_000; // manhã de 25/10: bloqueio legal
+    expect(s.publico().aberta).toBe(false);
+    expect(!enviar(s, 2, 'bom dia').ok).toBe(true);
     expect(s.publico().bloqueio).toMatch(/17h, quando terminar a votação/);
     relogio.t = DIA_ELEICAO_17H;
     expect(s.publico().aberta).toBe(true);

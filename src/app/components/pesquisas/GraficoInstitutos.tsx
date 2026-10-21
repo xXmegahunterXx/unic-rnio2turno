@@ -230,7 +230,7 @@ export function GraficoInstitutos({ pesquisas, cargo, cands }: { pesquisas: Pesq
           margem de erro
         </li>
       </ul>
-      <div className={cn('mt-4 grid grid-cols-1 gap-3 sm:gap-4', series.length === 1 ? 'max-w-xl' : series.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-3')}>
+      <div className={cn('mt-4 grid grid-cols-1 gap-3 sm:gap-4', series.length === 1 ? 'max-w-md' : series.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-2 xl:grid-cols-3')}>
         {series.map((s) => (
           <Painel key={s.chave} serie={s} cands={cands} esc={esc} />
         ))}

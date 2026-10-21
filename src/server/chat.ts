@@ -23,9 +23,8 @@
  * cada uma teria a sua sala: o chat pressupõe 1 instância (a topologia recomendada, ARCHITECTURE §12.5).
  *
  * Dia da eleição: em produção, de 0h às 17h de 25/10 (Brasília) a sala não recebe mensagens (propaganda no dia da
- * eleição é crime — Lei 9.504/97, art. 39, § 5º), mesmo aberta no painel. Antes de 25/10 também não (a sala é da noite
- * da apuração, como prometem a /ao-vivo e a sala: um teste do operador na produção não abre uma sala pública durante a
- * campanha), salvo com CHAT_ENSAIO=1 numa cópia de ensaio. O painel pode abrir antes: a sala fica "abre às 17h".
+ * eleição é crime — Lei 9.504/97, art. 39, § 5º), mesmo aberta no painel; às 17h volta sozinha. Antes de 25/10 a sala
+ * funciona normalmente quando o painel a abre (decisão do dono, 21/10: sala liberada já na reta final da campanha).
  */
 import { randomBytes } from 'node:crypto';
 import type { Context, Hono } from 'hono';
@@ -204,7 +203,7 @@ export interface OpcoesSalaChat {
   municipios?: readonly string[];
   /** registro cifrado dos envios ligado (chat-registro.ts): a sala avisa nas regras */
   registro?: boolean;
-  /** produção com CHAT_ENSAIO=1: sem o bloqueio de ANTES de 25/10 (o de 0h–17h de 25/10 vale sempre) */
+  /** produção com CHAT_ENSAIO=1 (cópia de ensaio); o bloqueio de 0h–17h de 25/10 vale sempre */
   ensaio?: boolean;
   /**
    * Sala TRAVADA fechada (motivo para o painel): ex.: CHAT_REGISTRO_CHAVE configurada mas ilegível — o dono decidiu
@@ -230,7 +229,7 @@ const configSalaSchema = z.object({
   fixada: z.object({ texto: z.string().min(1).max(LIMITES_CHAT.fixada), em: z.number().finite() }).nullable(),
 });
 
-/** Antes de 25/10, em produção: a sala só abre na noite da apuração. */
+/** LEGADO (até 21/10 a sala só abria na noite da apuração); mantido só para compatibilidade de importação. */
 export const BLOQUEIO_ANTES_DA_ELEICAO = 'A sala abre em 25 de outubro, às 17h (horário de Brasília), quando terminar a votação.';
 
 const zerarReacoes = (): Record<ReacaoId, number> => ({ fogo: 0, uau: 0, palmas: 0, olhos: 0 });
@@ -386,9 +385,8 @@ export class SalaChat {
   bloqueio(): string | null {
     if (!this.producao) return null;
     const agora = this.now();
-    const dia = bloqueioDiaEleicao(agora);
-    if (dia) return dia;
-    return !this.ensaio && agora < DIA_ELEICAO_INICIO ? BLOQUEIO_ANTES_DA_ELEICAO : null;
+    // só o bloqueio legal do dia da eleição (0h–17h de 25/10); antes disso a sala vale como o painel deixar
+    return bloqueioDiaEleicao(agora);
   }
 
   abertaAgora(): boolean {

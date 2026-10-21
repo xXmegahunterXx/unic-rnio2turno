@@ -15,6 +15,7 @@ import { Icon } from '@/app/ui/Icon';
 import {
   CHAVE_BRANCOS_NULOS,
   CHAVE_INDECISOS,
+  fmtConfianca,
   fmtDataPesquisa,
   fmtMargem,
   fmtPctPesquisa,
@@ -23,7 +24,7 @@ import {
   rotuloCargo,
   type Pesquisa,
 } from '@/shared/pesquisas';
-import { fmtDecimal, fmtInt } from '@/shared/format';
+import { fmtInt } from '@/shared/format';
 import type { CorCandidato } from '@/shared/types';
 
 export interface CandidatoPesquisa {
@@ -77,7 +78,7 @@ export function LinhaObrigatoria({ p, className }: { p: Pesquisa; className?: st
       <span className="text-fg-subtle">{rotulo}</span> <span className="text-fg">{valor}</span>
     </span>
   );
-  const conf = fmtDecimal(p.confiancaPct, Number.isInteger(p.confiancaPct) ? 0 : 1);
+  const conf = fmtConfianca(p.confiancaPct);
   const partes: ReactNode[] = [
     item('Instituto', p.instituto),
     item('Contratante', p.contratante ?? 'não informado'),
@@ -165,12 +166,13 @@ export function ValidosPesquisa({ p, cands, className }: { p: Pesquisa; cands: C
   const soma = v[0] + v[1] || 1;
   return (
     <div className={className}>
-      <div className="flex items-baseline justify-between gap-3 text-[12.5px]">
-        <span className="text-fg-muted">
-          Votos válidos · <span className="text-fg">{cands[0].nome}</span> <span className="num font-semibold text-fg">{fmtPctPesquisa(v[0])}</span>
+      <p className="text-[12px] font-medium uppercase tracking-[0.1em] text-fg-subtle">Votos válidos · divulgados pelo instituto</p>
+      <div className="mt-1 flex items-baseline justify-between gap-3 text-[13px]">
+        <span className="min-w-0 text-fg">
+          {cands[0].nome} <span className="num font-semibold">{fmtPctPesquisa(v[0])}</span>
         </span>
-        <span className="text-right text-fg-muted">
-          <span className="num font-semibold text-fg">{fmtPctPesquisa(v[1])}</span> <span className="text-fg">{cands[1].nome}</span>
+        <span className="min-w-0 text-right text-fg">
+          <span className="num font-semibold">{fmtPctPesquisa(v[1])}</span> {cands[1].nome}
         </span>
       </div>
       <div aria-hidden className="mt-1.5 flex h-1.5 gap-[2px] overflow-hidden rounded-full">

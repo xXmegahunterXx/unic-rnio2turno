@@ -6,6 +6,8 @@ import {
   CARGOS_PESQUISA,
   compararComResultado,
   fasePesquisas,
+  fmtConfianca,
+  fmtMargem,
   fmtPctPesquisa,
   fmtPeriodoColeta,
   hojeBrasilia,
@@ -113,21 +115,28 @@ describe('validaPesquisa — campos obrigatórios da Res. TSE 23.600/2019', () =
     expect(falha({ entrevistas: 12.5 }).campo).toBe('entrevistas');
     expect(falha({ entrevistas: 50 }).campo).toBe('entrevistas');
     expect(falha({ margemPp: 0 }).campo).toBe('margemPp');
-    expect(falha({ margemPp: 2.25 }).campo).toBe('margemPp');
+    expect(falha({ margemPp: 2.255 }).campo).toBe('margemPp'); // 3 casas: digitação
     expect(falha({ confiancaPct: 50 }).campo).toBe('confiancaPct');
+    expect(falha({ confiancaPct: 95.455 }).campo).toBe('confiancaPct');
     expect(ok({ margemPp: 2.2, confiancaPct: 95 }).margemPp).toBe(2.2);
+    // como os institutos divulgam: margem de 2,19 pontos e confiança de 95,45%
+    const p = ok({ margemPp: 2.19, confiancaPct: 95.45 });
+    expect([p.margemPp, p.confiancaPct]).toEqual([2.19, 95.45]);
   });
 
-  it('votos totais: os dois candidatos da disputa, no máximo uma casa decimal, soma ≤ 100,5', () => {
+  it('votos totais: os dois candidatos da disputa, até duas casas decimais, soma ≤ 101,5', () => {
     expect(falha({ totais: { '13': 45 } }).campo).toBe('totais');
     expect(falha({ totais: { '13': 45, '22': 44, '15': 3 } }).campo).toBe('totais');
     expect(falha({ totais: { '13': 45, '45': 44 } }).campo).toBe('totais'); // número que não é da disputa
-    expect(falha({ totais: { '13': 45.55, '22': 44 } }).campo).toBe('totais');
+    expect(falha({ totais: { '13': 45.555, '22': 44 } }).campo).toBe('totais');
     expect(falha({ totais: { '13': 55, '22': 44, brancosNulos: 3 } }).campo).toBe('totais'); // 102%
     expect(falha({ totais: { '13': 45, '22': 44, outros: 3 } }).campo).toBe('totais');
     expect(falha({ totais: { '13': 40, '22': 40, brancosNulos: 5, indecisos: 5 } }).campo).toBe('totais'); // 90% com tudo informado
     // arredondamento do instituto (100,5) passa
     expect(ok({ totais: { '13': 45.5, '22': 44, brancosNulos: 7, indecisos: 4 }, validos: undefined }).totais['13']).toBe(45.5);
+    // quatro inteiros arredondados que somam 101 (o instituto avisa) passam; duas casas como divulgado também
+    expect(ok({ totais: { '13': 46, '22': 48, brancosNulos: 5, indecisos: 2 }, validos: { '13': 49, '22': 51 } }).totais['22']).toBe(48);
+    expect(ok({ totais: { '13': 39.65, '22': 40.95, brancosNulos: 10.56, indecisos: 8.84 }, validos: { '13': 49.19, '22': 50.81 } }).validos).toEqual({ '13': 49.19, '22': 50.81 });
     // sem brancos/indecisos informados: só os dois
     expect(ok({ totais: { '22': 44, '13': 45 }, validos: undefined }).totais).toEqual({ '13': 45, '22': 44 });
   });
@@ -250,6 +259,13 @@ describe('textos', () => {
     expect(fmtPeriodoColeta('2026-09-30', '2026-10-02', false)).toBe('30/09 a 02/10');
     expect(fmtPctPesquisa(45)).toBe('45%');
     expect(fmtPctPesquisa(45.5)).toBe('45,5%');
+    // nunca arredonda o que o instituto publicou
+    expect(fmtPctPesquisa(39.65)).toBe('39,65%');
+    expect(fmtPctPesquisa(50)).toBe('50%');
+    expect(fmtMargem(2.19)).toBe('2,19');
+    expect(fmtConfianca(95.45)).toBe('95,45');
+    expect(linhaObrigatoria(ok({ margemPp: 2.19, confiancaPct: 95.45 }))).toContain('margem de erro de 2,19 pontos');
+    expect(informacoesObrigatorias(ok({ confiancaPct: 95.45 })).at(-1)?.valor).toBe('95,45%');
     expect(hojeBrasilia(Date.UTC(2026, 9, 21, 2, 59))).toBe('2026-10-20'); // 23h59 de 20/10 em Brasília
   });
   it('aviso fixo', () => {

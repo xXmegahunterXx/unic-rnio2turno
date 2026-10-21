@@ -406,7 +406,7 @@ function Formulario({
               value={f.contratante}
               onChange={(e) => set('contratante', e.target.value)}
               erro={erroDe('contratante')}
-              dica="Como está no registro (recursos próprios: o próprio instituto)."
+              dica="Como está no registro. Paga pelo próprio instituto: o nome dele + (recursos próprios), ex.: PoderData (recursos próprios)."
             />
           </div>
           <Campo
@@ -449,7 +449,7 @@ function Formulario({
               <Campo rotulo="Não sabem / não responderam" inputMode="decimal" sufixo="%" value={f.totais[CHAVE_INDECISOS] ?? ''} onChange={(e) => setTotal(CHAVE_INDECISOS, e.target.value)} />
             </div>
             {erroDe('totais') ? <p className="mt-2 text-[12.5px] text-alert-fg">{erroDe('totais')}</p> : null}
-            <p className="mt-2 text-[12px] text-fg-subtle">Como o instituto divulgou (no máximo uma casa decimal). Deixe vazio o que ele não divulgou.</p>
+            <p className="mt-2 text-[12px] text-fg-subtle">Copie como o instituto divulgou, sem arredondar (até duas casas decimais, ex.: 46,74). Deixe vazio o que ele não divulgou.</p>
           </fieldset>
 
           <fieldset className="rounded-xl border border-line p-3">

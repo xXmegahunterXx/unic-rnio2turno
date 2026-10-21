@@ -7,7 +7,8 @@
  * projeção ou "agregado": cada pesquisa aparece como o instituto divulgou, com a fonte (URL) de onde o número saiu.
  *
  *  - `validaPesquisa` EXIGE todos esses campos, o formato do registro (BR-NNNNN/AAAA para Presidente; UF-NNNNN/AAAA para
- *    Governador, com a UF da disputa), percentuais com no máximo uma casa decimal e soma plausível (≤ 100,5), datas
+ *    Governador, com a UF da disputa), números como o instituto divulgou (até duas casas decimais: margem de 2,19 pontos,
+ *    confiança de 95,45%, 39,65% de votos) e soma plausível (≤ 101,5: arredondamento declarado pelo instituto), datas
  *    coerentes (coleta depois do 1º turno, início ≤ fim ≤ divulgação, nada no futuro) e, quando houver votos válidos,
  *    coerência com os votos totais. O contratante também é exigido: o registro no TSE sempre o traz (art. 2º, I — com
  *    recursos próprios, é o próprio instituto).
@@ -60,9 +61,9 @@ export interface Pesquisa {
   divulgadaEm: string;
   /** Número de entrevistas. */
   entrevistas: number;
-  /** Margem de erro, em pontos percentuais, para mais ou para menos (ex.: 2 ou 2,2). */
+  /** Margem de erro, em pontos percentuais, para mais ou para menos (ex.: 2, 2,2 ou 2,19 — como o instituto divulgou). */
   margemPp: number;
-  /** Nível de confiança, em % (ex.: 95). */
+  /** Nível de confiança, em % (ex.: 95 ou 95,45). */
   confiancaPct: number;
   modo?: ModoPesquisa;
   /**
@@ -158,8 +159,13 @@ export const LIMITES_PESQUISA = {
   /** dias entre o início e o fim da coleta */
   duracaoMaxDias: 21,
   fontes: { min: 1, max: 6, url: 600 },
-  /** soma dos votos totais (arredondamentos do instituto) */
-  somaTotaisMax: 100.5,
+  /**
+   * soma dos votos totais: com 4 números inteiros arredondados, o instituto declara que a soma pode dar 101 (ex.:
+   * PoderData 46 + 48 + 5 + 2); 102 já é erro de digitação
+   */
+  somaTotaisMax: 101.5,
+  /** casas decimais aceitas em margem, confiança e percentuais (o que os institutos divulgam: 2,19 · 95,45 · 39,65) */
+  casasMax: 2,
   /** com brancos/nulos E indecisos informados, a soma fica perto de 100 */
   somaTotaisMinCompleta: 97,
   /** soma dos válidos */
@@ -292,13 +298,19 @@ function casas(n: number): number {
   return i < 0 ? 0 : s.length - i - 1;
 }
 
-/** Percentual como o instituto divulgou: "45%" (inteiro) ou "45,5%". */
+/** Casas para exibir um número exatamente como foi divulgado (0, 1 ou 2; nunca arredonda o que o instituto publicou). */
+const casasExibir = (n: number) => Math.min(2, casas(n));
+
+/** Percentual como o instituto divulgou: "45%" · "45,5%" · "39,65%". */
 export function fmtPctPesquisa(n: number): string {
-  return `${fmtDecimal(n, Number.isInteger(n) ? 0 : 1)}%`;
+  return `${fmtDecimal(n, casasExibir(n))}%`;
 }
 
-/** Margem: "2 pontos" · "2,2 pontos". */
-export const fmtMargem = (n: number) => fmtDecimal(n, Number.isInteger(n) ? 0 : 1);
+/** Margem: "2" · "2,2" · "2,19" (pontos). */
+export const fmtMargem = (n: number) => fmtDecimal(n, casasExibir(n));
+
+/** Nível de confiança sem o "%": "95" · "95,45". */
+export const fmtConfianca = (n: number) => fmtDecimal(n, casasExibir(n));
 
 // ---------------------------------------------------------------------------------------------
 // Validação
@@ -330,7 +342,7 @@ function texto(v: unknown, campo: CampoPesquisa, lim: { min: number; max: number
 function numero(v: unknown, campo: CampoPesquisa, min: number, max: number, maxCasas: number, unidade = ''): number | ResultadoValidacao {
   if (typeof v !== 'number' || !Number.isFinite(v)) return erro(campo, 'obrigatório (número).');
   if (v < min || v > max) return erro(campo, `entre ${fmtDecimal(min, casas(min) ? 1 : 0)} e ${fmtDecimal(max, casas(max) ? 1 : 0)}${unidade}.`);
-  if (casas(v) > maxCasas) return erro(campo, maxCasas === 0 ? 'número inteiro.' : `no máximo ${maxCasas === 1 ? 'uma casa decimal' : `${maxCasas} casas decimais`}, como o instituto divulgou.`);
+  if (casas(v) > maxCasas) return erro(campo, maxCasas === 0 ? 'número inteiro.' : `no máximo ${maxCasas === 1 ? 'uma casa decimal' : maxCasas === 2 ? 'duas casas decimais' : `${maxCasas} casas decimais`}, como o instituto divulgou.`);
   return v;
 }
 
@@ -412,9 +424,9 @@ export function validaPesquisa(entrada: unknown, ctx: ContextoValidacao = {}): R
   // amostra, margem e confiança
   const entrevistas = numero(e.entrevistas, 'entrevistas', L.entrevistas.min, L.entrevistas.max, 0);
   if (typeof entrevistas !== 'number') return entrevistas;
-  const margemPp = numero(e.margemPp, 'margemPp', L.margemPp.min, L.margemPp.max, 1, ' pontos');
+  const margemPp = numero(e.margemPp, 'margemPp', L.margemPp.min, L.margemPp.max, L.casasMax, ' pontos');
   if (typeof margemPp !== 'number') return margemPp;
-  const confiancaPct = numero(e.confiancaPct, 'confiancaPct', L.confiancaPct.min, L.confiancaPct.max, 1, '%');
+  const confiancaPct = numero(e.confiancaPct, 'confiancaPct', L.confiancaPct.min, L.confiancaPct.max, L.casasMax, '%');
   if (typeof confiancaPct !== 'number') return confiancaPct;
 
   let modo: ModoPesquisa | undefined;
@@ -433,7 +445,7 @@ export function validaPesquisa(entrada: unknown, ctx: ContextoValidacao = {}): R
   const numsTotais: number[] = [];
   for (const [k, v] of Object.entries(e.totais)) {
     if (k !== CHAVE_BRANCOS_NULOS && k !== CHAVE_INDECISOS && !RE_NUMERO_URNA.test(k)) return erro('totais', `chave "${k.slice(0, 16)}" desconhecida (use o número de urna, brancosNulos ou indecisos).`);
-    const n = numero(v, 'totais', 0, 100, 1, '%');
+    const n = numero(v, 'totais', 0, 100, L.casasMax, '%');
     if (typeof n !== 'number') return n;
     totais[k] = n;
     if (RE_NUMERO_URNA.test(k)) numsTotais.push(Number(k));
@@ -445,7 +457,7 @@ export function validaPesquisa(entrada: unknown, ctx: ContextoValidacao = {}): R
     if (exp[0] !== numsTotais[0] || exp[1] !== numsTotais[1]) return erro('totais', `os candidatos desta disputa são ${exp.join(' e ')}.`);
   }
   const somaTotais = Object.values(totais).reduce((a, b) => a + b, 0);
-  if (somaTotais > L.somaTotaisMax + 1e-9) return erro('totais', `a soma passa de 100% (${fmtDecimal(somaTotais, 1)}%) — confira os números.`);
+  if (somaTotais > L.somaTotaisMax + 1e-9) return erro('totais', `a soma passa de ${fmtDecimal(L.somaTotaisMax, 1)}% (${fmtDecimal(somaTotais, 1)}%) — confira os números.`);
   if (totais[CHAVE_BRANCOS_NULOS] !== undefined && totais[CHAVE_INDECISOS] !== undefined && somaTotais < L.somaTotaisMinCompleta - 1e-9) {
     return erro('totais', `com brancos/nulos e indecisos, a soma deveria chegar perto de 100% (deu ${fmtDecimal(somaTotais, 1)}%).`);
   }
@@ -462,7 +474,7 @@ export function validaPesquisa(entrada: unknown, ctx: ContextoValidacao = {}): R
       validos = {};
       for (const [k, v] of Object.entries(e.validos)) {
         if (!RE_NUMERO_URNA.test(k) || !numsTotais.includes(Number(k))) return erro('validos', 'use os mesmos dois candidatos dos votos totais.');
-        const n = numero(v, 'validos', 0, 100, 1, '%');
+        const n = numero(v, 'validos', 0, 100, L.casasMax, '%');
         if (typeof n !== 'number') return n;
         validos[k] = n;
       }
@@ -706,13 +718,13 @@ export function informacoesObrigatorias(p: Pesquisa): ItemObrigatorio[] {
     { rotulo: 'Coleta', valor: fmtPeriodoColeta(p.coletaInicio, p.coletaFim) },
     { rotulo: 'Entrevistas', valor: fmtInt(p.entrevistas) },
     { rotulo: 'Margem de erro', valor: `${fmtMargem(p.margemPp)} ${p.margemPp === 1 ? 'ponto' : 'pontos'} para mais ou para menos` },
-    { rotulo: 'Nível de confiança', valor: `${fmtDecimal(p.confiancaPct, Number.isInteger(p.confiancaPct) ? 0 : 1)}%` },
+    { rotulo: 'Nível de confiança', valor: `${fmtConfianca(p.confiancaPct)}%` },
   ];
 }
 
 /** Numa linha: "Datafolha · contratante: Folha · registro BR-01234/2026 · coleta 20 a 22/10/2026 · 2.004 entrevistas · margem de erro de 2 pontos, para mais ou para menos · confiança de 95%". */
 export function linhaObrigatoria(p: Pesquisa): string {
-  const conf = fmtDecimal(p.confiancaPct, Number.isInteger(p.confiancaPct) ? 0 : 1);
+  const conf = fmtConfianca(p.confiancaPct);
   return [
     p.instituto,
     `contratante: ${p.contratante ?? 'não informado'}`,

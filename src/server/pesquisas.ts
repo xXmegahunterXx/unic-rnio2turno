@@ -265,6 +265,11 @@ export class Pesquisas {
       const texto = JSON.stringify(corpo);
       return { corpo, texto, etag: etagFraco('pesq', 'votacao') };
     }
+    // simulação com nomes ocultos: a área não aparece — e a API também não entrega os números (por número de urna real)
+    if (this.d.anonimizado?.()) {
+      const corpo: PesquisasPublicas = { pesquisas: [], versao: 'oculta' };
+      return { corpo, texto: JSON.stringify(corpo), etag: etagFraco('pesq', 'oculta') };
+    }
     this.sincronizar();
     const s = this.semente();
     const chave = `${s.versao}|${this.versaoPainel}`;

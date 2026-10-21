@@ -180,8 +180,8 @@ function SecaoChatServidor() {
             ) : d.bloqueio ? (
               <Callout tom="alerta" titulo={d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? 'Dia da eleição' : 'Antes da apuração'}>
                 {d.bloqueio} Até lá ninguém consegue enviar mensagens, mesmo com a sala aberta
-                {d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? ' (propaganda no dia da eleição é crime)' : ''}. Abrir antes deixa a sala
-                pronta: ela passa a receber mensagens sozinha às 17h. A configuração (aberta, modo lento, fixada) sobrevive a reinícios.
+                {d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? ' (propaganda no dia da eleição é crime)' : ''}. Com a sala aberta, ela
+                volta a receber mensagens sozinha às 17h. A configuração (aberta, modo lento, fixada) sobrevive a reinícios.
               </Callout>
             ) : null}
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
