@@ -345,10 +345,10 @@
    ]
   },
   {
-   "id": "pq-e15deb2f776a4df8",
+   "id": "pq-3824631d04fddbe8",
    "cargo": "pres",
-   "instituto": "Futura Inteligência",
-   "contratante": "100% Cidades",
+   "instituto": "100% Cidades",
+   "contratante": "Futura Consultoria e Assessoria Ltda. (Futura)",
    "registro": "BR-06715/2026",
    "coletaInicio": "2026-10-16",
    "coletaFim": "2026-10-17",
@@ -543,10 +543,10 @@
    ]
   },
   {
-   "id": "pq-96cef8bce62e6de7",
+   "id": "pq-3c00a9eee8423557",
    "cargo": "pres",
-   "instituto": "Futura Inteligência",
-   "contratante": "100% Cidades",
+   "instituto": "100% Cidades",
+   "contratante": "Futura Consultoria e Assessoria Ltda. (Futura)",
    "registro": "BR-03764/2026",
    "coletaInicio": "2026-10-14",
    "coletaFim": "2026-10-15",
@@ -661,33 +661,6 @@
    ]
   },
   {
-   "id": "pq-8e9d207b407cb448",
-   "cargo": "gov-df",
-   "instituto": "IGAPE (Instituto Gazeta de Pesquisas)",
-   "contratante": "TV Atual (afiliada à Record News)",
-   "registro": "DF-02733/2026",
-   "coletaInicio": "2026-10-12",
-   "coletaFim": "2026-10-14",
-   "divulgadaEm": "2026-10-15",
-   "entrevistas": 1200,
-   "margemPp": 2.8,
-   "confiancaPct": 95,
-   "totais": {
-    "11": 55.8,
-    "13": 35.8,
-    "indecisos": 8.4
-   },
-   "validos": {
-    "11": 61,
-    "13": 39
-   },
-   "fontes": [
-    "https://jornaldebrasilia.com.br/brasilia/igape-celina-leao-tem-61-dos-votos-validos-e-abre-22-pontos-sobre-grass-no-df/",
-    "https://www.metropoles.com/colunas/grande-angular/igape-record-celina-tem-61-das-intencoes-de-votos-validos-e-grass-39",
-    "https://ncnews.com.br/2026/10/15/celina-tem-61-dos-votos-validos-contra-39-de-grass-aponta-igape-record/"
-   ]
-  },
-  {
    "id": "pq-702af339f466dad8",
    "cargo": "pres",
    "instituto": "Palver",
@@ -709,6 +682,33 @@
    "fontes": [
     "https://static.poder360.com.br/uploads/2026/10/pesquisa-palver-presidente-nacional-15out2026-1.pdf",
     "https://www.poder360.com.br/poder-pesquisas/saiba-como-estao-lula-e-flavio-nas-pesquisas-a-5-dias-da-eleicao/"
+   ]
+  },
+  {
+   "id": "pq-8e9d207b407cb448",
+   "cargo": "gov-df",
+   "instituto": "IGAPE (Instituto Gazeta de Pesquisas)",
+   "contratante": "TV Atual (afiliada à Record News)",
+   "registro": "DF-02733/2026",
+   "coletaInicio": "2026-10-12",
+   "coletaFim": "2026-10-14",
+   "divulgadaEm": "2026-10-14",
+   "entrevistas": 1200,
+   "margemPp": 2.8,
+   "confiancaPct": 95,
+   "totais": {
+    "11": 55.8,
+    "13": 35.8,
+    "indecisos": 8.4
+   },
+   "validos": {
+    "11": 61,
+    "13": 39
+   },
+   "fontes": [
+    "https://jornaldebrasilia.com.br/brasilia/igape-celina-leao-tem-61-dos-votos-validos-e-abre-22-pontos-sobre-grass-no-df/",
+    "https://www.metropoles.com/colunas/grande-angular/igape-record-celina-tem-61-das-intencoes-de-votos-validos-e-grass-39",
+    "https://ncnews.com.br/2026/10/15/celina-tem-61-dos-votos-validos-contra-39-de-grass-aponta-igape-record/"
    ]
   },
   {
@@ -973,10 +973,10 @@
    ]
   },
   {
-   "id": "pq-a2abeaf5b37aa746",
+   "id": "pq-2d96920f9c134bb6",
    "cargo": "pres",
-   "instituto": "Futura Inteligência",
-   "contratante": "100 Cidades Participações Ltda. (100% Cidades)",
+   "instituto": "100% Cidades",
+   "contratante": "Futura Consultoria e Assessoria Ltda. (Futura)",
    "registro": "BR-00650/2026",
    "coletaInicio": "2026-10-07",
    "coletaFim": "2026-10-10",
@@ -1081,9 +1081,9 @@
    ]
   },
   {
-   "id": "pq-847e2c80f9188cbb",
+   "id": "pq-ef7ffc27e9abb75a",
    "cargo": "gov-to",
-   "instituto": "Directa Pesquisas",
+   "instituto": "Direct Pesquisas",
    "contratante": "Trilhas do Cerrado Produções e Publicidades Ltda.",
    "registro": "TO-03128/2026",
    "coletaInicio": "2026-10-06",
