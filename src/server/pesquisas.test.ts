@@ -10,11 +10,21 @@ import { CABECALHO_BORDA } from './http-cache';
 import { metaDaRota, OG_COM_CANDIDATO, type ContextoMeta } from './meta-tags';
 import { Pesquisas, cabecalhosAteVirada } from './pesquisas';
 import { createJsonStore } from './state-store';
-import { login, montar, type Montado } from './test-helpers';
+import { login, montar, RAIZ, type Montado } from './test-helpers';
 import { comandoPesquisaSchema } from './validation';
 
 // Dados de TESTE (fictícios): nenhum número aqui é de pesquisa real.
 const AGORA = Date.UTC(2026, 9, 20, 15, 0, 0); // 20/10/2026 12h de Brasília
+/**
+ * Relógio dos testes que conferem a semente REAL: 23h de Brasília do dia da divulgação mais recente dela (a semente
+ * cresce até 24/10 e uma pesquisa divulgada "amanhã" seria recusada como do futuro). Antes da 0h de 25/10.
+ */
+const AGORA_SEMENTE = (() => {
+  const real = JSON.parse(readFileSync(join(RAIZ, 'public/data/pesquisas.json'), 'utf8')) as { pesquisas: Pesquisa[] };
+  const ultima = real.pesquisas.reduce((m, p) => (p.divulgadaEm > m ? p.divulgadaEm : m), '2026-10-20');
+  const [a, mes, d] = ultima.split('-').map(Number);
+  return Math.max(AGORA, Math.min(Date.UTC(a, mes - 1, d + 1, 2, 0, 0), INICIO_DIA_VOTACAO - 3600_000));
+})();
 
 const exemplo = (o: Partial<Pesquisa> = {}): Omit<Pesquisa, 'id'> & { id?: string } => ({
   cargo: 'pres',
@@ -210,7 +220,7 @@ describe('rotas (servidor de verdade)', () => {
   });
 
   it('painel: sessão obrigatória, zod, validação do conteúdo, CSRF; a pesquisa aparece na rota pública', async () => {
-    const m = await montar({ agora: AGORA });
+    const m = await montar({ agora: AGORA_SEMENTE });
     expect((await m.app.request('/api/admin/pesquisas')).status).toBe(401);
     const cookie = await login(m);
     expect((await pedir(m, cookie, { acao: 'salvar', pesquisa: { ...exemplo(), cargo: 'senado' } })).status).toBe(400);
@@ -255,7 +265,7 @@ describe('rotas (servidor de verdade)', () => {
   }, 60_000);
 
   it('dia da votação: lista suspensa e a imagem vira o convite genérico', async () => {
-    const m = await montar({ agora: AGORA });
+    const m = await montar({ agora: AGORA_SEMENTE });
     const cookie = await login(m);
     const adm = (await (await pedir(m, cookie, { acao: 'salvar', pesquisa: exemplo() })).json()) as PesquisasAdmin;
     const nova = adm.itens.find((i) => i.origem === 'painel')!;

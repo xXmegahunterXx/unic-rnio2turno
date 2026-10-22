@@ -2,6 +2,286 @@
  "sobre": "Pesquisas eleitorais REGISTRADAS no TSE para o 2º turno de 2026 (Lei 9.504/97, art. 33; Res. TSE 23.600/2019). Contrato e validação: src/shared/pesquisas.ts. Cada número vem de uma fonte aberta (URL em fontes). Nunca inventar, estimar ou completar número.",
  "pesquisas": [
   {
+   "id": "pq-0f389560608683f7",
+   "cargo": "pres",
+   "instituto": "Datafolha",
+   "contratante": "Folha de S.Paulo e TV Globo",
+   "registro": "BR-09709/2026",
+   "coletaInicio": "2026-10-20",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-22",
+   "entrevistas": 2520,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 46,
+    "22": 47,
+    "brancosNulos": 5,
+    "indecisos": 2
+   },
+   "validos": {
+    "13": 50,
+    "22": 50
+   },
+   "fontes": [
+    "https://tvtnews.com.br/datafolha-pesquisa-presidente-2-turno-pos-debate/",
+    "https://www.terra.com.br/noticias/eleicoes/datafolha-2-turno-flavio-bolsonaro-e-lula-empatam-com-50-em-votos-validos,178579b6fa0f17850de817b0260c73797lr3ng40.html",
+    "https://www.em.com.br/politica/2026/10/7526063-datafolha-flavio-e-lula-empatam-em-votos-validos.html",
+    "https://www.otempo.com.br/eleicoes/2026/presidentes/2026/10/22/flavio-bolsonaro-e-lula-empatam-em-50-dos-votos-validos-diz-datafolha"
+   ]
+  },
+  {
+   "id": "pq-7ce9177b4ada8352",
+   "cargo": "pres",
+   "instituto": "Indexa",
+   "contratante": "Agência Estado S.A.",
+   "registro": "BR-02348/2026",
+   "coletaInicio": "2026-10-20",
+   "coletaFim": "2026-10-21",
+   "divulgadaEm": "2026-10-22",
+   "entrevistas": 2000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 44.1,
+    "22": 45.2,
+    "brancosNulos": 4.3
+   },
+   "validos": {
+    "13": 49.4,
+    "22": 50.6
+   },
+   "fontes": [
+    "https://static.congressoemfoco.com.br/2026/10/22/attachment/2026/10/22/046860_relatorio___pesquisa_nacional___segundo_turno___rodada_2___imprensa.pdf",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/indexa-broadcast-presidente-outubro-2026-segundo-turno-2/",
+    "https://www.congressoemfoco.com.br/noticia/123503/flavio-tem-50-6-e-lula-49-4--diz-pesquisa-indexa-broadcast",
+    "https://www.cartacapital.com.br/cartaexpressa/pesquisa-indexa-mostra-flavio-bolsonaro-com-506-ante-494-de-lula/",
+    "https://revistaoeste.com/politica/indexa-broadcast-flavio-tem-452-contra-441-de-lula-no-2o-turno/"
+   ]
+  },
+  {
+   "id": "pq-2c49be0f3a9b9188",
+   "cargo": "pres",
+   "instituto": "PoderData",
+   "contratante": "PoderData (recursos próprios)",
+   "registro": "BR-07926/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-21",
+   "divulgadaEm": "2026-10-22",
+   "entrevistas": 4000,
+   "margemPp": 1.6,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 48,
+    "22": 49,
+    "brancosNulos": 3,
+    "indecisos": 1
+   },
+   "validos": {
+    "13": 49,
+    "22": 51
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/Relatorio-PoderData-Eleitoral-21out26-2.pdf",
+    "https://www.poder360.com.br/poderdata/pesquisa-poderdata-aya-leia-os-resultados-de-lula-e-flavio-na-reta-final-do-2o-turno-3/"
+   ]
+  },
+  {
+   "id": "pq-e947ba6b3bc32db8",
+   "cargo": "gov-df",
+   "instituto": "Opinião Inteligência Política",
+   "contratante": "S/A Correio Braziliense (Correio Braziliense)",
+   "registro": "DF-08851/2026",
+   "coletaInicio": "2026-10-16",
+   "coletaFim": "2026-10-19",
+   "divulgadaEm": "2026-10-22",
+   "entrevistas": 1006,
+   "margemPp": 3.3,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "11": 54.6,
+    "13": 37.5,
+    "brancosNulos": 5.7,
+    "indecisos": 2.2
+   },
+   "validos": {
+    "11": 59.3,
+    "13": 40.7
+   },
+   "fontes": [
+    "https://www.correiobraziliense.com.br/cidades-df/2026/10/7525016-pesquisa-correio-opiniao-indica-celina-com-593-dos-votos-validos-e-grass-com-407.html",
+    "https://www.correiobraziliense.com.br/politica/2026/10/7525930-correio-opiniao-veja-todos-os-dados-da-sexta-rodada-da-pesquisa.html",
+    "https://www.correiobraziliense.com.br/cidades-df/2026/10/7525228-pesquisa-correio-opiniao-80-acreditam-na-reeleicao-de-celina-leao.html"
+   ]
+  },
+  {
+   "id": "pq-fd2d59bf7a026e8c",
+   "cargo": "pres",
+   "instituto": "Gerp Mercadologia",
+   "contratante": "Gerp Mercadologia (recursos próprios)",
+   "registro": "BR-03835/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-21",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 2400,
+   "margemPp": 2,
+   "confiancaPct": 95.55,
+   "modo": "telefone",
+   "totais": {
+    "13": 45,
+    "22": 50,
+    "brancosNulos": 2,
+    "indecisos": 2
+   },
+   "validos": {
+    "13": 47,
+    "22": 53
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/gerp-nacional-2oturno-21.out_.2026.pdf",
+    "https://www.infomoney.com.br/politica/flavio-tem-53-e-lula-47-nos-votos-validos-mostra-gerp/"
+   ]
+  },
+  {
+   "id": "pq-49fe80f93019ce9c",
+   "cargo": "pres",
+   "instituto": "100% Cidades",
+   "contratante": "Futura Consultoria e Assessoria Ltda. (Futura)",
+   "registro": "BR-06614/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-20",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 2000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 46.8,
+    "22": 48.9,
+    "brancosNulos": 2,
+    "indecisos": 2.3
+   },
+   "validos": {
+    "13": 48.9,
+    "22": 51.1
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/pesquisaFutura-presidente-21out2026.pdf",
+    "https://www.cnnbrasil.com.br/eleicoes/futura-flavio-tem-511-dos-votos-validos-no-2o-turno-lula-489/"
+   ]
+  },
+  {
+   "id": "pq-e622fa9430a88865",
+   "cargo": "pres",
+   "instituto": "Palver",
+   "contratante": "Palver (recursos próprios)",
+   "registro": "BR-04612/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-20",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 5000,
+   "margemPp": 2.4,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "13": 48,
+    "22": 50,
+    "brancosNulos": 1,
+    "indecisos": 0
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/pesquisaPalver-presidente-21out2026_compressed-compactado.pdf",
+    "https://www.poder360.com.br/poder-pesquisas/flavio-tem-50-contra-48-de-lula-no-2o-turno-diz-pesquisa/"
+   ]
+  },
+  {
+   "id": "pq-757f3c7f6ba57e66",
+   "cargo": "pres",
+   "instituto": "Quaest",
+   "contratante": "Globo e jornal O Globo",
+   "registro": "BR-08535/2026",
+   "coletaInicio": "2026-10-17",
+   "coletaFim": "2026-10-20",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 2154,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 44,
+    "22": 45,
+    "brancosNulos": 9,
+    "indecisos": 2
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/quaest-nacional-2oturno-21.out_.2026.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/flavio-tem-45-contra-44-de-lula-no-2o-turno-diz-quaest/",
+    "https://www.metropoles.com/brasil/quaest-flavio-bolsonaro-tem-45-e-lula-44-no-2o-turno",
+    "https://exame.com/brasil/pesquisa-para-presidente-quaest-flavio-bolsonaro-tem-45-e-lula-44-a-4-dias-do-2o-turno/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/quaest-presidente-outubro-2026-segundo-turno-2/"
+   ]
+  },
+  {
+   "id": "pq-7d974546a1fdb963",
+   "cargo": "gov-df",
+   "instituto": "Quaest",
+   "contratante": "Globo Comunicação e Participações S/A (TV Globo)",
+   "registro": "DF-00402/2026",
+   "coletaInicio": "2026-10-17",
+   "coletaFim": "2026-10-20",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 1104,
+   "margemPp": 3,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "11": 50,
+    "13": 35,
+    "brancosNulos": 7,
+    "indecisos": 8
+   },
+   "fontes": [
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/quaest-governador-distrito-federal-outubro-2026-segundo-turno/",
+    "https://www.metropoles.com/colunas/grande-angular/celina-tem-50-das-intencoes-de-voto-e-grass-soma-35-diz-pesquisa-quaest",
+    "https://www.brasil247.com/brasilia/quaest-no-df-celina-leao-tem-50-e-leandro-grass-35/",
+    "https://www.meionews.com/politica/eleicoes-2026/pesquisa-quaest-no-df-2-turno-celina-leao-50-leandro-grass-35-578805",
+    "https://soubrasilia.com/quaest-df-celina-50-grass-35-segundo-turno/",
+    "https://simnoticias.com.br/cnn-brasil/quaest-no-df-flavio-tem-50-das-intencoes-de-voto-lula-39/"
+   ]
+  },
+  {
+   "id": "pq-6955d0bdcd70ff56",
+   "cargo": "pres",
+   "instituto": "Ideia",
+   "contratante": "Canal Meio S.A.",
+   "registro": "BR-08251/2026",
+   "coletaInicio": "2026-10-15",
+   "coletaFim": "2026-10-19",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 1500,
+   "margemPp": 2.5,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 46,
+    "22": 48,
+    "brancosNulos": 3.4,
+    "indecisos": 2.6
+   },
+   "validos": {
+    "13": 48.9,
+    "22": 51.1
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/Pesquisa-Meio_Ideia-Outubro-Imprensa.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/flavio-tem-511-e-lula-489-dos-votos-validos-diz-meio-ideia/"
+   ]
+  },
+  {
    "id": "pq-46cedd65f3d76928",
    "cargo": "pres",
    "instituto": "Instituto França",
@@ -256,6 +536,35 @@
     "https://bpmoney.com.br/politica/vicentinho-52-dorinha-48-segundo-turno-tocantins/",
     "https://ncnews.com.br/2026/10/20/realtime-big-data-pesquisas-governadores/",
     "https://revistaforum.com.br/politica/realtime-tocantins/"
+   ]
+  },
+  {
+   "id": "pq-bbff378bd898e392",
+   "cargo": "gov-rn",
+   "instituto": "DataTrends",
+   "contratante": "DataTrends (recursos próprios)",
+   "registro": "RN-01690/2026",
+   "coletaInicio": "2026-10-16",
+   "coletaFim": "2026-10-18",
+   "divulgadaEm": "2026-10-20",
+   "entrevistas": 1200,
+   "margemPp": 2.83,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 46,
+    "44": 49,
+    "brancosNulos": 3,
+    "indecisos": 2
+   },
+   "validos": {
+    "13": 48,
+    "44": 52
+   },
+   "fontes": [
+    "https://www.edmarlyra.com/datatrends-allyson-bezerra-tem-52-dos-votos-validos-contra-48-de-cadu-de-lula-no-rio-grande-do-norte/",
+    "https://www.blogdobg.com.br/datatrends-allyson-bezerra-lidera-numericamente-com-49-contra-46-de-cadu-de-lula/",
+    "https://robsonpiresxerife.com/pesquisa-datatrends-allyson-bezerra-lidera-numericamente-com-49-contra-46-de-cadu-de-lula/"
    ]
   },
   {
