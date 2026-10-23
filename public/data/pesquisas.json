@@ -1825,35 +1825,6 @@
    ]
   },
   {
-   "id": "pq-ef7ffc27e9abb75a",
-   "cargo": "gov-to",
-   "instituto": "Direct Pesquisas",
-   "contratante": "Trilhas do Cerrado Produções e Publicidades Ltda.",
-   "registro": "TO-03128/2026",
-   "coletaInicio": "2026-10-06",
-   "coletaFim": "2026-10-09",
-   "divulgadaEm": "2026-10-10",
-   "entrevistas": 1200,
-   "margemPp": 2.83,
-   "confiancaPct": 95,
-   "modo": "presencial",
-   "totais": {
-    "44": 44.8,
-    "45": 40.1,
-    "brancosNulos": 5.4,
-    "indecisos": 9.7
-   },
-   "validos": {
-    "44": 52.8,
-    "45": 47.2
-   },
-   "fontes": [
-    "https://bico24horas.com.br/politica/eleicoes-no-tocantins-professora-dorinha-lidera-primeira-pesquisa-do-segundo-turno-com-528-dos-votos-validos/",
-    "https://reportergoias.com.br/2026/10/professora-dorinha-lidera-disputa-pelo-governo-do-tocantins-no-2o-turno-com-528-dos-votos-validos-impulsionada-por-forte-onda-pro-bolsonaro-no-estado/",
-    "https://atitudeto.com.br/politica/apos-suspensao-de-pesquisa-no-tre-to-portal-atitude-filtra-levantamentos-eleitorais-para-proteger-escolha-do-eleitor/"
-   ]
-  },
-  {
    "id": "pq-76e75c1c225260c1",
    "cargo": "pres",
    "instituto": "Ipespe",
