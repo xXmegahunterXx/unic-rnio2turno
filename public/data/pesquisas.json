@@ -2,6 +2,156 @@
  "sobre": "Pesquisas eleitorais REGISTRADAS no TSE para o 2º turno de 2026 (Lei 9.504/97, art. 33; Res. TSE 23.600/2019). Contrato e validação: src/shared/pesquisas.ts. Cada número vem de uma fonte aberta (URL em fontes). Nunca inventar, estimar ou completar número.",
  "pesquisas": [
   {
+   "id": "pq-c4248310804c988f",
+   "cargo": "pres",
+   "instituto": "Alfa Inteligência",
+   "contratante": "Alfa Inteligência (recursos próprios)",
+   "registro": "BR-08496/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 2700,
+   "margemPp": 1.9,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 46,
+    "22": 49.9,
+    "brancosNulos": 2,
+    "indecisos": 2.1
+   },
+   "validos": {
+    "13": 48,
+    "22": 52
+   },
+   "fontes": [
+    "https://exame.com/brasil/pesquisa-alfa-a-dois-dias-do-2o-turno-flavio-bolsonaro-tem-52-e-lula-48/",
+    "https://viva.com.br/politica/alfa-inteligencia-flavio-tem-52-dos-votos-validos-contra-48-de-lula.html",
+    "https://acritica.net/eleicoes-2026/alfa-inteligencia-flavio-52-lula-48-votos-validos-segundo-turno/",
+    "https://www.cnnbrasil.com.br/eleicoes/alfa-flavio-tem-52-dos-votos-validos-no-2o-turno-lula-48/",
+    "https://timesbrasil.com.br/brasil/decisao-2026-flavio-bolsonaro-tem-52-dos-votos-validos-contra-48-de-lula-no-2o-turno-aponta-pesquisa-alfa-inteligencia/"
+   ]
+  },
+  {
+   "id": "pq-2e4b5d772c15b48e",
+   "cargo": "pres",
+   "instituto": "Ipespe",
+   "contratante": "Ipespe (recursos próprios)",
+   "registro": "BR-04350/2026",
+   "coletaInicio": "2026-10-20",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 1500,
+   "margemPp": 2.6,
+   "confiancaPct": 95.45,
+   "modo": "telefone",
+   "totais": {
+    "13": 47,
+    "22": 48,
+    "brancosNulos": 3,
+    "indecisos": 2
+   },
+   "validos": {
+    "13": 49.5,
+    "22": 50.5
+   },
+   "fontes": [
+    "https://ipespe.org.br/wp-content/uploads/2026/10/TRK-CAMPANHA-03_-IPESPE-ABRAPEL_2T_-20-a-22-OUT-2026_-VF_.pdf",
+    "https://ipespe.org.br/wp-content/uploads/2026/10/REPORT-IPESPE-ABRAPEL_TRK-CAMPANHA-03_20-22out2026_VF_.pdf",
+    "https://ipespe.org.br/pesquisa-ipespe-abrapel-3o-turno-tracking-da-campanha-weekly-tracking-rodada-03-20-a-22-de-outubro-de-2026/",
+    "https://ac24horas.com/2026/10/23/ipespe-abrapel-flavio-tem-505-dos-votos-validos-lula-495/",
+    "https://brasil247.com/brasil/pesquisa-ipespe-abrapel-aponta-alta-de-lula-queda-de-flavio-e-empate-tecnico"
+   ]
+  },
+  {
+   "id": "pq-ead51ac4102df37d",
+   "cargo": "pres",
+   "instituto": "Real Time Big Data",
+   "contratante": "Real Time Big Data (recursos próprios)",
+   "registro": "BR-09670/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 2000,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 45,
+    "22": 49,
+    "brancosNulos": 5,
+    "indecisos": 1
+   },
+   "validos": {
+    "13": 48,
+    "22": 52
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/Pesquisa-presidencial-Real-Time-Big-Data-23out2026.pdf",
+    "https://timesbrasil.com.br/eleicoes-2026/decisao-2026-pesquisa-real-time-mostra-flavio-bolsonaro-com-52-e-lula-com-48-dos-votos-validos/",
+    "https://www.abcmais.com/politica/real-time-big-data-veja-numeros-da-nova-pesquisa-sobre-disputa-entre-lula-e-flavio-pela-presidencia/",
+    "https://portaln10.com.br/politica/eleicoes/pesquisa-real-time-big-data-mantem-flavio-em-52-e-lula-em-48-indecisos-caem-a-1-355970/",
+    "https://www.poder360.com.br/poder-eleicoes-2026/saiba-como-estao-lula-e-flavio-nas-pesquisas-a-2-dias-da-eleicao/"
+   ]
+  },
+  {
+   "id": "pq-c9e6d1d664bfa37f",
+   "cargo": "pres",
+   "instituto": "Vox Brasil",
+   "contratante": "Vox Brasil (recursos próprios)",
+   "registro": "BR-03259/2026",
+   "coletaInicio": "2026-10-20",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 2100,
+   "margemPp": 2.15,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 45.4,
+    "22": 44.3,
+    "brancosNulos": 6,
+    "indecisos": 4.3
+   },
+   "validos": {
+    "13": 50.6,
+    "22": 49.4
+   },
+   "fontes": [
+    "https://www.metropoles.com/brasil/vox-lula-soma-506-dos-votos-validos-contra-494-de-flavio-bolsonaro",
+    "https://exame.com/brasil/pesquisa-vox-brasil-lula-tem-506-e-flavio-494-dos-votos-validos-no-2o-turno/",
+    "https://timesbrasil.com.br/eleicoes-2026/pesquisa-vox-brasil-lula-flavio-bolsonaro-empate-tecnico-segundo-turno/",
+    "https://www.poder360.com.br/poder-eleicoes-2026/saiba-como-estao-lula-e-flavio-nas-pesquisas-a-2-dias-da-eleicao/"
+   ]
+  },
+  {
+   "id": "pq-4219637310a7fbba",
+   "cargo": "gov-rn",
+   "instituto": "DataTrends",
+   "contratante": "DataTrends (recursos próprios)",
+   "registro": "RN-03645/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-21",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 1200,
+   "margemPp": 2.83,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 45,
+    "44": 48,
+    "brancosNulos": 5,
+    "indecisos": 2
+   },
+   "validos": {
+    "13": 48,
+    "44": 52
+   },
+   "fontes": [
+    "https://www.edmarlyra.com/pesquisa-datatrends-mantem-allyson-bezerra-com-52-e-cadu-de-lula-com-48-dos-votos-validos-no-rio-grande-do-norte/",
+    "https://www.edmarlyra.com/coluna-desta-sexta-feira-178/"
+   ]
+  },
+  {
    "id": "pq-0f389560608683f7",
    "cargo": "pres",
    "instituto": "Datafolha",
