@@ -1099,6 +1099,31 @@
    ]
   },
   {
+   "id": "pq-3a880d09f6a5b070",
+   "cargo": "gov-rn",
+   "instituto": "ITEM",
+   "contratante": "Rádio Difusora de Mossoró S.A. / Rádio Difusora",
+   "registro": "RN-01978/2026",
+   "coletaInicio": "2026-10-13",
+   "coletaFim": "2026-10-15",
+   "divulgadaEm": "2026-10-17",
+   "entrevistas": 1250,
+   "margemPp": 2.77,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 44,
+    "44": 51
+   },
+   "fontes": [
+    "https://difusoramossoro.com.br/pesquisa-difusora-item-allyson-bezerra-aparece-com-51-e-cadu-de-lula-tem-44-na-disputa-pelo-governo-do-rn/",
+    "https://glaucialima.com/2026/10/17/pesquisa-item-difusora-allyson-bezerra-lidera-disputa-pelo-governo-do-rn-com-51-contra-44-de-cadu-de-lula/",
+    "https://www.bnewsrn.com.br/noticias/politica/pesquisa-item-revela-cenario-no-2-turno-do-rn-quem-aparece-na-frente-e-como-esta-a-rejeicao-dos-candidatos.html",
+    "https://static.poder360.com.br/uploads/2026/10/ITEM-2oturno-RN-outubro.pdf",
+    "https://www.poder360.com.br/brasil/saiba-como-estao-cadu-de-lula-e-allyson-nas-pesquisas-do-rn/",
+    "https://costabrancanews.com/pesquisa-difusora-item-allyson-bezerra-aparece-com-51-e-cadu-de-lula-tem-44-na-disputa-pelo-governo-do-rn/"
+   ]
+  },
+  {
    "id": "pq-82fee4eff0b0a5ac",
    "cargo": "pres",
    "instituto": "Gerp Mercadologia",
@@ -1740,6 +1765,37 @@
    ]
   },
   {
+   "id": "pq-762894c8d0835f41",
+   "cargo": "gov-rn",
+   "instituto": "Instituto Seta",
+   "contratante": "Instituto Seta (recursos próprios)",
+   "registro": "RN-09503/2026",
+   "coletaInicio": "2026-10-07",
+   "coletaFim": "2026-10-10",
+   "divulgadaEm": "2026-10-11",
+   "entrevistas": 1500,
+   "margemPp": 2.5,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 32.4,
+    "44": 43.5,
+    "brancosNulos": 14.1,
+    "indecisos": 9.9
+   },
+   "validos": {
+    "13": 42.8,
+    "44": 57.2
+   },
+   "fontes": [
+    "https://blogdobarreto.com.br/primeira-pesquisa-do-segundo-turno-no-rn-traz-lula-e-allyson-na-lideranca/",
+    "https://blognetoqueiroz.com.br/saiu-primeira-pesquisa-no-rn-para-o-segundo-turno-allyson-com-vantagem-sobre-cadu-de-lula/",
+    "https://mossoronoticias.com.br/primeira-pesquisa-do-2o-turno-aponta-allyson-com-572-dos-votos-validos-no-rn/",
+    "https://blogdodina.com/pesquisa-seta-1o-turno-urnas-2o-turno-rn/",
+    "https://www.portalclaudiooliveira.com/2026/10/primeira-pesquisa-do-2-turno-aponta.html",
+    "https://difusoramossoro.com.br/pesquisa-seta-aponta-allyson-com-572-e-cadu-com-428-dos-votos-validos-no-2o-turno-no-rn/"
+   ]
+  },
+  {
    "id": "pq-d939e626fbaeb0b7",
    "cargo": "pres",
    "instituto": "DataTrends",
@@ -1822,6 +1878,36 @@
    "fontes": [
     "https://static.poder360.com.br/uploads/2026/10/pesquisa-ipespe-abrapel-10out2026.pdf",
     "https://www.poder360.com.br/poder-eleicoes-2026/ipespe-confirma-poderdata-aya-e-da-flavio-com-527-e-lula-com-473/"
+   ]
+  },
+  {
+   "id": "pq-698583d318a3d6a0",
+   "cargo": "gov-df",
+   "instituto": "IGAPE (Instituto Gazeta de Pesquisas)",
+   "contratante": "TV Atual (afiliada à Record News)",
+   "registro": "DF-00054/2026",
+   "coletaInicio": "2026-10-05",
+   "coletaFim": "2026-10-07",
+   "divulgadaEm": "2026-10-09",
+   "entrevistas": 1200,
+   "margemPp": 2.8,
+   "confiancaPct": 95,
+   "totais": {
+    "11": 55.8,
+    "13": 36.2,
+    "indecisos": 8
+   },
+   "validos": {
+    "11": 60.7,
+    "13": 39.3
+   },
+   "fontes": [
+    "https://noticias.r7.com/eleicoes/2026/pesquisa-igape-celina-leao-tem-607-dos-votos-validos-e-leandro-grass-393-09102026/",
+    "https://static.poder360.com.br/uploads/2026/10/Pesquisa-Igape-governador-DF-9out2026.pdf",
+    "https://tudooknoticias.com.br/distrito-federal/pesquisa-igape-celina-leao-tem-607-dos-votos-validos-no-df/",
+    "https://www.poppnews.com.br/2026/10/pesquisa-do-igape-indica-celina-leao.html",
+    "https://www.emdefesadasaude.com.br/2026/10/09/pesquisa-igape-aponta-celina-leao-com-607-dos-votos-validos-no-segundo-turno-no-df/",
+    "https://www.estruturalonline.com/2026/10/celina-leao-tem-607-dos-votos-validos.html"
    ]
   },
   {
