@@ -32,6 +32,57 @@
    ]
   },
   {
+   "id": "pq-5fed425e99e0b811",
+   "cargo": "gov-df",
+   "instituto": "Datafolha",
+   "contratante": "Folha de S.Paulo e TV Globo",
+   "registro": "DF-01738/2026",
+   "coletaInicio": "2026-10-20",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-22",
+   "entrevistas": 910,
+   "margemPp": 3,
+   "confiancaPct": 95,
+   "totais": {
+    "11": 54,
+    "13": 37,
+    "brancosNulos": 7,
+    "indecisos": 2
+   },
+   "fontes": [
+    "https://www.poder360.com.br/poder-eleicoes-2026/celina-leao-tem-54-contra-37-de-leandro-grass-diz-datafolha/",
+    "https://www.cnnbrasil.com.br/eleicoes/datafolha-celina-tem-54-no-2o-turno-ao-governo-do-df-grass-37/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/datafolha-governador-distrito-federal-outubro-2026-segundo-turno-2/",
+    "https://gpsbrasilia.com.br/datafolha-no-df-2o-turno-celina-leao-tem-54-e-leandro-grass-37/",
+    "https://www.metropoles.com/colunas/grande-angular/as-vesperas-2o-turno-celina-tem-54-e-grass-soma-37-diz-datafolha",
+    "https://www.terra.com.br/noticias/brasil/politica/celina-leao-tem-54-das-intencoes-de-voto-ao-governo-do-df-grass-aparece-com-37-indica-datafolha,8eeea1e011bdf718b2f50bb6f1832277p7eg3to4.html"
+   ]
+  },
+  {
+   "id": "pq-1439239e31ba06db",
+   "cargo": "gov-rn",
+   "instituto": "Exatus",
+   "contratante": "A de O Viana Editora e Comunicação Ltda / Grupo Agora RN",
+   "registro": "RN-01134/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-21",
+   "divulgadaEm": "2026-10-22",
+   "entrevistas": 1500,
+   "margemPp": 2.53,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 43.37,
+    "44": 46.08,
+    "brancosNulos": 5.64,
+    "indecisos": 4.92
+   },
+   "fontes": [
+    "https://agorarn.com.br/politica/exatus-allyson-cadu-segundo-turno-rn/",
+    "https://www.bnewsrn.com.br/noticias/politica/a-tres-dias-do-2-turno-exatus-aponta-empate-tecnico-entre-allyson-e-cadu-de-lula.html",
+    "https://www.carloscosta.com.br/2026/10/allyson-tem-46-e-cadu-de-lula-43-tres.html"
+   ]
+  },
+  {
    "id": "pq-7ce9177b4ada8352",
    "cargo": "pres",
    "instituto": "Indexa",
@@ -254,6 +305,34 @@
    ]
   },
   {
+   "id": "pq-2cfe2e550bc69854",
+   "cargo": "gov-rn",
+   "instituto": "Qualittá",
+   "contratante": "Qualittá (recursos próprios)",
+   "registro": "RN-05666/2026",
+   "coletaInicio": "2026-10-16",
+   "coletaFim": "2026-10-20",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 1200,
+   "margemPp": 2.8,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 41.5,
+    "44": 50.5
+   },
+   "validos": {
+    "13": 45.1,
+    "44": 54.9
+   },
+   "fontes": [
+    "https://portalgazetarn.com/pesquisa-qualitta-rn-hoje-aponta-allyson-bezerra-com-549-dos-votos-validos-no-2o-turno-no-rn/",
+    "https://www.tribunadenoticias.com.br/2026/10/pesquisa-qualitta-aponta-allyson-com.html",
+    "https://robsonpiresxerife.com/pesquisa-qualitta-estimulado-aponta-allyson-bezerra-com-505-dos-votos-validos-no-2o-turno-no-rn-contra-415-de-cadu/",
+    "https://www.bnewsrn.com.br/noticias/politica/rn-tem-duas-pesquisas-para-governo-com-resultados-destintos-confira.html",
+    "https://www.blogdojoaomarcolino.com/2026/10/allyson-lidera-disputa-pelo-governo-do.html"
+   ]
+  },
+  {
    "id": "pq-6955d0bdcd70ff56",
    "cargo": "pres",
    "instituto": "Ideia",
@@ -279,6 +358,63 @@
    "fontes": [
     "https://static.poder360.com.br/uploads/2026/10/Pesquisa-Meio_Ideia-Outubro-Imprensa.pdf",
     "https://www.poder360.com.br/poder-eleicoes-2026/flavio-tem-511-e-lula-489-dos-votos-validos-diz-meio-ideia/"
+   ]
+  },
+  {
+   "id": "pq-72f5167108d83ad6",
+   "cargo": "gov-rn",
+   "instituto": "Mensury",
+   "contratante": "Bruno E P Barreto Cirilo / Blog do Barreto",
+   "registro": "RN-09985/2026",
+   "coletaInicio": "2026-10-16",
+   "coletaFim": "2026-10-19",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 1500,
+   "margemPp": 2.53,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 44.27,
+    "44": 41.67,
+    "brancosNulos": 5.67,
+    "indecisos": 8.4
+   },
+   "validos": {
+    "13": 51.51,
+    "44": 48.49
+   },
+   "fontes": [
+    "https://blogdobarreto.com.br/pesquisa-mensury-traz-cadu-em-vantagem-sobre-allyson/",
+    "https://www.blogdeassis.com.br/2026/10/21/pesquisa-mensury-confirma-virada-e-aponta-cadu-de-lula-liderando-disputa-no-segundo-turno/480073/",
+    "https://www.bnewsrn.com.br/noticias/politica/rn-tem-duas-pesquisas-para-governo-com-resultados-destintos-confira.html",
+    "https://www.blogdobg.com.br/pesquisa-mensury-aponta-cadu-com-5151-e-allyson-bezerra-com-4849-na-disputa-pelo-governo/"
+   ]
+  },
+  {
+   "id": "pq-ad3777ba8ff71c4f",
+   "cargo": "gov-es",
+   "instituto": "Paraná Pesquisas",
+   "contratante": "Paraná Pesquisas (recursos próprios)",
+   "registro": "ES-01531/2026",
+   "coletaInicio": "2026-10-15",
+   "coletaFim": "2026-10-19",
+   "divulgadaEm": "2026-10-21",
+   "entrevistas": 1300,
+   "margemPp": 2.7,
+   "confiancaPct": 95,
+   "totais": {
+    "10": 52.4,
+    "15": 39.8,
+    "brancosNulos": 4.4,
+    "indecisos": 3.4
+   },
+   "validos": {
+    "10": 56.8,
+    "15": 43.2
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/ParanaPesquisa-governador-ES-20out2026.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/pazolini-tem-568-e-ferraco-432-no-2o-turno-no-es-diz-pesquisa/",
+    "https://exame.com/brasil/parana-pesquisas-pazolini-tem-524-e-ferraco-398-no-2o-turno-no-espirito-santo/"
    ]
   },
   {
@@ -568,6 +704,33 @@
    ]
   },
   {
+   "id": "pq-8efd79181fdb5f97",
+   "cargo": "pres",
+   "instituto": "Instituto Ranking",
+   "contratante": "Inteligência.com Serviços Ltda. (Fonte 83)",
+   "registro": "BR-00152/2026",
+   "coletaInicio": "2026-10-14",
+   "coletaFim": "2026-10-16",
+   "divulgadaEm": "2026-10-20",
+   "entrevistas": 2100,
+   "margemPp": 2.15,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 45.4,
+    "22": 44.6,
+    "brancosNulos": 6,
+    "indecisos": 4
+   },
+   "validos": {
+    "13": 50.4,
+    "22": 49.6
+   },
+   "fontes": [
+    "https://fonte83.com.br/politica/pesquisa-nacional-data-ranking-lula-tem-504-e-flavio-496-no-2o-turno/"
+   ]
+  },
+  {
    "id": "pq-9537b415840238a4",
    "cargo": "pres",
    "instituto": "AtlasIntel",
@@ -682,6 +845,35 @@
    ]
   },
   {
+   "id": "pq-f9fbf79ef895fcd3",
+   "cargo": "pres",
+   "instituto": "DataTrends",
+   "contratante": "DataTrends (recursos próprios)",
+   "registro": "BR-04454/2026",
+   "coletaInicio": "2026-10-15",
+   "coletaFim": "2026-10-17",
+   "divulgadaEm": "2026-10-19",
+   "entrevistas": 2000,
+   "margemPp": 2.19,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 46,
+    "22": 49,
+    "brancosNulos": 4,
+    "indecisos": 1
+   },
+   "validos": {
+    "13": 48.5,
+    "22": 51.5
+   },
+   "fontes": [
+    "https://institutodatatrends.com/pesquisas/62535/datatrends-flavio-bolsonaro-tem-51-5-dos-votos-validos-contra-48-5-de-lula-na-disputa-presidencial",
+    "https://blogdoalberesxavier.com/noticias/81229/datatrends-flavio-bolsonaro-tem-515-dos-votos-validos-contra-485-de-lula-na-disputa-presidencial",
+    "https://www.gp1.com.br/eleicoes-2026/noticia/2026/10/19/flavio-bolsonaro-tem-515-e-lula-485-aponta-datatrends-634295.html"
+   ]
+  },
+  {
    "id": "pq-0658b97256183357",
    "cargo": "gov-es",
    "instituto": "Instituto Perfil",
@@ -741,6 +933,60 @@
    ]
   },
   {
+   "id": "pq-5fde12acf4fd020f",
+   "cargo": "pres",
+   "instituto": "Instituto Phoenix",
+   "contratante": "Franco & Rodrigues Comunicação Social e Empreendimentos Ltda. (Jornal Correio Continental RO)",
+   "registro": "BR-08809/2026",
+   "coletaInicio": "2026-10-13",
+   "coletaFim": "2026-10-16",
+   "divulgadaEm": "2026-10-19",
+   "entrevistas": 3999,
+   "margemPp": 1.55,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 47.59,
+    "22": 45.21,
+    "brancosNulos": 3,
+    "indecisos": 4.2
+   },
+   "validos": {
+    "13": 51.3,
+    "22": 48.7
+   },
+   "fontes": [
+    "https://www.phoenixnewsrondonia.com.br/pesquisa-do-instituto-phoenix-aponta-lula-com-51-3-e-flavio-bolsonaro-com-48-7-dos-votos-validos"
+   ]
+  },
+  {
+   "id": "pq-a01a42b4d3018673",
+   "cargo": "gov-am",
+   "instituto": "Projeta",
+   "contratante": "Projeta (recursos próprios)",
+   "registro": "AM-02688/2026",
+   "coletaInicio": "2026-10-13",
+   "coletaFim": "2026-10-16",
+   "divulgadaEm": "2026-10-19",
+   "entrevistas": 1200,
+   "margemPp": 2.8,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "22": 38.95,
+    "55": 53.1,
+    "brancosNulos": 4.23,
+    "indecisos": 3.72
+   },
+   "validos": {
+    "22": 42.32,
+    "55": 57.68
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/pesquisaProjeta-governador-AM-19out2026.pdf",
+    "https://bncamazonas.com.br/poder/omar-aziz-vence-eleicao-com-ampla-vantagem-apontam-pesquisas-projeta-e-pontual/"
+   ]
+  },
+  {
    "id": "pq-1698f8367090376d",
    "cargo": "gov-df",
    "instituto": "IGAPE (Instituto Gazeta de Pesquisas)",
@@ -793,6 +1039,35 @@
    "fontes": [
     "https://static.poder360.com.br/uploads/2026/10/RELATORIO-VOX-BRASIL-NACIONAL-10-2-TURNO-18-10-2026.pdf",
     "https://www.poder360.com.br/poder-pesquisas/saiba-como-estao-lula-e-flavio-nas-pesquisas-a-5-dias-da-eleicao/"
+   ]
+  },
+  {
+   "id": "pq-4b5703e3d1eb8df2",
+   "cargo": "pres",
+   "instituto": "Veritá",
+   "contratante": "Veritá (recursos próprios)",
+   "registro": "BR-01107/2026",
+   "coletaInicio": "2026-10-12",
+   "coletaFim": "2026-10-16",
+   "divulgadaEm": "2026-10-17",
+   "entrevistas": 15554,
+   "margemPp": 1,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 47.7,
+    "22": 49.7,
+    "brancosNulos": 1.5,
+    "indecisos": 1.1
+   },
+   "validos": {
+    "13": 48.9,
+    "22": 51.1
+   },
+   "fontes": [
+    "https://admin.cnnbrasil.com.br/wp-content/uploads/sites/12/2026/10/Relatorio-Brasil-Outubro-2026.pdf",
+    "https://lgjdbpskgjfbmlffbntx.supabase.co/storage/v1/object/public/pesquisas/pdfs/1792244296504_Relatorio_Brasil_Outubro_2026.pdf",
+    "https://timesbrasil.com.br/eleicoes-2026/decisao-2026-flavio-tem-511-e-lula-489-aponta-pesquisa-verita/",
+    "https://www.bahianoticias.com.br/noticia/322563-pesquisa-verita-aponta-flavio-vencendo-com-511-e-lula-ficando-em-489-na-simulacao-de-segundo-turno"
    ]
   },
   {
@@ -881,6 +1156,29 @@
    ]
   },
   {
+   "id": "pq-cddf20629d3e994f",
+   "cargo": "gov-rn",
+   "instituto": "DataVero",
+   "contratante": "TL Comunicação e Marketing Ltda.",
+   "registro": "RN-01514/2026",
+   "coletaInicio": "2026-10-13",
+   "coletaFim": "2026-10-15",
+   "divulgadaEm": "2026-10-16",
+   "entrevistas": 1500,
+   "margemPp": 2.53,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 46.71,
+    "44": 45.73,
+    "brancosNulos": 4.32,
+    "indecisos": 3.24
+   },
+   "fontes": [
+    "https://blogdobarreto.com.br/cadu-ultrapassa-allyson-na-pesquisa-datavero/",
+    "https://static.poder360.com.br/uploads/2026/10/PesquisaDatavero-governo-RN-16out2026.pdf"
+   ]
+  },
+  {
    "id": "pq-386fa2e73cb16a22",
    "cargo": "pres",
    "instituto": "MDA Pesquisa",
@@ -938,6 +1236,33 @@
    ]
   },
   {
+   "id": "pq-92e6f24df578010a",
+   "cargo": "gov-to",
+   "instituto": "Datapop",
+   "contratante": "P&P Publicidade, Produção e Comunicação Ltda. (GT Multimídia)",
+   "registro": "TO-09294/2026",
+   "coletaInicio": "2026-10-10",
+   "coletaFim": "2026-10-14",
+   "divulgadaEm": "2026-10-16",
+   "entrevistas": 1000,
+   "margemPp": 3.1,
+   "confiancaPct": 95,
+   "totais": {
+    "44": 49.7,
+    "45": 42.3,
+    "brancosNulos": 2.4,
+    "indecisos": 5.6
+   },
+   "validos": {
+    "44": 54.1,
+    "45": 45.9
+   },
+   "fontes": [
+    "https://tocantins.jornalopcao.com.br/noticias/datapop-aponta-dorinha-com-541-dos-votos-validos-e-vicentinho-junior-com-459-602445/",
+    "https://afnoticias.com.br/eleicoes/tre-rejeita-pedido-de-vicentinho-para-suspender-pesquisa-datapop-que-aponta-dorinha-a-frente"
+   ]
+  },
+  {
    "id": "pq-274e10d5cd7a6286",
    "cargo": "pres",
    "instituto": "Datafolha",
@@ -967,6 +1292,35 @@
     "https://tvtnews.com.br/?p=806543",
     "https://www.dci.com.br/politica/veja-o-horario-da-proxima-pesquisa-presidente-2026-quaest-datafolha-e-btg/",
     "https://bpmoney.com.br/?p=426263"
+   ]
+  },
+  {
+   "id": "pq-08c18677b8acf6ce",
+   "cargo": "pres",
+   "instituto": "Indexa",
+   "contratante": "Agência Estado S.A.",
+   "registro": "BR-04629/2026",
+   "coletaInicio": "2026-10-13",
+   "coletaFim": "2026-10-14",
+   "divulgadaEm": "2026-10-15",
+   "entrevistas": 2000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 42,
+    "22": 44,
+    "brancosNulos": 4
+   },
+   "validos": {
+    "13": 49,
+    "22": 51
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/indexabroadcast-2oturno-outubro.pdf",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/indexa-broadcast-presidente-outubro-2026-segundo-turno/",
+    "https://viva.com.br/politica/indexabroadcast-no-2-turno-flavio-bolsonaro-tem-44-ante-42-de-lula.html",
+    "https://www.bahianoticias.com.br/noticia/322484-pesquisa-indexabroadcast-confirma-empate-tecnico-no-2-turno-flavio-tem-51-dos-votos-validos-e-lula-49"
    ]
   },
   {
@@ -1122,6 +1476,30 @@
     "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/real-time-big-data-governador-distrito-federal-outubro-2026-segundo-turno/",
     "https://www.dgabc.com.br/Noticia/4352627/no-df-celina-tem-53-e-grass-36-no-segundo-turno-aponta-realtime-big-data",
     "https://www.correiodamanha.com.br/nacional/distrito-federal/2026/10/327036-celina-lidera-com-60-dos-votos-validos-enquanto-grass-tem-40.html"
+   ]
+  },
+  {
+   "id": "pq-59cc8ab2457b2d7b",
+   "cargo": "gov-ac",
+   "instituto": "Data Control",
+   "contratante": "E. A. de Carvalho e Cia Ltda. (Ambienta - Soluções Ambientais)",
+   "registro": "AC-04381/2026",
+   "coletaInicio": "2026-10-07",
+   "coletaFim": "2026-10-12",
+   "divulgadaEm": "2026-10-13",
+   "entrevistas": 1344,
+   "margemPp": 2.7,
+   "confiancaPct": 95,
+   "totais": {
+    "10": 30.73,
+    "11": 62.05,
+    "brancosNulos": 2.83,
+    "indecisos": 4.39
+   },
+   "fontes": [
+    "https://ac24horas.com/2026/10/13/data-control-aponta-mailza-com-62-das-intencoes-de-voto-contra-307-de-alan-rick-no-acre/",
+    "https://static.poder360.com.br/uploads/2026/10/Data-Control-AC-2oturno-governador-outubro.pdf",
+    "https://acreagora.com/2026/10/13/data-control-a-tribuna-mailza-abre-vantagem-de-31-pontos-sobre-alan-rick-e-chega-a-6688-dos-votos-validos-no-acre/"
    ]
   },
   {
@@ -1444,6 +1822,30 @@
    "fontes": [
     "https://static.poder360.com.br/uploads/2026/10/pesquisa-ipespe-abrapel-10out2026.pdf",
     "https://www.poder360.com.br/poder-eleicoes-2026/ipespe-confirma-poderdata-aya-e-da-flavio-com-527-e-lula-com-473/"
+   ]
+  },
+  {
+   "id": "pq-ddb9cdfb4c5ec59e",
+   "cargo": "pres",
+   "instituto": "Vox Brasil",
+   "contratante": "Vox Brasil (recursos próprios)",
+   "registro": "BR-09623/2026",
+   "coletaInicio": "2026-10-05",
+   "coletaFim": "2026-10-07",
+   "divulgadaEm": "2026-10-09",
+   "entrevistas": 2100,
+   "margemPp": 2.15,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 44.2,
+    "22": 42.7,
+    "brancosNulos": 3.4,
+    "indecisos": 9.7
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/pesquisa-vox-brasil-9out2026.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/lula-tem-442-e-flavio-427-no-2o-turno-diz-vox-brasil/"
    ]
   },
   {
