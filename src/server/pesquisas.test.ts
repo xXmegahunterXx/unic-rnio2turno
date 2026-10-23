@@ -8,6 +8,7 @@ import type { Pesquisa, PesquisasAdmin, PesquisasPublicas } from '../shared/pesq
 import type { Race } from '../shared/types';
 import { CABECALHO_BORDA } from './http-cache';
 import { metaDaRota, OG_COM_CANDIDATO, type ContextoMeta } from './meta-tags';
+import { layoutPesquisa } from './og-pesquisa';
 import { Pesquisas, cabecalhosAteVirada } from './pesquisas';
 import { createJsonStore } from './state-store';
 import { login, montar, RAIZ, type Montado } from './test-helpers';
@@ -300,6 +301,17 @@ describe('meta tags de /pesquisas', () => {
     expect(m.canonico).toBe(`/pesquisas?p=${p.id}`);
     // desconhecida → capa
     expect(metaDaRota('/pesquisas', new URLSearchParams({ p: p.id }), ctx(AGORA, false)).imagem).toBe('/api/og/pesquisa.png');
+  });
+  it('aviso exigido pela Justiça Eleitoral: na descrição do link e na imagem de compartilhar', () => {
+    const aviso = 'Todas as perguntas aplicadas foram estimuladas.';
+    const pa = { ...p, aviso };
+    const m = metaDaRota('/pesquisas', new URLSearchParams({ p: p.id }), { ...ctx(AGORA), pesquisa: () => pa });
+    expect(m.descricao).toContain(aviso);
+    const cands = racesFicticias().get('pres')!.candidatos.map((c) => ({ numero: c.numero, nome: c.nomeUrna, partido: c.partido, cor: c.cor }));
+    for (const formato of ['og', 'x', 'feed', 'story'] as const) {
+      expect(JSON.stringify(layoutPesquisa({ pesquisa: pa, candidatos: cands, formato })), formato).toContain(aviso);
+      expect(JSON.stringify(layoutPesquisa({ pesquisa: p, candidatos: cands, formato })), formato).not.toContain('estimuladas');
+    }
   });
   it('dia da votação: sem nome nem número e a imagem genérica', () => {
     expect(OG_COM_CANDIDATO).toContain('/api/og/pesquisa.png');

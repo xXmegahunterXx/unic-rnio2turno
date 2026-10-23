@@ -194,6 +194,12 @@ function Dica({ p, pesquisa, cands, esquerda }: { p: PontoSerie; pesquisa?: Pesq
             · confiança {fmtConfianca(pesquisa.confiancaPct)}% · {fmtInt(pesquisa.entrevistas)} entrevistas
             <br />
             Contratante: {pesquisa.contratante ?? 'não informado'}
+            {pesquisa.aviso ? (
+              <>
+                <br />
+                <span className="font-medium text-fg">{pesquisa.aviso}</span>
+              </>
+            ) : null}
           </>
         ) : null}
       </div>

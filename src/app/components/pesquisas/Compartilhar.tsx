@@ -111,6 +111,12 @@ function Rodape({ p }: { p: Pesquisa }) {
       ) : (
         <div className="text-fg">{itens.map((it) => `${it.rotulo}: ${it.valor}`).join(' · ')}</div>
       )}
+      {/* informação que a Justiça Eleitoral mandou constar em toda divulgação desta pesquisa */}
+      {p.aviso ? (
+        <div className="font-semibold text-fg" style={{ marginTop: 6 * k }}>
+          {p.aviso}
+        </div>
+      ) : null}
       <div className="text-fg-muted" style={{ marginTop: 6 * k, fontSize: (retrato ? 15 : 12.5) * k }}>
         {AVISO_PESQUISAS}
       </div>

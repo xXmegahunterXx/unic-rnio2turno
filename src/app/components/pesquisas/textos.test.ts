@@ -36,6 +36,11 @@ describe('texto de compartilhar da pesquisa', () => {
     expect(pesoTextoX(t)).toBeLessThanOrEqual(250);
     expect(t).toContain('Pesquisa não é resultado.');
   });
+  it('aviso exigido pela Justiça Eleitoral vai junto dos números', () => {
+    const t = textoPesquisa(p({ aviso: 'Todas as perguntas aplicadas foram estimuladas.' }), cands);
+    expect(t).toContain('confiança 95%. Todas as perguntas aplicadas foram estimuladas.');
+    expect(pesoPostX(t, [], true)).toBeLessThanOrEqual(280);
+  });
   it('nunca corta informação obrigatória: com nomes longos, sai só o aviso final', () => {
     const t = textoPesquisa(p({ contratante: 'Associação Fictícia de Veículos de Comunicação de Algum Lugar Muito Distante' }), cands);
     expect(t).toContain('Associação Fictícia de Veículos de Comunicação de Algum Lugar Muito Distante');

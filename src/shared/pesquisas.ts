@@ -75,6 +75,12 @@ export interface Pesquisa {
   validos?: Record<string, number>;
   /** De onde cada número saiu (página do instituto, do contratante ou reportagem que cite os dados): URLs https. */
   fontes: string[];
+  /**
+   * Informação que a Justiça Eleitoral mandou constar em toda divulgação desta pesquisa (ex.: "Todas as perguntas
+   * aplicadas foram estimuladas", decisão do TRE). Aparece junto das informações obrigatórias no site, na descrição do
+   * link e na imagem de compartilhar. Ausente na quase totalidade das pesquisas.
+   */
+  aviso?: string;
 }
 
 /** O que o painel manda (o id é calculado pelo servidor quando falta). */
@@ -136,7 +142,8 @@ export type CampoPesquisa =
   | 'modo'
   | 'totais'
   | 'validos'
-  | 'fontes';
+  | 'fontes'
+  | 'aviso';
 
 export type ResultadoValidacao = { ok: Pesquisa } | { erro: string; campo?: CampoPesquisa };
 
@@ -159,6 +166,8 @@ export const LIMITES_PESQUISA = {
   /** dias entre o início e o fim da coleta */
   duracaoMaxDias: 21,
   fontes: { min: 1, max: 6, url: 600 },
+  /** aviso exigido por decisão judicial (texto curto, como na decisão) */
+  aviso: { min: 3, max: 200 },
   /**
    * soma dos votos totais: com 4 números inteiros arredondados, o instituto declara que a soma pode dar 101 (ex.:
    * PoderData 46 + 48 + 5 + 2); 102 já é erro de digitação
@@ -193,6 +202,7 @@ export const ROTULO_CAMPO: Record<CampoPesquisa, string> = {
   totais: 'Votos totais',
   validos: 'Votos válidos',
   fontes: 'Fontes',
+  aviso: 'Aviso exigido pela Justiça Eleitoral',
 };
 
 const RE_DATA = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -500,6 +510,14 @@ export function validaPesquisa(entrada: unknown, ctx: ContextoValidacao = {}): R
     if (!fontes.includes(u)) fontes.push(u);
   }
 
+  // aviso exigido pela Justiça Eleitoral (opcional)
+  let aviso: string | undefined;
+  if (e.aviso !== undefined && e.aviso !== null && !(typeof e.aviso === 'string' && limpar(e.aviso) === '')) {
+    const a = texto(e.aviso, 'aviso', L.aviso);
+    if (typeof a !== 'string') return a;
+    aviso = a;
+  }
+
   // chaves em ordem fixa: candidatos pela urna, depois brancos/nulos e indecisos
   const ordenar = (o: Record<string, number>) => {
     const out: Record<string, number> = {};
@@ -524,6 +542,7 @@ export function validaPesquisa(entrada: unknown, ctx: ContextoValidacao = {}): R
     totais: ordenar(totais),
     ...(validos ? { validos: ordenar(validos) } : {}),
     fontes,
+    ...(aviso ? { aviso } : {}),
   };
   return { ok: p };
 }
@@ -733,6 +752,8 @@ export function linhaObrigatoria(p: Pesquisa): string {
     `${fmtInt(p.entrevistas)} entrevistas`,
     `margem de erro de ${fmtMargem(p.margemPp)} ${p.margemPp === 1 ? 'ponto' : 'pontos'}, para mais ou para menos`,
     `confiança de ${conf}%`,
+    // sem o ponto final: quem usa a linha fecha a frase
+    ...(p.aviso ? [p.aviso.replace(/[.!]+$/, '')] : []),
   ].join(' · ');
 }
 

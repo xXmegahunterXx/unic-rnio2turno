@@ -480,6 +480,14 @@ function Formulario({
           />
           {erroDe('fontes') ? <p className="-mt-2 text-[12.5px] text-alert-fg">{erroDe('fontes')}</p> : null}
 
+          <Campo
+            rotulo="Aviso exigido pela Justiça Eleitoral (opcional)"
+            value={f.aviso}
+            onChange={(e) => set('aviso', e.target.value)}
+            erro={erroDe('aviso')}
+            placeholder="Só se uma decisão mandou constar algo na divulgação"
+          />
+
           <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-line bg-surface-2/60 p-3 text-[13.5px] leading-snug text-fg">
             <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[rgb(var(--brand))]" checked={conferi} onChange={(e) => setConferi(e.target.checked)} />
             <span>Conferi cada número na fonte e o número de registro no TSE. Nada foi estimado ou completado.</span>

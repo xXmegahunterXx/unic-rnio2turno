@@ -33,6 +33,8 @@ export interface FormPesquisa {
   validos: Record<string, string>;
   /** uma URL por linha */
   fontes: string;
+  /** informação que a Justiça Eleitoral mandou constar na divulgação (vazio = nenhuma) */
+  aviso: string;
 }
 
 export const formVazio = (cargo: CargoPesquisa = 'pres'): FormPesquisa => ({
@@ -52,6 +54,7 @@ export const formVazio = (cargo: CargoPesquisa = 'pres'): FormPesquisa => ({
   comValidos: false,
   validos: {},
   fontes: '',
+  aviso: '',
 });
 
 /** "45,5" → 45.5 · "2.004" (milhar) → 2004 · "" → undefined · lixo → NaN (a validação recusa). */
@@ -88,6 +91,7 @@ export function formDe(p: Pesquisa): FormPesquisa {
     comValidos: !!p.validos,
     validos,
     fontes: p.fontes.join('\n'),
+    aviso: p.aviso ?? '',
   };
 }
 
@@ -133,6 +137,7 @@ export function entradaDe(f: FormPesquisa, numeros: readonly number[]): Pesquisa
   if (f.id) e.id = f.id;
   if (f.modo) e.modo = f.modo;
   if (validos) e.validos = validos;
+  if (f.aviso.trim()) e.aviso = f.aviso.trim();
   return e as PesquisaEntrada & Record<string, unknown>;
 }
 

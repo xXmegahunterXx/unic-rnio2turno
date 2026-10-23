@@ -163,6 +163,18 @@ describe('validaPesquisa — campos obrigatórios da Res. TSE 23.600/2019', () =
     expect(falha({ instituto: '<script>' }).campo).toBe('instituto');
   });
 
+  it('aviso exigido pela Justiça Eleitoral: opcional, texto curto e limpo; entra na linha obrigatória', () => {
+    expect(ok().aviso).toBeUndefined();
+    expect(ok({ aviso: '   ' }).aviso).toBeUndefined();
+    const p = ok({ aviso: '  Todas as perguntas   aplicadas foram estimuladas. ' });
+    expect(p.aviso).toBe('Todas as perguntas aplicadas foram estimuladas.');
+    expect(linhaObrigatoria(p).endsWith(' · Todas as perguntas aplicadas foram estimuladas')).toBe(true);
+    expect(linhaObrigatoria(ok())).not.toContain('estimuladas');
+    expect(falha({ aviso: 'x'.repeat(201) }).campo).toBe('aviso');
+    expect(falha({ aviso: '<b>' }).campo).toBe('aviso');
+    expect(falha({ aviso: 12 }).campo).toBe('aviso');
+  });
+
   it('sem a lista de candidatos (arquivo conferido fora do servidor): aceita dois números quaisquer', () => {
     const r = validaPesquisa(base({ totais: { '13': 45, '22': 44 }, validos: undefined }));
     expect('ok' in r).toBe(true);

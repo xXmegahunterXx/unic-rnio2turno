@@ -101,6 +101,8 @@ export function LinhaObrigatoria({ p, className }: { p: Pesquisa; className?: st
           {x}
         </span>
       ))}
+      {/* informação que a Justiça Eleitoral mandou constar em toda divulgação desta pesquisa */}
+      {p.aviso ? <span className="mt-1 block font-medium text-fg">{p.aviso}</span> : null}
     </p>
   );
 }

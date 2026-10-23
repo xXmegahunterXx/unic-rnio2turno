@@ -171,11 +171,13 @@ function linhasExtras(m: Medidas, p: Pesquisa, cands: CandidatoCartao[]): No | n
   const ind = p.totais[CHAVE_INDECISOS];
   const outros = [bn !== undefined ? `Branco, nulo ou nenhum: ${fmtPctPesquisa(bn)}` : '', ind !== undefined ? `Não sabem ou não responderam: ${fmtPctPesquisa(ind)}` : ''].filter(Boolean);
   if (outros.length) partes.push(outros.join(' · '));
-  if (!partes.length) return null;
+  if (!partes.length && !p.aviso) return null;
   return h(
     'div',
     { flexDirection: 'column', marginTop: m.gap, fontSize: m.extra, color: C.muted, lineHeight: 1.35 },
     ...partes.map((t) => h('div', {}, t)),
+    // informação que a Justiça Eleitoral mandou constar em toda divulgação desta pesquisa
+    p.aviso ? h('div', { color: C.fg, fontWeight: 600 }, p.aviso) : null,
   );
 }
 

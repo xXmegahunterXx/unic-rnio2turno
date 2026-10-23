@@ -27,16 +27,20 @@ export function textoPesquisa(p: Pesquisa, cands: CandidatoTexto[]): string {
   const conf = fmtConfianca(p.confiancaPct);
   const contr = p.contratante ?? 'não informado';
   const coleta = fmtPeriodoColeta(p.coletaInicio, p.coletaFim, false);
+  // informação que a Justiça Eleitoral mandou constar em toda divulgação desta pesquisa (vai junto dos números)
+  const avisoJudicial = p.aviso ? ` ${p.aviso}` : '';
   const base =
     `Pesquisa ${p.instituto} (${rotuloCargoCurto(p.cargo)}, 2º turno), votos totais: ${placar}. ` +
     `Registro ${p.registro}; contratante: ${contr}; coleta ${coleta}; ` +
-    `${fmtInt(p.entrevistas)} entrevistas; margem ±${fmtMargem(p.margemPp)} p.p.; confiança ${conf}%.`;
+    `${fmtInt(p.entrevistas)} entrevistas; margem ±${fmtMargem(p.margemPp)} p.p.; confiança ${conf}%.` +
+    avisoJudicial;
   const comAviso = `${base} Pesquisa não é resultado.`;
   if (cabeNoX(comAviso)) return comAviso;
   if (cabeNoX(base)) return base;
   const compacto =
     `${p.instituto} (${rotuloCargoCurto(p.cargo)}, 2º turno), totais: ${placar}. ` +
-    `Reg. ${p.registro}; contratante: ${contr}; coleta ${coleta}; ${fmtInt(p.entrevistas)} entrev.; margem ±${fmtMargem(p.margemPp)} p.p.; confiança ${conf}%.`;
+    `Reg. ${p.registro}; contratante: ${contr}; coleta ${coleta}; ${fmtInt(p.entrevistas)} entrev.; margem ±${fmtMargem(p.margemPp)} p.p.; confiança ${conf}%.` +
+    avisoJudicial;
   if (cabeNoX(compacto)) return compacto;
   return `Pesquisa ${p.instituto} (${rotuloCargoCurto(p.cargo)}, 2º turno), registro ${p.registro}: os números e todas as informações exigidas pelo TSE estão no link.`;
 }

@@ -371,6 +371,7 @@ const pesquisaEntrada = z
     totais: z.record(z.string().max(16), pctPesquisa).refine((o) => Object.keys(o).length <= 4, 'chaves demais'),
     validos: z.record(z.string().max(16), pctPesquisa).refine((o) => Object.keys(o).length <= 2, 'chaves demais').optional(),
     fontes: z.array(z.string().max(600)).min(1, 'informe a fonte').max(6, 'no máximo 6 fontes'),
+    aviso: z.string().max(400).optional(),
   })
   .strict();
 
