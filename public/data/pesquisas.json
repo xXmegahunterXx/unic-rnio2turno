@@ -116,6 +116,34 @@
    ]
   },
   {
+   "id": "pq-e7d0bf824448e1df",
+   "cargo": "gov-to",
+   "instituto": "Paraná Pesquisas",
+   "contratante": "FIETO - Federação das Indústrias do Estado do Tocantins",
+   "registro": "TO-02968/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1500,
+   "margemPp": 2.5,
+   "confiancaPct": 95,
+   "totais": {
+    "44": 38.5,
+    "45": 55.5,
+    "brancosNulos": 3.6,
+    "indecisos": 2.3
+   },
+   "validos": {
+    "44": 41,
+    "45": 59
+   },
+   "fontes": [
+    "https://ncnews.com.br/2026/10/24/parana-pesquisas-tocantins-vicentinho-2-turno/",
+    "https://folhadobico.com.br/parana-pesquisas-vicentinho-tem-59-dos-votos-validos-e-dorinha-41-no-tocantins/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/parana-pesquisas-governador-tocantins-outubro-2026-vespera-segundo-turno/"
+   ]
+  },
+  {
    "id": "pq-3b8c0121fbaa07fe",
    "cargo": "gov-df",
    "instituto": "IGAPE (Instituto Gazeta de Pesquisas)",
