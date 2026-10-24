@@ -2,6 +2,34 @@
  "sobre": "Pesquisas eleitorais REGISTRADAS no TSE para o 2º turno de 2026 (Lei 9.504/97, art. 33; Res. TSE 23.600/2019). Contrato e validação: src/shared/pesquisas.ts. Cada número vem de uma fonte aberta (URL em fontes). Nunca inventar, estimar ou completar número.",
  "pesquisas": [
   {
+   "id": "pq-3b8c0121fbaa07fe",
+   "cargo": "gov-df",
+   "instituto": "IGAPE (Instituto Gazeta de Pesquisas)",
+   "contratante": "TV Atual (afiliada à Record News)",
+   "registro": "DF-00827/2026",
+   "coletaInicio": "2026-10-22",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 2000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "totais": {
+    "11": 53.7,
+    "13": 34.3,
+    "brancosNulos": 6.2,
+    "indecisos": 5.8
+   },
+   "validos": {
+    "11": 61,
+    "13": 39
+   },
+   "fontes": [
+    "https://jornaldebrasilia.com.br/brasilia/igape-celina-chega-a-61-dos-votos-validos-contra-39-de-grass-na-reta-final-no-df/",
+    "https://expressaobrasiliense.com/eleicoes-2026/pesquisa-igape-df-celina-leao-lidera-com-61-dos-votos-validos-e-abre-22-pontos-sobre-leandro-grass-no-2o-turno/",
+    "https://tudooknoticias.com.br/distrito-federal/pesquisa-igape-aponta-celina-leao-com-61-dos-votos-validos-no-df/"
+   ]
+  },
+  {
    "id": "pq-c4248310804c988f",
    "cargo": "pres",
    "instituto": "Alfa Inteligência",
@@ -63,6 +91,36 @@
    ]
   },
   {
+   "id": "pq-568b7b9ae914878d",
+   "cargo": "gov-am",
+   "instituto": "Projeta",
+   "contratante": "Projeta (recursos próprios)",
+   "registro": "AM-04125/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 1200,
+   "margemPp": 2.8,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "22": 39.17,
+    "55": 52.78,
+    "brancosNulos": 4.35,
+    "indecisos": 3.7
+   },
+   "validos": {
+    "22": 42.6,
+    "55": 57.4
+   },
+   "fontes": [
+    "https://marioadolfo.com/omar-aziz-lidera-pesquisa-projeta-com-57-4-dos-votos-validos-e-abre-quase-15-pontos-sobre-maria-do-carmo/",
+    "https://emtempo.com.br/610665/politica/omar-aziz-lidera-pesquisa-segundo-turno-amazonas/",
+    "https://fatoamazonico.com.br/projeta-omar-aziz-tem-574-dos-votos-validos-contra-426-de-maria-do-carmo-no-amazonas/",
+    "https://portaldoamazonas.com/omar-lidera-com-574-dos-votos-validos-a-dois-dias-do-segundo-turno-aponta-projeta/"
+   ]
+  },
+  {
    "id": "pq-ead51ac4102df37d",
    "cargo": "pres",
    "instituto": "Real Time Big Data",
@@ -94,6 +152,37 @@
    ]
   },
   {
+   "id": "pq-3f450639907d1f60",
+   "cargo": "pres",
+   "instituto": "Veritá",
+   "contratante": "Veritá (recursos próprios)",
+   "registro": "BR-06070/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-22",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 15554,
+   "margemPp": 1,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 47.5,
+    "22": 50.2,
+    "brancosNulos": 1.4,
+    "indecisos": 0.9
+   },
+   "validos": {
+    "13": 48.7,
+    "22": 51.3
+   },
+   "fontes": [
+    "https://admin.cnnbrasil.com.br/wp-content/uploads/sites/12/2026/10/Relatorio-Brasil-22-de-outubro-de-2026.pdf",
+    "https://www.cnnbrasil.com.br/eleicoes/verita-flavio-tem-513-dos-votos-validos-no-2o-turno-lula-487/",
+    "https://timesbrasil.com.br/brasil/decisao-2026-flavio-tem-513-e-lula-487-dos-votos-validos-aponta-verita-2/",
+    "https://portaln10.com.br/politica/eleicoes/pesquisa-verita-mostra-flavio-com-513-e-lula-com-487-dos-votos-validos-a-dois-dias-da-eleicao-356041/",
+    "https://jornalrazao.com/politica/pesquisa-verita-flavio-51-lula-48-dois-dias-2-turno"
+   ]
+  },
+  {
    "id": "pq-c9e6d1d664bfa37f",
    "cargo": "pres",
    "instituto": "Vox Brasil",
@@ -121,6 +210,35 @@
     "https://exame.com/brasil/pesquisa-vox-brasil-lula-tem-506-e-flavio-494-dos-votos-validos-no-2o-turno/",
     "https://timesbrasil.com.br/eleicoes-2026/pesquisa-vox-brasil-lula-flavio-bolsonaro-empate-tecnico-segundo-turno/",
     "https://www.poder360.com.br/poder-eleicoes-2026/saiba-como-estao-lula-e-flavio-nas-pesquisas-a-2-dias-da-eleicao/"
+   ]
+  },
+  {
+   "id": "pq-b27db854b10aef59",
+   "cargo": "pres",
+   "instituto": "DataTrends",
+   "contratante": "DataTrends (recursos próprios)",
+   "registro": "BR-03365/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-21",
+   "divulgadaEm": "2026-10-23",
+   "entrevistas": 2000,
+   "margemPp": 2.19,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 46,
+    "22": 50,
+    "brancosNulos": 4,
+    "indecisos": 1
+   },
+   "validos": {
+    "13": 48.1,
+    "22": 51.9
+   },
+   "fontes": [
+    "https://www.edmarlyra.com/datatrends-flavio-bolsonaro-amplia-vantagem-sobre-lula-e-chega-a-519-dos-votos-validos-2/",
+    "https://www.edmarlyra.com/wp-content/uploads/2026/10/IMG_4793.png",
+    "https://didigalvao.com.br/pesquisa-datatrends-aponta-flavio-bolsonaro-com-519-e-lula-com-481-dos-votos-validos/",
+    "https://www.riotimesonline.com/datatrends-poll-flavio-51-9-lula-48-1-runoff-2026/"
    ]
   },
   {
