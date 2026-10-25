@@ -94,7 +94,22 @@ export interface Ponto {
   alvo: number;
   cen: string;
   municipios: MunicipioProjecao[];
+  /** Os mesmos municípios num instante ANTERIOR (cache defasado; ver `OpcoesPontos.antes`). */
+  antes?: MunicipioProjecao[];
   verdade: number;
+}
+
+/** Variações da noite simulada para medir a fonte TSE (src/engine/projecao-calibracao.test.ts, PROJECAO_MEDIR=1). */
+export interface OpcoesPontos {
+  /** Frações das seções de cada abrangência (padrão FRACOES). */
+  fracoes?: readonly number[];
+  /** 'exterior-primeiro': as seções do exterior chegam antes de todas as outras (a ordem relativa fica). */
+  ordem?: 'exterior-primeiro';
+  /**
+   * Instante do cache defasado, em posições de `ordem` (seções do Brasil), a partir do instante k do ponto: ex.
+   * `(k) => k - 0.03 * nSec` (cache 3% atrás) ou `() => 0.002 * nSec` (lote grande: o cache parou em 0,2%).
+   */
+  antes?: (k: number, nSec: number) => number;
 }
 
 export interface Caso {
@@ -109,9 +124,9 @@ export interface Caso {
 }
 
 /** k (prefixo de `ordem`) em que a abrangência atinge a fração `alvo` das seções (+0,5 p.p. de folga). */
-function ksDoEscopo(model: Model, e: Escopo): number[] {
+function ksDoEscopo(model: Model, e: Escopo, fracoes: readonly number[] = FRACOES): number[] {
   const tot = e.u < 0 ? st.nSec : st.ufSecEnd[e.u] - st.ufSecStart[e.u];
-  const metas = FRACOES.map((a) => Math.min(tot, Math.ceil((a + 0.005) * tot)));
+  const metas = fracoes.map((a) => Math.min(tot, Math.ceil((a + 0.005) * tot)));
   if (e.u < 0) return metas;
   const out: number[] = [];
   let c = 0;
@@ -149,10 +164,19 @@ function entradas(model: Model, mun: Float64Array, e: Escopo, elei: Float64Array
 }
 
 /** Todos os pontos de um cenário. */
-export function pontosDoCenario(c: (typeof CENARIOS)[number]): Ponto[] {
+export function pontosDoCenario(c: (typeof CENARIOS)[number], o: OpcoesPontos = {}): Ponto[] {
+  const fracoes = o.fracoes ?? FRACOES;
   const p = presetList(st, c.seed).find((x) => x.id === c.preset)!;
   const cen = mesclaCenario(cenarioPadrao(st, c.seed), { ...p.cenario, seed: c.seed, ...(c.ordem ? { ordemRegional: c.ordem } : {}) }, st);
-  const model = buildModel(st, cen);
+  let model = buildModel(st, cen);
+  if (o.ordem === 'exterior-primeiro') {
+    const zz = st.ufIndex.get('ZZ');
+    const ordem = new Int32Array(st.nSec);
+    let n = 0;
+    for (const i of model.ordem) if (st.secUf[i] === zz) ordem[n++] = i;
+    for (const i of model.ordem) if (st.secUf[i] !== zz) ordem[n++] = i;
+    model = { ...model, ordem };
+  }
   const elei = new Float64Array(st.nMun);
   for (let m = 0; m < st.nMun; m++) for (let i = st.munSecStart[m]; i < st.munSecEnd[m]; i++) elei[m] += model.aptos[i];
   const agg = new Aggregator(model, 4);
@@ -167,30 +191,54 @@ export function pontosDoCenario(c: (typeof CENARIOS)[number]): Ponto[] {
     return (100 * a) / (a + b);
   });
   const pedidos: { k: number; e: number; alvo: number }[] = [];
-  ESCOPOS.forEach((e, ie) => ksDoEscopo(model, e).forEach((k, i) => pedidos.push({ k, e: ie, alvo: FRACOES[i] })));
+  ESCOPOS.forEach((e, ie) => ksDoEscopo(model, e, fracoes).forEach((k, i) => pedidos.push({ k, e: ie, alvo: fracoes[i] })));
   pedidos.sort((x, y) => x.k - y.k);
   return pedidos.map((pd) => {
     const e = ESCOPOS[pd.e];
+    const kAntes = o.antes ? Math.max(0, Math.min(pd.k, Math.round(o.antes(pd.k, st.nSec)))) : -1;
     return {
       tipo: e.tipo,
       nome: e.nome,
       abrangencia: e.u < 0 ? 'BR' : st.ufs[e.u],
       alvo: pd.alvo,
-      cen: `${c.preset}/${c.seed}/${cen.ordemRegional}`,
+      cen: `${c.preset}/${c.seed}/${cen.ordemRegional}${o.ordem ? `/${o.ordem}` : ''}`,
       municipios: entradas(model, agg.get(pd.k).mun, e, elei),
+      ...(kAntes >= 0 ? { antes: entradas(model, agg.get(kAntes).mun, e, elei) } : {}),
       verdade: verdade[pd.e],
     };
   });
 }
 
+/** Como a fonte TSE é imitada em `avalia`. */
+export interface OpcoesTse {
+  /** Fração (0–1) dos municípios começados que está no cache (sorteio fixo por posição). */
+  cache: number;
+  /** Cache defasado: os municípios lidos trazem os números de `Ponto.antes` (só os que já tinham seções lá). */
+  defasado?: boolean;
+  /** Acompanhamento da UF (`-ab.json`: seções e eleitorado totalizados de cada município, sem votos) disponível. */
+  ab?: boolean;
+}
+
 /**
- * Projeta um ponto (null se a projeção não estaria liberada). `cacheTse` (0–1) imita a fonte TSE: município sem seções nunca está no
- * cache e, dos começados, só essa fração (sorteio fixo por posição) vem "lida"; os demais entram como desconhecidos e o
- * total oficial da UF ancora.
+ * Projeta um ponto (null se a projeção não estaria liberada). `cacheTse` imita a fonte TSE — número (0–1) ou
+ * `OpcoesTse`: município sem seções nunca está no cache e, dos começados, só essa fração (sorteio fixo por posição) vem
+ * "lida" (com `defasado`, com os números de `Ponto.antes`); os demais entram como desconhecidos e o total oficial da UF
+ * ancora. Com `ab`, cada município leva o acompanhamento da UF (seções e eleitorado totalizados AGORA, sem votos).
  */
-export function avalia(pt: Ponto, prm: Readonly<ParamsProjecao> = PARAMS_PROJECAO, cacheTse?: number): Caso | null {
+export function avalia(pt: Ponto, prm: Readonly<ParamsProjecao> = PARAMS_PROJECAO, cacheTse?: number | OpcoesTse): Caso | null {
+  const r = avaliaBruto(pt, prm, cacheTse);
+  return r.liberada && !r.travaCache ? r.caso : null;
+}
+
+/** Como `avalia`, sem esconder: o caso (se houver cálculo) e o que as regras de exibição fariam com ele. */
+export function avaliaBruto(
+  pt: Ponto,
+  prm: Readonly<ParamsProjecao> = PARAMS_PROJECAO,
+  cacheTse?: number | OpcoesTse,
+): { caso: Caso | null; liberada: boolean; travaCache: boolean; calc: ReturnType<typeof calcularProjecao> } {
   let entrada: EntradaProjecao = { municipios: pt.municipios };
-  if (cacheTse !== undefined) {
+  const tse: OpcoesTse | undefined = typeof cacheTse === 'number' ? { cache: cacheTse } : cacheTse;
+  if (tse) {
     const totaisUf: Record<string, ContagemProjecao> = {};
     for (const m of pt.municipios) {
       if (!m.t2) continue;
@@ -202,12 +250,27 @@ export function avalia(pt: Ponto, prm: Readonly<ParamsProjecao> = PARAMS_PROJECA
       t.eleitorado += m.t2.eleitorado;
       t.eleitoradoTotalizado += m.t2.eleitoradoTotalizado;
     }
-    // como no servidor: município sem nenhuma seção nunca é baixado (o acompanhamento da UF já diz que está zerado)
-    const fora = (m: MunicipioProjecao, i: number) => !m.t2 || m.t2.secoesTotalizadas === 0 || ((i * 2654435761) >>> 0) / 2 ** 32 >= cacheTse;
-    entrada = { municipios: pt.municipios.map((m, i) => (fora(m, i) ? { ...m, t2: null } : m)), totaisUf };
+    const sorteio = (i: number) => ((i * 2654435761) >>> 0) / 2 ** 32 < tse.cache;
+    const lido = (m: MunicipioProjecao, i: number): MunicipioProjecao['t2'] => {
+      // como no servidor: município sem nenhuma seção nunca é baixado (o acompanhamento da UF já diz que está zerado)
+      const fonte = tse.defasado && pt.antes ? pt.antes[i].t2 : m.t2;
+      return fonte && fonte.secoesTotalizadas > 0 && sorteio(i) ? fonte : null;
+    };
+    entrada = {
+      municipios: pt.municipios.map((m, i) => ({
+        ...m,
+        t2: lido(m, i),
+        ...(tse.ab && m.t2
+          ? { ab: { secoes: m.t2.secoes, secoesTotalizadas: m.t2.secoesTotalizadas, eleitorado: m.t2.eleitorado, eleitoradoTotalizado: m.t2.eleitoradoTotalizado } }
+          : {}),
+      })),
+      totaisUf,
+    };
   }
   const calc = calcularProjecao(entrada, prm);
   // as mesmas regras do servidor (montarProjecao): limiares e, na fonte TSE, a trava de cobertura do cache (UF/governador)
-  if (!calc || !projecaoLiberada(pt.abrangencia, calc) || coberturaCacheBaixa(pt.abrangencia, calc)) return null;
-  return { tipo: pt.tipo, nome: pt.nome, alvo: pt.alvo, f: calc.fracaoApurada, err: calc.pct[0] - pt.verdade, meia: calc.meia, dp: calc.dp, cen: pt.cen };
+  const caso: Caso | null = calc
+    ? { tipo: pt.tipo, nome: pt.nome, alvo: pt.alvo, f: calc.fracaoApurada, err: calc.pct[0] - pt.verdade, meia: calc.meia, dp: calc.dp, cen: pt.cen }
+    : null;
+  return { caso, liberada: !!calc && projecaoLiberada(pt.abrangencia, calc), travaCache: !!calc && coberturaCacheBaixa(pt.abrangencia, calc), calc };
 }

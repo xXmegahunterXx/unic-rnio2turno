@@ -4,7 +4,7 @@
  * simulação e é neutro por construção. Nos 3 formatos do kit (16:9, 4:5, 9:16), sobre o `CartaoBase`.
  */
 import type { ReactNode } from 'react';
-import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO, HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { Icon, type IconName } from '@/app/ui/Icon';
 import { CartaoBase, SeloOficial, useCartao, type FormatoCartao } from '@/app/components/share';
@@ -28,9 +28,10 @@ export function CartaoConvite({ formato, agora }: { formato: FormatoCartao; agor
 
 function Miolo({ agora }: { agora: number }) {
   const { k, retrato, formato } = useCartao();
-  const momento = momentoApuracao(agora, INICIO_APURACAO);
+  // a hora e a contagem miram o fim da votação (19h; prorrogada, eram 17h): até lá, "É hoje" — nunca "Ao vivo agora"
+  const momento = momentoApuracao(agora, FIM_VOTACAO);
   const antes = momento === 'dias' || momento === 'amanha' || momento === 'hoje';
-  const pilula = antes ? rotuloFaltam(agora) : momento === 'agora' ? 'Ao vivo agora' : 'Resultado e reprise da noite';
+  const pilula = antes ? rotuloFaltam(agora, FIM_VOTACAO) : momento === 'agora' ? 'Ao vivo agora' : 'Resultado e reprise da noite';
   const story = formato === 'story';
 
   const data = (
@@ -42,7 +43,7 @@ function Miolo({ agora }: { agora: number }) {
         25/10
       </div>
       <div className="font-display font-semibold leading-tight tracking-[-0.02em] text-fg" style={{ fontSize: (retrato ? 44 : 38) * k, marginTop: 14 * k }}>
-        <span className="num">17h</span> <span className="text-fg-muted">· horário de Brasília</span>
+        <span className="num">{HORA_FIM_VOTACAO}</span> <span className="text-fg-muted">· horário de Brasília</span>
       </div>
       <div
         className="inline-flex items-center rounded-full bg-brand-cta font-semibold text-brand-ink"

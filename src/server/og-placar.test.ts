@@ -135,10 +135,10 @@ describe('layout', () => {
     expect(txt({ local: true })).not.toContain('ELEITO');
   });
 
-  it('antes das 17h: percentuais do 1º turno rotulados, sem barra de progresso', () => {
+  it('antes da apuração: percentuais do 1º turno rotulados, sem barra de progresso; a divulgação a partir do fim da votação (19h)', () => {
     const t = textos(layoutPlacar({ race: pres, resumo: resumoDe([0, 0], { secoesTotalizadas: 0, status: 'aguardando' }), simulacao: false, horario: 0, pre: true }));
     expect(t.filter((x) => x === 'NO 1º TURNO')).toHaveLength(2);
-    expect(t).toEqual(expect.arrayContaining(['45,16', '47,03', '25/10 · A PARTIR DAS 17H', 'Apuração a partir das 17h de 25/10']));
+    expect(t).toEqual(expect.arrayContaining(['45,16', '47,03', '25/10 · A PARTIR DAS 19H', 'Apuração a partir das 19h de 25/10']));
   });
 
   it('marca do site sempre; "Oferecimento" só com anunciante, rotulado e DEPOIS do rodapé do Sintonia', () => {
@@ -251,13 +251,14 @@ describe('rotas (fonte TSE com o 2º turno forjado)', () => {
 
   beforeAll(async () => {
     f = criarFakeFetch();
-    t = await montar({ fetch: f, agora: Date.UTC(2026, 9, 25, 21, 43, 0) });
+    // 19h43 de Brasília: depois do fim da votação (prorrogada até as 19h; antes disso as rotas respondem o convite genérico)
+    t = await montar({ fetch: f, agora: Date.UTC(2026, 9, 25, 22, 43, 0) });
     const cookie = await login(t);
     expect((await comando(t, cookie, { tipo: 'tse', tse: { baseUrl: BASE } })).status).toBe(200);
     expect((await comando(t, cookie, { tipo: 'fonte', fonte: 'tse' })).status).toBe(200);
     // números FICTÍCIOS só neste teste: 61,3% das seções, cada finalista com o seu total
     const d = structuredClone(jsonFixture<TseResultadoArquivo>(BR));
-    Object.assign(d, { dg: '25/10/2026', hg: '18:42:13', dt: '25/10/2026', ht: '18:42:13', and: 'p' });
+    Object.assign(d, { dg: '25/10/2026', hg: '19:42:13', dt: '25/10/2026', ht: '19:42:13', and: 'p' });
     Object.assign(d.s, { st: '30000', pst: '61,27' });
     for (const a of d.carg[0].agr) for (const p of a.par) for (const c of p.cand) c.vap = c.n === '13' ? '4123456' : '3987654';
     Object.assign(d.v, { vv: '8111110', vnom: '8111110', tv: '8400000', vb: '120000', tvn: '168890' });

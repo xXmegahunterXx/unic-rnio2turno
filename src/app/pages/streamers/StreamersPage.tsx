@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { UF, UFBr } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
 import { fmtInt } from '@/shared/format';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { LIVES, type LivesPublico } from '@/shared/lives';
 import { comandoBot, mensagemTimer, urlTextoPlacar, type BotChat } from '@/shared/texto-placar';
 import { cn } from '@/app/lib/cn';
@@ -728,8 +729,8 @@ function BotsDeChat() {
 const DICAS_BOT: { icone: IconName; titulo: string; texto: ReactNode }[] = [
   {
     icone: 'relogio',
-    titulo: 'Sem nomes antes das 17h de 25/10',
-    texto: 'Até a apuração começar, a resposta traz só a contagem regressiva e o endereço. No dia 25, das 0h às 17h, só “a apuração começa às 17h”.',
+    titulo: `Sem nomes antes das ${HORA_FIM_VOTACAO} de 25/10`,
+    texto: `Até a apuração começar, a resposta traz só a contagem regressiva e o endereço. No dia 25, das 0h às ${HORA_FIM_VOTACAO} (fim da votação), só o horário em que a votação termina, sem nomes nem números.`,
   },
   {
     icone: 'selo',

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { INICIO_APURACAO } from './constants';
-import { INICIO_DIA_VOTACAO } from './diaVotacao';
+import { FIM_VOTACAO, INICIO_DIA_VOTACAO } from './diaVotacao';
 import {
+  AVISO_DIA_VOTACAO,
   AVISO_PESQUISAS,
   CARGOS_PESQUISA,
   compararComResultado,
@@ -230,14 +231,21 @@ describe('fases da área', () => {
     expect(mostrarBlocoPesquisas({ agora: antes, fase: 'pre', fonte: 'pre' })).toBe(true);
     expect(mostrarBlocoPesquisas({ agora: antes, fase: 'apurando', fonte: 'simulacao', simulacao: true })).toBe(false);
   });
-  it('dia da votação (0h–17h de 25/10): só o aviso; às 17h volta', () => {
+  it('dia da votação (0h–19h de 25/10, prorrogada): só o aviso; às 19h volta', () => {
     expect(fasePesquisas({ agora: INICIO_DIA_VOTACAO, fase: 'pre' })).toBe('votacao');
     expect(fasePesquisas({ agora: INICIO_APURACAO - 1, fase: 'pre' })).toBe('votacao');
     expect(mostrarBlocoPesquisas({ agora: INICIO_DIA_VOTACAO - 1, fase: 'pre' })).toBe(true);
     expect(mostrarBlocoPesquisas({ agora: INICIO_DIA_VOTACAO, fase: 'pre' })).toBe(false);
-    expect(fasePesquisas({ agora: INICIO_APURACAO, fase: 'apurando', fonte: 'tse' })).toBe('lista');
-    // depois das 17h o bloco não volta (a home mostra a apuração)
-    expect(mostrarBlocoPesquisas({ agora: INICIO_APURACAO + 1, fase: 'pre' })).toBe(false);
+    // 17h e 18h: a votação continua (mesmo com a leitura do TSE já ligada)
+    expect(fasePesquisas({ agora: INICIO_APURACAO, fase: 'apurando', fonte: 'tse' })).toBe('votacao');
+    expect(fasePesquisas({ agora: Date.UTC(2026, 9, 25, 21, 0, 0), fase: 'apurando', fonte: 'tse' })).toBe('votacao');
+    expect(fasePesquisas({ agora: FIM_VOTACAO - 1, fase: 'apurando', fonte: 'tse' })).toBe('votacao');
+    expect(fasePesquisas({ agora: FIM_VOTACAO, fase: 'apurando', fonte: 'tse' })).toBe('lista');
+    // depois do fim da votação o bloco não volta (a home mostra a apuração)
+    expect(mostrarBlocoPesquisas({ agora: FIM_VOTACAO + 1, fase: 'pre' })).toBe(false);
+    // o aviso cita o fim da votação, sem número nem nome
+    expect(AVISO_DIA_VOTACAO).toMatch(/prorrogada até as 19h \(horário de Brasília\)/);
+    expect(AVISO_DIA_VOTACAO).not.toMatch(/17h|\d+%/);
   });
   it('resultado oficial só com o TSE concluído, nunca na simulação', () => {
     const depois = INICIO_APURACAO + 4 * 3600_000;

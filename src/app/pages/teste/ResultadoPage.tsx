@@ -16,6 +16,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion, useReducedMotion } from 'framer-motion';
 import { AFIRMACOES, calcularSintonia, DOCUMENTOS, type Resposta } from '@/app/content/afirmacoes';
 import { fmtInt } from '@/shared/format';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { corSlot } from '@/app/lib/raceUi';
 import { Container } from '@/app/components/layout/Container';
@@ -330,7 +331,7 @@ function Resultado({ seed, respostas, importantes }: { seed: number; respostas: 
               <div>
                 <h2 className="font-display text-[22px] font-semibold tracking-[-0.02em] text-fg sm:text-[26px]">E no dia 25?</h2>
                 <p className="mt-1 max-w-xl text-[14.5px] leading-relaxed text-fg-muted">
-                  A partir das 17h, acompanhe a apuração ao vivo — do Brasil inteiro até a urna da sua seção.
+                  A partir das {HORA_FIM_VOTACAO}, quando termina a votação, acompanhe a apuração ao vivo — do Brasil inteiro até a urna da sua seção.
                 </p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-nowrap">

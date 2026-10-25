@@ -57,6 +57,11 @@ describe('textoConviteSite', () => {
     expect(textoConviteSite(brt(10, 12))).toMatch(/^Faltam 15 dias para o 2º turno\./);
     expect(textoConviteSite(brt(24, 9))).toMatch(/^É amanhã/);
   });
+  it('votação prorrogada até as 19h: entre 17h e 19h ainda "é hoje", sem dizer que a apuração começou às 17h', () => {
+    expect(textoConviteSite(brt(25, 18))).toMatch(/^É hoje: a votação do 2º turno foi prorrogada até as 19h \(Brasília\)/);
+    expect(textoConviteSite(brt(25, 19))).toMatch(/em andamento/);
+    for (const t of [brt(25, 17), brt(25, 18, 59), brt(25, 19), brt(25, 23)]) expect(textoConviteSite(t)).not.toMatch(/17h/);
+  });
 });
 
 describe('Teste Cego: tempo honesto na Home', () => {

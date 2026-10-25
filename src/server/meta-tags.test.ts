@@ -25,7 +25,7 @@ beforeAll(async () => {
   ctx = {
     races,
     nomeMunicipio: (uf, cod) => nomes.get(`${uf}|${cod}`),
-    // relógio fixo antes do dia da votação: com o relógio de verdade, no dia 25/10 antes das 17h toda página vira o
+    // relógio fixo antes do dia da votação: com o relógio de verdade, no dia 25/10 antes das 19h toda página vira o
     // convite genérico (sem nome nem número) e os testes de imagem específica deixam de valer
     agora: () => Date.UTC(2026, 9, 20, 15, 0, 0),
     fase: () => fase,
@@ -334,7 +334,7 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     fase = 'pre';
   });
 
-  it('dia da votação (0h–17h de 25/10): nenhuma descrição com nome ou número de candidato; às 17h volta', () => {
+  it('dia da votação (0h–19h de 25/10, prorrogada): nenhuma descrição com nome ou número de candidato; às 19h volta', () => {
     const manha = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 13, 0, 0)); // 10h de Brasília
     fase = 'pre';
     for (const p of ['/apuracao', '/apuracao/sp', '/apuracao/sp/62910', '/tv', '/embed/placar']) {
@@ -345,14 +345,20 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     expect(metaDaRota('/apuracao/sp/62910', q(), manha).descricao).toMatch(/^Resultado do 1º turno em Campinas \(SP\) e, em 25\/10/);
     const vespera = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 2, 59, 0)); // 23h59 de 24/10
     expect(metaDaRota('/apuracao/sp/62910', q(), vespera).descricao).toMatch(/Lula 43,00%/);
-    const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 20, 0, 0)); // 17h
+    // a descrição de antes da apuração aponta o fim da votação (19h)
+    expect(metaDaRota('/apuracao', q(), manha).descricao).toMatch(/a partir das 19h/);
+    // 17h e 18h: a votação continua (prorrogada), ainda sem nomes, mesmo com a fase já em 'apurando'
     fase = 'apurando';
+    for (const t of [Date.UTC(2026, 9, 25, 20, 0, 0), Date.UTC(2026, 9, 25, 21, 0, 0), Date.UTC(2026, 9, 25, 21, 59, 59)]) {
+      expect(metaDaRota('/apuracao/sp/62910', q(), comPlacarFixo(ctx, t)).descricao, String(t)).not.toMatch(/Lula|Flávio|%/);
+    }
+    const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 22, 0, 0)); // 19h
     expect(metaDaRota('/apuracao/sp/62910', q(), apuracao).descricao).toMatch(/Lula 48,00%/);
     fase = 'pre';
   });
 
-  it('dia da votação (0h–17h de 25/10): a IMAGEM de prévia também sai sem candidato; antes e às 17h volta', () => {
-    const manha = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 19, 59, 0)); // 16h59 de Brasília
+  it('dia da votação (0h–19h de 25/10, prorrogada): a IMAGEM de prévia também sai sem candidato; antes e às 19h volta', () => {
+    const manha = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 21, 59, 0)); // 18h59 de Brasília
     fase = 'pre';
     for (const p of ['/', '/apuracao', '/apuracao/sp', '/apuracao/sp/62910', '/apuracao/sp/62910/1/1', '/governadores', '/live', '/tv', '/streamers', '/sobre', '/embed/placar']) {
       const m = metaDaRota(p, q(), manha);
@@ -365,14 +371,16 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     expect(metaDaRota('/anuncie', q(), manha).imagem).toBe('/api/og/anuncie.png');
     const vespera = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 2, 59, 0)); // 23h59 de 24/10
     expect(metaDaRota('/apuracao', q(), vespera).imagem).toBe('/api/og/apuracao.png?race=pres');
-    const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 20, 0, 0)); // 17h
     fase = 'apurando';
+    // 17h: a votação continua (prorrogada): a imagem segue genérica
+    expect(metaDaRota('/apuracao/sp', q(), comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 20, 0, 0))).imagem).toBe(OG_GENERICA_DIA_VOTACAO);
+    const apuracao = comPlacarFixo(ctx, Date.UTC(2026, 9, 25, 22, 0, 0)); // 19h
     expect(metaDaRota('/apuracao/sp', q(), apuracao).imagem).toBe('/api/og/apuracao.png?race=pres&uf=sp');
     expect(metaDaRota('/', q(), apuracao).imagem).toBe('/api/og/apuracao.png?race=pres');
     fase = 'pre';
   });
 
-  it('dia da votação (0h–17h de 25/10): curiosidades e cenários sem nomes nem percentuais na descrição e na imagem', () => {
+  it('dia da votação (0h–19h de 25/10): curiosidades e cenários sem nomes nem percentuais na descrição e na imagem', () => {
     const manha = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 15, 0, 0) }; // 12h de Brasília
     const fato = metaDaRota('/curiosidades', q('fato=finalistas-menor-diferenca'), manha);
     expect(fato.descricao).not.toMatch(/Lula|Flávio|%/);
@@ -383,13 +391,14 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     expect(cen.descricao).not.toMatch(/Lula|Flávio|%/);
     expect(cen.imagem).toBe(OG_GENERICA_DIA_VOTACAO);
     expect(cen.imagemAlt).not.toMatch(/Lula|Flávio|%/);
-    // às 17h volta tudo
-    const noite = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 20, 0, 0) };
+    // 18h: ainda votação (prorrogada); às 19h volta tudo
+    expect(metaDaRota('/cenarios', q(`c=${cod}`), { ...ctx, agora: () => Date.UTC(2026, 9, 25, 21, 0, 0) }).descricao).not.toMatch(/Lula|Flávio|%/);
+    const noite = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 22, 0, 0) };
     expect(metaDaRota('/cenarios', q(`c=${cod}`), noite).descricao).toMatch(/Neste cenário: /);
     expect(metaDaRota('/curiosidades', q('fato=finalistas-menor-diferenca'), noite).imagem).toBe('/api/og/curiosidade.png?f=finalistas-menor-diferenca');
   });
 
-  it('dia da votação (0h–17h de 25/10): a ficha de um finalista sem nome, partido nem número no título, na descrição e na imagem', () => {
+  it('dia da votação (0h–19h de 25/10): a ficha de um finalista sem nome, partido nem número no título, na descrição e na imagem', () => {
     const manha = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 15, 1, 0) }; // 12h01 de Brasília
     for (const sq of ['280002542548', '280002551544']) {
       const m = metaDaRota(`/candidato/${sq}`, q(), manha);
@@ -401,8 +410,9 @@ describe('I07: títulos e descrições por fase (Brasil, UF e município)', () =
     // sem o índice de fichas no servidor: o título genérico também não leva o nome
     const semIndice = { ...manha, ficha: () => ({ lida: null, existe: 'sem-indice' as const }) };
     expect(metaDaRota('/candidato/280002542548', q(), semIndice).titulo).toBe('Ficha do candidato · Sintonia');
-    // às 17h volta
-    const noite = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 20, 0, 0) };
+    // às 19h volta (às 17h, ainda votação)
+    expect(metaDaRota('/candidato/280002542548', q(), { ...ctx, agora: () => Date.UTC(2026, 9, 25, 20, 0, 0) }).titulo).toBe('Ficha de candidato · Presidente · Sintonia');
+    const noite = { ...ctx, agora: () => Date.UTC(2026, 9, 25, 22, 0, 0) };
     expect(metaDaRota('/candidato/280002542548', q(), noite).titulo).toBe('Lula (PT) · Presidente · Ficha do candidato · Sintonia');
     expect(metaDaRota('/candidato/280002542548', q(), { ...noite, ficha: semIndice.ficha }).titulo).toBe('Lula (PT) · Ficha do candidato · Sintonia');
   });

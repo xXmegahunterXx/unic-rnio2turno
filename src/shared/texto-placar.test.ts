@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Candidate, Race, Summary } from './types';
 import { INICIO_APURACAO } from './constants';
+import { FIM_VOTACAO, votacaoEmCurso } from './diaVotacao';
 import {
   DOMINIO_TEXTO_PADRAO,
   INICIO_DIA_VOTACAO,
@@ -52,11 +53,11 @@ const resumo = (p: Partial<Summary> = {}): Summary => ({
   status: 'apurando',
   lider: 0,
   eleito: null,
-  ultimaAtualizacao: Date.UTC(2026, 9, 25, 21, 47, 12),
+  ultimaAtualizacao: Date.UTC(2026, 9, 25, 23, 47, 12),
   ...p,
 });
 
-const NOITE = Date.UTC(2026, 9, 25, 21, 50); // 18:50 de Brasília
+const NOITE = Date.UTC(2026, 9, 25, 23, 50); // 20:50 de Brasília (depois do fim da votação, 19h)
 const ANTES = Date.UTC(2026, 9, 17, 15, 0); // 17/10, 12h de Brasília
 
 const status = (p: Partial<NonNullable<EntradaTextoPlacar['status']>> = {}): NonNullable<EntradaTextoPlacar['status']> => ({
@@ -128,29 +129,56 @@ describe('fases e horários', () => {
     expect(textoPlacarBot(entrada({ ligado: false, dominio: '' }))).toBe(DOMINIO_TEXTO_PADRAO);
   });
 
-  it('dia da votação, de 0h às 17h (relógio real): nenhum nome nem número, nem na simulação', () => {
+  it('dia da votação, de 0h até o fim da votação (19h, prorrogada; relógio real): nenhum nome nem número, nem na simulação', () => {
     expect(diaDeVotacaoAntesDas17(INICIO_DIA_VOTACAO - 1)).toBe(false);
     expect(diaDeVotacaoAntesDas17(INICIO_DIA_VOTACAO)).toBe(true);
-    expect(diaDeVotacaoAntesDas17(INICIO_APURACAO - 1)).toBe(true);
-    expect(diaDeVotacaoAntesDas17(INICIO_APURACAO)).toBe(false);
-    for (const agora of [INICIO_DIA_VOTACAO, INICIO_DIA_VOTACAO + 9 * 3_600_000, INICIO_APURACAO - 1000]) {
-      for (const st of [status(), status({ simulacao: true }), status({ simulacao: true, anonimizado: true }), status({ fase: 'pre' })]) {
+    expect(diaDeVotacaoAntesDas17(INICIO_APURACAO)).toBe(true); // 17h: a votação continua
+    expect(diaDeVotacaoAntesDas17(FIM_VOTACAO - 1)).toBe(true);
+    expect(diaDeVotacaoAntesDas17(FIM_VOTACAO)).toBe(false);
+    for (const agora of [INICIO_DIA_VOTACAO, INICIO_DIA_VOTACAO + 9 * 3_600_000, INICIO_APURACAO, INICIO_APURACAO + 3_600_000, FIM_VOTACAO - 1000]) {
+      for (const st of [status(), status({ simulacao: true }), status({ simulacao: true, anonimizado: true }), status({ fase: 'pre' }), status({ fase: 'apurando', simNow: agora })]) {
         const t = textoPlacarBot(entrada({ agora, status: st }));
         conferir(t);
         expect(t).not.toMatch(NOMES);
         expect(t).not.toMatch(/%/);
-        expect(t).toMatch(/começa hoje, às 17h/);
+        expect(t).toMatch(/prorrogada até as 19h/);
+        expect(t).not.toMatch(/17h|Faltam -|NaN/);
       }
     }
+    // 18h de Brasília: falta 1 h para o fim da votação
+    expect(textoPlacarBot(entrada({ agora: INICIO_APURACAO + 3_600_000 }))).toBe(
+      'A votação do 2º turno foi prorrogada até as 19h (horário de Brasília); a apuração começa em seguida. Faltam 1 h. Acompanhe seção por seção: sintonia2026.com.br',
+    );
+  });
+
+  it('18h de 25/10 ainda é dia de votação; 19h já não é', () => {
+    const h18 = Date.UTC(2026, 9, 25, 21, 0, 0);
+    const h19 = Date.UTC(2026, 9, 25, 22, 0, 0);
+    expect(FIM_VOTACAO).toBe(h19);
+    expect(votacaoEmCurso(h18)).toBe(true);
+    expect(diaDeVotacaoAntesDas17(h18)).toBe(true);
+    expect(votacaoEmCurso(h19)).toBe(false);
+    expect(diaDeVotacaoAntesDas17(h19)).toBe(false);
+    // às 19h o placar volta (com a apuração em andamento)
+    expect(textoPlacarBot(entrada({ agora: h19 }))).toMatch(/^Presidente · 2º turno: Lula \(PT\)/);
   });
 
   it('antes da apuração: contagem regressiva, sem nomes', () => {
     const t = textoPlacarBot(entrada({ agora: ANTES, status: status({ fase: 'pre', simNow: ANTES }) }));
     conferir(t);
     expect(t).not.toMatch(NOMES);
-    expect(t).toBe('Presidente · 2º turno: a apuração começa em 25/10, às 17h (horário de Brasília). Faltam 8 dias e 5 h. Acompanhe seção por seção: sintonia2026.com.br');
+    // a divulgação começa no fim da votação (prorrogada até as 19h): o horário e a contagem apontam as 19h
+    expect(t).toBe('Presidente · 2º turno: a apuração começa em 25/10, às 19h (horário de Brasília). Faltam 8 dias e 7 h. Acompanhe seção por seção: sintonia2026.com.br');
     // sem status (servidor subindo): o relógio real
-    expect(textoPlacarBot(entrada({ agora: ANTES, status: null }))).toContain('Faltam 8 dias e 5 h.');
+    expect(textoPlacarBot(entrada({ agora: ANTES, status: null }))).toContain('Faltam 8 dias e 7 h.');
+    // depois das 19h ainda na fase 'pre' (fonte sem dados): aguardando, nunca "começa às…" no passado nem contagem negativa
+    const depois = Date.UTC(2026, 9, 25, 22, 30);
+    const tard = textoPlacarBot(entrada({ agora: depois, status: status({ fase: 'pre', simNow: depois }) }));
+    conferir(tard);
+    expect(tard).toBe('Presidente · 2º turno: aguardando as primeiras seções totalizadas. Acompanhe seção por seção: sintonia2026.com.br');
+    // simulação: segue o próprio relógio (o início dela é inicioApuracao)
+    const simPre = textoPlacarBot(entrada({ agora: ANTES, status: status({ simulacao: true, fase: 'pre', simNow: INICIO_APURACAO - 2 * 3_600_000 }) }));
+    expect(simPre).toContain('Faltam 2 h.');
     // UF e governador no cabeçalho, ainda sem nomes
     const pe = textoPlacarBot(entrada({ agora: ANTES, uf: 'PE', status: status({ fase: 'pre', simNow: ANTES }) }));
     expect(pe).toMatch(/^Presidente · Pernambuco · 2º turno: /);
@@ -175,7 +203,7 @@ describe('placar', () => {
     conferir(t);
     expect(t.length).toBeLessThanOrEqual(TEXTO_PLACAR.alvo);
     expect(t).toBe(
-      'Presidente · 2º turno: Lula (PT) 50,12% × Flávio Bolsonaro (PL) 49,88% dos votos válidos, com 63,20% das seções totalizadas. Dado das 18:47 (Brasília). Acompanhe seção por seção: sintonia2026.com.br',
+      'Presidente · 2º turno: Lula (PT) 50,12% × Flávio Bolsonaro (PL) 49,88% dos votos válidos, com 63,20% das seções totalizadas. Dado das 20:47 (Brasília). Acompanhe seção por seção: sintonia2026.com.br',
     );
     // o array em outra ordem não muda o texto (a ordem é a do número na urna)
     expect(textoPlacarBot(entrada({ race: PRES_INVERTIDA, resumo: resumo({ votos: [4988, 5012] }) }))).toBe(t);

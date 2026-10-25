@@ -229,7 +229,8 @@ describe('app na fonte TSE (fetch falso): placar do arquivo nacional na descriç
     f.rotas.set(ARQ_BR, br);
     const dist = mkdtempSync(join(tmpdir(), 'sintonia-meta-placar-'));
     writeFileSync(join(dist, 'index.html'), '<!doctype html><html><head><title>x</title><meta name="description" content="" /><!--app-meta--></head><body></body></html>');
-    m = await montar({ fetch: f, agora: Date.UTC(2026, 9, 25, 21, 43, 0), env: { SERVE_STATIC: '1', DIST_DIR: dist } });
+    // 19h43 de Brasília: depois do fim da votação (prorrogada até as 19h; antes disso as descrições não levam nomes)
+    m = await montar({ fetch: f, agora: Date.UTC(2026, 9, 25, 22, 43, 0), env: { SERVE_STATIC: '1', DIST_DIR: dist } });
     const cookie = await login(m);
     expect((await comando(m, cookie, { tipo: 'tse', tse: { baseUrl: BASE } })).status).toBe(200);
     expect((await comando(m, cookie, { tipo: 'fonte', fonte: 'tse' })).status).toBe(200);

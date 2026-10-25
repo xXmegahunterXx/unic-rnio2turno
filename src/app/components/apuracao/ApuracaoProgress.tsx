@@ -1,6 +1,7 @@
 /** Progresso da totalização: % de seções, barra, "x de y seções" e horário da última atualização (Brasília). */
 import type { Summary } from '@/shared/types';
 import { pctTotalizadas } from '@/shared/calc';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { fmtHoraSeg, fmtInt, fmtPct } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
@@ -93,7 +94,7 @@ export function ApuracaoProgress({ resumo, variant = 'default', className }: Apu
         ) : aguardando ? (
           <>
             <Icon name="relogio" size={14} />
-            <span>Aguardando as primeiras seções totalizadas (divulgação a partir das 17h)</span>
+            <span>Aguardando as primeiras seções totalizadas (divulgação a partir das {HORA_FIM_VOTACAO})</span>
           </>
         ) : (
           <>

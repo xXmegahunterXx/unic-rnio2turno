@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { DIA_ELEICAO_17H, DIA_ELEICAO_INICIO, EMOJI_REACAO, LIMITES_CHAT, REACOES, type ChatAdmin, type ComandoChat, type MensagemAdmin, type MotivoRecusa } from '@/shared/chat';
 import { fmtHora, fmtInt } from '@/shared/format';
 import { cn } from '@/app/lib/cn';
@@ -143,7 +144,7 @@ function SecaoChatServidor() {
           acoes={
             d.bloqueio && d.aberta ? (
               <Badge tone="alert" size="sm" caps>
-                Aguardando 17h
+                Aguardando {HORA_FIM_VOTACAO}
               </Badge>
             ) : d.aberta ? (
               <Badge tone="ok" size="sm" dot caps>
@@ -168,7 +169,7 @@ function SecaoChatServidor() {
                 icon="play"
                 disabled={!!d.travada}
                 loading={ocupado === 'abrir'}
-                onClick={() => void cmd({ acao: 'abrir' }, d.bloqueio ? 'Sala aberta: recebe mensagens às 17h de 25/10' : 'Sala aberta')}
+                onClick={() => void cmd({ acao: 'abrir' }, d.bloqueio ? `Sala aberta: recebe mensagens às ${HORA_FIM_VOTACAO} de 25/10` : 'Sala aberta')}
               >
                 Abrir a sala
               </Button>
@@ -181,7 +182,7 @@ function SecaoChatServidor() {
               <Callout tom="alerta" titulo={d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? 'Dia da eleição' : 'Antes da apuração'}>
                 {d.bloqueio} Até lá ninguém consegue enviar mensagens, mesmo com a sala aberta
                 {d.agora >= DIA_ELEICAO_INICIO && d.agora < DIA_ELEICAO_17H ? ' (propaganda no dia da eleição é crime)' : ''}. Com a sala aberta, ela
-                volta a receber mensagens sozinha às 17h. A configuração (aberta, modo lento, fixada) sobrevive a reinícios.
+                volta a receber mensagens sozinha às {HORA_FIM_VOTACAO}, quando termina a votação. A configuração (aberta, modo lento, fixada) sobrevive a reinícios.
               </Callout>
             ) : null}
             <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">

@@ -8,6 +8,7 @@
 import { memo, useCallback } from 'react';
 import type { CorCandidato, FeedEvent, Race } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
+import { HORA_FIM_VOTACAO, VOTACAO_PRORROGADA } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { corSlot, slotDe } from '@/app/lib/raceUi';
 import { useIsDesktop } from '@/app/lib/useMediaQuery';
@@ -35,6 +36,9 @@ const BORDA: Record<CorCandidato, string> = {
   outros: 'border-line',
 };
 
+/** Lista vazia: os marcos chegam depois do fim da votação (19h; prorrogada, eram 17h). */
+const VAZIO = `Os marcos da apuração aparecem aqui a partir das ${HORA_FIM_VOTACAO}.`;
+
 export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, className }: FeedPanelProps) {
   const desktop = useIsDesktop();
   // O feed é sempre do 2º turno (ao vivo ou simulação): a imagem leva a marca SIMULAÇÃO quando for o caso.
@@ -56,7 +60,7 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
           Acontecimentos
         </h2>
         {destaque ? <Destaque e={destaque} race={race} simulado={simulado} className="mb-2.5" /> : null}
-        <EventFeed eventos={resto} race={race} variant="ticker" max={10} acao={acao} emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
+        <EventFeed eventos={resto} race={race} variant="ticker" max={10} acao={acao} emptyText={VAZIO} />
         {poucos ? <ComoAcompanhar className="mt-3 rounded-2xl border border-line bg-surface p-4" /> : null}
       </section>
     );
@@ -74,7 +78,7 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
         <div className={cn('flex flex-1 flex-col', largo && 'lg:grid lg:grid-cols-2 lg:gap-10')}>
           <div className="min-w-0">
             {destaque ? <Destaque e={destaque} race={race} simulado={simulado} className="mb-4" /> : null}
-            <EventFeed eventos={resto} race={race} variant="list" max={20} acao={acao} emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
+            <EventFeed eventos={resto} race={race} variant="list" max={20} acao={acao} emptyText={VAZIO} />
           </div>
           <ComoAcompanhar className={cn('mt-auto border-t border-line pt-4', largo && 'lg:mt-0 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0')} />
         </div>
@@ -93,7 +97,7 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
       {destaque ? <Destaque e={destaque} race={race} simulado={simulado} className="mb-4" /> : null}
       <div className="relative min-h-0 flex-1">
         <div className="-mr-2 max-h-[400px] overflow-y-auto pr-2 [mask-image:linear-gradient(to_bottom,black_calc(100%-36px),transparent)] min-[1360px]:absolute min-[1360px]:inset-0 min-[1360px]:max-h-none">
-          <EventFeed eventos={resto} race={race} variant="list" max={20} acao={acao} className="pb-8" emptyText="Os marcos da apuração aparecem aqui a partir das 17h." />
+          <EventFeed eventos={resto} race={race} variant="list" max={20} acao={acao} className="pb-8" emptyText={VAZIO} />
         </div>
       </div>
     </section>
@@ -103,7 +107,13 @@ export const FeedPanel = memo(function FeedPanel({ eventos, race, largo, classNa
 /** Guia neutro e curto para o começo da noite: como os números chegam e quando um resultado se define. */
 function ComoAcompanhar({ className }: { className?: string }) {
   const itens: { icon: 'urna' | 'troca' | 'selo'; texto: string }[] = [
-    { icon: 'urna', texto: 'A partir das 17h (Brasília), cada seção totalizada pelo TSE entra no placar.' },
+    {
+      icon: 'urna',
+      // votação prorrogada até as 19h (o TSE suspendeu a divulgação até lá): o guia não promete números "a partir das 17h"
+      texto: VOTACAO_PRORROGADA
+        ? `A votação foi prorrogada até as ${HORA_FIM_VOTACAO} (Brasília). Depois, cada seção totalizada pelo TSE entra no placar.`
+        : `A partir das ${HORA_FIM_VOTACAO} (Brasília), cada seção totalizada pelo TSE entra no placar.`,
+    },
     { icon: 'troca', texto: 'A ordem de chegada varia entre estados e regiões, por isso quem está à frente pode mudar ao longo da noite.' },
     { icon: 'selo', texto: 'O resultado fica definido quando a diferença supera o número de eleitores das seções que faltam.' },
   ];

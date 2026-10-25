@@ -7,6 +7,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { LiveStatus, RaceId, Summary } from '@/shared/types';
 import { fmtHora } from '@/shared/format';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { NomesOcultos } from '@/app/components/apuracao/NomesOcultos';
 import { SeloAtualizacao, type ResumoSelo } from '@/app/components/apuracao/SeloAtualizacao';
@@ -153,7 +154,7 @@ export function SeloFase({
   }
   return (
     <Badge tone="neutral" size="sm" icon="relogio">
-      Divulgação a partir das 17h (Brasília)
+      Divulgação a partir das {HORA_FIM_VOTACAO} (Brasília)
     </Badge>
   );
 }

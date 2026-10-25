@@ -63,3 +63,63 @@ describe('calibração da projeção em noites simuladas', () => {
     expect(falhas).toEqual([]);
   });
 });
+
+/**
+ * Medição da fonte TSE em cenários do dia (não roda por padrão: `PROJECAO_MEDIR=1 npx vitest run
+ * src/engine/projecao-calibracao`). Cache dos municípios 100% / 30% / 0%, cache defasado (3% das seções atrás), lote
+ * grande de uma vez (o cache parou em 0,2% e o oficial saltou), exterior primeiro; sem e com o acompanhamento da UF
+ * (`-ab.json`). Para cada abrangência e fração: erro absoluto (todas as contas, exibidas ou não), cobertura da faixa e
+ * quanto fica exibido (limiares + trava de cobertura do cache).
+ */
+describe.skipIf(!process.env.PROJECAO_MEDIR)('medição da fonte TSE (cenários do dia)', () => {
+  it('imprime a tabela', { timeout: 600_000 }, async () => {
+    const { avaliaBruto } = await import('./tests/projecao-harness');
+    const FR = [0.1, 0.15, 0.2, 0.3, 0.5] as const;
+    const cens = CENARIOS;
+    const normal = cens.flatMap((c) => pontosDoCenario(c, { fracoes: FR, antes: (k, n) => k - 0.03 * n }));
+    const salto = cens.flatMap((c) => pontosDoCenario(c, { fracoes: FR, antes: (_k, n) => 0.002 * n }));
+    const exterior = cens.flatMap((c) => pontosDoCenario(c, { fracoes: FR, ordem: 'exterior-primeiro' })).filter((p) => p.tipo === 'pres-BR');
+    type Modo = { nome: string; pts: typeof normal; tse?: Parameters<typeof avaliaBruto>[2] };
+    const modos: Modo[] = [];
+    for (const ab of [false, true]) {
+      const s = ab ? ' + ab' : '';
+      modos.push(
+        { nome: `cache 100%${s}`, pts: normal, tse: { cache: 1, ab } },
+        { nome: `cache 30%${s}`, pts: normal, tse: { cache: 0.3, ab } },
+        { nome: `cache 0%${s}`, pts: normal, tse: { cache: 0, ab } },
+        { nome: `cache 100% defasado 3%${s}`, pts: normal, tse: { cache: 1, defasado: true, ab } },
+        { nome: `lote grande (cache parou em 0,2%)${s}`, pts: salto, tse: { cache: 1, defasado: true, ab } },
+        { nome: `exterior primeiro, cache 0%${s}`, pts: exterior, tse: { cache: 0, ab } },
+      );
+    }
+    const linhas: string[] = ['modo | abrangência | fração | n | exibida | erro médio | erro p95 | erro máx | cobertura (todas) | cobertura (exibidas) | meia média'];
+    for (const md of modos) {
+      const rs = md.pts.map((p) => avaliaBruto(p, undefined, md.tse));
+      for (const tipo of ['pres-BR', 'pres-UF', 'gov'] as Tipo[]) {
+        for (const alvo of FR) {
+          const sel = rs.filter((r, i) => r.caso && md.pts[i].tipo === tipo && md.pts[i].alvo === alvo);
+          if (!sel.length) continue;
+          const abs = sel.map((r) => Math.abs(r.caso!.err)).sort((a, b) => a - b);
+          const exib = sel.filter((r) => r.liberada && !r.travaCache);
+          const cob = (xs: typeof sel) => (xs.length ? `${((100 * xs.filter((r) => Math.abs(r.caso!.err) <= r.caso!.meia).length) / xs.length).toFixed(1)}%` : '—');
+          linhas.push(
+            [
+              md.nome,
+              tipo,
+              `${Math.round(alvo * 100)}%`,
+              sel.length,
+              `${((100 * exib.length) / sel.length).toFixed(0)}%`,
+              (abs.reduce((a, b) => a + b, 0) / abs.length).toFixed(2),
+              abs[Math.min(abs.length - 1, Math.floor(0.95 * abs.length))].toFixed(2),
+              abs[abs.length - 1].toFixed(2),
+              cob(sel),
+              cob(exib),
+              (sel.reduce((a, r) => a + r.caso!.meia, 0) / sel.length).toFixed(2),
+            ].join(' | '),
+          );
+        }
+      }
+    }
+    console.log(`\n${linhas.join('\n')}`);
+  });
+});

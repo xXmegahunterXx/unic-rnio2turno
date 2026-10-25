@@ -2,7 +2,7 @@
  * Faixa final da Home: "Domingo, 25 de outubro, 17h" com quanto falta (relógio de parede, dias de Brasília),
  * "Lembrar da apuração" e "Compartilhar o Sintonia". Depois do início real, só o convite para compartilhar.
  */
-import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { useNow } from '@/app/lib/useNow';
 import { BotaoCompartilharSite, BotaoLembrete, lembreteDisponivel } from './AcoesHome';
@@ -11,7 +11,8 @@ import { rotuloFaltam } from './textosHome';
 export function FaixaFinal({ className }: { className?: string }) {
   const agora = useNow(60_000);
   const antes = lembreteDisponivel(agora);
-  const faltam = rotuloFaltam(agora, INICIO_APURACAO);
+  // pílula pelo fim da votação (19h; prorrogada, eram 17h): entre 17h e 19h ainda "É hoje", não "É agora"
+  const faltam = rotuloFaltam(agora, FIM_VOTACAO);
   return (
     <section
       aria-labelledby="home-final"

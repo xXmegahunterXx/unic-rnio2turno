@@ -5,7 +5,7 @@
  *  - Aviso fixo e curto (`AVISO_PESQUISAS`); cada cartão com os dois candidatos na ordem da urna, percentuais grandes,
  *    votos totais e (quando divulgados) válidos, SEMPRE a linha das informações obrigatórias e o link da fonte.
  *  - Gráfico por instituto (uma série por instituto; sem média, projeção ou "agregador").
- *  - Dia da votação (0h–17h de 25/10, relógio do servidor): só um aviso neutro.
+ *  - Dia da votação (0h–19h de 25/10, até o fim da votação, relógio do servidor): só um aviso neutro.
  *  - Resultado oficial concluído (fonte TSE, fase 'encerrada'): "Pesquisas × resultado" no topo.
  *  - Simulação com nomes ocultos (`status.anonimizado`): a área não aparece.
  *  - `?cargo=pres|gov-xx` escolhe a disputa; `?p=<id>` (o link dos cartões compartilhados) abre a disputa da pesquisa,
@@ -27,6 +27,7 @@ import { Icon } from '@/app/ui/Icon';
 import { Segmented } from '@/app/ui/Segmented';
 import { Skeleton } from '@/app/ui/Skeleton';
 import { UF_NOMES, UFS_GOV_2T } from '@/shared/constants';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { AVISO_DIA_VOTACAO, AVISO_PESQUISAS, ehCargoPesquisa, pesquisasDoCargo, ufDoCargo, type CargoPesquisa, type Pesquisa } from '@/shared/pesquisas';
 
 type Grupo = 'pres' | 'gov';
@@ -260,7 +261,7 @@ function ComoEscolhemos() {
     'Quando o próprio instituto pagou a pesquisa, o contratante aparece como “recursos próprios”.',
     'Cada pesquisa aparece sozinha: o Sintonia não calcula média, projeção nem junta institutos.',
     'Votos válidos só aparecem quando o instituto divulgou.',
-    'No dia da votação, das 0h às 17h (horário de Brasília), a área fica sem pesquisas.',
+    `No dia da votação, das 0h às ${HORA_FIM_VOTACAO} (horário de Brasília), quando termina a votação, a área fica sem pesquisas.`,
   ];
   return (
     <section aria-labelledby="pesq-criterio" className="mt-12 rounded-2xl border border-line bg-surface-2/40 p-5 sm:p-6">

@@ -6,8 +6,9 @@
  *
  * Rotas: `GET /api/apuracao/:race/br/projecao` (Presidente, Brasil) e `GET /api/apuracao/:race/:uf/projecao` (Presidente
  * na UF e Governador) → `{ projecao: Projecao }`. Rota ausente, erro, payload estranho ou `disponivel: false`: o cartão
- * não aparece (nada de erro na tela). Antes do limiar, só durante a apuração, uma linha discreta avisando a partir de
- * quando ele aparece. Chave da noite 'projecao' desligada → o servidor responde `motivo: 'desligada'` e nada aparece.
+ * não aparece (nada de erro na tela). Antes do limiar (`motivo: 'cedo'`), só durante a apuração, o cartão de espera no
+ * mesmo quadro: quando a estimativa aparece e a barra das seções apuradas até os ~10% (nenhum número de candidato).
+ * Chave da noite 'projecao' desligada → o servidor responde `motivo: 'desligada'` e nada aparece.
  *
  * Neutralidade: ordem da urna, cor de cada finalista vinda dos dados (`corSlot(cand.cor)`, nunca pela posição), textos
  * simétricos, sem foto e sem "vencedor"/"eleito". Simulação: selo no próprio cartão; com nomes ocultos, os nomes e cores
@@ -137,6 +138,35 @@ const pct1 = (n: number) => fmtPct(Math.min(100, Math.max(0, n)), 1);
 /** "Com 34% das urnas apuradas": inteiro truncado, como o TSE; abaixo de 1%, "menos de 1%". */
 const pctUrnas = (n: number) => (n > 0 && n < 1 ? 'menos de 1%' : fmtPct(Math.floor(Math.min(100, Math.max(0, n))), 0));
 
+/**
+ * % das seções como o placar mostra (`pctTotalizadas`, src/shared/calc.ts): TRUNCADO em 2 casas, como o TSE. O payload
+ * traz o mesmo número com 4 casas; o +1e-6 só absorve o erro de ponto flutuante (0,29 × 100 = 28,999…).
+ */
+export function pctSecoesPlacar(n: number): number {
+  if (!(n > 0)) return 0;
+  if (n >= 100) return 100;
+  return Math.floor(n * 100 + 1e-6) / 100;
+}
+
+/** Cartão antes do limiar: % das seções (como o placar), fração da barra até os ~10% (0–1) e se já chegou lá. */
+export interface Aguardando {
+  pct: number;
+  barra: number;
+  noLimiar: boolean;
+}
+
+/**
+ * Estado do cartão de espera: só com `motivo: 'cedo'` (antes do limiar, inclusive com 0% das seções — o cartão já está
+ * lá quando a totalização começa ou retoma). Com as seções já em ~10% e o cálculo ainda sem base (fração dos válidos
+ * esperados ou UFs/municípios com urnas abaixo do limiar), a barra fica cheia e a frase muda. Qualquer outro caso → null.
+ */
+export function aguardandoDe(p: Pick<Projecao, 'disponivel' | 'motivo' | 'pctSecoes'>): Aguardando | null {
+  if (p.disponivel || p.motivo !== 'cedo') return null;
+  const pct = pctSecoesPlacar(p.pctSecoes);
+  const limiar = LIMIAR_FRACAO * 100;
+  return { pct, barra: Math.min(1, pct / limiar), noLimiar: pct >= limiar };
+}
+
 export interface ProjecaoCartaoProps {
   race: Race;
   /** 'BR' ou a sigla da UF. */
@@ -163,7 +193,96 @@ class Silencioso extends Component<{ children: ReactNode }, { erro: boolean }> {
   }
 }
 
-/** O cartão (ou a linha discreta antes do limiar, ou nada), protegido por um error boundary silencioso. */
+/** Título "Projeção do Sintonia" + selo "Estimativa" (+ selo de simulação): o mesmo nos dois estados do cartão. */
+function Cabecalho({ id, simulado }: { id: string; simulado?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+      <h2 id={id} className="font-display text-[19px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[21px]">
+        {TEXTOS_PROJECAO.titulo}
+      </h2>
+      <span className="inline-flex h-5 items-center rounded-md border border-line bg-surface-2 px-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
+        Estimativa
+      </span>
+      {simulado ? <SimulationRibbon variant="badge" className="h-5 px-1.5 text-[9.5px]" /> : null}
+    </div>
+  );
+}
+
+const CLASSE_LINK =
+  'font-medium text-fg underline decoration-line/[3] underline-offset-[3px] transition-colors hover:decoration-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand';
+
+/** "· como calculamos" (link da metodologia): nunca se separa (o ponto não fica sozinho no fim da linha). */
+function ComoCalculamos() {
+  return (
+    <span className="inline-flex items-center gap-x-1.5 whitespace-nowrap">
+      <span aria-hidden>·</span>
+      <Link to="/metodologia#projecao" className={CLASSE_LINK}>
+        {TEXTOS_PROJECAO.comoCalculamos}
+      </Link>
+    </span>
+  );
+}
+
+/**
+ * Cartão de espera (antes do limiar): o mesmo quadro do cartão real, compacto, com a frase de quando a estimativa
+ * aparece e a barra das seções apuradas até os ~10% (o mesmo número do placar). Nenhum número de candidato — por isso
+ * sem `data-sem-anuncio-fixo` e igual na simulação com nomes ocultos.
+ */
+function ProjecaoAguardando({ abrangencia, a, simulado, className }: { abrangencia: 'BR' | UF; a: Aguardando; simulado?: boolean; className?: string }) {
+  const limiar = fmtPct(LIMIAR_FRACAO * 100, 0);
+  const pct = fmtPct(a.pct);
+  const valor = TEXTOS_PROJECAO.aguardandoValor(pct, limiar);
+  const id = `projecao-titulo-${abrangencia}`;
+  return (
+    <section
+      aria-labelledby={id}
+      data-projecao={abrangencia}
+      data-projecao-estado="aguardando"
+      className={cn('min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}
+    >
+      {/* celular: texto e, embaixo, a barra; a partir de 640 px, a barra à direita (cartão de uma faixa só) */}
+      <div className="flex flex-col gap-3.5 sm:flex-row sm:items-end sm:justify-between sm:gap-8">
+        <div className="min-w-0">
+          <Cabecalho id={id} simulado={simulado} />
+          <p className="mt-1.5 max-w-[56ch] text-pretty text-[13px] leading-snug text-fg-muted">
+            <span className="num">{a.noLimiar ? TEXTOS_PROJECAO.aguardandoBase : TEXTOS_PROJECAO.aguardando(limiar)}</span>{' '}
+            {/* depois do ponto final, sem "·": se quebrar a linha, o link começa a de baixo sozinho, sem pontuação solta */}
+            <Link to="/metodologia#projecao" className={cn(CLASSE_LINK, 'whitespace-nowrap')}>
+              {TEXTOS_PROJECAO.comoCalculamos.charAt(0).toUpperCase() + TEXTOS_PROJECAO.comoCalculamos.slice(1)}
+            </Link>
+          </p>
+        </div>
+        <div className="w-full min-w-0 sm:w-[17.5rem] sm:shrink-0">
+          <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[12.5px] leading-none">
+            <span className="text-fg-muted">{TEXTOS_PROJECAO.aguardandoRotulo}</span>
+            <span className="num whitespace-nowrap text-fg-muted">
+              {/* "0,24% de 10%": o % das seções em destaque; já no limiar, só ele */}
+              <span className="font-semibold text-fg">{pct}</span>
+              {a.noLimiar ? null : valor.slice(pct.length)}
+            </span>
+          </div>
+          <div
+            role="progressbar"
+            aria-label={TEXTOS_PROJECAO.aguardandoRotulo}
+            aria-valuemin={0}
+            aria-valuemax={LIMIAR_FRACAO * 100}
+            aria-valuenow={Math.min(a.pct, LIMIAR_FRACAO * 100)}
+            aria-valuetext={a.noLimiar ? pct : valor}
+            className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-3"
+          >
+            {/* como a barra do placar: o preenchimento DESLIZA com translateX (sem layout a cada quadro) */}
+            <div
+              className="h-full w-full rounded-full bg-brand-grad transition-transform duration-700 ease-out"
+              style={{ transform: `translateX(${a.barra * 100 - 100}%)` }}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** O cartão (ou o cartão de espera antes do limiar, ou nada), protegido por um error boundary silencioso. */
 export function ProjecaoCartao(props: ProjecaoCartaoProps) {
   return (
     <Silencioso key={`${props.race.id}|${props.abrangencia}`}>
@@ -181,17 +300,10 @@ function ProjecaoCartaoInterno({ race, abrangencia, aoVivo, simulado, anonimizad
   if (!proj || q.isError || status?.fase !== 'apurando') return null;
 
   if (!proj.disponivel) {
-    // antes do limiar, só durante a apuração e com o placar ainda abaixo de ~10%: uma linha discreta (nos outros
-    // motivos, ou se o que falta é espalhamento/cobertura e não fração apurada, nada)
-    if (proj.motivo !== 'cedo' || !(proj.pctSecoes > 0) || !(proj.pctSecoes < LIMIAR_FRACAO * 100)) return null;
-    return (
-      <p className={cn('flex items-start gap-2 px-1 text-[12.5px] leading-snug text-fg-subtle', className)}>
-        <Icon name="grafico" size={14} className="mt-px shrink-0" />
-        <span>
-          A Projeção do Sintonia aparece a partir de cerca de <span className="num">{fmtPct(LIMIAR_FRACAO * 100, 0)}</span> das urnas apuradas.
-        </span>
-      </p>
-    );
+    // antes do limiar (motivo 'cedo'), só durante a apuração: o cartão de espera, com a barra até os ~10% e nenhum número
+    // de candidato. Nos outros motivos ('sem-base', 'definido', 'encerrada', 'desligada'), nada.
+    const a = aguardandoDe(proj);
+    return a ? <ProjecaoAguardando abrangencia={abrangencia} a={a} simulado={simulado} className={className} /> : null;
   }
 
   const linhas = casar(race, proj, anonimizado);
@@ -208,18 +320,7 @@ function ProjecaoCartaoInterno({ race, abrangencia, aoVivo, simulado, anonimizad
       className={cn('min-w-0 rounded-2xl border border-line bg-surface p-4 shadow-card sm:p-5', className)}
     >
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-          <h2
-            id={`projecao-titulo-${abrangencia}`}
-            className="font-display text-[19px] font-semibold leading-tight tracking-[-0.015em] text-fg sm:text-[21px]"
-          >
-            {TEXTOS_PROJECAO.titulo}
-          </h2>
-          <span className="inline-flex h-5 items-center rounded-md border border-line bg-surface-2 px-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">
-            Estimativa
-          </span>
-          {simulado ? <SimulationRibbon variant="badge" className="h-5 px-1.5 text-[9.5px]" /> : null}
-        </div>
+        <Cabecalho id={`projecao-titulo-${abrangencia}`} simulado={simulado} />
         <p className="mt-1 max-w-[72ch] text-pretty text-[12.5px] leading-snug text-fg-muted">{TEXTOS_PROJECAO.subtitulo.replace('1º turno', '1º\u00a0turno')}</p>
       </div>
 
@@ -296,16 +397,7 @@ function ProjecaoCartaoInterno({ race, abrangencia, aoVivo, simulado, anonimizad
       <p className="mt-3.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 border-t border-line pt-3 text-[12px] leading-snug text-fg-muted">
         <Icon name="info" size={14} className="shrink-0 text-fg-subtle" />
         <span className="num">{TEXTOS_PROJECAO.rodape(pctUrnas(proj.pctSecoes))}</span>
-        {/* "· como calculamos" nunca se separa (o ponto não fica sozinho no fim da linha) */}
-        <span className="inline-flex items-center gap-x-1.5 whitespace-nowrap">
-          <span aria-hidden>·</span>
-          <Link
-            to="/metodologia#projecao"
-            className="font-medium text-fg underline decoration-line/[3] underline-offset-[3px] transition-colors hover:decoration-brand-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-          >
-            {TEXTOS_PROJECAO.comoCalculamos}
-          </Link>
-        </span>
+        <ComoCalculamos />
       </p>
     </section>
   );

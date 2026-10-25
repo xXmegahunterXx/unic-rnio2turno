@@ -275,14 +275,18 @@ describe('SalaChat: denúncias e moderação', () => {
     expect(s.publico().mensagens).toHaveLength(0);
   });
 
-  it('dia da eleição: em produção a sala aberta não recebe mensagens até 17h', () => {
+  it('dia da eleição: em produção a sala aberta não recebe mensagens até o fim da votação (19h, prorrogada)', () => {
     const { s, relogio } = sala({ producao: true, agora: DIA_ELEICAO_INICIO + 3600_000 });
     s.comando({ acao: 'abrir' });
     expect(s.publico().aberta).toBe(false);
-    expect(s.publico().bloqueio).toMatch(/17h/);
+    expect(s.publico().bloqueio).toMatch(/19h/);
     const r = enviar(s, 1, 'bom dia');
     expect(!r.ok && r.motivo).toBe('fechada');
-    relogio.t = DIA_ELEICAO_17H;
+    // 18h de Brasília: a votação continua (prorrogada até as 19h), a sala segue fechada
+    relogio.t = Date.UTC(2026, 9, 25, 21, 0, 0);
+    expect(s.publico().aberta).toBe(false);
+    expect(!enviar(s, 1, 'boa tarde').ok).toBe(true);
+    relogio.t = DIA_ELEICAO_17H; // 19h
     expect(s.publico().aberta).toBe(true);
     expect(enviar(s, 1, 'boa noite').ok).toBe(true);
     // fora de produção (dev/ensaio), sem bloqueio
@@ -304,7 +308,7 @@ describe('SalaChat: antes da eleição e reinício', () => {
     relogio.t = DIA_ELEICAO_INICIO + 3600_000; // manhã de 25/10: bloqueio legal
     expect(s.publico().aberta).toBe(false);
     expect(!enviar(s, 2, 'bom dia').ok).toBe(true);
-    expect(s.publico().bloqueio).toMatch(/17h, quando terminar a votação/);
+    expect(s.publico().bloqueio).toMatch(/19h, quando terminar a votação/);
     relogio.t = DIA_ELEICAO_17H;
     expect(s.publico().aberta).toBe(true);
     expect(enviar(s, 1, 'boa noite').ok).toBe(true);
@@ -368,7 +372,7 @@ describe('SalaChat: presença, reações e intervalo', () => {
     expect(s.reacoes()).toEqual({ fogo: 0, uau: 0, palmas: 0, olhos: 0 });
   });
 
-  it('dia da eleição (0h–17h): reação e presença recusadas, mesmo com a sala aberta no painel', () => {
+  it('dia da eleição (0h–19h): reação e presença recusadas, mesmo com a sala aberta no painel', () => {
     const { s, relogio } = sala({ producao: true, agora: DIA_ELEICAO_INICIO + 60_000 });
     s.comando({ acao: 'abrir' });
     expect(s.reagir(TOKEN(1), { fogo: 3 }, 'r1')).toBe(false);

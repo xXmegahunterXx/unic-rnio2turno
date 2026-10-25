@@ -21,6 +21,7 @@ import {
   type ValorLikert,
 } from '@/app/content/afirmacoes';
 import { fmtInt, fmtPct } from '@/shared/format';
+import { HORA_FIM_VOTACAO, VOTACAO_PRORROGADA } from '@/shared/diaVotacao';
 import { SIGLAS_GOV_2T, nEstadosGov } from '@/shared/gov2t';
 import { REGRA_CORES, coresPresidente } from '@/shared/cores';
 import { LIMIAR_FRACAO, LIMIAR_MUNICIPIOS, MIN_UFS_COM_URNAS } from '@/shared/projecao';
@@ -132,9 +133,20 @@ export default function MetodologiaPage() {
 
       <Secao id="apuracao" titulo="Como funciona a apuração">
         <p>
-          A votação do 2º turno vai das 8h às 17h (horário de Brasília). <strong>A divulgação começa às 17h</strong>, quando as urnas de todo o
-          país já fecharam. Cada urna imprime o boletim, envia o resultado à Justiça Eleitoral e, depois de conferido, a seção passa a
-          contar como <strong>totalizada</strong>.
+          {VOTACAO_PRORROGADA ? (
+            <>
+              A votação do 2º turno estava marcada das 8h às 17h (horário de Brasília) e foi prorrogada até as {HORA_FIM_VOTACAO} em todo o
+              país. <strong>A divulgação dos resultados começa depois das {HORA_FIM_VOTACAO}</strong>, quando as urnas de todo o país já
+              fecharam.
+            </>
+          ) : (
+            <>
+              A votação do 2º turno vai das 8h às 17h (horário de Brasília). <strong>A divulgação começa às 17h</strong>, quando as urnas de
+              todo o país já fecharam.
+            </>
+          )}{' '}
+          Cada urna imprime o boletim, envia o resultado à Justiça Eleitoral e, depois de conferido, a seção passa a contar como{' '}
+          <strong>totalizada</strong>.
         </p>
         <Lista
           itens={[

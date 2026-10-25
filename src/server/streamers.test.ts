@@ -48,7 +48,8 @@ describe('GET /api/texto/placar', () => {
     expect(r.headers.get('cache-control')).toBe(`public, max-age=0, s-maxage=${TEXTO_PLACAR.bordaS}`);
     expect(r.headers.get('cloudflare-cdn-cache-control')).toMatch(/^max-age=5\b/);
     expect(r.headers.get('x-robots-tag')).toBe('noindex');
-    expect(t).toMatch(/^Presidente · 2º turno: a apuração começa em 25\/10, às 17h/);
+    // a divulgação começa no fim da votação (prorrogada até as 19h)
+    expect(t).toMatch(/^Presidente · 2º turno: a apuração começa em 25\/10, às 19h/);
     expect(t).toMatch(/Faltam \d+ dias/);
     expect(t).toContain('sintonia2026.com.br');
     expect(t).not.toMatch(NOMES);
@@ -63,12 +64,17 @@ describe('GET /api/texto/placar', () => {
     expect(await h.text()).toBe('');
   });
 
-  it('dia da votação, antes das 17h: só "começa às 17h"', async () => {
+  it('dia da votação, até o fim da votação (19h, prorrogada): só o horário do fim da votação, sem nomes', async () => {
     const antes = m.relogio.t;
-    m.relogio.t = INICIO_APURACAO - 3 * 3_600_000;
+    m.relogio.t = INICIO_APURACAO - 3 * 3_600_000; // 14h
     try {
       const { t } = await texto('?uf=sp');
-      expect(t).toBe('A apuração do 2º turno começa hoje, às 17h (horário de Brasília). Acompanhe seção por seção: sintonia2026.com.br');
+      expect(t).toBe('A votação do 2º turno foi prorrogada até as 19h (horário de Brasília); a apuração começa em seguida. Faltam 5 h. Acompanhe seção por seção: sintonia2026.com.br');
+      // 18h: a votação continua (prorrogada), o texto segue sem nomes
+      m.relogio.t = INICIO_APURACAO + 3_600_000;
+      const t18 = (await texto('?uf=sp')).t;
+      expect(t18).toBe('A votação do 2º turno foi prorrogada até as 19h (horário de Brasília); a apuração começa em seguida. Faltam 1 h. Acompanhe seção por seção: sintonia2026.com.br');
+      expect(t18).not.toMatch(NOMES);
     } finally {
       m.relogio.t = antes;
     }

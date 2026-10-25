@@ -316,7 +316,7 @@ describe('cartão de UF antes da apuração (revisão de QA)', () => {
   });
 });
 
-describe('dia da votação (0h–17h de 25/10): as rotas de imagem com candidato respondem o convite genérico', () => {
+describe('dia da votação (0h–19h de 25/10, prorrogada): as rotas de imagem com candidato respondem o convite genérico', () => {
   const COM_CANDIDATO = [
     '/api/og/apuracao.png?race=pres',
     '/api/og/apuracao.png?race=pres&uf=sp&formato=x',
@@ -332,7 +332,7 @@ describe('dia da votação (0h–17h de 25/10): as rotas de imagem com candidato
     dia = await montar({ agora: Date.UTC(2026, 9, 25, 15, 0, 0) }); // 12h de Brasília
   });
 
-  it('às 12h: convite genérico (o mesmo do ?m=0), sem foto, cache curto; às 17h volta o cartão com candidato', async () => {
+  it('às 12h: convite genérico (o mesmo do ?m=0), sem foto, cache curto; às 19h volta o cartão com candidato', async () => {
     const convite = Buffer.from(await (await dia.app.request('/api/og/audiencia.png?m=0')).arrayBuffer());
     const conviteX = Buffer.from(await (await dia.app.request('/api/og/audiencia.png?m=0&formato=x')).arrayBuffer());
     for (const url of COM_CANDIDATO) {
@@ -349,8 +349,13 @@ describe('dia da votação (0h–17h de 25/10): as rotas de imagem com candidato
     // imagens sem candidato seguem como sempre (composição das bancadas, Teste Cego)
     expect((await dia.app.request('/api/og/camara.png')).headers.get('x-og-generica')).toBeNull();
     expect((await dia.app.request('/api/og/teste.png')).headers.get('x-og-generica')).toBeNull();
-    // 17h00: a apuração começa — o placar volta (com as fotos oficiais), sem reiniciar nada
-    dia.relogio.t = Date.UTC(2026, 9, 25, 20, 0, 0);
+    // 17h e 18h59: a votação continua (prorrogada até as 19h) — ainda o convite genérico
+    for (const t of [Date.UTC(2026, 9, 25, 20, 0, 0), Date.UTC(2026, 9, 25, 21, 59, 0)]) {
+      dia.relogio.t = t;
+      expect((await dia.app.request('/api/og/candidato.png?sq=280002542548')).headers.get('x-og-generica'), String(t)).toBe('dia-da-votacao');
+    }
+    // 19h00: fim da votação — o placar volta (com as fotos oficiais), sem reiniciar nada
+    dia.relogio.t = Date.UTC(2026, 9, 25, 22, 0, 0);
     const depois = await dia.app.request('/api/og/candidato.png?sq=280002542548');
     expect(depois.headers.get('x-og-generica')).toBeNull();
     expect(depois.headers.get('x-og-fotos')).toBe('1');

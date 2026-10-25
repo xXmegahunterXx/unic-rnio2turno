@@ -6,6 +6,7 @@
  */
 import { BRT_OFFSET_MS, INICIO_APURACAO } from '@/shared/constants';
 import { fmtInt } from '@/shared/format';
+import { FIM_VOTACAO, HORA_FIM_VOTACAO, VOTACAO_PRORROGADA } from '@/shared/diaVotacao';
 
 const DIA = 86_400_000;
 
@@ -42,9 +43,10 @@ export function rotuloFaltam(agora: number, alvo: number = INICIO_APURACAO): str
 
 /**
  * Texto do convite para compartilhar o site (sem URL: o kit acrescenta). Só fatos do calendário e do produto —
- * nenhum número de apuração, nenhum candidato. ≤ 220 de peso do X.
+ * nenhum número de apuração, nenhum candidato. ≤ 220 de peso do X. O `alvo` padrão é o fim da votação (19h de 25/10,
+ * `FIM_VOTACAO`; a votação foi prorrogada, eram 17h): até lá, "é hoje"; depois, "em andamento" (sem horário).
  */
-export function textoConviteSite(agora: number, alvo: number = INICIO_APURACAO): string {
+export function textoConviteSite(agora: number, alvo: number = FIM_VOTACAO): string {
   const teste = 'E o Teste Cego: concorde ou discorde sem saber de quem é cada ideia.';
   switch (momentoApuracao(agora, alvo)) {
     case 'dias':
@@ -52,12 +54,20 @@ export function textoConviteSite(agora: number, alvo: number = INICIO_APURACAO):
     case 'amanha':
       return `É amanhã: domingo, 25/10, às 17h (Brasília), começa a apuração do 2º turno, do Brasil inteiro até a sua seção. ${teste}`;
     case 'hoje':
-      return `É hoje: às 17h (Brasília) começa a apuração do 2º turno. Acompanhe ao vivo, do Brasil inteiro até a sua seção. ${teste}`;
+      return VOTACAO_PRORROGADA && alvo === FIM_VOTACAO
+        ? `É hoje: a votação do 2º turno foi prorrogada até as ${HORA_FIM_VOTACAO} (Brasília); depois, começa a divulgação dos resultados. Acompanhe ao vivo no Sintonia, do Brasil inteiro até a sua seção.`
+        : `É hoje: às ${horaBrasilia(alvo)} (Brasília) começa a apuração do 2º turno. Acompanhe ao vivo, do Brasil inteiro até a sua seção. ${teste}`;
     case 'agora':
-      return 'A apuração do 2º turno começou às 17h (Brasília). Acompanhe ao vivo, do Brasil inteiro até a sua seção, com os dados oficiais do TSE.';
+      return 'A apuração do 2º turno está em andamento. Acompanhe ao vivo, do Brasil inteiro até a sua seção, com os dados oficiais do TSE.';
     default:
       return 'A apuração do 2º turno de 2026, do Brasil inteiro até a sua seção, com os dados oficiais do TSE. E o Teste Cego: concorde ou discorde sem saber de quem é cada ideia.';
   }
+}
+
+/** "19h", "17h30" (Brasília) de um instante. */
+function horaBrasilia(ms: number): string {
+  const d = new Date(ms + BRT_OFFSET_MS);
+  return `${d.getUTCHours()}h${d.getUTCMinutes() ? String(d.getUTCMinutes()).padStart(2, '0') : ''}`;
 }
 
 export const HASHTAGS_HOME = ['Eleições2026', 'SegundoTurno'];

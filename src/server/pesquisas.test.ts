@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { INICIO_APURACAO } from '../shared/constants';
-import { INICIO_DIA_VOTACAO } from '../shared/diaVotacao';
+import { FIM_VOTACAO, INICIO_DIA_VOTACAO } from '../shared/diaVotacao';
 import type { Pesquisa, PesquisasAdmin, PesquisasPublicas } from '../shared/pesquisas';
 import type { Race } from '../shared/types';
 import { CABECALHO_BORDA } from './http-cache';
@@ -19,14 +19,14 @@ const AGORA = Date.UTC(2026, 9, 20, 15, 0, 0); // 20/10/2026 12h de Brasília
 /**
  * Relógio dos testes que conferem a semente REAL: 23h de Brasília do dia da divulgação mais recente dela (a semente
  * cresce até o dia da votação e uma pesquisa divulgada "amanhã" seria recusada como do futuro). Se essa hora cai no
- * dia da votação antes das 17h (pesquisas suspensas), vai para 18h de 25/10.
+ * dia da votação antes do fim dela (19h, prorrogada; pesquisas suspensas), vai para 20h de 25/10.
  */
 const AGORA_SEMENTE = (() => {
   const real = JSON.parse(readFileSync(join(RAIZ, 'public/data/pesquisas.json'), 'utf8')) as { pesquisas: Pesquisa[] };
   const ultima = real.pesquisas.reduce((m, p) => (p.divulgadaEm > m ? p.divulgadaEm : m), '2026-10-20');
   const [a, mes, d] = ultima.split('-').map(Number);
   const t = Math.max(AGORA, Date.UTC(a, mes - 1, d + 1, 2, 0, 0));
-  return t >= INICIO_DIA_VOTACAO && t < INICIO_APURACAO + 3600_000 ? INICIO_APURACAO + 3600_000 : t;
+  return t >= INICIO_DIA_VOTACAO && t < FIM_VOTACAO + 3600_000 ? FIM_VOTACAO + 3600_000 : t;
 })();
 
 const exemplo = (o: Partial<Pesquisa> = {}): Omit<Pesquisa, 'id'> & { id?: string } => ({
@@ -76,7 +76,7 @@ function criar(o: { semente?: unknown; stateDir?: string; agora?: { t: number };
   return { p: novo(), novo, dataDir, stateDir, relogio };
 }
 
-describe('cache que nunca atravessa a 0h nem as 17h de 25/10', () => {
+describe('cache que nunca atravessa a 0h nem o fim da votação (19h) de 25/10', () => {
   it('longe das viradas: 30 s + stale', () => {
     const h = cabecalhosAteVirada(AGORA, 30, true);
     expect(h['cache-control']).toBe('public, max-age=30, s-maxage=30, stale-while-revalidate=30');
@@ -91,9 +91,12 @@ describe('cache que nunca atravessa a 0h nem as 17h de 25/10', () => {
     // stale-if-error só quando não alcança a virada
     expect(cabecalhosAteVirada(INICIO_DIA_VOTACAO - 120_000, 30, true)[CABECALHO_BORDA]).toBe('max-age=30, stale-while-revalidate=30');
   });
-  it('no dia da votação: até as 17h; depois, normal', () => {
-    expect(cabecalhosAteVirada(INICIO_APURACAO - 10_000, 30, true)['cache-control']).toBe('public, max-age=9, s-maxage=9');
-    expect(cabecalhosAteVirada(INICIO_APURACAO + 1000, 30, true)['cache-control']).toBe('public, max-age=30, s-maxage=30, stale-while-revalidate=30');
+  it('no dia da votação: até o fim da votação (19h, prorrogada); depois, normal', () => {
+    // 17h não é mais virada: a área continua suspensa até as 19h
+    expect(cabecalhosAteVirada(INICIO_APURACAO - 10_000, 30, true)['cache-control']).toBe('public, max-age=30, s-maxage=30, stale-while-revalidate=30');
+    expect(cabecalhosAteVirada(FIM_VOTACAO - 10_000, 30, true)['cache-control']).toBe('public, max-age=9, s-maxage=9');
+    expect(cabecalhosAteVirada(FIM_VOTACAO - 500, 30, true)[CABECALHO_BORDA]).toBe('no-store');
+    expect(cabecalhosAteVirada(FIM_VOTACAO + 1000, 30, true)['cache-control']).toBe('public, max-age=30, s-maxage=30, stale-while-revalidate=30');
   });
 });
 
@@ -177,11 +180,15 @@ describe('Pesquisas: semente + painel', () => {
     expect(regs).not.toContain('BR-09002/2026');
   });
 
-  it('dia da votação (0h–17h de 25/10): lista pública vazia e suspensa; às 17h volta', () => {
+  it('dia da votação (0h–19h de 25/10, prorrogada): lista pública vazia e suspensa; às 19h volta', () => {
     const { p } = criar({ semente });
+    const suspensa = { pesquisas: [], versao: 'dia-da-votacao', suspensas: true };
     expect(p.publicas(AGORA).corpo.pesquisas).toHaveLength(2);
-    expect(p.publicas(INICIO_DIA_VOTACAO + 1).corpo).toEqual({ pesquisas: [], versao: 'dia-da-votacao', suspensas: true });
-    expect(p.publicas(INICIO_APURACAO).corpo.pesquisas).toHaveLength(2);
+    expect(p.publicas(INICIO_DIA_VOTACAO + 1).corpo).toEqual(suspensa);
+    expect(p.publicas(INICIO_APURACAO).corpo).toEqual(suspensa); // 17h: a votação continua
+    expect(p.publicas(Date.UTC(2026, 9, 25, 21, 0, 0)).corpo).toEqual(suspensa); // 18h de Brasília
+    expect(p.publicas(FIM_VOTACAO - 1).corpo).toEqual(suspensa);
+    expect(p.publicas(FIM_VOTACAO).corpo.pesquisas).toHaveLength(2); // 19h
   });
 
   it('simulação com nomes ocultos: a lista pública sai vazia (nem a API entrega os números)', () => {
@@ -277,7 +284,10 @@ describe('rotas (servidor de verdade)', () => {
     expect(pub).toMatchObject({ pesquisas: [], suspensas: true });
     const img = await m.app.request(`/api/og/pesquisa.png?id=${nova.pesquisa.id}`);
     expect(img.headers.get('x-og-generica')).toBe('dia-da-votacao');
-    m.relogio.t = INICIO_APURACAO + 1000;
+    // 18h: ainda suspensa (a votação foi prorrogada até as 19h)
+    m.relogio.t = INICIO_APURACAO + 3600_000;
+    expect((await (await m.app.request('/api/pesquisas')).json()) as PesquisasPublicas).toMatchObject({ pesquisas: [], suspensas: true });
+    m.relogio.t = FIM_VOTACAO + 1000;
     expect(((await (await m.app.request('/api/pesquisas')).json()) as PesquisasPublicas).pesquisas).toHaveLength(adm.semente.total + 1);
   }, 30_000);
 });
