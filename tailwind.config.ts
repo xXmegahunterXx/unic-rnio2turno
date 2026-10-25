@@ -57,12 +57,17 @@ export default {
         // brilho que atravessa a barra de progresso só com transform (composição na GPU, sem repintar a cada quadro)
         varrer: { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(100%)' } },
         'fade-up': { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'none' } },
+        // vinheta da projeção: letreiro atravessando a tela e faixas que se abrem
+        letreiro: { '0%': { transform: 'translateX(100vw)' }, '100%': { transform: 'translateX(-100%)' } },
+        faixa: { '0%': { transform: 'scaleX(0)' }, '35%': { transform: 'scaleX(1)' }, '100%': { transform: 'scaleX(1)' } },
       },
       animation: {
         'pulse-dot': 'pulse-dot 1.6s ease-in-out infinite',
         shimmer: 'shimmer 1.8s linear infinite',
         varrer: 'varrer 1.8s linear infinite',
         'fade-up': 'fade-up .5s cubic-bezier(.2,.8,.2,1) both',
+        letreiro: 'letreiro 1.9s cubic-bezier(.3,.1,.3,1) both',
+        faixa: 'faixa 1.9s cubic-bezier(.2,.8,.2,1) both',
       },
     },
   },
