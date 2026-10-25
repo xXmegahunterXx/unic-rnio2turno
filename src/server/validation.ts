@@ -311,6 +311,7 @@ export const adminCommandSchema = z.discriminatedUnion('tipo', [
   chave('carimbo-print'),
   chave('meta-placar'),
   chave('medir-local'),
+  chave('projecao'),
   z
     .object({
       tipo: z.literal('pausa-tse'),

@@ -12,6 +12,7 @@
  *  - contarLives: ligado (contagem anônima; desligada responde 204 sem contar);
  *  - (integração da leva 3: tudo o que é novo na noite tem chave) faixaConexao, carimboPrint, metaPlacar e medirLocal
  *    ligados; pausaTse 'auto'.
+ *  - projecao ("Projeção do Sintonia", 25/10): ligada; estado salvo antes dela (sem o campo) = ligada.
  */
 import type { CargaStatus, ChavesNoite, FatorCarga, ModoAvisoNacional, ModoPausaTse } from './types';
 
@@ -36,6 +37,7 @@ export const CHAVES_NOITE_PADRAO: Readonly<ChavesNoite> = Object.freeze({
   metaPlacar: true,
   medirLocal: true,
   pausaTse: 'auto' as ModoPausaTse,
+  projecao: true,
 });
 
 /** Chaves liga/desliga: nome do comando do painel → campo em `ChavesNoite`. */
@@ -49,6 +51,7 @@ export const COMANDO_CHAVE = {
   'carimbo-print': 'carimboPrint',
   'meta-placar': 'metaPlacar',
   'medir-local': 'medirLocal',
+  projecao: 'projecao',
 } as const satisfies Record<string, keyof ChavesNoite>;
 export type ComandoChave = keyof typeof COMANDO_CHAVE;
 
@@ -63,6 +66,7 @@ export const ROTULO_CHAVE: Record<ComandoChave, string> = {
   'carimbo-print': 'Carimbo nos mapas e no placar',
   'meta-placar': 'Placar na prévia dos links',
   'medir-local': 'Medição por estado, país e aparelho',
+  projecao: 'Projeção do Sintonia',
 };
 
 const copia = (c: Readonly<ChavesNoite>): ChavesNoite => ({ ...c, freio: { ...c.freio } });
@@ -89,6 +93,7 @@ export function parseChavesNoite(v: unknown, fallback: Readonly<ChavesNoite> = C
     metaPlacar: bool(o.metaPlacar, fallback.metaPlacar ?? true),
     medirLocal: bool(o.medirLocal, fallback.medirLocal ?? true),
     pausaTse: (MODOS_PAUSA_TSE as readonly unknown[]).includes(o.pausaTse) ? (o.pausaTse as ModoPausaTse) : (fallback.pausaTse ?? 'auto'),
+    projecao: bool(o.projecao, fallback.projecao ?? true),
   };
 }
 

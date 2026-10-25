@@ -43,6 +43,7 @@ import { ComparacaoT1 } from '@/app/components/pages/nacional/ComparacaoT1';
 import { ExteriorCard } from '@/app/components/pages/nacional/ExteriorCard';
 import { EleitoradoT1 } from '@/app/components/pages/nacional/EleitoradoT1';
 import { EleitoBanner } from '@/app/components/pages/nacional/EleitoBanner';
+import { ProjecaoCartao } from '@/app/components/pages/nacional/Projecao';
 import { GovernadoresFaixa } from '@/app/components/pages/nacional/GovernadoresFaixa';
 import { EstadosSecao, LiderancaCard, ParticipacaoSecao, RegioesCard } from '@/app/components/pages/nacional/Blocos';
 import { NacionalEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
@@ -276,6 +277,8 @@ export default function NacionalPage() {
           ) : null}
           <div className={cn(COLUNA, 'min-[1360px]:col-span-7')}>
             <Placar race={race} resumo={resumo} variant="hero" simulado={simulado} className="order-1 min-[1360px]:order-none" />
+            {/* "Projeção do Sintonia": logo depois do placar (nunca acima dele); só ao vivo, com o limiar atingido */}
+            <ProjecaoCartao className="order-1 min-[1360px]:order-none" race={race} abrangencia="BR" aoVivo={!t} simulado={simulado} anonimizado={anonimizado} definido={resumo.eleito != null} />
             <CorridaPanel className="order-4 min-[1360px]:order-none min-[1360px]:flex-1" serie={data.serie} race={race} />
           </div>
           <div className={cn(COLUNA, 'min-[1360px]:col-span-5')}>

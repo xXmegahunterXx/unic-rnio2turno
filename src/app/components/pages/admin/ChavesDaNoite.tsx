@@ -3,7 +3,8 @@
  * (src/shared/chaves-noite.ts) — freio de carga (I37), "pessoas agora" no site (I09), HTML na borda (I05), medição dos
  * anúncios (I11), aviso do arquivo nacional parado (I18), texto para bots (I22) e contagem de lives (I23) — e, desde a
  * integração da leva 3, as peças novas da noite: faixa "Conexão instável" (I05), carimbo do print (I10), placar na prévia
- * dos links (I07a), medição por estado/país/aparelho (I14) e a pausa por bloqueio do TSE (I03).
+ * dos links (I07a), medição por estado/país/aparelho (I14) e a pausa por bloqueio do TSE (I03) — e, no dia 25/10, a
+ * "Projeção do Sintonia" (src/shared/projecao.ts; desligada, o servidor responde `motivo: 'desligada'` e o cartão some).
  *
  * Valem na hora, para todos os visitantes, sem publicar nada. No servidor as chaves NÃO sobem a versão do estado (não
  * invalidam o cache de ninguém): por isso uma consulta do painel que saiu antes do comando pode trazer o valor anterior
@@ -51,7 +52,7 @@ const SUCESSO_PAUSA: Record<ModoPausaTse, string> = {
 };
 
 /** Peças novas da noite (integração da leva 3): todas ligadas por padrão; desligar volta ao site de antes delas. */
-const PECAS_NOVAS: { cmd: ComandoChave; campo: 'faixaConexao' | 'carimboPrint' | 'metaPlacar' | 'medirLocal'; descricao: string }[] = [
+const PECAS_NOVAS: { cmd: ComandoChave; campo: 'faixaConexao' | 'carimboPrint' | 'metaPlacar' | 'medirLocal' | 'projecao'; descricao: string }[] = [
   {
     cmd: 'faixa-conexao',
     campo: 'faixaConexao',
@@ -71,6 +72,12 @@ const PECAS_NOVAS: { cmd: ComandoChave; campo: 'faixaConexao' | 'carimboPrint' |
     cmd: 'medir-local',
     campo: 'medirLocal',
     descricao: 'Conta as páginas por estado, país e celular/computador (só siglas). Desligada, só essa parte da audiência para.',
+  },
+  {
+    cmd: 'projecao',
+    campo: 'projecao',
+    descricao:
+      'Cartão “Projeção do Sintonia” (estimativa do resultado final, com faixa) no Brasil e nos estados, a partir de 10% apurado; some sozinho quando o resultado é definido. Desligada, some em segundos em todas as telas.',
   },
 ];
 
@@ -93,6 +100,7 @@ export function foraDoPadrao(c: ChavesNoite): number {
     'metaPlacar',
     'medirLocal',
     'pausaTse',
+    'projecao',
   ] as const) {
     if (c[k] !== p[k]) n++;
   }
@@ -302,7 +310,16 @@ export function ChavesDaNoite({ className }: { className?: string }) {
         <Rotulo>Peças novas da noite · padrão ligadas</Rotulo>
         <ul className="mt-2 grid grid-cols-1 divide-y divide-[rgb(var(--line)/var(--line-alpha))] rounded-2xl border border-line lg:grid-cols-2 lg:divide-y-0">
           {PECAS_NOVAS.map((p, i) => (
-            <li key={p.cmd} className={cn('px-4 py-3.5', i >= 2 && 'lg:border-t lg:border-line', i % 2 === 1 && 'lg:border-l lg:border-line')}>
+            <li
+              key={p.cmd}
+              className={cn(
+                'px-4 py-3.5',
+                i >= 2 && 'lg:border-t lg:border-line',
+                i % 2 === 1 && 'lg:border-l lg:border-line',
+                // número ímpar de peças: a última ocupa a linha inteira (sem um buraco à direita)
+                i === PECAS_NOVAS.length - 1 && i % 2 === 0 && 'lg:col-span-2',
+              )}
+            >
               <Toggle
                 checked={c[p.campo]}
                 onChange={(v) => void alternar(p.cmd, v)}

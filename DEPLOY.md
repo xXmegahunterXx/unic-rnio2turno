@@ -813,6 +813,7 @@ todas e o que está fora do padrão.
 | Carimbo do print | ligada | "domínio · % apurado · hora" dentro dos mapas e no pé do placar | `painel.sh carimbo-print ligar\|desligar` |
 | Placar na prévia | ligada | o placar entra na descrição dos links (WhatsApp, X); desligada, descrições sem números | `painel.sh meta-placar ligar\|desligar` |
 | Medição por estado | ligada | páginas por estado, país e aparelho (só siglas); `AUDIENCIA_LOCAL=0` no `.env` desliga de vez | `painel.sh medir-local ligar\|desligar` |
+| Projeção do Sintonia | ligada | cartão com a estimativa do resultado final (com faixa) a partir de ~10% apurado; desligada, some em segundos | `painel.sh projecao ligar\|desligar` (ou `projecao-on`/`projecao-off`) |
 | Pausa do TSE | automática | quando o TSE bloqueia: `restrita` = só com 429 ou a borda do TSE (use se a pausa recomeçar a cada "Retomar"); `off` = nunca pausa (risco maior de bloqueio). Trocar encerra a pausa em curso | `painel.sh pausa-tse auto\|restrita\|off` |
 
 Também: `deploy/painel.sh tse-retomar` (retoma na hora as leituras do TSE pausadas por um bloqueio que foi falso

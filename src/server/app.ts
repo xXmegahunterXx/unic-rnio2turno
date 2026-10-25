@@ -68,6 +68,7 @@ import { Metricas } from './metrics';
 import { CC_OG, registrarOg } from './og-rotas';
 import { registrarOgAudiencia } from './og-audiencia';
 import { registrarDesdeT1 } from './desde-t1';
+import { registrarProjecao } from './projecao';
 import { registrarStreamers } from './lives'; // I22/I23 (frente G)
 import { ServicoOg } from './og-servico';
 import { DadosEstaticos } from './dados-estaticos';
@@ -1141,6 +1142,8 @@ export function createApp(deps: AppDeps) {
 
   // "Desde o 1º turno" no Brasil por município (src/server/desde-t1.ts): agregado com cache de 5 s, nunca baixa do TSE
   registrarDesdeT1(app, { dados, tse: deps.tse, races, now });
+  // "Projeção do Sintonia" (src/server/projecao.ts): Brasil e UF, cache de 5 s, nunca baixa do TSE; chave da noite 'projecao'
+  registrarProjecao(app, { dados, tse: deps.tse, races, now, ligada: () => noite().projecao, aoFalhar: (msg, e) => log.erro(msg, e) });
 
   app.get('/api/apuracao/:race/uf/:uf', (c) => {
     const race = parseRace(c.req.param('race'));

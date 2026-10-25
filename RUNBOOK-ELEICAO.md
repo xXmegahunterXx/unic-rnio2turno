@@ -547,6 +547,7 @@ do padrão. Na dúvida sobre uma peça, desligue-a e avise o dono.
 | Carimbo nos mapas e no placar | ligado | `painel.sh carimbo-print desligar` | mapas e placar sem "domínio · % apurado · hora" |
 | Placar na prévia dos links | ligado | `painel.sh meta-placar desligar` | descrições no WhatsApp/X sem números |
 | Medição por estado, país e aparelho | ligada | `painel.sh medir-local desligar` | essa parte da audiência para (o resto continua) |
+| Projeção do Sintonia | ligada | `painel.sh projecao desligar` (ou `projecao-off`) · painel → Chaves da noite | o cartão some em ~5–20 s (CDN + intervalo do app); a rota responde `motivo: 'desligada'` |
 | Pausa quando o TSE bloqueia | automática | `painel.sh pausa-tse restrita` (só 429/borda do TSE) · `off` (nunca pausa) · `auto` | seção 3.1 |
 | Alertas no Telegram / vigia externo | desligados até configurar | `ALERTAS=0` no `.env` e `docker compose up -d app` | nada é enviado |
 | Cabeçalho da borda | ligado | `CDN_CC=0` no `.env` e `docker compose up -d app` | cache como antes da leva 3 (seção 3.3) |

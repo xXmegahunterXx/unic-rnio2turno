@@ -53,6 +53,8 @@
 #   sudo /opt/sintonia/deploy/painel.sh carimbo-print ligar|desligar carimbo "domínio · % apurado · hora" nos mapas e no placar
 #   sudo /opt/sintonia/deploy/painel.sh meta-placar ligar|desligar   placar na descrição dos links (WhatsApp, X)
 #   sudo /opt/sintonia/deploy/painel.sh medir-local ligar|desligar   audiência por estado, país e aparelho
+#   sudo /opt/sintonia/deploy/painel.sh projecao ligar|desligar      "Projeção do Sintonia" (estimativa do resultado final)
+#                                                         atalhos: painel.sh projecao-on  ·  painel.sh projecao-off
 #   sudo /opt/sintonia/deploy/painel.sh pausa-tse auto|restrita|off  pausa quando o TSE bloqueia: auto (padrão); restrita =
 #                                                         só 429 ou borda do TSE; off = nunca pausa (risco maior de bloqueio)
 #   sudo /opt/sintonia/deploy/painel.sh tse-retomar       retoma JÁ as leituras do TSE pausadas por bloqueio (falso positivo)
@@ -63,6 +65,12 @@
 # =====================================================================================================
 # shellcheck source=deploy/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+
+# atalhos da projeção: projecao-on / projecao-off = projecao ligar / projecao desligar
+case ${1:-} in
+  projecao-on) set -- projecao ligar ;;
+  projecao-off) set -- projecao desligar ;;
+esac
 
 case ${1:-} in
   '' | -h | --help | ajuda)
@@ -78,7 +86,7 @@ case ${1:-} in
     [[ ${2:-} =~ ^[1235]$ ]] || morrer "Use: painel.sh freio 2   (1 = solta; 2, 3 ou 5; acrescente \"leve\" para o modo leve: painel.sh freio 3 leve)"
     [[ -z ${3:-} || ${3:-} == leve ]] || morrer "Use: painel.sh freio $2 leve   (ou sem o \"leve\")"
     ;;
-  contador-publico | html-borda | medir-anuncios | texto-bots | contar-lives | faixa-conexao | carimbo-print | meta-placar | medir-local)
+  contador-publico | html-borda | medir-anuncios | texto-bots | contar-lives | faixa-conexao | carimbo-print | meta-placar | medir-local | projecao)
     [[ ${2:-} =~ ^(ligar|desligar)$ ]] || morrer "Use: painel.sh $1 ligar   ou   painel.sh $1 desligar"
     ;;
   pausa-tse)
@@ -212,7 +220,7 @@ function resumoTse(h) {
 // ---- chaves da noite (leva 3; padrões = CHAVES_NOITE_PADRAO em src/shared/chaves-noite.ts) ----------------------
 const PADRAO_NOITE = {
   freio: { fator: 1, leve: false }, contadorPublico: true, htmlBorda: false, medirAnuncios: true, avisoNacional: 'auto', textoBots: true, contarLives: true,
-  faixaConexao: true, carimboPrint: true, metaPlacar: true, medirLocal: true, pausaTse: 'auto',
+  faixaConexao: true, carimboPrint: true, metaPlacar: true, medirLocal: true, pausaTse: 'auto', projecao: true,
 };
 /** comando → [campo em AdminState.noite, rótulo] */
 const CHAVES = {
@@ -225,6 +233,7 @@ const CHAVES = {
   'carimbo-print': ['carimboPrint', 'Carimbo nos mapas e no placar'],
   'meta-placar': ['metaPlacar', 'Placar na prévia dos links'],
   'medir-local': ['medirLocal', 'Medição por estado, país e aparelho'],
+  projecao: ['projecao', 'Projeção do Sintonia'],
 };
 const PAUSA_TSE = {
   auto: 'automática (429, borda do TSE ou 403 num arquivo já lido)',
@@ -241,6 +250,7 @@ const EXPLICA = {
   carimboPrint: (v) => (v ? 'mapas e placar com o carimbo' : 'sem carimbo'),
   metaPlacar: (v) => (v ? 'descrições dos links com o placar' : 'descrições sem números'),
   medirLocal: (v) => (v ? 'páginas contadas por estado, país e aparelho' : 'essa parte da audiência parada'),
+  projecao: (v) => (v ? 'o site mostra a estimativa do resultado final (some quando o resultado é definido)' : 'o site não mostra a projeção'),
 };
 
 function chavesDe(s) {
@@ -286,7 +296,7 @@ async function estado() {
   console.log('Chat ao vivo:     ' + linhaChat(c));
   console.log('Anúncios:         ' + linhaAnuncios(s));
   const nt = chavesDe(s);
-  const fora = ['contadorPublico', 'htmlBorda', 'medirAnuncios', 'textoBots', 'contarLives', 'avisoNacional', 'faixaConexao', 'carimboPrint', 'metaPlacar', 'medirLocal', 'pausaTse']
+  const fora = ['contadorPublico', 'htmlBorda', 'medirAnuncios', 'textoBots', 'contarLives', 'avisoNacional', 'faixaConexao', 'carimboPrint', 'metaPlacar', 'medirLocal', 'pausaTse', 'projecao']
     .filter((k) => nt[k] !== PADRAO_NOITE[k]).length;
   console.log('Freio de carga:   ' + linhaFreio(nt.freio));
   console.log('Chaves da noite:  ' + (fora ? `${fora} fora do padrão (veja: painel.sh chaves)` : 'todas no padrão (painel.sh chaves)'));
@@ -484,7 +494,8 @@ function horarioDe(txt) {
       case 'faixa-conexao':
       case 'carimbo-print':
       case 'meta-placar':
-      case 'medir-local': {
+      case 'medir-local':
+      case 'projecao': {
         const [campo, rotulo] = CHAVES[cmd];
         const r = await comando({ tipo: cmd, ligado: arg === 'ligar' });
         const v = chavesDe(r)[campo];

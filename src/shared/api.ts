@@ -154,6 +154,8 @@ export type AdminCommand =
   | { tipo: 'meta-placar'; ligado: boolean }
   /** I14: contagem de páginas por estado, país e aparelho (desligado = não conta). */
   | { tipo: 'medir-local'; ligado: boolean }
+  /** "Projeção do Sintonia" (desligado = `disponivel: false, motivo: 'desligada'`; o app não mostra nada). */
+  | { tipo: 'projecao'; ligado: boolean }
   /** I03: quando pausar as leituras do TSE por bloqueio ('off' também encerra uma pausa em curso). */
   | { tipo: 'pausa-tse'; modo: ModoPausaTse }
   // ---- Leva 3: ações executadas pelo SERVIDOR (interceptadas em app.ts; o motor recusa: "indisponível nesta versão") ---

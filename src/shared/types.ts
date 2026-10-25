@@ -411,6 +411,11 @@ export interface ChavesNoite {
   medirLocal: boolean;
   /** I03 ('pausa-tse'): quando o servidor pausa as leituras do TSE por bloqueio (ver `ModoPausaTse`). */
   pausaTse: ModoPausaTse;
+  /**
+   * 'projecao': "Projeção do Sintonia" (src/shared/projecao.ts; GET /api/apuracao/:race/(br|:uf)/projecao). false = o
+   * servidor responde `disponivel: false, motivo: 'desligada'` e o app não mostra nada. Estado salvo sem o campo = ligada.
+   */
+  projecao: boolean;
 }
 
 /** Patrocínio/anúncio institucional (nunca político — ARCHITECTURE §1.5). */

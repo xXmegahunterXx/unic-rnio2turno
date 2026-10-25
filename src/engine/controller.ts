@@ -711,7 +711,8 @@ export function createController(ds: LoadedDataset, opts: ControllerOptions): Co
       case 'faixa-conexao':
       case 'carimbo-print':
       case 'meta-placar':
-      case 'medir-local': {
+      case 'medir-local':
+      case 'projecao': {
         if (typeof cmd.ligado !== 'boolean') throw new CommandError(`${cmd.tipo}: informe "ligado" (true ou false).`);
         state = { ...state, noite: { ...chavesNoite(state), [COMANDO_CHAVE[cmd.tipo]]: cmd.ligado } };
         log(`${ROTULO_CHAVE[cmd.tipo]}: ${cmd.ligado ? 'ligado' : 'desligado'}`);

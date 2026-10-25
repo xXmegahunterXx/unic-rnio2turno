@@ -57,6 +57,7 @@ import { MunicipioPainel } from '@/app/components/pages/detalhe/MunicipioPainel'
 import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
 import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 import { DesdePrimeiroTurno } from '@/app/components/apuracao/DesdePrimeiroTurno';
+import { ProjecaoCartao } from '@/app/components/pages/nacional/Projecao';
 import { ExteriorTabela, usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
 import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
 import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
@@ -329,6 +330,19 @@ export default function UfPage() {
         {lg && !t1 ? <StatsGrid t={r} className="mt-4" /> : null}
         {exterior ? <PanoramaMunicipios race={race} municipios={snap.municipios} unidade={unidade} className="mt-3 sm:mt-4" /> : null}
       </div>
+      {/* "Projeção do Sintonia": logo depois do placar (no celular, antes da régua "Reveja a noite"); só ao vivo, com o
+          limiar atingido — senão não ocupa espaço nenhum */}
+      {!t1 ? (
+        <ProjecaoCartao
+          race={race}
+          abrangencia={uf}
+          aoVivo={!t}
+          simulado={simulado}
+          anonimizado={!!ctx.anonimizado}
+          definido={resumoPlacar?.eleito != null}
+          className={cn('mt-3 sm:mt-4', atualizando && 'opacity-60')}
+        />
+      ) : null}
       </div>
 
       {/* ------------------------------------------------------------ mapa (ou as seções, no DF) */}

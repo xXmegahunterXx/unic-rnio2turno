@@ -1,5 +1,6 @@
 /**
- * /metodologia — de onde vêm os dados (TSE, IBGE), como funciona a apuração e o "matematicamente eleito",
+ * /metodologia — de onde vêm os dados (TSE, IBGE), como funciona a apuração e o "matematicamente eleito", a "Projeção do
+ * Sintonia" (estimativa do resultado final durante a apuração),
  * a simulação e como ela é sinalizada, a regra de cores (identificação para Presidente, neutras no resto) e a metodologia do Teste Cego
  * (afirmações únicas com escala de concordância: redação, posições documentadas, fórmula, documentos-fonte e
  * aviso de revisão editorial).
@@ -22,6 +23,7 @@ import {
 import { fmtInt, fmtPct } from '@/shared/format';
 import { SIGLAS_GOV_2T, nEstadosGov } from '@/shared/gov2t';
 import { REGRA_CORES, coresPresidente } from '@/shared/cores';
+import { LIMIAR_FRACAO, LIMIAR_MUNICIPIOS, MIN_UFS_COM_URNAS } from '@/shared/projecao';
 import type { CorCandidato } from '@/shared/types';
 import { useMeta } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
@@ -45,6 +47,7 @@ const SUMARIO = [
   { id: 'dados', titulo: 'De onde vêm os dados' },
   { id: 'apuracao', titulo: 'Como funciona a apuração' },
   { id: 'eleito', titulo: '“Matematicamente eleito”' },
+  { id: 'projecao', titulo: 'Projeção do Sintonia' },
   { id: 'simulacao', titulo: 'A simulação' },
   { id: 'neutralidade', titulo: 'Cores e neutralidade' },
   { id: 'teste-cego', titulo: 'Teste Cego' },
@@ -78,7 +81,7 @@ export default function MetodologiaPage() {
       icone="lista"
       titulo="Como o Sintonia funciona"
       lead="De onde vêm os números, como calculamos cada percentual, como a simulação é sinalizada e como o Teste Cego foi feito. Tudo aberto, para você conferir."
-      atualizado="10 de outubro de 2026"
+      atualizado="25 de outubro de 2026"
       sumario={SUMARIO}
     >
       <Secao id="dados" titulo="De onde vêm os dados">
@@ -169,6 +172,64 @@ export default function MetodologiaPage() {
           É uma regra conservadora: considera que todos os eleitores das seções que faltam votariam, o que nunca acontece. Também mostramos{' '}
           <strong>quanto falta para virar</strong>: o percentual dos votos válidos que ainda devem chegar de que quem está atrás precisaria. Ao
           fim da totalização, o selo vira simplesmente <strong>eleito</strong>. A proclamação oficial é sempre da Justiça Eleitoral.
+        </p>
+      </Secao>
+
+      <Secao id="projecao" titulo="Projeção do Sintonia">
+        <p>
+          Durante a apuração, o Sintonia mostra uma <strong>estimativa do resultado final</strong> de cada finalista, com uma faixa provável
+          (“entre X% e Y%”). É uma conta estatística nossa, feita só com os números públicos do TSE: o que já foi apurado no 2º turno e o resultado
+          oficial do 1º turno. Não é pesquisa, não é o resultado oficial e não aponta vencedor: o resultado é o do{' '}
+          <LinkExterno href="https://resultados.tse.jus.br">TSE</LinkExterno>.
+        </p>
+        <Subtitulo>Como calculamos</Subtitulo>
+        <Lista
+          numerada
+          itens={[
+            <>
+              <strong>Município a município.</strong> Para cada um dos <span className="num">{fmtInt(totais?.municipios ?? 5570)}</span> municípios,
+              estimamos quantos votos válidos ele vai ter ao fim da contagem, pelo que já foi apurado nele e pelo tamanho do eleitorado.
+            </>,
+            <>
+              <strong>Onde a apuração já começou</strong>, a parte que falta segue a proporção já apurada naquele município.
+            </>,
+            <>
+              <strong>Onde ainda não chegou nenhuma urna</strong>, partimos do 1º turno no município (só os votos dos dois finalistas) e aplicamos a
+              mudança média entre o 1º e o 2º turno já vista nos municípios do mesmo estado com urnas apuradas. O total de votos esperado também vem
+              do 1º turno, corrigido pela relação entre os turnos observada nos municípios do estado já concluídos.
+            </>,
+            <>
+              <strong>Somamos tudo</strong> e chegamos ao percentual projetado de cada finalista sobre os votos válidos. A mesma conta vale para o
+              Brasil, para cada estado e para as disputas de governador.
+            </>,
+          ]}
+        />
+        <p>
+          <strong>A faixa</strong> mostra a incerteza: é mais larga no começo e estreita conforme as urnas chegam, e fica mais larga quando a
+          mudança desde o 1º turno varia muito de um município para outro. Calibramos a largura com apurações simuladas para que o resultado final
+          fique dentro dela em pelo menos <span className="num">95%</span> dos casos — ou seja, ainda pode ficar fora.
+        </p>
+        <Destaque icone="info" titulo="Quando aparece e quando some">
+          <Lista
+            itens={[
+              <>
+                Aparece com pelo menos <span className="num">{fmtPct(LIMIAR_FRACAO * 100, 0)}</span> dos votos esperados já apurados e, no Brasil,
+                com urnas de pelo menos <span className="num">{fmtInt(MIN_UFS_COM_URNAS)}</span> estados (num estado, de pelo menos{' '}
+                <span className="num">{fmtPct(LIMIAR_MUNICIPIOS * 100, 0)}</span> dos municípios).
+              </>,
+              <>Some quando o resultado fica definido (“matematicamente eleito” ou eleito) e quando a apuração termina.</>,
+              <>Os dois finalistas aparecem na ordem da urna, com o mesmo texto e as mesmas regras.</>,
+              <>Na simulação, a projeção usa os números fictícios e leva o selo SIMULAÇÃO.</>,
+            ]}
+          />
+        </Destaque>
+        <p>
+          <strong>Limites.</strong> A conta supõe que, dentro de cada município, as urnas que faltam votam como as já apuradas. Se as últimas a
+          chegar forem diferentes das primeiras (bairros ou distritos com perfil próprio, por exemplo), a projeção erra mais. O mesmo vale entre
+          municípios: a conta usa uma mudança média por estado para os que ainda não têm urna, e municípios de perfil diferente no mesmo estado
+          (a capital e o interior, por exemplo) podem mudar de forma diferente entre os turnos. Num estado, a projeção também só aparece quando
+          já lemos os resultados dos municípios que somam a maior parte das urnas apuradas. Por isso ela vem sempre com a faixa e com o
+          percentual de urnas apuradas.
         </p>
       </Secao>
 

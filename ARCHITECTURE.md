@@ -1361,6 +1361,7 @@ Painel → Controle → "Chaves da noite" e em `deploy/painel.sh chaves`. Estado
 | `carimbo-print` | ligado | mapas e placar sem o carimbo (`LiveStatus.semCarimbo`) |
 | `meta-placar` | ligado | descrições dos links sem placar |
 | `medir-local` | ligada | sem a contagem por estado, país e aparelho (`AUDIENCIA_LOCAL=0` desliga de vez) |
+| `projecao` (`projecao-on\|off`) | ligada | `/api/apuracao/:race/:abr/projecao` responde `disponivel: false, motivo: 'desligada'`; o cartão "Projeção do Sintonia" some em ~5–20 s (núcleo `src/shared/projecao.ts`, rota `src/server/projecao.ts`, cartão `src/app/components/pages/nacional/Projecao.tsx`) |
 | `pausa-tse` (`auto\|restrita\|off`) | `auto` | `restrita`: só 429/borda do TSE; `off`: nunca pausa (encerra a pausa em curso) |
 
 Ações (não são chaves): `tse-retomar` e `alerta-teste`. Variáveis de ambiente da leva 3 (exigem reinício): `CDN_CC`,

@@ -20,6 +20,8 @@ describe('chaves da noite', () => {
       metaPlacar: true,
       medirLocal: true,
       pausaTse: 'auto',
+      // "Projeção do Sintonia" (25/10): ligada
+      projecao: true,
     });
     expect(Object.isFrozen(CHAVES_NOITE_PADRAO) && Object.isFrozen(CHAVES_NOITE_PADRAO.freio)).toBe(true);
     expect(PISO_PESSOAS_PUBLICO).toBe(500);
@@ -57,6 +59,7 @@ describe('chaves da noite', () => {
       metaPlacar: true,
       medirLocal: true,
       pausaTse: 'auto',
+      projecao: true,
     });
     expect(parseChavesNoite({ freio: { fator: 5 }, avisoNacional: 'off' })).toMatchObject({ freio: { fator: 5, leve: false }, avisoNacional: 'off' });
   });
@@ -74,6 +77,15 @@ describe('chaves da noite', () => {
     });
     expect(parseChavesNoite({ pausaTse: 'off' }).pausaTse).toBe('off');
     expect(parseChavesNoite({ faixaConexao: 'nao', pausaTse: 'sempre' })).toMatchObject({ faixaConexao: true, pausaTse: 'auto' });
+  });
+
+  it('projeção: estado salvo antes dela (sem o campo) = ligada; false fica; lixo volta a ligada', () => {
+    const antigo = { freio: { fator: 1, leve: false }, contadorPublico: true, htmlBorda: true, medirAnuncios: true, avisoNacional: 'auto', textoBots: true, contarLives: true, faixaConexao: true, carimboPrint: true, metaPlacar: true, medirLocal: true, pausaTse: 'auto' };
+    expect(parseChavesNoite(antigo).projecao).toBe(true);
+    expect(chavesNoite({ noite: antigo as unknown as ChavesNoite }).projecao).toBe(true);
+    expect(parseChavesNoite({ projecao: false }).projecao).toBe(false);
+    expect(parseChavesNoite({ projecao: 'nao' }).projecao).toBe(true);
+    expect(COMANDO_CHAVE.projecao).toBe('projecao');
   });
 
   it('fatores aceitos: 1, 2, 3 e 5', () => {
