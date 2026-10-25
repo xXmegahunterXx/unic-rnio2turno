@@ -18,13 +18,15 @@ import { comandoPesquisaSchema } from './validation';
 const AGORA = Date.UTC(2026, 9, 20, 15, 0, 0); // 20/10/2026 12h de Brasília
 /**
  * Relógio dos testes que conferem a semente REAL: 23h de Brasília do dia da divulgação mais recente dela (a semente
- * cresce até 24/10 e uma pesquisa divulgada "amanhã" seria recusada como do futuro). Antes da 0h de 25/10.
+ * cresce até o dia da votação e uma pesquisa divulgada "amanhã" seria recusada como do futuro). Se essa hora cai no
+ * dia da votação antes das 17h (pesquisas suspensas), vai para 18h de 25/10.
  */
 const AGORA_SEMENTE = (() => {
   const real = JSON.parse(readFileSync(join(RAIZ, 'public/data/pesquisas.json'), 'utf8')) as { pesquisas: Pesquisa[] };
   const ultima = real.pesquisas.reduce((m, p) => (p.divulgadaEm > m ? p.divulgadaEm : m), '2026-10-20');
   const [a, mes, d] = ultima.split('-').map(Number);
-  return Math.max(AGORA, Math.min(Date.UTC(a, mes - 1, d + 1, 2, 0, 0), INICIO_DIA_VOTACAO - 3600_000));
+  const t = Math.max(AGORA, Date.UTC(a, mes - 1, d + 1, 2, 0, 0));
+  return t >= INICIO_DIA_VOTACAO && t < INICIO_APURACAO + 3600_000 ? INICIO_APURACAO + 3600_000 : t;
 })();
 
 const exemplo = (o: Partial<Pesquisa> = {}): Omit<Pesquisa, 'id'> & { id?: string } => ({
