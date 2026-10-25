@@ -130,6 +130,13 @@ export const PARAMS_PROJECAO: Readonly<ParamsProjecao> = Object.freeze({
   encolhimento: 0,
 });
 
+/**
+ * Projeção por estado e por Governador no site. Desligada na noite de 25/10: nas apurações simuladas com a ordem real
+ * das urnas dentro das capitais (não aleatória), a faixa por estado ficou estreita demais (AM, SP). O Brasil segue.
+ * A rota do servidor continua calculando (testes e painel); só o cartão das páginas de estado não aparece.
+ */
+export const PROJECAO_POR_UF = false;
+
 export const TEXTOS_PROJECAO = {
   titulo: 'Projeção do Sintonia',
   subtitulo:

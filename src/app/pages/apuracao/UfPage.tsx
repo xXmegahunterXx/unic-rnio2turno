@@ -58,6 +58,7 @@ import { ComparaTurnos } from '@/app/components/pages/detalhe/ComparaTurnos';
 import { AvisoT1Oculto } from '@/app/components/pages/nacional/ComparacaoT1';
 import { DesdePrimeiroTurno } from '@/app/components/apuracao/DesdePrimeiroTurno';
 import { ProjecaoCartao } from '@/app/components/pages/nacional/Projecao';
+import { PROJECAO_POR_UF } from '@/shared/projecao';
 import { ExteriorTabela, usePaisesExterior } from '@/app/components/pages/detalhe/ExteriorTabela';
 import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
 import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
@@ -330,9 +331,9 @@ export default function UfPage() {
         {lg && !t1 ? <StatsGrid t={r} className="mt-4" /> : null}
         {exterior ? <PanoramaMunicipios race={race} municipios={snap.municipios} unidade={unidade} className="mt-3 sm:mt-4" /> : null}
       </div>
-      {/* "Projeção do Sintonia": logo depois do placar (no celular, antes da régua "Reveja a noite"); só ao vivo, com o
-          limiar atingido — senão não ocupa espaço nenhum */}
-      {!t1 ? (
+      {/* "Projeção do Sintonia" por estado/Governador: DESLIGADA nesta noite (PROJECAO_POR_UF) — nas apurações simuladas,
+          com a ordem real das urnas dentro das capitais, a faixa por estado ficou estreita demais; só o Brasil aparece */}
+      {PROJECAO_POR_UF && !t1 ? (
         <ProjecaoCartao
           race={race}
           abrangencia={uf}

@@ -24,7 +24,7 @@ import { fmtInt, fmtPct } from '@/shared/format';
 import { HORA_FIM_VOTACAO, VOTACAO_PRORROGADA } from '@/shared/diaVotacao';
 import { SIGLAS_GOV_2T, nEstadosGov } from '@/shared/gov2t';
 import { REGRA_CORES, coresPresidente } from '@/shared/cores';
-import { LIMIAR_FRACAO, LIMIAR_MUNICIPIOS, MIN_UFS_COM_URNAS } from '@/shared/projecao';
+import { LIMIAR_FRACAO, MIN_UFS_COM_URNAS } from '@/shared/projecao';
 import type { CorCandidato } from '@/shared/types';
 import { useMeta } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
@@ -211,8 +211,9 @@ export default function MetodologiaPage() {
               do 1º turno, corrigido pela relação entre os turnos observada nos municípios do estado já concluídos.
             </>,
             <>
-              <strong>Somamos tudo</strong> e chegamos ao percentual projetado de cada finalista sobre os votos válidos. A mesma conta vale para o
-              Brasil, para cada estado e para as disputas de governador.
+              <strong>Somamos tudo</strong> e chegamos ao percentual projetado de cada finalista sobre os votos válidos. Nesta noite, a projeção
+              aparece só para o Brasil: nos testes, a faixa por estado ficou estreita demais quando as urnas de uma capital chegam numa ordem que
+              não é aleatória.
             </>,
           ]}
         />
@@ -225,9 +226,8 @@ export default function MetodologiaPage() {
           <Lista
             itens={[
               <>
-                Aparece com pelo menos <span className="num">{fmtPct(LIMIAR_FRACAO * 100, 0)}</span> dos votos esperados já apurados e, no Brasil,
-                com urnas de pelo menos <span className="num">{fmtInt(MIN_UFS_COM_URNAS)}</span> estados (num estado, de pelo menos{' '}
-                <span className="num">{fmtPct(LIMIAR_MUNICIPIOS * 100, 0)}</span> dos municípios).
+                Aparece com pelo menos <span className="num">{fmtPct(LIMIAR_FRACAO * 100, 0)}</span> dos votos esperados já apurados e com urnas
+                de pelo menos <span className="num">{fmtInt(MIN_UFS_COM_URNAS)}</span> estados.
               </>,
               <>Some quando o resultado fica definido (“matematicamente eleito” ou eleito) e quando a apuração termina.</>,
               <>Os dois finalistas aparecem na ordem da urna, com o mesmo texto e as mesmas regras.</>,
