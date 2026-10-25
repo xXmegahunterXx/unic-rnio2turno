@@ -2,6 +2,498 @@
  "sobre": "Pesquisas eleitorais REGISTRADAS no TSE para o 2º turno de 2026 (Lei 9.504/97, art. 33; Res. TSE 23.600/2019). Contrato e validação: src/shared/pesquisas.ts. Cada número vem de uma fonte aberta (URL em fontes). Nunca inventar, estimar ou completar número.",
  "pesquisas": [
   {
+   "id": "pq-95932fb692027483",
+   "cargo": "pres",
+   "instituto": "100% Cidades",
+   "contratante": "Futura Consultoria e Assessoria Ltda. (Futura)",
+   "registro": "BR-09726/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 2000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 47.9,
+    "22": 48.2,
+    "brancosNulos": 2.3,
+    "indecisos": 1.6
+   },
+   "validos": {
+    "13": 49.9,
+    "22": 50.1
+   },
+   "fontes": [
+    "https://exame.com/brasil/pesquisa-futura-flavio-bolsonaro-tem-501-e-lula-499-no-2o-turno/",
+    "https://www.cnnbrasil.com.br/eleicoes/futura-flavio-tem-501-dos-votos-validos-no-2o-turno-lula-499/",
+    "https://ndmais.com.br/politica/pesquisa-futura-vantagem-flavio-bolsonaro-50-1-disputa-lula-segundo-turno/",
+    "https://www.cnnbrasil.com.br/eleicoes/ultimas-pesquisas-segundo-turno-eleicao/"
+   ]
+  },
+  {
+   "id": "pq-84d0607fe00c0a38",
+   "cargo": "pres",
+   "instituto": "Datafolha",
+   "contratante": "Folha de S.Paulo e TV Globo",
+   "registro": "BR-09540/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 4050,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 47,
+    "22": 48,
+    "brancosNulos": 3,
+    "indecisos": 2
+   },
+   "validos": {
+    "13": 49,
+    "22": 51
+   },
+   "fontes": [
+    "https://www.metropoles.com/brasil/ultima-datafolha-flavio-bolsonaro-lula",
+    "https://srzd.com/blog/brasil/politica/datafolha-flavio-51-e-lula-49-dos-votos-validos-2-estao-indecisos/",
+    "https://www.oliberal.com/politica/pesquisa-datafolha-flavio-tem-51-e-lula-49-dos-votos-validos-na-vespera-do-2-turno-1.1186426",
+    "https://www.bandab.com.br/politica/eleicoes-2026/datafolha-flavio-bolsonaro-lula-votos-validos-segundo-turno/",
+    "https://timesbrasil.com.br/eleicoes-2026/decisao-2026-datafolha-aponta-flavio-bolsonaro-com-51-e-lula-com-49-dos-votos-validos/"
+   ]
+  },
+  {
+   "id": "pq-9fce5306c1b1b479",
+   "cargo": "gov-df",
+   "instituto": "Datafolha",
+   "contratante": "Folha de S.Paulo e TV Globo",
+   "registro": "DF-03453/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1619,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "totais": {
+    "11": 54,
+    "13": 38,
+    "brancosNulos": 6,
+    "indecisos": 2
+   },
+   "validos": {
+    "11": 59,
+    "13": 41
+   },
+   "fontes": [
+    "https://www.metropoles.com/distrito-federal/datafolha-celina-leao-tem-54-dos-votos-validos-e-leandro-grass-38",
+    "https://www.cnnbrasil.com.br/eleicoes/datafolha-df-celina-tem-59-dos-votos-validos-no-2o-turno-grass-41/",
+    "https://www.poder360.com.br/poder-eleicoes-2026/celina-tem-59-dos-votos-validos-e-grass-41-no-df-diz-datafolha/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/datafolha-governador-distrito-federal-outubro-2026-vespera-segundo-turno/",
+    "https://www.dgabc.com.br/Noticia/4364676/datafolha-celina-leao-tem-59-e-leandro-grass-41-dos-votos-validos-no-df"
+   ]
+  },
+  {
+   "id": "pq-1c1a6e736ce333ac",
+   "cargo": "pres",
+   "instituto": "Nexus",
+   "contratante": "Banco BTG Pactual",
+   "registro": "BR-08234/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 2000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "modo": "telefone",
+   "totais": {
+    "13": 46,
+    "22": 47,
+    "brancosNulos": 5.2,
+    "indecisos": 1.8
+   },
+   "validos": {
+    "13": 49.5,
+    "22": 50.5
+   },
+   "fontes": [
+    "https://www.cnnbrasil.com.br/eleicoes/nexus-btg-flavio-tem-505-de-votos-validos-no-2o-turno-lula-495/",
+    "https://www.terra.com.br/noticias/eleicoes/pesquisas/pesquisa-btg-nexus-flavio-bolsonaro-tem-524-em-votos-validos-no-2-turno-e-lula-476,b0d6df3b828e8771f848e4abc07b0522r3c7odst.html",
+    "https://ndmais.com.br/politica/pesquisa-btg-nexus-flavio-bolsonaro-lula-segundo-turno-2/"
+   ]
+  },
+  {
+   "id": "pq-2bb7515080f32905",
+   "cargo": "pres",
+   "instituto": "Palver",
+   "contratante": "Palver (recursos próprios)",
+   "registro": "BR-01794/2026",
+   "coletaInicio": "2026-10-22",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 5000,
+   "margemPp": 2.2,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "13": 49,
+    "22": 50,
+    "brancosNulos": 1,
+    "indecisos": 0
+   },
+   "fontes": [
+    "https://exame.com/brasil/pesquisa-para-presidente-palver-flavio-bolsonaro-tem-50-e-lula-49-no-2o-turno/",
+    "https://www.terra.com.br/noticias/eleicoes/pesquisas/pesquisa-palver-flavio-tem-50-e-lula-49-das-intencoes-de-voto-na-vespera-da-eleicao,7f031eb36baaf078d917a18523382b167iva35lv.html",
+    "https://transmissaopolitica.com.br/politica-nacional/2026/10/24/pesquisa-palver-2026-flavio-lula-segundo-turno/",
+    "https://portaln10.com.br/politica/eleicoes/pesquisa-palver-mostra-flavio-com-50-e-lula-com-49-na-vespera-do-segundo-turno-356091/"
+   ]
+  },
+  {
+   "id": "pq-cc4ed967888063ba",
+   "cargo": "gov-ac",
+   "instituto": "Quaest",
+   "contratante": "Rádio TV do Amazonas Ltda (Rede Amazônica)",
+   "registro": "AC-02344/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 2154,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "totais": {
+    "10": 30,
+    "11": 51,
+    "brancosNulos": 8,
+    "indecisos": 11
+   },
+   "validos": {
+    "10": 38,
+    "11": 62
+   },
+   "fontes": [
+    "https://noticiasdahora.com.br/politica/quaest-mailza-tem-62-dos-votos-validos-e-abre-24-pontos-de-vantagem-sobre-alan-rick-na-vespera-da-eleicao/",
+    "https://tmc.com.br/politica/mailza-assis-alan-rick-quaest-acre-segundo-turno/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/quaest-governador-acre-outubro-2026-vespera-segundo-turno/",
+    "https://www.band.com.br/politica/eleicoes/quaest-no-acre-mailza-tem-62-dos-votos-validos-alan-rick-38"
+   ]
+  },
+  {
+   "id": "pq-09f9ab9f7df6e546",
+   "cargo": "pres",
+   "instituto": "Quaest",
+   "contratante": "Globo e jornal O Globo",
+   "registro": "BR-09158/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 3702,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 45,
+    "22": 46,
+    "brancosNulos": 8,
+    "indecisos": 1
+   },
+   "validos": {
+    "13": 49,
+    "22": 51
+   },
+   "fontes": [
+    "https://www.poder360.com.br/poder-eleicoes-2026/flavio-tem-51-dos-votos-validos-contra-49-de-lula-diz-quaest/",
+    "https://tvtnews.com.br/quaest-pesquisa-para-presidente-2-turno-lula-flavio/",
+    "https://srzd.com/blog/brasil/flavio-51-lula-49-dos-validos-segundo-pesquisa-quaest/",
+    "https://diariodonordeste.verdesmares.com.br/pontopoder/pesquisa-quaest-flavio-bolsonaro-tem-51-e-lula-49-nos-votos-validos-no-2-turno-1.3800971",
+    "https://acritica.net/eleicoes-2026/quaest-flavio-bolsonaro-51-lula-49-votos-validos-vespera-segundo-turno/"
+   ]
+  },
+  {
+   "id": "pq-7171f696b452e8db",
+   "cargo": "gov-es",
+   "instituto": "Quaest",
+   "contratante": "TV Gazeta",
+   "registro": "ES-04365/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 2154,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "10": 45,
+    "15": 41,
+    "brancosNulos": 5,
+    "indecisos": 9
+   },
+   "fontes": [
+    "https://www.agazeta.com.br/es/politica/pazolini-tem-55-e-ricardo-45-dos-votos-validos-para-governo-do-es-diz-1026",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/quaest-governador-espirito-santo-outubro-2026-vespera-segundo-turno/",
+    "https://oantagonista.com.br/brasil/quaest-aponta-pazolini-dez-pontos-a-frente-de-ferraco-no-es/",
+    "https://www.opovo.com.br/noticias/politica/eleicoes/2026/10/24/quaest-es-pazolini-tem-55-e-ferraco-45-no-2-turno.html"
+   ]
+  },
+  {
+   "id": "pq-3a216e8d2925a334",
+   "cargo": "gov-rn",
+   "instituto": "Quaest",
+   "contratante": "Inter TV Cabugi",
+   "registro": "RN-01264/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 2154,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "totais": {
+    "13": 44,
+    "44": 45,
+    "brancosNulos": 8,
+    "indecisos": 3
+   },
+   "validos": {
+    "13": 49,
+    "44": 51
+   },
+   "fontes": [
+    "https://www.opovo.com.br/noticias/politica/eleicoes/2026/10/24/quaest-governo-rn-allyson-tem-51-e-cadu-de-lula-tem-49.html",
+    "https://www.bnewsrn.com.br/noticias/politica/pesquisa-quaest-no-rn-allyson-tem-51-e-cadu-de-lula-49-dos-votos-validos.html",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/quaest-governador-rio-grande-do-norte-outubro-2026-vespera-segundo-turno/"
+   ]
+  },
+  {
+   "id": "pq-45dc46dba6c6798a",
+   "cargo": "gov-to",
+   "instituto": "Quaest",
+   "contratante": "Centro Norte de Comunicação Ltda / TV Anhanguera",
+   "registro": "TO-03069/2026",
+   "coletaInicio": "2026-10-23",
+   "coletaFim": "2026-10-24",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 2154,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "totais": {
+    "44": 36,
+    "45": 51,
+    "brancosNulos": 11,
+    "indecisos": 2
+   },
+   "validos": {
+    "44": 41,
+    "45": 59
+   },
+   "fontes": [
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/quaest-governador-tocantins-outubro-2026-segundo-turno-2/",
+    "https://www.nsctotal.com.br/politica/quaest-to-vicentino-junior-psdb-tem-59-dos-votos-validos-contra-41-da-professora-dorinha-uniao",
+    "https://www.dgabc.com.br/Noticia/4364688/quaest-vicentinho-tem-59-dos-votos-validos-ao-governo-do-to-professora-dorinha-41-",
+    "https://www.oliberal.com/politica/quaest-vicentinho-tem-59-dos-votos-validos-ao-governo-do-to-professora-dorinha-41-1.1186440"
+   ]
+  },
+  {
+   "id": "pq-07a7a623bbd9250e",
+   "cargo": "gov-ac",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "AC-07723/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1191,
+   "margemPp": 3,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "10": 34.9,
+    "11": 53.3,
+    "brancosNulos": 9.1,
+    "indecisos": 2.7
+   },
+   "validos": {
+    "10": 39.6,
+    "11": 60.4
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/Pesquisa-Atlas-Eleicoes-Acre-2T-2026-261003.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/mailza-tem-604-dos-votos-validos-contra-396-de-alan-rick-no-ac/",
+    "https://exame.com/brasil/pesquisa-atlas-mailza-assis-tem-604-e-alan-rick-396-no-2o-turno-no-acre/"
+   ]
+  },
+  {
+   "id": "pq-419cb83b60f25e26",
+   "cargo": "gov-am",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "AM-09640/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1825,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "22": 42.1,
+    "55": 55.4,
+    "brancosNulos": 1.7,
+    "indecisos": 0.8
+   },
+   "validos": {
+    "22": 43.1,
+    "55": 56.9
+   },
+   "fontes": [
+    "https://exame.com/brasil/pesquisa-atlasintel-omar-aziz-tem-569-e-maria-do-carmo-431-no-amazonas/",
+    "https://www.terra.com.br/noticias/brasil/politica/atlas-omar-aziz-tem-569-dos-votos-validos-e-maria-do-carmo-431-para-o-governo-do-amazonas,49bcf6a3a998ecc36cfe7c7f4f9d34766rx35qys.html",
+    "https://www.cnnbrasil.com.br/eleicoes/atlas-aziz-tem-569-de-votos-validos-no-am-maria-do-carmo-431/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/atlasintel-governador-amazonas-outubro-2026-vespera-segundo-turno/"
+   ]
+  },
+  {
+   "id": "pq-46f7b849925b2254",
+   "cargo": "pres",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "BR-06380/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 4990,
+   "margemPp": 1,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "13": 48.4,
+    "22": 49.9
+   },
+   "validos": {
+    "13": 49.2,
+    "22": 50.8
+   },
+   "fontes": [
+    "https://exame.com/brasil/pesquisa-atlasintel-flavio-bolsonaro-tem-508-e-lula-492-na-vespera-do-2o-turno/",
+    "https://infomoney.com.br/politica/flavio-tem-499-e-lula-484-na-ultima-atlasintel-antes-das-urnas",
+    "https://www.moneytimes.com.br/pesquisa-atlasintel-bloomberg-24-de-outubro-gaep/"
+   ]
+  },
+  {
+   "id": "pq-4dee8c13ec9b4122",
+   "cargo": "gov-df",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "DF-08658/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1807,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "totais": {
+    "11": 54.8,
+    "13": 39.8,
+    "brancosNulos": 3.1,
+    "indecisos": 2.3
+   },
+   "validos": {
+    "11": 57.9,
+    "13": 42.1
+   },
+   "fontes": [
+    "https://www.poder360.com.br/poder-eleicoes-2026/celina-tem-579-dos-votos-validos-e-grass-421-diz-atlasintel/",
+    "https://www.cnnbrasil.com.br/eleicoes/atlasintel-no-df-celina-tem-579-dos-votos-validos-grass-421/",
+    "https://www.metropoles.com/distrito-federal/atlasintel-celina-tem-579-dos-votos-validos-contra-421-de-grass",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/altasintel-governador-distrito-federal-outubro-2026-vespera-segundo-turno/"
+   ]
+  },
+  {
+   "id": "pq-6d6cb3a8d586cb4d",
+   "cargo": "gov-es",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "ES-05872/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1865,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "10": 49.8,
+    "15": 47.4,
+    "brancosNulos": 1.3,
+    "indecisos": 1.5
+   },
+   "validos": {
+    "10": 51.2,
+    "15": 48.8
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/Pesquisa-Atlas-Eleicoes-Espirito-Santo-2T-2026-261003-1.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/pazolini-tem-512-dos-votos-validos-e-ferraco-488-no-es-diz-atlasintel/",
+    "https://exame.com/brasil/pesquisa-atlasintel-pazolini-tem-512-e-ferraco-488-no-segundo-turno/"
+   ]
+  },
+  {
+   "id": "pq-3b5b932d0c5ede40",
+   "cargo": "gov-rn",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "RN-07127/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1780,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "13": 49,
+    "44": 47,
+    "brancosNulos": 2.6,
+    "indecisos": 1.4
+   },
+   "validos": {
+    "13": 51.1,
+    "44": 48.9
+   },
+   "fontes": [
+    "https://www.blogdobg.com.br/pesquisa-atlasintel-governo-rn-cadu-de-lula-tem-511-dos-votos-validos-allyson-bezerra-489/",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/atlasintel-governador-rio-grande-do-norte-outubro-2026-vespera-segundo-turno/",
+    "https://blogdobarreto.com.br/atlas-rn-cadu-de-lula-tem-511-dos-votos-validos-allyson-bezerra-489/"
+   ]
+  },
+  {
+   "id": "pq-02c180ccc6a0f66d",
+   "cargo": "gov-to",
+   "instituto": "AtlasIntel",
+   "contratante": "AtlasIntel (recursos próprios)",
+   "registro": "TO-01088/2026",
+   "coletaInicio": "2026-10-18",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1891,
+   "margemPp": 2,
+   "confiancaPct": 95,
+   "modo": "internet",
+   "totais": {
+    "44": 36.5,
+    "45": 53.6,
+    "brancosNulos": 6.3,
+    "indecisos": 3.6
+   },
+   "validos": {
+    "44": 40.5,
+    "45": 59.5
+   },
+   "fontes": [
+    "https://static.poder360.com.br/uploads/2026/10/Pesquisa-Atlas-Eleicoes-Tocantins-T2-2026-261024.pdf",
+    "https://www.poder360.com.br/poder-eleicoes-2026/vicentinho-tem-595-dos-votos-validos-contra-405-de-dorinha-no-to/",
+    "https://www.terra.com.br/noticias/brasil/politica/pesquisa-atlas-vicentinho-tem-596-dos-votos-validos-no-tocantins-e-professora-dorinha-405,a6dcca513961ef71a5ef20714de0c56cnkk6efnt.html",
+    "https://www.gazetadopovo.com.br/eleicoes/2026/pesquisa-eleitoral-2026/atlasintel-governador-tocantins-outubro-2026-vespera-segundo-turno/"
+   ]
+  },
+  {
    "id": "pq-6fa9a6183ec2816d",
    "cargo": "pres",
    "instituto": "Colectta",
@@ -113,6 +605,33 @@
     "https://www.infomoney.com.br/politica/cnt-mda-flavio-tem-463-e-lula-45-dos-votos-totais-configurando-empate-tecnico/",
     "https://tvtnews.com.br/pesquisa-cnt-mda-24-10-flavio-507-e-lula-493/",
     "https://br.investing.com/news/politics-news/flavio-tem-463-e-lula-soma-45-em-empate-tecnico-na-vespera-da-eleicao-diz-cntmda-2101792"
+   ]
+  },
+  {
+   "id": "pq-febeaa67c54bd158",
+   "cargo": "gov-rn",
+   "instituto": "Media",
+   "contratante": "Potengi Comunicação Ltda. (O Potengi)",
+   "registro": "RN-07104/2026",
+   "coletaInicio": "2026-10-19",
+   "coletaFim": "2026-10-23",
+   "divulgadaEm": "2026-10-24",
+   "entrevistas": 1050,
+   "margemPp": 3,
+   "confiancaPct": 95,
+   "modo": "presencial",
+   "totais": {
+    "13": 45.8,
+    "44": 44.6,
+    "brancosNulos": 5.5,
+    "indecisos": 4.1
+   },
+   "validos": {
+    "13": 50.7,
+    "44": 49.3
+   },
+   "fontes": [
+    "https://www.blogdobg.com.br/pesquisa-media-o-potengi-governo-rn-cadu-de-lula-tem-507-dos-votos-validos-contra-493-de-allyson-bezerra/"
    ]
   },
   {
