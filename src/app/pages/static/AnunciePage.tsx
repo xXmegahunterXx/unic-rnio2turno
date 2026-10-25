@@ -201,7 +201,7 @@ const MOTIVOS: { icone: IconName; titulo: string; texto: string }[] = [
   {
     icone: 'ao-vivo',
     titulo: '25 de outubro, ao vivo',
-    texto: 'A apuração do 2º turno a partir das 17h, com placar, mapa e cada seção atualizados ao longo da noite. Sua marca junto da tela em que o país acompanha a eleição.',
+    texto: 'A apuração do 2º turno ao vivo, com placar, mapa e cada seção atualizados ao longo da noite. Sua marca junto da tela em que o país acompanha a eleição.',
   },
   {
     icone: 'olho-fechado',
@@ -396,7 +396,7 @@ const REGRAS: { icone: IconName; titulo: string; texto: ReactNode }[] = [
   {
     icone: 'selo',
     titulo: 'Só anunciantes não políticos',
-    texto: 'Candidatos, partidos, campanhas, órgãos públicos e peças com conteúdo político-eleitoral não são aceitos. O cadastro exige essa declaração e recusa nomes de candidatos, números, siglas e termos de eleição. Também não são aceitos anúncios de apostas, cassino e mercados de previsão; bebida alcoólica fica fora do ar no dia da votação até as 17h.',
+    texto: 'Candidatos, partidos, campanhas, órgãos públicos e peças com conteúdo político-eleitoral não são aceitos. O cadastro exige essa declaração e recusa nomes de candidatos, números, siglas e termos de eleição. Também não são aceitos anúncios de apostas, cassino e mercados de previsão; bebida alcoólica fica fora do ar no dia da votação até as 19h (fim da votação, com a prorrogação).',
   },
   { icone: 'info', titulo: 'Sempre identificado', texto: '“Publicidade”, “Patrocinado” ou “Oferecido por” em todo formato.' },
   {

@@ -68,7 +68,7 @@ describe("'anuncio-salvar' com os campos v2", () => {
   it('categorias sensíveis recusadas no servidor (mesma validação)', () => {
     expect(erro({ tipo: 'anuncio-salvar', anuncio: anuncio({ marca: 'Bet Brasil' }) })).toMatch(/^Anúncio recusado: o Sintonia não aceita anúncios de apostas/);
     expect(erro({ tipo: 'anuncio-salvar', anuncio: anuncio({ url: 'https://polymarket.com' }) })).toMatch(/mercados de previsão/);
-    expect(erro({ tipo: 'anuncio-salvar', anuncio: anuncio({ titulo: 'Cerveja gelada' }) })).toMatch(/bebida alcoólica.*25\/10 até as 17h/);
+    expect(erro({ tipo: 'anuncio-salvar', anuncio: anuncio({ titulo: 'Cerveja gelada' }) })).toMatch(/bebida alcoólica.*25\/10 até as 19h/);
   });
 });
 

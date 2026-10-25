@@ -859,7 +859,7 @@ export function SecaoAnuncios() {
       <Callout tom="alerta" titulo="Somente anunciantes não políticos" className="mb-4 lg:mb-5">
         Proibido: partido, federação, candidato, campanha, mandato, governo ou órgão público com mensagem institucional, e qualquer conteúdo
         político-eleitoral (Lei 9.504/97). Também não aceitamos apostas, cassino e mercados de previsão; bebida alcoólica fica fora do ar em 25/10
-        até as 17h. Na dúvida, não publique.
+        até as 19h. Na dúvida, não publique.
       </Callout>
 
       {desfazer ? (

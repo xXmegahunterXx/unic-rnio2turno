@@ -1,6 +1,6 @@
 /**
  * Categorias sensíveis (src/shared/anuncios-categorias.ts): apostas, cassino e mercados de previsão recusados; bebida
- * alcoólica com aviso no painel e recusada se a janela cobrir 25/10 até as 17h (Brasília). Também pela validação
+ * alcoólica com aviso no painel e recusada se a janela cobrir 25/10 até as 19h (Brasília, com a prorrogação). Também pela validação
  * única (`validaAnuncio`), logo depois da barreira político-eleitoral.
  */
 import { describe, expect, it } from 'vitest';
@@ -152,24 +152,25 @@ describe('bebida alcoólica', () => {
 
   it('aviso só para bebida alcoólica', () => {
     const aviso = avisoCategoria({ marca: 'Cervejaria Serra', titulo: 'Chope artesanal', texto: '', cta: 'Ver', url: base.url });
-    expect(aviso).toMatch(/^Bebida alcoólica \(termo "cerveja" em "marca"\): o anúncio não pode ficar no ar em 25\/10 até as 17h \(Brasília\)/);
+    expect(aviso).toMatch(/^Bebida alcoólica \(termo "cerveja" em "marca"\): o anúncio não pode ficar no ar em 25\/10 até as 19h \(Brasília\)/);
     expect(avisoCategoria({ marca: 'Loja', titulo: 'Ofertas', texto: '', cta: 'Ver', url: base.url })).toBeNull();
     expect(avisoCategoria({ marca: 'Bet', titulo: 'Ofertas', texto: '', cta: 'Ver', url: base.url })).toBeNull(); // recusada: sai como erro
   });
 
-  it('janela sem álcool: 25/10, 0h → 17h de Brasília', () => {
+  it('janela sem álcool: 25/10, 0h → 19h de Brasília', () => {
     expect(JANELA_SEM_ALCOOL.inicio).toBe(Date.parse('2026-10-25T03:00:00Z'));
-    expect(JANELA_SEM_ALCOOL.fim).toBe(Date.parse('2026-10-25T20:00:00Z'));
+    expect(JANELA_SEM_ALCOOL.fim).toBe(Date.parse('2026-10-25T22:00:00Z'));
   });
 
-  it('recusada se a janela cobrir 25/10 até as 17h; encostada passa', () => {
+  it('recusada se a janela cobrir 25/10 até as 19h; encostada passa', () => {
     const a = { categoria: 'alcool' as const, termo: 'cerveja', campo: 'título' };
-    expect(recusaAlcoolNaJanela(a, { inicio: null, fim: null })).toMatch(/25\/10 até as 17h/);
+    expect(recusaAlcoolNaJanela(a, { inicio: null, fim: null })).toMatch(/25\/10 até as 19h/);
     expect(recusaAlcoolNaJanela(a, { inicio: brt(20, 9), fim: null })).not.toBeNull();
     expect(recusaAlcoolNaJanela(a, { inicio: null, fim: brt(25, 0, 1) })).not.toBeNull();
     expect(recusaAlcoolNaJanela(a, { inicio: brt(25, 16, 59), fim: brt(26, 2) })).not.toBeNull();
+    expect(recusaAlcoolNaJanela(a, { inicio: brt(25, 17), fim: brt(26, 2) })).not.toBeNull(); // prorrogação: 17h–19h ainda é votação
     expect(recusaAlcoolNaJanela(a, { inicio: brt(20, 9), fim: brt(25, 0) })).toBeNull(); // termina 25/10, 0h
-    expect(recusaAlcoolNaJanela(a, { inicio: brt(25, 17), fim: null })).toBeNull(); // começa 25/10, 17h
+    expect(recusaAlcoolNaJanela(a, { inicio: brt(25, 19), fim: null })).toBeNull(); // começa 25/10, 19h
     expect(recusaAlcoolNaJanela(a, { inicio: brt(1, 9), fim: brt(10, 9) })).toBeNull();
   });
 
@@ -177,9 +178,10 @@ describe('bebida alcoólica', () => {
     const cerveja = { ...base, marca: 'Cervejaria Serra', titulo: 'Chope artesanal' };
     const r = validaAnuncio(cerveja);
     expect(r).toEqual({
-      erro: 'Anúncio de bebida alcoólica (termo "cerveja" em "marca"): não pode ficar no ar em 25/10 até as 17h (Brasília), durante a votação. Termine até 25/10, 0h, ou comece a partir de 25/10, 17h.',
+      erro: 'Anúncio de bebida alcoólica (termo "cerveja" em "marca"): não pode ficar no ar em 25/10 até as 19h (Brasília), durante a votação. Termine até 25/10, 0h, ou comece a partir de 25/10, 19h.',
     });
-    expect('ok' in validaAnuncio({ ...cerveja, inicio: brt(25, 17) })).toBe(true);
+    expect('ok' in validaAnuncio({ ...cerveja, inicio: brt(25, 19) })).toBe(true);
+    expect('erro' in validaAnuncio({ ...cerveja, inicio: brt(25, 17) })).toBe(true); // prorrogação até 19h
     expect('ok' in validaAnuncio({ ...cerveja, inicio: brt(18, 9), fim: brt(25, 0) })).toBe(true);
     expect('erro' in validaAnuncio({ ...cerveja, inicio: brt(18, 9), fim: brt(25, 18) })).toBe(true);
   });

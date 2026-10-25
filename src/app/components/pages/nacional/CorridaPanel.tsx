@@ -100,7 +100,7 @@ function GraficoVazio() {
           <p className="flex items-center justify-center gap-2 text-[14px] font-semibold text-fg">
             <Icon name="grafico" size={16} className="text-fg-muted" />O gráfico começa com as primeiras seções
           </p>
-          <p className="mt-1 text-pretty text-[12.5px] leading-snug text-fg-muted">Cada ponto mostra o placar acumulado até ali, a partir das 17h (Brasília).</p>
+          <p className="mt-1 text-pretty text-[12.5px] leading-snug text-fg-muted">Cada ponto mostra o placar acumulado até ali.</p>
         </div>
       </div>
     </div>

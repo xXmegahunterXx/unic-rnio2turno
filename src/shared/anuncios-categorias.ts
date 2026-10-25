@@ -7,12 +7,13 @@
  *    pôquer, bingo, "tigrinho"…) e mercados de previsão (Polymarket, Kalshi, PredictIt e afins). Pelo texto (marca,
  *    título, texto, botão e caminho do link) e pelo destino (domínios .bet/.bet.br/.casino…, nomes de operadoras).
  *  - BEBIDA ALCOÓLICA: aceita, com aviso no painel (`avisoCategoria`), e recusada se a janela de exibição cobrir o dia
- *    da votação até o fim dela (25/10, 0h → 17h de Brasília; `JANELA_SEM_ALCOOL`).
+ *    da votação até o fim dela (25/10, 0h → 19h de Brasília, com a prorrogação; `JANELA_SEM_ALCOOL`).
  *
  * Como em anuncios-politica.ts, conservador de propósito: um falso positivo no texto só pede outra redação. Os textos
  * são descritivos e neutros (dizem a categoria, o termo e o campo).
  */
 import { normalizarTexto, type CampoAnuncioPolitica } from './anuncios-politica';
+import { FIM_VOTACAO, HORA_FIM_VOTACAO, INICIO_DIA_VOTACAO } from './diaVotacao';
 
 export type CategoriaRecusada = 'apostas' | 'cassino' | 'previsao';
 export type CategoriaSensivel = CategoriaRecusada | 'alcool';
@@ -34,12 +35,12 @@ export const NOME_CATEGORIA: Record<CategoriaSensivel, string> = {
 };
 
 /**
- * Dia da votação até o fim dela (25/10/2026, 0h → 17h de Brasília, [inicio, fim)): anúncio de bebida alcoólica cuja
+ * Dia da votação até o fim dela (25/10/2026, 0h → 19h de Brasília com a prorrogação, [inicio, fim)): anúncio de bebida alcoólica cuja
  * janela de exibição cruze este intervalo é recusado.
  */
 export const JANELA_SEM_ALCOOL = {
-  inicio: Date.parse('2026-10-25T00:00:00-03:00'),
-  fim: Date.parse('2026-10-25T17:00:00-03:00'),
+  inicio: INICIO_DIA_VOTACAO,
+  fim: FIM_VOTACAO,
 } as const;
 
 // ---- termos (sobre o texto normalizado: minúsculas, sem acento, palavras separadas por um espaço) --------------------
@@ -213,13 +214,13 @@ export function motivoCategoria(campos: readonly CampoAnuncioPolitica[], url: st
 
 /**
  * Bebida alcoólica: recusa se a janela de exibição [inicio, fim) — null/0 = aberta — cruzar `JANELA_SEM_ALCOOL`.
- * Janelas encostadas não se cruzam: fim em 25/10, 0h, ou início em 25/10, 17h, passam.
+ * Janelas encostadas não se cruzam: fim em 25/10, 0h, ou início em 25/10, 19h, passam.
  */
 export function recusaAlcoolNaJanela(a: AchadoCategoria, janela: { inicio?: number | null; fim?: number | null }): string | null {
   const ini = janela.inicio ? janela.inicio : -Infinity;
   const fim = janela.fim ? janela.fim : Infinity;
   if (!(ini < JANELA_SEM_ALCOOL.fim && JANELA_SEM_ALCOOL.inicio < fim)) return null;
-  return `Anúncio de bebida alcoólica (${onde(a)}): não pode ficar no ar em 25/10 até as 17h (Brasília), durante a votação. Termine até 25/10, 0h, ou comece a partir de 25/10, 17h.`;
+  return `Anúncio de bebida alcoólica (${onde(a)}): não pode ficar no ar em 25/10 até as ${HORA_FIM_VOTACAO} (Brasília), durante a votação. Termine até 25/10, 0h, ou comece a partir de 25/10, ${HORA_FIM_VOTACAO}.`;
 }
 
 /**
@@ -237,5 +238,5 @@ export function avisoCategoria(a: { marca: string; titulo: string; texto: string
     a.url,
   );
   if (achado?.categoria !== 'alcool') return null;
-  return `Bebida alcoólica (${onde(achado)}): o anúncio não pode ficar no ar em 25/10 até as 17h (Brasília). Inclua uma frase de advertência, como “Beba com moderação”.`;
+  return `Bebida alcoólica (${onde(achado)}): o anúncio não pode ficar no ar em 25/10 até as ${HORA_FIM_VOTACAO} (Brasília). Inclua uma frase de advertência, como “Beba com moderação”.`;
 }

@@ -24,7 +24,7 @@
 #   sudo /opt/sintonia/deploy/painel.sh sem-aviso         tira o aviso do site
 #
 #   sudo /opt/sintonia/deploy/painel.sh chat-estado       sala do chat: aberta/fechada, modo lento, fixada, pessoas, denúncias
-#   sudo /opt/sintonia/deploy/painel.sh chat-abrir        abre a sala (em produção só recebe mensagens a partir das 17h de 25/10)
+#   sudo /opt/sintonia/deploy/painel.sh chat-abrir        abre a sala (em produção só recebe mensagens a partir das 19h de 25/10)
 #   sudo /opt/sintonia/deploy/painel.sh chat-fechar       fecha a sala (emergência: enxurrada de desinformação, ataque)
 #   sudo /opt/sintonia/deploy/painel.sh chat-limpar       apaga TODAS as mensagens da sala (as abas abertas também limpam)
 #   sudo /opt/sintonia/deploy/painel.sh chat-lento 20     modo lento: segundos entre mensagens da mesma pessoa (3–300)
