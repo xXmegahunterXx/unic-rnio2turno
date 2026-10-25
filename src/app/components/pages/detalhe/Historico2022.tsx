@@ -56,8 +56,10 @@ export function Historico2022Cartao({ abrangencia, variante = 'coluna', classNam
         )}
       >
         <div className="min-w-0">
-          <p className="num text-[11.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">2022 · 2º turno</p>
+          {/* o ano vai também no título acessível: na lista de títulos, "Presidente em …" sozinho se confunde com 2026 */}
+          <p aria-hidden className="num text-[11.5px] font-semibold uppercase tracking-[0.12em] text-fg-muted">2022 · 2º turno</p>
           <h2 id={idTitulo} className="mt-1 text-balance font-display text-[17px] font-semibold leading-tight tracking-[-0.015em] text-fg">
+            <span className="sr-only">2º turno de 2022: </span>
             Presidente {local}
           </h2>
           <p className="num mt-0.5 text-pretty text-[12.5px] leading-snug text-fg-muted">% dos votos válidos em 30 de outubro de 2022</p>
@@ -68,10 +70,12 @@ export function Historico2022Cartao({ abrangencia, variante = 'coluna', classNam
             <Lado linha={a} />
             <Lado linha={b} direita />
           </div>
-          {/* barra dividida estática (sem animação), nas cores dos partidos; os números acima são o conteúdo */}
+          {/* barra dividida estática (sem animação), nas cores dos partidos; os números acima são o conteúdo.
+              flex-grow proporcional com base 0: o vão de 2 px sai dos DOIS lados na proporção (como no VoteSplitBar),
+              nunca só do segundo */}
           <div aria-hidden className="relative mt-3 flex h-1.5 gap-0.5 overflow-hidden rounded-full bg-surface-3">
-            <span className="h-full" style={{ width: `${a.pct}%`, backgroundColor: corPartido(a.partido) }} />
-            <span className="h-full flex-1" style={{ backgroundColor: corPartido(b.partido) }} />
+            <span className="h-full" style={{ flex: `${a.pct} 1 0%`, backgroundColor: corPartido(a.partido) }} />
+            <span className="h-full" style={{ flex: `${b.pct} 1 0%`, backgroundColor: corPartido(b.partido) }} />
           </div>
           {/* numa linha só; abaixo de 380 px, "fonte: TSE" desce inteira para a linha de baixo */}
           <p className="num mt-2.5 text-[11.5px] leading-snug text-fg-subtle">

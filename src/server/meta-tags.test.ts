@@ -25,6 +25,9 @@ beforeAll(async () => {
   ctx = {
     races,
     nomeMunicipio: (uf, cod) => nomes.get(`${uf}|${cod}`),
+    // relógio fixo antes do dia da votação: com o relógio de verdade, no dia 25/10 antes das 17h toda página vira o
+    // convite genérico (sem nome nem número) e os testes de imagem específica deixam de valer
+    agora: () => Date.UTC(2026, 9, 20, 15, 0, 0),
     fase: () => fase,
     ficha: (sq) => ({ lida: est.ficha(sq), existe: est.existeCandidato(sq) }),
     cargo: (n) => est.cargo(n),
