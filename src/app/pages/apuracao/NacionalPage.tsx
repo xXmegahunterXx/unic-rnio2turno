@@ -46,6 +46,7 @@ import { EleitoBanner } from '@/app/components/pages/nacional/EleitoBanner';
 import { GovernadoresFaixa } from '@/app/components/pages/nacional/GovernadoresFaixa';
 import { EstadosSecao, LiderancaCard, ParticipacaoSecao, RegioesCard } from '@/app/components/pages/nacional/Blocos';
 import { NacionalEsqueleto } from '@/app/components/pages/nacional/Esqueletos';
+import { Historico2022Cartao } from '@/app/components/pages/detalhe/Historico2022';
 import { ehSimulado, ehT1, raceExibida, semT1, ufDaRace } from '@/app/components/pages/nacional/fase';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { momentoTitulo, tituloNacional } from '@/shared/titulos';
@@ -252,6 +253,8 @@ export default function NacionalPage() {
           <div className={cn(COLUNA, 'min-[1360px]:col-span-4 min-[1360px]:pt-[5.25rem]')}>
             <RegioesCard className="order-5 min-[1360px]:order-none" race={race} regioes={data.regioes} />
             <ExteriorResumo className="order-9 min-[1360px]:order-none" race={race} data={data} meta={meta} raceLink={raceParam} />
+            {/* contexto histórico: 2º turno de 2022 (oficial, TSE); some com nomes ocultos ou se o arquivo falhar */}
+            <Historico2022Cartao abrangencia="BR" variante="nacional" className="order-9 min-[1360px]:order-none" />
           </div>
         </div>
       ) : (
@@ -324,6 +327,8 @@ export default function NacionalPage() {
             ) : (
               <ComparacaoT1 className="order-6 min-[1360px]:order-none" race={race} resumo={resumo} raceT1={raceT1} anonimizado={anonimizado} />
             )}
+            {/* contexto histórico, logo depois da comparação com o 1º turno: 2º turno de 2022 (oficial, TSE) */}
+            <Historico2022Cartao abrangencia="BR" variante="nacional" className="order-6 min-[1360px]:order-none" />
             <LiderancaCard className="order-12 min-[1360px]:order-none" race={race} ufs={data.ufs} raceLink={raceParam} t={t} />
           </div>
         </div>

@@ -62,6 +62,7 @@ import { MunicipioUnico } from '@/app/components/pages/detalhe/MunicipioUnico';
 import { ParticipacaoCartao } from '@/app/components/pages/detalhe/ParticipacaoCartao';
 import { NomesOcultos } from '@/app/components/pages/detalhe/NomesOcultos';
 import { PerfilEleitorado } from '@/app/components/pages/detalhe/PerfilEleitorado';
+import { Historico2022Cartao } from '@/app/components/pages/detalhe/Historico2022';
 import { emUf } from '@/app/components/pages/detalhe/fmt';
 import { useTitulo } from '@/app/components/pages/home/useTitulo';
 import { ehT1 } from '@/app/components/pages/nacional/fase';
@@ -222,6 +223,7 @@ export default function UfPage() {
   const snapUnico = qUnico.data && qUnico.data.cod === codUnico && qUnico.data.race === snap.race ? qUnico.data : undefined;
   const restanteVisivel = !t1 && r.eleito === null && r.status !== 'encerrada';
   const vivo = qVivo.data && qVivo.data.uf === uf && qVivo.data.race === ctx.id ? qVivo.data : undefined;
+  const desdeT1Visivel = !t1 && ctx.fase !== 'pre' && !!raceT1 && !!snapT1 && !ctx.anonimizado;
 
   // Ao lado do placar (desktop) ou depois do mapa (celular): o que falta, 1º × 2º turno ou a participação no 1º turno.
   const lateral = restanteVisivel ? (
@@ -429,7 +431,7 @@ export default function UfPage() {
       {lateralCelular}
 
       {/* ------------------------------------------------------------ desde o 1º turno (% e votos; onde cada um cresceu mais) */}
-      {!t1 && ctx.fase !== 'pre' && raceT1 && snapT1 && !ctx.anonimizado ? (
+      {desdeT1Visivel && raceT1 && snapT1 ? (
         <DesdePrimeiroTurno
           race={race}
           raceT1={raceT1}
@@ -443,6 +445,12 @@ export default function UfPage() {
           simulado={simulado}
           className={cn('mt-5 sm:mt-7', atualizando && 'opacity-60')}
         />
+      ) : null}
+
+      {/* ------------------------------------------------------------ contexto histórico: 2º turno de 2022 para Presidente
+          (oficial, TSE), perto do "desde o 1º turno". Some na simulação com nomes ocultos e se o arquivo falhar. */}
+      {ctx.idT2 === 'pres' ? (
+        <Historico2022Cartao abrangencia={uf} variante="faixa" className={desdeT1Visivel ? 'mt-4' : undefined} />
       ) : null}
 
       {/* ------------------------------------------------------------ publicidade (depois do placar e do mapa, nunca dentro) */}
