@@ -3,10 +3,12 @@
  * `GET /api/apuracao/:race/:uf/projecao` (Presidente na UF/exterior e Governador). Resposta `{ projecao: Projecao }`.
  *
  * Fontes: 1º turno = dataset (motor, corrida `-t1`); 2º turno = motor (simulação/pré) ou, na fonte TSE, SÓ o que já está
- * no cache dos municípios (`TseSource.resumosMunicipaisEmCache`) + o total OFICIAL de cada UF (o placar nacional, que o
- * servidor já lê): esta rota nunca baixa arquivo do TSE nem mexe na prioridade da fila (o mesmo cuidado do
- * "desde o 1º turno", src/server/desde-t1.ts). Município ainda não lido entra como "desconhecido" e o oficial da UF
- * ancora o já apurado.
+ * no cache dos municípios (`TseSource.resumosMunicipaisEmCache`) + o acompanhamento de cada UF já lido
+ * (`TseSource.acompanhamentoMunicipalEmCache`: seções e eleitorado totalizados por município, sem votos) + o total
+ * OFICIAL de cada UF (o placar nacional, que o servidor já lê): esta rota nunca baixa arquivo do TSE nem mexe na
+ * prioridade da fila (o mesmo cuidado do "desde o 1º turno", src/server/desde-t1.ts). Município ainda não lido entra
+ * como "desconhecido" e o oficial da UF ancora o já apurado; o acompanhamento diz quais desconhecidos começaram (e marca
+ * o lido defasado). Assim a projeção não depende do cache dos municípios estar cheio (reinício, lote grande do TSE).
  *
  * Cache igual ao do desde-t1: recalcula só quando o status muda (versão, fonte, fase, marca da corrida, chave) ou a
  * cada 5 s, e `s-maxage=5` na CDN. NUNCA 500 por erro de cálculo: devolve `disponivel: false, motivo: 'sem-base'`.
@@ -21,6 +23,7 @@ import {
   paresT1,
   projecaoIndisponivel,
   t1Projecao,
+  type AcompanhamentoProjecao,
   type ContagemProjecao,
   type ContextoProjecao,
   type MunicipioProjecao,
@@ -80,10 +83,13 @@ export async function calcularProjecaoServidor(
   const ufs: UF[] = abr === 'BR' ? race.ufs : [abr];
   const municipios: MunicipioProjecao[] = [];
   const totaisUf: Record<string, ContagemProjecao | undefined> = {};
-  // na fonte TSE: só o cache dos municípios (nunca baixa nada)
+  // na fonte TSE: só o cache dos municípios e o acompanhamento das UFs (nunca baixa nada)
   const cacheTse = new Map<string, ContagemProjecao>();
+  const abTse = new Map<string, AcompanhamentoProjecao>();
   if (tse) {
-    for (const { uf, cod, resumo: r } of d.tse.fonte?.resumosMunicipaisEmCache(race.id) ?? []) cacheTse.set(`${uf}|${cod}`, r);
+    const fonte = d.tse.fonte;
+    for (const { uf, cod, resumo: r } of fonte?.resumosMunicipaisEmCache(race.id) ?? []) cacheTse.set(`${uf}|${cod}`, r);
+    for (const { uf, cod, ...a } of fonte?.acompanhamentoMunicipalEmCache?.(race.id) ?? []) abTse.set(`${uf}|${cod}`, a);
     for (const uf of ufs) totaisUf[uf] = n.ufs[uf] ?? (race.abrangencia === uf ? n.resumo : undefined);
   }
   for (const uf of ufs) {
@@ -95,7 +101,7 @@ export async function calcularProjecaoServidor(
       t1Cache.set(chaveT1, t1);
     }
     if (tse) {
-      for (const [cod, t] of t1) municipios.push({ uf, t1: t, t2: cacheTse.get(`${uf}|${cod}`) ?? null });
+      for (const [cod, t] of t1) municipios.push({ uf, t1: t, t2: cacheTse.get(`${uf}|${cod}`) ?? null, ab: abTse.get(`${uf}|${cod}`) ?? null });
     } else {
       for (const m of (await d.dados.uf(race.id, uf)).municipios) municipios.push({ uf, t1: t1.get(m.cod) ?? null, t2: m });
     }

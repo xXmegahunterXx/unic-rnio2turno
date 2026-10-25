@@ -1270,6 +1270,28 @@ export class TseSource {
     return out;
   }
 
+  /**
+   * Acompanhamento municipal do 2º turno JÁ EM CACHE (o `-ab.json` de cada UF, que o aquecimento relê a cada ciclo;
+   * nada é baixado, nenhuma prioridade da fila muda): seções e eleitorado totalizados de cada município, SEM votos.
+   * Base da "Projeção do Sintonia" (src/server/projecao.ts) para os municípios ainda não lidos. UF cujo acompanhamento
+   * ainda não foi lido fica de fora.
+   */
+  acompanhamentoMunicipalEmCache(
+    raceId: RaceId,
+  ): { uf: UF; cod: string; secoes: number; secoesTotalizadas: number; eleitorado: number; eleitoradoTotalizado: number }[] {
+    const c = this.corridas.get(String(raceId).toLowerCase());
+    if (!c) return [];
+    const out: ReturnType<TseSource['acompanhamentoMunicipalEmCache']> = [];
+    for (const uf of c.mapeada.ufs) {
+      const ab = this.munUf.get(`${c.chave}|${uf}`)?.ab;
+      if (!ab) continue;
+      for (const [cod, it] of ab.porMun) {
+        out.push({ uf, cod, secoes: map.int(it.s?.ts), secoesTotalizadas: map.int(it.s?.st), eleitorado: map.int(it.e?.te), eleitoradoTotalizado: map.int(it.e?.est) });
+      }
+    }
+    return out;
+  }
+
   private nacionalEm(c: Corrida, race: Race, t: number, agora: number): NationalSnapshot {
     const hist = this.histSe(c, race);
     const em = (abr: Abr) => hist?.resumoEm(abr, t) ?? map.resumoZerado(this.resumoAbr(c, abr, race));

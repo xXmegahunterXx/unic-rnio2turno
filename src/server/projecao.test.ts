@@ -7,7 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { NationalSnapshot, UfSnapshot } from '../shared/types';
 import type { RespostaProjecao } from '../shared/projecao';
 import { pctValidos } from '../shared/calc';
-import { criarFakeFetch, BASE, type FakeFetch } from '../tse/__fixtures__/fake-fetch';
+import { criarFakeFetch, BASE, jsonFixture, type FakeFetch } from '../tse/__fixtures__/fake-fetch';
+import type { TseAcompanhamentoArquivo, TseResultadoArquivo } from '../tse/feed';
 import { CC_PROJECAO } from './projecao';
 import { comando, login, montar, type Montado } from './test-helpers';
 
@@ -128,6 +129,69 @@ describe('fonte TSE: só o que já está em cache (nunca baixa município)', () 
       expect(typeof j!.disponivel).toBe('boolean');
       if (j!.disponivel) expect(j!.candidatos[0].pct + j!.candidatos[1].pct).toBeCloseTo(100, 3);
     }
+    const novas = f.chamadas.slice(antes);
+    expect(novas.filter((u) => /\/[a-z]{2}\d{5}-c\d{4}-|-ab\.json$/.test(u))).toEqual([]);
+  }, 30_000);
+});
+
+describe('fonte TSE: cache dos municípios vazio, com o acompanhamento da UF', () => {
+  let m: Montado;
+  let f: FakeFetch;
+  // DF (1 município, Brasília 97012): metade das seções totalizada, nenhum arquivo de município publicado (404)
+  const base = jsonFixture<TseResultadoArquivo>('ele2026/6258/dados/br/br-c0001-e006258-u.json');
+  const TE = 2_200_000;
+  const arq = (abr: string, ts: number, st: number, lula: number, flavio: number): TseResultadoArquivo => {
+    const d = structuredClone(base);
+    const est = Math.round((TE * st) / ts);
+    const c = lula + flavio + 30_000;
+    Object.assign(d, { tpabr: abr === 'br' ? 'br' : 'uf', cdabr: abr, dt: '25/10/2026', ht: '18:20:30', tf: 'n', and: 'p' });
+    Object.assign(d.s, { ts: String(ts), st: String(st) });
+    Object.assign(d.e, { te: String(TE), est: String(est), c: String(c), a: String(est - c) });
+    Object.assign(d.v, { tv: String(c), vvc: String(c - 30_000), vv: String(c - 30_000), vnom: String(c - 30_000), vb: '10000', tvn: '20000' });
+    for (const cd of d.carg[0].agr.flatMap((a) => a.par.flatMap((x) => x.cand))) cd.vap = String(cd.n === '13' ? lula : flavio);
+    return d;
+  };
+  beforeAll(async () => {
+    f = criarFakeFetch();
+    f.rotas.set('ele2026/6258/dados/br/br-c0001-e006258-u.json', arq('br', 499_248, 3_000, 450_000, 400_000));
+    f.rotas.set('ele2026/6258/dados/df/df-c0001-e006258-u.json', arq('df', 6_000, 3_000, 450_000, 400_000));
+    f.rotas.set('ele2026/6258/dados/df/df-e006258-ab.json', (): TseAcompanhamentoArquivo => {
+      const b = arq('df', 6_000, 3_000, 450_000, 400_000);
+      return { ele: '6258', t: '2', dg: '25/10/2026', hg: '18:20:30', abr: [{ tpabr: 'mun', cdabr: '97012', dt: b.dt, ht: b.ht, s: b.s, e: b.e }] };
+    });
+    m = await montar({ fetch: f, agora: Date.UTC(2026, 9, 25, 21, 43, 0) });
+    const cookie = await login(m);
+    expect((await comando(m, cookie, { tipo: 'tse', tse: { baseUrl: BASE } })).status).toBe(200);
+    expect((await comando(m, cookie, { tipo: 'fonte', fonte: 'tse' })).status).toBe(200);
+    await m.app.request('/api/apuracao/pres/br');
+    // o aquecimento (depois de cada ciclo) lê o acompanhamento do DF; o arquivo de Brasília não existe (404). O balde de
+    // pedidos ao TSE usa o relógio do servidor: ele anda para o pedido de prioridade baixa sair.
+    const src = m.tse.fonte!;
+    m.relogio.t += 2_000;
+    await src.pollOnce();
+    for (let i = 0; i < 100 && !src.acompanhamentoMunicipalEmCache('pres').length; i++) {
+      m.relogio.t += 1_000;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+  }, 30_000);
+  afterAll(async () => {
+    await m.tse.encerrar();
+  });
+
+  it('a projeção do DF aparece sem nenhum município lido, com a proporção oficial, e a rota não baixa nada', async () => {
+    const src = m.tse.fonte!;
+    expect(src.resumosMunicipaisEmCache('pres')).toEqual([]);
+    expect(src.acompanhamentoMunicipalEmCache('pres')).toEqual([
+      { uf: 'DF', cod: '97012', secoes: 6_000, secoesTotalizadas: 3_000, eleitorado: TE, eleitoradoTotalizado: TE / 2 },
+    ]);
+    const antes = f.chamadas.length;
+    const { j } = await pede(m, '/api/apuracao/pres/df/projecao');
+    expect(j).toMatchObject({ abrangencia: 'DF', disponivel: true, pctSecoes: 50 });
+    expect(j!.fracaoApurada).toBeCloseTo(0.5, 3);
+    // um município só: o que falta segue a proporção oficial (450 mil × 400 mil)
+    expect(j!.candidatos[0].pct).toBeCloseTo((100 * 450) / 850, 3);
+    expect(j!.candidatos[0].min).toBeLessThan(j!.candidatos[0].pct);
+    expect(j!.candidatos[0].max).toBeGreaterThan(j!.candidatos[0].pct);
     const novas = f.chamadas.slice(antes);
     expect(novas.filter((u) => /\/[a-z]{2}\d{5}-c\d{4}-|-ab\.json$/.test(u))).toEqual([]);
   }, 30_000);

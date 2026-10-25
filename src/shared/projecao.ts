@@ -13,7 +13,11 @@
  *     médio (ponderado pelos válidos apurados) observado nos municípios já com urnas da MESMA UF (sem nenhum na UF: o
  *     do Brasil), limitada a [0, 100].
  *  4. Fonte TSE: o servidor só tem os municípios já lidos (cache); os demais entram como "desconhecidos" e o total
- *     OFICIAL da UF ancora o já apurado (o que falta dos desconhecidos segue o passo 3, em bloco).
+ *     OFICIAL da UF ancora o já apurado (o que falta dos desconhecidos segue o passo 3, em bloco). Com o acompanhamento
+ *     da UF (`-ab.json`: seções/eleitorado totalizados por município, sem votos), o swing da parte apurada dos
+ *     desconhecidos é medido contra o 1º turno só dessa parte e o que falta pesa cada município pelo que falta nele; o
+ *     lido defasado (menos seções do que o acompanhamento) vira desconhecido, e o que falta dele segue o já lido. Assim
+ *     a conta não depende do cache estar cheio (reinício do servidor, lote grande do TSE de uma vez).
  *  5. Soma tudo → % final projetado. A faixa (meia-largura) vem de um desvio estimado — a incerteza do que falta, que
  *     depende da fração já apurada dos válidos esperados e da dispersão do swing observado — × um fator, calibrado
  *     em noites simuladas do nosso motor (src/engine/projecao-calibracao.test.ts) para conter o resultado final em
@@ -76,9 +80,11 @@ export const PISO_FAIXA_PP = 0.3;
  */
 export const PISO_FAIXA_TSE_PP = 0.5;
 /**
- * Fonte TSE: cobertura mínima do cache (seções totalizadas dos municípios já lidos ÷ seções totalizadas oficiais) para
- * mostrar a projeção de uma UF ou de governador. Abaixo disso quase tudo passaria pelo bloco de desconhecidos e a faixa
- * não cobre os 95% (estresse da revisão: 80–93% sem a trava, 99–100% com ela). O Brasil não usa a trava.
+ * Fonte TSE: cobertura mínima (seções totalizadas em municípios conhecidos — lidos ou no acompanhamento da UF — ÷ seções
+ * totalizadas oficiais) para mostrar a projeção de uma UF ou de governador. Sem o acompanhamento, abaixo disso quase
+ * tudo passaria pelo bloco de desconhecidos e a faixa não cobre os 95% (estresse da revisão: 80–93% sem a trava,
+ * 99–100% com ela). Com o acompanhamento em dia a cobertura é ~1 e a conta fica boa mesmo com o cache vazio (98,6–100%
+ * nas simulações); a trava passa a pegar só o acompanhamento atrasado em relação ao total oficial. O Brasil não usa.
  */
 export const LIMIAR_COBERTURA_CACHE = 0.9;
 
@@ -159,12 +165,24 @@ export interface T1Projecao {
   validos: number;
 }
 
+/**
+ * Fonte TSE: acompanhamento do município (o `-ab.json` da UF, um arquivo só e sempre em dia): seções e eleitorado já
+ * totalizados, SEM votos.
+ */
+export type AcompanhamentoProjecao = Pick<Tally, 'secoes' | 'secoesTotalizadas' | 'eleitorado' | 'eleitoradoTotalizado'>;
+
 export interface MunicipioProjecao {
   uf: string;
   /** 2º turno; null = desconhecido (fonte TSE: município ainda não lido). */
   t2: ContagemProjecao | null;
   /** 1º turno; null = sem resultado do 1º turno. */
   t1: T1Projecao | null;
+  /**
+   * Fonte TSE (opcional): acompanhamento. Diz QUAIS desconhecidos já começaram e quanto (o swing da parte apurada deles
+   * é medido contra o 1º turno só dessa parte, e o que falta segue cada município) e marca como defasado o município lido
+   * com menos seções do que o acompanhamento mostra (ele passa a desconhecido: o total oficial da UF cobre os votos).
+   */
+  ab?: AcompanhamentoProjecao | null;
 }
 
 export interface EntradaProjecao {
@@ -191,8 +209,8 @@ export interface CalculoProjecao {
   ufs: number;
   ufsComUrnas: number;
   /**
-   * Fonte TSE (com `totaisUf`): seções totalizadas dos municípios lidos ÷ seções totalizadas oficiais das UFs da
-   * abrangência (0–1). Ausente fora da fonte TSE.
+   * Fonte TSE (com `totaisUf`): seções totalizadas em municípios conhecidos (lidos no cache ou, com o acompanhamento,
+   * as que ele mostra) ÷ seções totalizadas oficiais das UFs da abrangência (0–1). Ausente fora da fonte TSE.
    */
   coberturaCache?: number;
 }
@@ -256,7 +274,18 @@ interface MunInterno {
   /** votos dos dois finalistas no 1º turno */
   f1: number;
   w1: number;
+  /** acompanhamento (fonte TSE), quando houver */
+  ab: AcompanhamentoProjecao | null;
+  /** desconhecido com acompanhamento: fração já totalizada dele (eleitorado; 0 sem acompanhamento) */
+  fAb: number;
+  /** lido defasado (virou desconhecido): a proporção já apurada nele, que o que falta dele segue, e as seções lidas */
+  pDefasado: number | null;
+  sDefasado: number;
 }
+
+/** Fração já totalizada de um município pelo acompanhamento (eleitorado; sem ele, seções). */
+const fracaoAb = (a: AcompanhamentoProjecao): number =>
+  a.eleitorado > 0 ? clamp01(a.eleitoradoTotalizado / a.eleitorado) : a.secoes > 0 ? clamp01(a.secoesTotalizadas / a.secoes) : 0;
 
 /**
  * Calcula a projeção (2 finalistas). null sem base nenhuma (sem válidos esperados, ou corrida sem exatamente 2
@@ -265,9 +294,32 @@ interface MunInterno {
 export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjecao> = PARAMS_PROJECAO): CalculoProjecao | null {
   const muns: MunInterno[] = [];
   const nCand = 2;
-  for (const m of e.municipios) {
-    const t2 = m.t2;
-    if (t2 && t2.votos.length !== nCand) return null;
+  const entrada = Array.from(e.municipios);
+  // fonte TSE: a UF está "em dia" quando as seções totalizadas em municípios conhecidos (lidos no cache ou no
+  // acompanhamento) cobrem LIMIAR_COBERTURA_CACHE do total oficial dela. Fora de dia (cache e acompanhamento atrasados,
+  // ex.: logo depois de um lote grande do TSE, antes do aquecimento relê-los) não há como saber quais lidos estão
+  // defasados — a parte nova deles seria contada duas vezes (no bloco dos desconhecidos, pelo total oficial, e no que
+  // falta deles) — nem de que municípios vem o já apurado: a UF inteira vira bloco de desconhecidos (o total oficial
+  // ancora e o que falta segue o já apurado nela), o jeito mais robusto.
+  const foraDeDia = new Set<string>();
+  if (e.totaisUf) {
+    const conhecidas = new Map<string, number>();
+    for (const m of entrada) {
+      if (!e.totaisUf[m.uf]) continue;
+      conhecidas.set(m.uf, (conhecidas.get(m.uf) ?? 0) + Math.max(0, m.t2?.secoesTotalizadas ?? 0, m.ab?.secoesTotalizadas ?? 0));
+    }
+    for (const [uf, n] of conhecidas) if (n < LIMIAR_COBERTURA_CACHE * (e.totaisUf[uf]?.secoesTotalizadas ?? 0)) foraDeDia.add(uf);
+  }
+  for (const m of entrada) {
+    if (m.t2 && m.t2.votos.length !== nCand) return null;
+    // fonte TSE: só com o total oficial da UF (que cobre os votos dele) o acompanhamento vale
+    const ab = e.totaisUf?.[m.uf] && m.ab ? m.ab : null;
+    const fora = foraDeDia.has(m.uf);
+    // lido com menos seções do que o acompanhamento mostra = defasado: vira desconhecido (senão a parte nova dele seria
+    // contada duas vezes); o que falta dele segue o já lido (encolhido para o 1º turno + swing com poucas seções lidas)
+    const defasado = !!m.t2 && !!ab && ab.secoesTotalizadas > m.t2.secoesTotalizadas;
+    const t2 = fora || defasado ? null : m.t2;
+    const vLido = defasado && !fora ? soma(m.t2!.votos) : 0;
     const v2 = t2 ? soma(t2.votos) : 0;
     const comecado = !!t2 && t2.secoesTotalizadas > 0 && v2 > 0;
     const t1 = m.t1 && m.t1.validos > 0 && m.t1.finalistas.length === nCand ? m.t1 : null;
@@ -281,6 +333,10 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
       q1: t1 && f1 > 0 ? t1.finalistas[0] / f1 : null,
       f1,
       w1: t1 ? t1.validos : 0,
+      ab,
+      fAb: !t2 && ab && !fora ? fracaoAb(ab) : 0,
+      pDefasado: vLido > 0 ? m.t2!.votos[0] / vLido : null,
+      sDefasado: vLido > 0 ? m.t2!.secoesTotalizadas : 0,
     });
   }
   if (!muns.length) return null;
@@ -311,7 +367,7 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
   };
   for (const m of muns) {
     ufs.add(m.uf);
-    if (m.t2 && m.t2.secoesTotalizadas > 0) {
+    if ((m.t2 && m.t2.secoesTotalizadas > 0) || (!m.t2 && m.ab && m.ab.secoesTotalizadas > 0)) {
       municipiosComUrnas++;
       ufsComUrnas.add(m.uf);
     }
@@ -332,13 +388,14 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
     }
   }
   // fonte TSE: a parte apurada dos desconhecidos (total oficial da UF − lidos) também mostra o swing — comparado ao
-  // 1º turno do bloco de desconhecidos inteiro (não se sabe quais deles já começaram)
+  // 1º turno da parte deles que já foi apurada, pelo acompanhamento (cada um pesa os válidos do 1º turno × a fração já
+  // totalizada); sem acompanhamento, ao 1º turno do bloco de desconhecidos inteiro (não se sabe quais começaram)
   if (e.totaisUf) {
-    const blocos = new Map<string, { lidos: number[]; f0: number; f1: number }>();
+    const blocos = new Map<string, { lidos: number[]; f0: number; f1: number; a0: number; a1: number }>();
     for (const m of muns) {
       if (!e.totaisUf[m.uf]) continue;
       let b = blocos.get(m.uf);
-      if (!b) blocos.set(m.uf, (b = { lidos: [0, 0], f0: 0, f1: 0 }));
+      if (!b) blocos.set(m.uf, (b = { lidos: [0, 0], f0: 0, f1: 0, a0: 0, a1: 0 }));
       if (m.t2) {
         b.lidos[0] += m.t2.votos[0];
         b.lidos[1] += m.t2.votos[1];
@@ -346,6 +403,8 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
         // ponderado pelos válidos do 1º turno, como o prior e o volume do bloco (descPrior0/descEsperado)
         b.f0 += m.q1 * m.w1;
         b.f1 += m.w1;
+        b.a0 += m.q1 * m.w1 * m.fAb;
+        b.a1 += m.w1 * m.fAb;
       }
     }
     for (const [uf, b] of blocos) {
@@ -354,7 +413,7 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
       const a0 = Math.max(0, tot.votos[0] - b.lidos[0]);
       const a1 = Math.max(0, tot.votos[1] - b.lidos[1]);
       if (!(a0 + a1 > 0)) continue;
-      const d = a0 / (a0 + a1) - b.f0 / b.f1;
+      const d = a0 / (a0 + a1) - (b.a1 > 0 ? b.a0 / b.a1 : b.f0 / b.f1);
       let a = swUf.get(uf);
       if (!a) swUf.set(uf, (a = new AcSwing()));
       a.add(d, a0 + a1);
@@ -398,7 +457,10 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
     // desconhecidos (fonte TSE)
     let descEsperado = 0;
     let descPrior0 = 0;
-    let descSoma2 = 0;
+    // o que falta de cada desconhecido: volume × (1 − fração já totalizada pelo acompanhamento; 0 sem ele)
+    let descRestoW = 0;
+    let descRestoQ = 0;
+    let descRestoW2 = 0;
     const lidos = [0, 0];
     let lidosElei = 0;
     let lidosEleiTot = 0;
@@ -437,7 +499,17 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
         temDesconhecido = true;
         descEsperado += ve;
         descPrior0 += ve * q;
-        descSoma2 += ve * ve;
+        const w = ve * (1 - m.fAb);
+        descRestoW += w;
+        // defasado: o já lido e o 1º turno + swing, pesados pela precisão de cada um (poucas seções lidas → perto do prior)
+        let qr = q;
+        if (m.pDefasado !== null) {
+          const pObs = 1 / (prm.varIntra / (1 + prm.alfa * m.sDefasado));
+          const pPri = 1 / (sw.var + prm.varMinMun);
+          qr = (pObs * m.pDefasado + pPri * q) / (pObs + pPri);
+        }
+        descRestoQ += w * qr;
+        descRestoW2 += w * w;
         continue;
       }
       final[0] += ve * q;
@@ -458,17 +530,19 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
         const espObs = apS > 0 && eleiTotDesc > 0 && eleiDesc >= eleiTotDesc ? (apS * eleiDesc) / eleiTotDesc : 0;
         const esp = Math.max(espObs > 0 ? espObs : descEsperado, apS);
         const resto = esp - apS;
-        const q = descEsperado > 0 ? descPrior0 / descEsperado : 0.5;
+        // o que falta segue o 1º turno + swing de cada desconhecido, pesado pelo que falta nele (sem acompanhamento,
+        // pelo volume inteiro); tudo já totalizado pelo acompanhamento: o do bloco inteiro
+        const q = descRestoW > 0 ? descRestoQ / descRestoW : descEsperado > 0 ? descPrior0 / descEsperado : 0.5;
         final[0] += ap[0] + resto * q;
         final[1] += ap[1] + resto * (1 - q);
         esperadoTotal += esp;
         apuradoTotal += apS;
         restoSemUrnas += resto;
-        // o que falta dos desconhecidos, espalhado pelos municípios deles (proporcional ao volume esperado de cada um)
+        // o que falta dos desconhecidos, espalhado pelos municípios deles (proporcional ao que falta em cada um)
         // (+ a heterogeneidade interna dos já começados entre eles, como num município começado)
-        const fr = descEsperado > 0 ? resto / descEsperado : 1;
+        const fr = descRestoW > 0 ? resto / descRestoW : 1;
         const secDesc = Math.max(0, tot.secoesTotalizadas - lidosSecTot);
-        varIndep += (descSoma2 > 0 ? fr * fr * descSoma2 : resto * resto) * (sw.var + prm.varMinMun) + (resto * resto * prm.varIntra) / (1 + prm.alfa * secDesc);
+        varIndep += (descRestoW2 > 0 ? fr * fr * descRestoW2 : resto * resto) * (sw.var + prm.varMinMun) + (resto * resto * prm.varIntra) / (1 + prm.alfa * secDesc);
         if (apS > 0) sistTotal += resto * prm.sistIniciado;
       }
     }
@@ -482,12 +556,12 @@ export function calcularProjecao(e: EntradaProjecao, prm: Readonly<ParamsProjeca
   const pct0 = (100 * final[0]) / total;
   const dp = (100 * Math.sqrt(varIndep + varAmostra + sistTotal * sistTotal)) / total;
   const meia = Math.max(prm.piso, e.totaisUf ? PISO_FAIXA_TSE_PP : 0, prm.fator * dp);
-  // fonte TSE: quanto do já apurado oficialmente está nos municípios lidos (cache)
+  // fonte TSE: quanto do já apurado oficialmente está em municípios conhecidos (lidos no cache ou no acompanhamento)
   let coberturaCache: number | undefined;
   if (e.totaisUf) {
     let lidas = 0;
     let oficiais = 0;
-    for (const m of muns) if (m.t2 && e.totaisUf[m.uf]) lidas += Math.max(0, m.t2.secoesTotalizadas);
+    for (const m of muns) if (e.totaisUf[m.uf]) lidas += Math.max(0, m.t2?.secoesTotalizadas ?? 0, m.ab?.secoesTotalizadas ?? 0);
     for (const uf of ufs) oficiais += Math.max(0, e.totaisUf[uf]?.secoesTotalizadas ?? 0);
     coberturaCache = oficiais > 0 ? Math.min(1, lidas / oficiais) : 0;
   }

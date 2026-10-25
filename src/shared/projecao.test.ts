@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   calcularProjecao,
+  coberturaCacheBaixa,
   LIMIAR_FRACAO,
   montarProjecao,
   paresT1,
@@ -127,6 +128,79 @@ describe('calcularProjecao', () => {
     const tarde = calcularProjecao({ municipios: muns(16) })!;
     expect(cedo.fracaoApurada).toBeLessThan(tarde.fracaoApurada);
     expect(cedo.meia).toBeGreaterThan(tarde.meia);
+  });
+
+  describe('fonte TSE com o acompanhamento da UF (cache dos municípios vazio ou defasado)', () => {
+    const ab = (s: number, st: number) => ({ secoes: s, secoesTotalizadas: st, eleitorado: s * 100, eleitoradoTotalizado: st * 100 });
+
+    it('o swing dos desconhecidos é medido contra o 1º turno só da parte já apurada; o que falta segue cada município', () => {
+      // A (1º turno 30%) todo apurado, B (70%) sem urnas; nenhum lido. Oficial = A com 35% → swing +5 p.p. → B 75%
+      const municipios: MunicipioProjecao[] = [
+        { ...mun('PA', [300, 700, 0], null), ab: ab(10, 10) },
+        { ...mun('PA', [700, 300, 0], null), ab: ab(10, 0) },
+      ];
+      const totaisUf = { PA: { votos: [350, 650], secoes: 20, secoesTotalizadas: 10, eleitorado: 2000, eleitoradoTotalizado: 1000 } };
+      const c = calcularProjecao({ municipios, totaisUf })!;
+      expect(c.pct[0]).toBeCloseTo(55, 9);
+      expect(c.validosApurados).toBe(1000);
+      expect(c.validosEsperados).toBeCloseTo(2000, 9);
+      expect(c.municipiosComUrnas).toBe(1);
+      expect(c.coberturaCache).toBe(1);
+      expect(projecaoLiberada('PA', c)).toBe(true);
+      expect(coberturaCacheBaixa('PA', c)).toBe(false);
+      // sem o acompanhamento: o bloco inteiro (50%) vira a base → swing −15 p.p. e o que falta sai com a proporção já
+      // apurada (35%); a UF fica escondida (nenhum município conhecido com urnas, cobertura 0)
+      const sem = calcularProjecao({ municipios: municipios.map((m) => ({ ...m, ab: null })), totaisUf })!;
+      expect(sem.pct[0]).toBeCloseTo(35, 9);
+      expect(projecaoLiberada('PA', sem)).toBe(false);
+      expect(coberturaCacheBaixa('PA', sem)).toBe(true);
+    });
+
+    it('lido defasado (menos seções que o acompanhamento) vira desconhecido: nada contado duas vezes; o que falta dele segue o já lido', () => {
+      // M lido com 1 de 10 seções (60/40); o acompanhamento e o oficial já têm 5 (500 votos, 60/40). N sem urnas (1º turno 40%).
+      const municipios: MunicipioProjecao[] = [
+        { ...mun('AM', [500, 500, 0], { v: [60, 40], st: 1, s: 10 }), ab: ab(10, 5) },
+        { ...mun('AM', [400, 600, 0], null), ab: ab(10, 0) },
+      ];
+      const totaisUf = { AM: { votos: [300, 200], secoes: 20, secoesTotalizadas: 5, eleitorado: 2000, eleitoradoTotalizado: 500 } };
+      const c = calcularProjecao({ municipios, totaisUf })!;
+      expect(c.validosApurados).toBe(500);
+      expect(c.validosEsperados).toBeCloseTo(2000, 9);
+      // swing do bloco = 60% − 50% (1º turno de M, a parte apurada) = +10 p.p.; resto: M (500) a 60%, N (1000) a 50%
+      expect(c.pct[0]).toBeCloseTo((100 * (300 + 0.6 * 500 + 0.5 * 1000)) / 2000, 9);
+      expect(c.coberturaCache).toBe(1);
+      // acompanhamento atrás do lido (lido mais novo, em dia com o oficial): o lido vale
+      const lidoNovo = { ...mun('AM', [500, 500, 0], { v: [300, 200], st: 5, s: 10 }), ab: ab(10, 0) };
+      const atras = calcularProjecao({ municipios: [lidoNovo, municipios[1]], totaisUf })!;
+      expect(atras.municipiosComUrnas).toBe(1);
+      expect(atras.validosApurados).toBe(500);
+      expect(atras.pct[0]).toBeCloseTo((100 * (600 + 0.5 * 1000)) / 2000, 9);
+    });
+
+    it('UF fora de dia (lidos e acompanhamento atrás do oficial, ex.: lote grande): a UF inteira vira bloco de desconhecidos', () => {
+      // lido e acompanhamento com 1 seção; o oficial já tem 8 → ninguém sabe quem andou: nada dos lidos entra
+      const municipios: MunicipioProjecao[] = [
+        { ...mun('PA', [500, 500, 0], { v: [60, 40], st: 1, s: 10 }), ab: ab(10, 1) },
+        { ...mun('PA', [400, 600, 0], null), ab: ab(10, 0) },
+      ];
+      const totaisUf = { PA: { votos: [480, 320], secoes: 20, secoesTotalizadas: 8, eleitorado: 2000, eleitoradoTotalizado: 800 } };
+      const c = calcularProjecao({ municipios, totaisUf })!;
+      const bloco = calcularProjecao({ municipios: municipios.map((m) => ({ ...m, t2: null, ab: null })), totaisUf })!;
+      expect(c.pct[0]).toBeCloseTo(bloco.pct[0], 9);
+      expect(c.validosApurados).toBe(800);
+      expect(c.coberturaCache).toBeCloseTo(1 / 8, 9);
+      expect(coberturaCacheBaixa('PA', c)).toBe(true);
+    });
+
+    it('fora da fonte TSE (sem totais oficiais) o acompanhamento é ignorado', () => {
+      const municipios: MunicipioProjecao[] = [
+        { ...mun('SP', [10, 10, 0], { v: [600, 400], st: 1, s: 4 }), ab: ab(4, 3) },
+        { ...mun('SP', [300, 700, 0], null), ab: ab(4, 2) },
+      ];
+      const com = calcularProjecao({ municipios })!;
+      const sem = calcularProjecao({ municipios: municipios.map((m) => ({ ...m, ab: undefined })) })!;
+      expect(com).toEqual(sem);
+    });
   });
 
   it('sem base: lista vazia, corrida com 3 candidatos ou nenhum volume', () => {
