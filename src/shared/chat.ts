@@ -21,6 +21,7 @@
  * LGPD: o servidor guarda só o texto público das últimas mensagens, em memória (nada em disco, nada de IP); o
  * visitante é uma chave anonimizada (rede com sal + token aleatório do navegador) usada para os limites.
  */
+import { FIM_VOTACAO, HORA_FIM_VOTACAO, INICIO_DIA_VOTACAO } from './diaVotacao';
 
 // ---- contrato da API --------------------------------------------------------------------------------------------
 
@@ -49,7 +50,7 @@ export interface FixadaChat {
 export interface ChatPublico {
   /** sala aberta para mensagens (fechada = só leitura; FECHADA por padrão) */
   aberta: boolean;
-  /** motivo de a sala estar fechada mesmo com o admin tendo aberto (ex.: dia da eleição antes das 17h) */
+  /** motivo de a sala estar fechada mesmo com o admin tendo aberto (ex.: dia da eleição antes do fim da votação) */
   bloqueio: string | null;
   /** modo lento: segundos entre mensagens do mesmo visitante */
   lentoS: number;
@@ -786,16 +787,21 @@ export const LETRAS_DUPLICADA_GLOBAL = 4;
 
 // ---- dia da eleição ------------------------------------------------------------------------------------------------
 
-/** 25/10/2026 00:00 e 17:00 em Brasília (UTC−3). */
-export const DIA_ELEICAO_INICIO = Date.UTC(2026, 9, 25, 3, 0, 0);
-export const DIA_ELEICAO_17H = Date.UTC(2026, 9, 25, 20, 0, 0);
+/** 25/10/2026 00:00 em Brasília (UTC−3): começo do dia da eleição. Fonte única: src/shared/diaVotacao.ts. */
+export const DIA_ELEICAO_INICIO = INICIO_DIA_VOTACAO;
+/**
+ * Fim da votação em Brasília: 19h de 25/10/2026 (`FIM_VOTACAO`; a votação foi prorrogada até as 19h). O nome ficou do
+ * horário original (17h) e é mantido por compatibilidade de importação.
+ */
+export const DIA_ELEICAO_17H = FIM_VOTACAO;
 
 /**
- * No dia da eleição, até as 17h (horário de Brasília), a sala não recebe mensagens: propaganda no dia da eleição é
- * crime (Lei 9.504/97, art. 39, § 5º) e a votação ainda está aberta. Devolve o motivo exibido ou null.
+ * No dia da eleição, até o fim da votação (`HORA_FIM_VOTACAO`, horário de Brasília), a sala não recebe mensagens:
+ * propaganda no dia da eleição é crime (Lei 9.504/97, art. 39, § 5º) e a votação ainda está aberta. Devolve o motivo
+ * exibido ou null.
  */
 export function bloqueioDiaEleicao(agora: number): string | null {
-  if (agora >= DIA_ELEICAO_INICIO && agora < DIA_ELEICAO_17H) return 'A sala abre às 17h, quando terminar a votação.';
+  if (agora >= DIA_ELEICAO_INICIO && agora < DIA_ELEICAO_17H) return `A sala abre às ${HORA_FIM_VOTACAO}, quando terminar a votação.`;
   return null;
 }
 

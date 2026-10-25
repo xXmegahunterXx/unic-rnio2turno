@@ -15,7 +15,7 @@
  *
  * Ligado em app.ts por `ligarMetaNoite(ctxMeta, …)` (uma linha): corridas na fonte 'tse' passam por aqui; as do motor
  * (simulação, pré, 1º turno) continuam com o placar do motor. Também entrega o relógio às meta tags (`ctx.agora`), usado
- * para tirar os nomes das descrições no dia da votação, antes das 17h.
+ * para tirar os nomes das descrições no dia da votação, até o fim dela (19h, `FIM_VOTACAO`).
  */
 import type { Race, Summary, UF } from '../shared/types';
 import { anonimizarRace } from '../shared/anon';

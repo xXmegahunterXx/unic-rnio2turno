@@ -23,6 +23,7 @@
  */
 import { pctTotalizadas, pctValidos, validos, margem } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
+import { HORA_FIM_VOTACAO } from '../shared/diaVotacao';
 import { fmtHoraSeg, fmtInt, fmtPP, fmtPct } from '../shared/format';
 import { partidoENumero } from '../shared/anon';
 import type { Candidate, Race, Summary, UF } from '../shared/types';
@@ -450,7 +451,8 @@ export function layoutPlacar(inp: OgPlacarInput, opts: { semFundo?: boolean } = 
 
   let selo: No;
   if (inp.simulacao) selo = pilula('SIMULAÇÃO · DADOS FICTÍCIOS', m, C.brand, '#ffffff');
-  else if (inp.pre) selo = pilula('25/10 · A PARTIR DAS 17H', m, 'rgba(255,255,255,0.06)', C.fg, C.line);
+  // antes da apuração: a divulgação começa no fim da votação (prorrogada até as 19h)
+  else if (inp.pre) selo = pilula(`25/10 · A PARTIR DAS ${HORA_FIM_VOTACAO.toUpperCase()}`, m, 'rgba(255,255,255,0.06)', C.fg, C.line);
   else if (t1) selo = pilula('RESULTADO OFICIAL · TSE', m, 'rgba(255,255,255,0.06)', C.fg, C.line);
   else if (encerrada) selo = pilula('APURAÇÃO ENCERRADA', m, 'rgba(255,255,255,0.06)', C.fg, C.line);
   else selo = pilula('AO VIVO', m, 'rgba(255,255,255,0.06)', C.fg, C.line);
@@ -512,7 +514,7 @@ export function layoutPlacar(inp: OgPlacarInput, opts: { semFundo?: boolean } = 
   let statusPrincipal: string;
   let statusSecundario: string;
   if (inp.pre) {
-    statusPrincipal = 'Apuração a partir das 17h de 25/10';
+    statusPrincipal = `Apuração a partir das ${HORA_FIM_VOTACAO} de 25/10`;
     statusSecundario = 'Percentuais do 1º turno · Fonte: TSE';
   } else if (t1) {
     statusPrincipal = `${fmtPct(pctSec)} das seções totalizadas`;

@@ -3,8 +3,9 @@
  *
  *  - Até as 23h59 de 24/10 (relógio do servidor): a pessoa crava o % dos votos válidos de cada finalista com um divisor
  *    só (somam 100%) e recebe o cartão "Meu palpite" para postar (x/feed/story, gerado no navegador).
- *  - Dia da votação (25/10, 0h–17h): o palpite fica travado e NÃO se compartilha (art. 39, § 5º).
- *  - Depois das 17h: com o resultado OFICIAL do TSE, a página mostra a diferença ("Você errou por Z p.p." / "Na mosca")
+ *  - Dia da votação (25/10, de 0h ao fim da votação — 19h, prorrogada; eram 17h): o palpite fica travado e NÃO se
+ *    compartilha (art. 39, § 5º).
+ *  - Depois do fim da votação: com o resultado OFICIAL do TSE, a página mostra a diferença ("Você errou por Z p.p." / "Na mosca")
  *    e o cartão do resultado. Números simulados nunca entram na comparação.
  *  - Link recebido (`/palpite#<código>`): mostra o palpite de quem mandou e compara com o seu (só os dois — como o
  *    Duelo do Teste Cego). O código vai depois do "#": não chega a servidor algum.
@@ -23,6 +24,7 @@ import type { Candidate } from '@/shared/types';
 import { escolherAnuncio } from '@/shared/anuncios-escolha';
 import { OFERECIMENTO_COM_CANDIDATOS, OFERECIMENTO_RANKING_DESAFIO } from '@/shared/oferecimento';
 import { fmtDataHora, fmtPct } from '@/shared/format';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { useMeta, useNacional, useStatus } from '@/app/data/hooks';
 import { cn } from '@/app/lib/cn';
 import { brilhoDuplo, corSlot } from '@/app/lib/raceUi';
@@ -313,7 +315,7 @@ function Conteudo({
   finalistas: FinalistasPalpite;
   agora: number;
   aberto: boolean;
-  /** 25/10 de 0h às 17h: travado e sem compartilhar */
+  /** 25/10 de 0h ao fim da votação (19h): travado e sem compartilhar */
   votacao: boolean;
   salvo: Palpite | null;
   gravar: (p: Palpite) => boolean;
@@ -596,7 +598,7 @@ function Travado({
   salvo: Palpite;
   oficial: ResultadoOficial | null;
   simulacao: boolean;
-  /** 25/10 de 0h às 17h: sem compartilhar */
+  /** 25/10 de 0h ao fim da votação (19h): sem compartilhar */
   votacao: boolean;
   oferecimento: string | null;
 }) {
@@ -637,7 +639,7 @@ function Travado({
         {votacao ? (
           <p className="flex items-start gap-2 text-pretty text-[13.5px] leading-snug text-fg-muted">
             <Icon name="relogio" size={16} className="mt-px shrink-0 text-brand-fg" />
-            Hoje é dia de votação: para nenhum palpite com nome de candidato circular enquanto as urnas estão abertas, o compartilhar volta às 17h.
+            Hoje é dia de votação: para nenhum palpite com nome de candidato circular enquanto as urnas estão abertas, o compartilhar volta às {HORA_FIM_VOTACAO}, quando termina a votação.
           </p>
         ) : oficial?.final && av ? (
           <BotaoCompartilhar
@@ -877,7 +879,7 @@ function Recebido({
 function ComoFunciona({ aberto }: { aberto: boolean }) {
   const itens = [
     'Arraste o divisor na direção de um candidato para aumentar a parte dele, ou use os botões de 0,1 ponto. Os dois somam 100% dos votos válidos.',
-    'Crave o palpite. Até as 23h59 de 24/10 (Brasília) dá para mudar; depois, ele fica travado neste aparelho. No dia da votação, até as 17h, o palpite não é compartilhado.',
+    `Crave o palpite. Até as 23h59 de 24/10 (Brasília) dá para mudar; depois, ele fica travado neste aparelho. No dia da votação, até as ${HORA_FIM_VOTACAO}, o palpite não é compartilhado.`,
     `Quando o TSE concluir a apuração, a página mostra a diferença entre o seu palpite e o resultado oficial, em pontos percentuais. Menos de ${fmtDiferenca(NA_MOSCA_PP)}: na mosca.`,
     'Compartilhe a imagem e o link: quem abrir vê o seu palpite e pode comparar com o dele.',
     // o convite para desafiar só vale até o prazo (depois, o desafio só mostra o que já está neste aparelho)

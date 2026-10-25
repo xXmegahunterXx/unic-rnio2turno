@@ -9,7 +9,7 @@ import { useNow } from '@/app/lib/useNow';
 import { CHAVE_PALPITE, deslocamentoRelogio, gravarPalpite, lerPalpiteSalvo, type Palpite } from './nucleo';
 
 /**
- * "Agora" pelo relógio do servidor (o prazo das 17h de 25/10 é o do servidor, não o do aparelho), com tique de 1 s.
+ * "Agora" pelo relógio do servidor (o fim da votação, 19h de 25/10, é o do servidor, não o do aparelho), com tique de 1 s.
  * Sem status (erro de rede, demo antes do worker), o relógio do aparelho.
  */
 export function useAgoraServidor(): number {

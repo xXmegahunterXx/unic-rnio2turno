@@ -4,17 +4,19 @@
  * (`urlCompartilhada`, I08) e a imagem gerada pelo SERVIDOR (OG). Nada sai daqui sozinho: o dono toca em "Abrir no X",
  * "WhatsApp", "Copiar" ou "Baixar imagem".
  *
- *  - Convite (sempre): sem nome e sem número; imagem genérica (`/api/og/audiencia.png?m=0`).
+ *  - Convite (sempre): sem nome e sem número; imagem genérica (`/api/og/audiencia.png?m=0`). Até o fim da votação (19h
+ *    de 25/10, relógio do servidor), o texto é o convite do dia da votação, mesmo com a fonte já no TSE.
  *  - Audiência: um por marco atingido (10, 50 e 100 mil pessoas agora; todos acima do piso público de 500). O texto diz
  *    só o marco, arredondado para baixo; a imagem lê o número do SERVIDOR (o `?m=` da URL só pode baixar o marco) e sai
  *    sem número com a chave "Pessoas agora no site" desligada.
  *  - Momentos: um por evento NACIONAL de Presidente do feed (começo, marcos de % apurado, liderança, virada e
  *    resultado), do mais recente para o mais antigo; a imagem é o placar de agora (`/api/og/apuracao.png`).
- *    TRAVA: cartão com nome de candidato só a partir das 17h de 25/10, pelo relógio do SERVIDOR (`wallNow`). Antes
- *    disso, só na simulação com os nomes ocultos ("Candidato A/B", com "[SIMULAÇÃO]" no texto).
+ *    TRAVA: cartão com nome de candidato só a partir do fim da votação (19h de 25/10 — `FIM_VOTACAO`; a votação foi
+ *    prorrogada, eram 17h), pelo relógio do SERVIDOR (`wallNow`). Antes disso, só na simulação com os nomes ocultos
+ *    ("Candidato A/B", com "[SIMULAÇÃO]" no texto).
  */
 import type { Fase, FeedEvent, TipoEvento } from '@/shared/types';
-import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO } from '@/shared/diaVotacao';
 import { textoComLink, urlCompartilhada, whatsappUrl, xIntentUrl } from '@/app/lib/share';
 import { HASHTAGS, SUFIXO_LINK, comSufixoLink, textoPostarAudiencia, textoPostarConvite, textoPostarEvento } from '@/app/components/share/textos';
 
@@ -76,7 +78,7 @@ export interface ResultadoPostar {
   convite: CartaoPostar;
   audiencia: CartaoPostar[];
   momentos: CartaoPostar[];
-  /** Momentos escondidos pela trava das 17h (têm nome de candidato). */
+  /** Momentos escondidos pela trava do fim da votação, 19h (têm nome de candidato). */
   travados: number;
   /** Próximo marco de audiência ainda não atingido (null depois do último). */
   proximoMarco: MarcoAudiencia | null;
@@ -85,11 +87,11 @@ export interface ResultadoPostar {
 }
 
 /**
- * Cartões com nome de candidato liberados? A partir das 17h de 25/10 pelo relógio do servidor; antes, só na simulação
- * com os nomes ocultos. Puro.
+ * Cartões com nome de candidato liberados? A partir do fim da votação (19h de 25/10, `FIM_VOTACAO`) pelo relógio do
+ * servidor; antes, só na simulação com os nomes ocultos. Puro.
  */
 export function nomesLiberados(e: Pick<EntradaPostar, 'wallNow' | 'simulado' | 'anonimizado'>): boolean {
-  if (Number.isFinite(e.wallNow) && e.wallNow >= INICIO_APURACAO) return true;
+  if (Number.isFinite(e.wallNow) && e.wallNow >= FIM_VOTACAO) return true;
   return e.simulado && e.anonimizado;
 }
 
@@ -109,14 +111,14 @@ export function imagemAudiencia(marco: MarcoAudiencia | 0, formato: FormatoImage
   return `/api/og/audiencia.png?m=${marco}&formato=${formato}`;
 }
 
-/** Monta os cartões da aba "Postar". Puro (testado: texto ≤ 220, trava das 17h, só eventos nacionais). */
+/** Monta os cartões da aba "Postar". Puro (testado: texto ≤ 220, trava do fim da votação, só eventos nacionais). */
 export function cartoesPostar(e: EntradaPostar): ResultadoPostar {
   const liberados = nomesLiberados(e);
   const convite: CartaoPostar = {
     id: `convite-${e.fase}`,
     tipo: 'convite',
     rotulo: 'Convite',
-    texto: textoPostarConvite(e.fase, e.simulado),
+    texto: textoPostarConvite(e.fase, e.simulado, Number.isFinite(e.wallNow) ? e.wallNow : undefined),
     caminho: '/apuracao',
     imagem: { x: imagemAudiencia(0, 'x'), story: imagemAudiencia(0, 'story') },
   };

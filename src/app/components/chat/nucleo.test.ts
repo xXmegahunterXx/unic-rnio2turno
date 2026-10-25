@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MensagemChat } from '@/shared/chat';
 import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO } from '@/shared/diaVotacao';
 import {
   ALCANCE_MAX_PX,
   ANTECIPA_MAX_PX,
@@ -121,19 +122,19 @@ describe('ritmo de consulta', () => {
     // o servidor nunca leva o navegador a consultar mais rápido que 2,5 s
     expect(intervaloConsulta({ aberta: true, intervaloS: 0.1 }, 'tela')).toBe(2500);
   });
-  it('fechada antes das 17h de 25/10: acorda na hora da abertura (com sorteio de até 15 s), nunca antes do normal', () => {
+  it('fechada antes do fim da votação (19h de 25/10): acorda na hora da abertura (com sorteio de até 15 s), nunca antes do normal', () => {
     const fechada = { aberta: false, intervaloS: 2.5 };
     // longe da abertura: o normal
-    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO - 3_600_000, 0.5)).toBe(90_000);
+    expect(proximaConsulta(fechada, 'fundo', 0, FIM_VOTACAO - 3_600_000, 0.5)).toBe(90_000);
     // 30 s antes: acorda 1 s depois da hora + sorteio
-    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(31_000);
-    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO - 30_000, 0.999)).toBe(31_000 + 14_985);
-    expect(proximaConsulta(fechada, 'tela', 0, INICIO_APURACAO - 5_000, 1)).toBe(20_000);
+    expect(proximaConsulta(fechada, 'fundo', 0, FIM_VOTACAO - 30_000, 0)).toBe(31_000);
+    expect(proximaConsulta(fechada, 'fundo', 0, FIM_VOTACAO - 30_000, 0.999)).toBe(31_000 + 14_985);
+    expect(proximaConsulta(fechada, 'tela', 0, FIM_VOTACAO - 5_000, 1)).toBe(20_000);
     // aberta, depois da hora ou com falhas: o normal (o recuo não é furado)
-    expect(proximaConsulta({ aberta: true, intervaloS: 2.5 }, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(12_000);
-    expect(proximaConsulta(fechada, 'fundo', 0, INICIO_APURACAO + 1, 0)).toBe(90_000);
-    expect(proximaConsulta(fechada, 'fundo', 1, INICIO_APURACAO - 30_000, 0)).toBe(60_000);
-    expect(proximaConsulta(null, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(8000);
+    expect(proximaConsulta({ aberta: true, intervaloS: 2.5 }, 'fundo', 0, FIM_VOTACAO - 30_000, 0)).toBe(12_000);
+    expect(proximaConsulta(fechada, 'fundo', 0, FIM_VOTACAO + 1, 0)).toBe(90_000);
+    expect(proximaConsulta(fechada, 'fundo', 1, FIM_VOTACAO - 30_000, 0)).toBe(60_000);
+    expect(proximaConsulta(null, 'fundo', 0, FIM_VOTACAO - 30_000, 0)).toBe(8000);
   });
 });
 
@@ -141,22 +142,33 @@ describe('fase da sala e abertura', () => {
   it('demo, conectando, aberta, antes da hora e fechada depois dela', () => {
     expect(faseChat(null, true, 0)).toBe('demo');
     expect(faseChat(null, false, 0)).toBe('conectando');
-    expect(faseChat({ aberta: true }, false, INICIO_APURACAO - 1)).toBe('aberta');
-    expect(faseChat({ aberta: false }, false, INICIO_APURACAO - 1)).toBe('antes');
-    expect(faseChat({ aberta: false }, false, INICIO_APURACAO)).toBe('fechada');
+    expect(faseChat({ aberta: true }, false, FIM_VOTACAO - 1)).toBe('aberta');
+    expect(faseChat({ aberta: false }, false, FIM_VOTACAO - 1)).toBe('antes');
+    expect(faseChat({ aberta: false }, false, FIM_VOTACAO)).toBe('fechada');
+  });
+  it('votação prorrogada: a sala abre às 19h (FIM_VOTACAO), não às 17h (início da leitura do TSE)', () => {
+    expect(FIM_VOTACAO).toBe(Date.UTC(2026, 9, 25, 22, 0, 0));
+    // entre 17h e 19h a sala segue "antes" (a pílula diz quando abre) e acorda na hora certa
+    expect(faseChat({ aberta: false }, false, INICIO_APURACAO)).toBe('antes');
+    expect(faseChat({ aberta: false }, false, INICIO_APURACAO + 3_600_000)).toBe('antes');
+    expect(textoAbertura(INICIO_APURACAO + 1)).toBe('abre hoje, 19h');
+    expect(proximaConsulta({ aberta: false, intervaloS: 2.5 }, 'fundo', 0, FIM_VOTACAO - 30_000, 0)).toBe(31_000);
+    expect(proximaConsulta({ aberta: false, intervaloS: 2.5 }, 'fundo', 0, INICIO_APURACAO - 30_000, 0)).toBe(90_000);
   });
   it('texto curto da pílula pelo dia em Brasília', () => {
     // hoje (19/10, segunda) → domingo; 24/10 → amanhã; 25/10 de manhã → hoje; mais de 6 dias → data
-    expect(textoAbertura(Date.UTC(2026, 9, 19, 15, 0))).toBe('abre domingo, 17h');
-    expect(textoAbertura(Date.UTC(2026, 9, 25, 2, 59))).toBe('abre amanhã, 17h'); // 23h59 de 24/10 em Brasília
-    expect(textoAbertura(Date.UTC(2026, 9, 25, 3, 0))).toBe('abre hoje, 17h');
-    expect(textoAbertura(INICIO_APURACAO - 1)).toBe('abre hoje, 17h');
-    expect(textoAbertura(Date.UTC(2026, 9, 18, 15, 0))).toBe('abre 25/10, 17h');
-    expect(textoAbertura(INICIO_APURACAO)).toBeNull();
+    expect(textoAbertura(Date.UTC(2026, 9, 19, 15, 0))).toBe('abre domingo, 19h');
+    expect(textoAbertura(Date.UTC(2026, 9, 25, 2, 59))).toBe('abre amanhã, 19h'); // 23h59 de 24/10 em Brasília
+    expect(textoAbertura(Date.UTC(2026, 9, 25, 3, 0))).toBe('abre hoje, 19h');
+    expect(textoAbertura(FIM_VOTACAO - 1)).toBe('abre hoje, 19h');
+    expect(textoAbertura(Date.UTC(2026, 9, 18, 15, 0))).toBe('abre 25/10, 19h');
+    expect(textoAbertura(FIM_VOTACAO)).toBeNull();
+    // com outro horário explícito, a hora sai dele
+    expect(textoAbertura(INICIO_APURACAO - 1, INICIO_APURACAO)).toBe('abre hoje, 17h');
   });
   it('contagem até a abertura', () => {
-    expect(contagemAbertura(INICIO_APURACAO - (2 * 86_400 + 3 * 3600 + 4 * 60 + 5) * 1000)).toMatchObject({ dias: 2, horas: 3, minutos: 4, segundos: 5 });
-    expect(contagemAbertura(INICIO_APURACAO + 10)).toMatchObject({ dias: 0, horas: 0, minutos: 0, segundos: 0, ms: 0 });
+    expect(contagemAbertura(FIM_VOTACAO - (2 * 86_400 + 3 * 3600 + 4 * 60 + 5) * 1000)).toMatchObject({ dias: 2, horas: 3, minutos: 4, segundos: 5 });
+    expect(contagemAbertura(FIM_VOTACAO + 10)).toMatchObject({ dias: 0, horas: 0, minutos: 0, segundos: 0, ms: 0 });
   });
 });
 
@@ -261,7 +273,7 @@ describe('popup do computador', () => {
     expect(prefEfetiva({ sessao: null, guardada: 'minimizado', aberta: true })).toBe('minimizado');
     expect(prefEfetiva({ sessao: null, guardada: 'aberto', aberta: false })).toBe('minimizado');
     expect(prefEfetiva({ sessao: { pref: 'aberto', aberta: false }, guardada: null, aberta: false })).toBe('aberto');
-    // abriu para ver a contagem e minimizou; às 17h a sala abre: vale o padrão (aberto)
+    // abriu para ver a contagem e minimizou; às 19h a sala abre: vale o padrão (aberto)
     expect(prefEfetiva({ sessao: { pref: 'minimizado', aberta: false }, guardada: null, aberta: true })).toBe('aberto');
     expect(prefEfetiva({ sessao: { pref: 'minimizado', aberta: true }, guardada: 'aberto', aberta: true })).toBe('minimizado');
   });

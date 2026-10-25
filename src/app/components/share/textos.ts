@@ -8,7 +8,7 @@
  */
 import type { FeedEvent, Race, Tally, UF } from '@/shared/types';
 import { UF_NOMES } from '@/shared/constants';
-import { diaDeVotacaoAntesDas17 } from '@/shared/diaVotacao';
+import { HORA_FIM_VOTACAO, VOTACAO_PRORROGADA, diaDeVotacaoAntesDas17 } from '@/shared/diaVotacao';
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
 import { fmtCompact, fmtHora, fmtInt, fmtLista, fmtPP, fmtPct } from '@/shared/format';
 import { nEstadosGov } from '@/shared/gov2t';
@@ -35,17 +35,18 @@ export const HASHTAGS = {
 
 export const hashtags = (k: keyof typeof HASHTAGS): string[] => [...HASHTAGS[k]];
 
-// ---- dia da votação (0h–17h de 25/10, Brasília) -----------------------------------------------------------------
+// ---- dia da votação (0h–19h de 25/10, Brasília: até o fim da votação, `FIM_VOTACAO`; eram 17h até a prorrogação) -----
 // Decisão do dono (CHECKLIST A11.10, "vale também para as imagens"): nesse intervalo, nada que circula com o link leva
 // nome, foto, número ou percentual de candidato. O kit troca o conteúdo com candidato pelo convite abaixo (só texto e
 // link, sem imagem); os conteúdos sem candidato (`generico`: convite do site, Teste Cego sem resultado, bancadas por
 // partido) seguem iguais. As meta tags e as rotas de imagem do servidor fazem o mesmo (src/server/meta-tags.ts).
 
-/** Convite neutro do dia da votação: sem nome, número nem percentual. */
-export const TEXTO_DIA_VOTACAO =
-  'É hoje: às 17h (Brasília) começa a apuração do 2º turno. Acompanhe ao vivo no Sintonia, do Brasil inteiro até a sua seção, com os dados oficiais do TSE.';
+/** Convite neutro do dia da votação: sem nome, número nem percentual. A votação vai até as 19h; depois, a divulgação. */
+export const TEXTO_DIA_VOTACAO = VOTACAO_PRORROGADA
+  ? `É hoje: a votação do 2º turno foi prorrogada até as ${HORA_FIM_VOTACAO} (Brasília); depois, começa a divulgação dos resultados. Acompanhe ao vivo no Sintonia, do Brasil inteiro até a sua seção.`
+  : `É hoje: às ${HORA_FIM_VOTACAO} (Brasília), quando termina a votação, começa a divulgação dos resultados do 2º turno. Acompanhe ao vivo no Sintonia, do Brasil inteiro até a sua seção.`;
 /** Linha sob o título do sheet quando o conteúdo foi trocado pelo convite. */
-export const DESCRICAO_DIA_VOTACAO = 'Hoje, até as 17h, o compartilhamento leva só o convite para a apuração e o link: sem imagem, nomes ou números.';
+export const DESCRICAO_DIA_VOTACAO = `Hoje, até as ${HORA_FIM_VOTACAO}, quando termina a votação, o compartilhamento leva só o convite para a apuração e o link: sem imagem, nomes ou números.`;
 
 /** Conteúdo com candidato vira o convite agora? (relógio REAL do servidor; `generico` = conteúdo sem candidato) */
 export function trocaPeloConvite(agora: number, generico?: boolean): boolean {
@@ -190,13 +191,16 @@ export function textoPostarAudiencia(marco: number): string {
 }
 
 /**
- * Texto do cartão "Convite" da aba "Postar" (I26): sem nome, sem número, pela fase da noite. Antes das 17h, a data e a
- * hora; apurando, o convite para acompanhar; encerrada, o resultado completo para consultar. Puro.
+ * Texto do cartão "Convite" da aba "Postar" (I26): sem nome, sem número, pela fase da noite. Antes da divulgação, a data
+ * e a hora do fim da votação (19h, prorrogada); durante a votação pelo relógio REAL do servidor (`agora`, 0h–19h de
+ * 25/10), o convite do dia da votação mesmo com a fonte já no TSE (17h–19h); apurando, o convite para acompanhar;
+ * encerrada, o resultado completo para consultar. Puro.
  */
-export function textoPostarConvite(fase: 'pre' | 'apurando' | 'encerrada', simulado?: boolean): string {
+export function textoPostarConvite(fase: 'pre' | 'apurando' | 'encerrada', simulado?: boolean, agora?: number): string {
+  if (fase !== 'encerrada' && typeof agora === 'number' && diaDeVotacaoAntesDas17(agora)) return finalizar(TEXTO_DIA_VOTACAO, simulado);
   const t =
     fase === 'pre'
-      ? 'Domingo, 25/10, às 17h (Brasília), começa a divulgação dos resultados do 2º turno. Acompanhe a apuração ao vivo no Sintonia, do Brasil inteiro até a sua seção.'
+      ? `Domingo, 25/10, a votação do 2º turno vai até as ${HORA_FIM_VOTACAO} (Brasília); depois, começa a divulgação dos resultados. Acompanhe a apuração ao vivo no Sintonia, do Brasil inteiro até a sua seção.`
       : fase === 'apurando'
         ? 'Apuração do 2º turno ao vivo no Sintonia: do Brasil inteiro até a sua seção.'
         : 'Resultado do 2º turno no Sintonia: do Brasil inteiro até a sua seção.';

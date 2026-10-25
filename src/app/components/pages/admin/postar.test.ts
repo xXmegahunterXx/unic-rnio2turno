@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { FeedEvent } from '@/shared/types';
 import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO } from '@/shared/diaVotacao';
 import { pesoTextoX } from '@/app/lib/share';
-import { LIMITE_TEXTO, PREFIXO_SIMULACAO, SUFIXO_LINK, textoPostarConvite } from '@/app/components/share/textos';
+import { LIMITE_TEXTO, PREFIXO_SIMULACAO, SUFIXO_LINK, TEXTO_DIA_VOTACAO, textoPostarConvite } from '@/app/components/share/textos';
 import { MAX_MOMENTOS, MARCOS_AUDIENCIA, cartoesPostar, linksPostar, marcosAtingidos, nomesLiberados, type EntradaPostar } from './postar';
 
 const PROIBIDAS = /vai ganhar|vitória|esmagador|derrota|virou o jogo|lavada|surra|favorito|torcida|imbat/i;
@@ -37,19 +38,30 @@ const base = (o: Partial<EntradaPostar> = {}): EntradaPostar => ({
   ...o,
 });
 
-describe('trava das 17h de 25/10 (cartões com nome)', () => {
-  it('pelo relógio do servidor: antes das 17h, nenhum momento; a partir das 17h, todos os nacionais', () => {
-    const antes = cartoesPostar(base({ wallNow: INICIO_APURACAO - 1 }));
+describe('trava do fim da votação, 19h de 25/10 (cartões com nome)', () => {
+  it('pelo relógio do servidor: antes das 19h, nenhum momento; a partir das 19h, todos os nacionais', () => {
+    expect(FIM_VOTACAO).toBe(brt(19, 0));
+    const antes = cartoesPostar(base({ wallNow: FIM_VOTACAO - 1 }));
     expect(antes.nomesLiberados).toBe(false);
     expect(antes.momentos).toEqual([]);
     expect(antes.travados).toBe(4);
-    const depois = cartoesPostar(base({ wallNow: INICIO_APURACAO }));
+    // 17h (começo da leitura do TSE) já não libera: a votação foi prorrogada até as 19h
+    expect(cartoesPostar(base({ wallNow: INICIO_APURACAO })).nomesLiberados).toBe(false);
+    const depois = cartoesPostar(base({ wallNow: FIM_VOTACAO }));
     expect(depois.nomesLiberados).toBe(true);
     expect(depois.travados).toBe(0);
     expect(depois.momentos.map((c) => c.id)).toEqual(['momento-e', 'momento-v', 'momento-m10', 'momento-i']);
   });
 
-  it('antes das 17h, só a simulação com nomes ocultos libera (e marcada [SIMULAÇÃO])', () => {
+  it('convite: até as 19h, o do dia da votação (mesmo apurando); depois, o da fase', () => {
+    expect(cartoesPostar(base({ wallNow: brt(18, 30) })).convite.texto).toBe(TEXTO_DIA_VOTACAO);
+    expect(cartoesPostar(base({ wallNow: brt(9, 0), fase: 'pre' })).convite.texto).toBe(TEXTO_DIA_VOTACAO);
+    expect(cartoesPostar(base({ wallNow: FIM_VOTACAO })).convite.texto).toBe(textoPostarConvite('apurando'));
+    expect(textoPostarConvite('pre')).toMatch(/até as 19h \(Brasília\)/);
+    for (const fase of ['pre', 'apurando', 'encerrada'] as const) expect(textoPostarConvite(fase)).not.toMatch(/17h/);
+  });
+
+  it('antes das 19h, só a simulação com nomes ocultos libera (e marcada [SIMULAÇÃO])', () => {
     const cedo = Date.UTC(2026, 9, 21, 12);
     expect(nomesLiberados({ wallNow: cedo, simulado: true, anonimizado: true })).toBe(true);
     expect(nomesLiberados({ wallNow: cedo, simulado: true, anonimizado: false })).toBe(false);

@@ -1,7 +1,7 @@
 /**
  * `GET /api/texto/placar?race=pres&uf=sp` (I22, leva 3): o placar em TEXTO PURO para os bots de chat das lives
  * (Nightbot `$(urlfetch …)`, StreamElements `${customapi.…}`, Fossabot `$(customapi …)`). Regras do texto em
- * src/shared/texto-placar.ts (sem nomes antes das 17h de 25/10, ordem da urna, simulação e nomes ocultos).
+ * src/shared/texto-placar.ts (sem nomes antes do fim da votação, 19h de 25/10; ordem da urna, simulação e nomes ocultos).
  *
  *  - `text/plain; charset=utf-8`, ≤ 380 caracteres, SEMPRE 200 (um bot que recebe erro escreve o erro no chat);
  *  - cache: o navegador não guarda; a borda guarda 5 s (`Cloudflare-CDN-Cache-Control`; a Regra 1 da Cloudflare já

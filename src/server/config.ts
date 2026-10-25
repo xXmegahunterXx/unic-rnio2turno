@@ -43,8 +43,9 @@
  *                     decisão do dono e do advogado (chat-registro.ts). A chave privada fica fora da VPS
  *   CHAT_REGISTRO_HEADER_PORTA cabeçalho com a porta de origem do visitante, quando o proxy a repassa (opcional)
  *   CHAT_ENSAIO       '1' (só para ensaio numa cópia do site): em produção, a sala aberta no painel recebe mensagens antes
- *                     de 25/10. Sem ela (o padrão), a sala só recebe mensagens a partir das 17h de 25/10 (o painel pode
- *                     abri-la antes e ela fica "abre às 17h"). O bloqueio legal de 0h–17h de 25/10 vale sempre
+ *                     de 25/10. Sem ela (o padrão), a sala só recebe mensagens a partir do fim da votação, 19h de 25/10
+ *                     (`FIM_VOTACAO`; o painel pode abri-la antes e ela fica "abre às 19h"). O bloqueio legal de 0h–19h
+ *                     de 25/10 vale sempre
  *
  * Log:
  *   LOG_FORMAT        'json' (padrão em produção: 1 objeto por linha) ou 'texto' (padrão em dev)

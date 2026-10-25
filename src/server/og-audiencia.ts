@@ -180,7 +180,7 @@ export function pngAudiencia(
 }
 
 /**
- * O convite genérico (o mesmo de `?m=0`): é a prévia do dia da votação (0h–17h de 25/10) nas meta tags e o que as rotas
+ * O convite genérico (o mesmo de `?m=0`): é a prévia do dia da votação (0h–19h de 25/10) nas meta tags e o que as rotas
  * de imagem com candidato respondem nesse intervalo (og-rotas.ts).
  */
 export const pngConvite = (formato: FormatoOgAudiencia = 'og', dominio = 'sintonia2026.com.br', log?: Pick<Logger, 'info'>) =>

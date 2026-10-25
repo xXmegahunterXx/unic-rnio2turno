@@ -6,6 +6,7 @@
  */
 import type { Candidate } from '@/shared/types';
 import { fmtDecimal, fmtPct } from '@/shared/format';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { LIMITE_TEXTO, limitarTexto } from '@/app/components/share/textos';
 import { pesoTextoX } from '@/app/lib/share';
 import { pctsDoPalpite, type Avaliacao } from './nucleo';
@@ -73,11 +74,13 @@ export const mancheteResultado = (av: Avaliacao, pessoa: 'eu' | 'voce' | 'recebi
  * "a apuração começou" durante a votação, nem "começou" depois do fim).
  */
 export function textoSemPalpite(votacao: boolean, fase: 'pre' | 'apurando' | 'encerrada' | undefined): { titulo: string; texto: string; botao: string } {
+  // durante a votação (até as 19h, prorrogada; eram 17h): o horário do fim da votação; o botão só promete a contagem
+  // regressiva quando a página da apuração ainda a mostra (fase 'pre')
   if (votacao || fase === 'pre')
     return {
-      titulo: 'A apuração começa às 17h',
-      texto: 'Às 17h (horário de Brasília), quando termina a votação, os números do TSE aparecem aqui, estado por estado, cidade por cidade, seção por seção.',
-      botao: 'Ver a contagem regressiva',
+      titulo: `A votação vai até as ${HORA_FIM_VOTACAO}`,
+      texto: `Às ${HORA_FIM_VOTACAO} (horário de Brasília), quando termina a votação, começa a divulgação dos resultados: os números do TSE aparecem na apuração, estado por estado, cidade por cidade, seção por seção.`,
+      botao: fase === 'pre' ? 'Ver a contagem regressiva' : 'Ir para a apuração',
     };
   if (fase === 'encerrada')
     return {

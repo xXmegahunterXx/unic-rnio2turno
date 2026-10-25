@@ -351,11 +351,12 @@ export function registrarOg(app: App, d: DepsOg): void {
     return comPrimeiroTurnoLocal(race, r1, s1?.resumo ?? null);
   };
 
-  // ---- dia da votação (0h–17h de 25/10, Brasília) ----------------------------------------------------
+  // ---- dia da votação (0h–19h de 25/10, Brasília: até o fim da votação, FIM_VOTACAO) ---------------
   // As imagens que mostram candidato (OG_COM_CANDIDATO: placar, município, seção, governadores, ficha, curiosidades,
   // cenários) respondem o convite GENÉRICO (o de /api/og/audiencia.png?m=0: sem foto, nome, número nem percentual), com
   // cache curto (60 s): as meta tags já apontam para o convite, mas um cartão guardado antes pelo X ou pelo WhatsApp com a
-  // URL antiga busca a imagem de novo — e não pode receber candidato. Às 17h volta sozinho (no máximo ~2 min de borda).
+  // URL antiga busca a imagem de novo — e não pode receber candidato. No fim da votação (19h; a votação foi prorrogada
+  // até as 19h) volta sozinho (no máximo ~2 min de borda).
   const dominioConvite = d.dominio || 'sintonia2026.com.br';
   for (const rota of OG_COM_CANDIDATO) {
     app.use(rota, async (c, next) => {

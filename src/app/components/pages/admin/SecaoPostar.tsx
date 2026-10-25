@@ -5,15 +5,16 @@
  * (16:9 para o X, 9:16 para Status e Stories). Nada é publicado sozinho e nada sai do painel além do que o dono abre.
  *
  * Regras (núcleo puro em postar.ts, testado): textos de share/textos.ts (≤ 220, neutros, "[SIMULAÇÃO]" quando simulado);
- * cartões com nome de candidato só a partir das 17h de 25/10 pelo relógio do servidor (antes, só na simulação com os
- * nomes ocultos); a imagem de audiência lê o número do servidor (a URL só pode baixar o marco) e sai sem número com a
- * chave "Pessoas agora no site" desligada. Sem anúncio em nenhum cartão. Carregada sob demanda pela SalaDeControle.
+ * cartões com nome de candidato só a partir do fim da votação (19h de 25/10, prorrogada; eram 17h) pelo relógio do
+ * servidor (antes, só na simulação com os nomes ocultos); a imagem de audiência lê o número do servidor (a URL só pode
+ * baixar o marco) e sai sem número com a chave "Pessoas agora no site" desligada. Sem anúncio em nenhum cartão. Carregada sob demanda pela SalaDeControle.
  */
 import { useMemo, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { AudienciaAdmin } from '@/shared/audiencia';
 import { chavesNoite } from '@/shared/chaves-noite';
 import { fmtDataHora, fmtHora, fmtInt } from '@/shared/format';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { LIMITE_X, copiarTexto, pesoPostX, urlAbsoluta } from '@/app/lib/share';
 import { Badge, Button, Icon, buttonClasses, toast } from '@/app/ui';
@@ -115,8 +116,9 @@ export function SecaoPostar() {
         }
       >
         {!r.nomesLiberados ? (
-          <Callout tom="neutro" icone="relogio" titulo="Liberados às 17h de 25/10 (Brasília)">
-            Os cartões com nome de candidato só aparecem a partir das 17h do dia da eleição, pelo relógio do servidor (agora{' '}
+          <Callout tom="neutro" icone="relogio" titulo={`Liberados às ${HORA_FIM_VOTACAO} de 25/10 (Brasília)`}>
+            Os cartões com nome de candidato só aparecem a partir das {HORA_FIM_VOTACAO} do dia da eleição, quando termina a votação, pelo
+            relógio do servidor (agora{' '}
             <span className="num">{fmtDataHora(st.wallNow)}</span>).
             {r.travados ? (
               <>

@@ -260,14 +260,17 @@ describe('textos da aba "Postar" (I26)', () => {
   });
 });
 
-describe('dia da votação (0h–17h de 25/10): o kit troca o conteúdo com candidato pelo convite', () => {
+describe('dia da votação (0h–19h de 25/10, votação prorrogada): o kit troca o conteúdo com candidato pelo convite', () => {
   const h = (dia: number, hora: number, min = 0) => Date.UTC(2026, 9, dia, hora + 3, min, 0); // hora de Brasília
-  it('troca só de 0h a 16h59 de 25/10, e nunca o conteúdo marcado como genérico', () => {
+  it('troca só de 0h a 18h59 de 25/10, e nunca o conteúdo marcado como genérico', () => {
     expect(trocaPeloConvite(h(24, 23, 59))).toBe(false);
     expect(trocaPeloConvite(h(25, 0, 0))).toBe(true);
     expect(trocaPeloConvite(h(25, 12, 1))).toBe(true);
     expect(trocaPeloConvite(h(25, 16, 59))).toBe(true);
-    expect(trocaPeloConvite(h(25, 17, 0))).toBe(false);
+    // 17h (começo da leitura do TSE) já não libera: a votação segue até as 19h
+    expect(trocaPeloConvite(h(25, 17, 0))).toBe(true);
+    expect(trocaPeloConvite(h(25, 18, 59))).toBe(true);
+    expect(trocaPeloConvite(h(25, 19, 0))).toBe(false);
     expect(trocaPeloConvite(h(25, 12, 1), true)).toBe(false);
   });
   it('o convite não tem nome, partido, número nem percentual, e cabe no X', () => {
@@ -275,5 +278,11 @@ describe('dia da votação (0h–17h de 25/10): o kit troca o conteúdo com cand
       expect(t).not.toMatch(/\d+[,.]?\d*\s*%|Lula|Flávio|Bolsonaro|\bPT\b|\bPL\b|\b13\b|\b22\b/);
     }
     expect(TEXTO_DIA_VOTACAO.length).toBeLessThanOrEqual(LIMITE_TEXTO);
+  });
+  it('o convite diz o fim da votação (19h) e não o horário antigo (17h)', () => {
+    expect(TEXTO_DIA_VOTACAO).toMatch(/até as 19h \(Brasília\)/);
+    expect(TEXTO_DIA_VOTACAO).toMatch(/divulgação dos resultados/);
+    expect(DESCRICAO_DIA_VOTACAO).toMatch(/^Hoje, até as 19h/);
+    for (const t of [TEXTO_DIA_VOTACAO, DESCRICAO_DIA_VOTACAO]) expect(t).not.toMatch(/17h/);
   });
 });

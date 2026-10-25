@@ -14,12 +14,13 @@
  *    recursos próprios, é o próprio instituto).
  *  - Ordenação (mais recente primeiro), séries por instituto (uma por instituto, nunca somadas) e a comparação com o
  *    resultado oficial são funções puras.
- *  - Dia da votação (0h–17h de 25/10, `diaDeVotacaoAntesDas17`): a área some (`fasePesquisas` → 'votacao').
+ *  - Dia da votação (0h de 25/10 até o fim da votação, 19h de Brasília — `FIM_VOTACAO`, `diaDeVotacaoAntesDas17`; a
+ *    votação foi prorrogada até as 19h): a área some (`fasePesquisas` → 'votacao').
  *
  * Os números de urna dos candidatos NUNCA são digitados aqui: quem valida passa os da corrida (`meta.json`, vindo do TSE).
  */
 import { UF_NOMES, UFS_GOV_2T } from './constants';
-import { diaDeVotacaoAntesDas17, INICIO_DIA_VOTACAO } from './diaVotacao';
+import { diaDeVotacaoAntesDas17, HORA_FIM_VOTACAO, INICIO_DIA_VOTACAO, VOTACAO_PRORROGADA } from './diaVotacao';
 import { fmtDecimal, fmtInt } from './format';
 import type { FonteDados, Fase, UF } from './types';
 
@@ -92,7 +93,7 @@ export interface PesquisasPublicas {
   pesquisas: Pesquisa[];
   /** Identifica o conteúdo (muda quando a lista muda). */
   versao: string;
-  /** Dia da votação (0h–17h de 25/10): lista vazia de propósito — a área não aparece. */
+  /** Dia da votação (0h–19h de 25/10, até o fim da votação): lista vazia de propósito — a área não aparece. */
   suspensas?: true;
 }
 
@@ -689,7 +690,8 @@ export function compararComResultado(p: Pick<Pesquisa, 'totais' | 'validos'>, re
 /**
  * O que a área de pesquisas mostra agora:
  *  - 'oculta': simulação com nomes ocultos (`anonimizado`) — a área não aparece;
- *  - 'votacao': dia da votação, 0h–17h de 25/10 (Brasília, relógio do servidor) — só um aviso neutro;
+ *  - 'votacao': dia da votação, de 0h de 25/10 até o fim da votação (19h de Brasília, relógio do servidor) — só um
+ *    aviso neutro;
  *  - 'resultado': resultado oficial do TSE concluído (fonte 'tse', sem simulação, fase 'encerrada') — "Pesquisas ×
  *    resultado";
  *  - 'lista': as pesquisas registradas.
@@ -761,6 +763,7 @@ export function linhaObrigatoria(p: Pesquisa): string {
 export const AVISO_PESQUISAS =
   'Pesquisas registradas no TSE. Pesquisa não é resultado: mostra a intenção de voto no período da coleta, dentro da margem de erro.';
 
-/** Aviso do dia da votação (0h–17h de 25/10): neutro, sem número nem nome. */
-export const AVISO_DIA_VOTACAO =
-  'Hoje é dia de votação. Até as 17h (horário de Brasília), esta área fica sem pesquisas; às 17h começa a divulgação dos resultados.';
+/** Aviso do dia da votação (0h de 25/10 até o fim da votação, `HORA_FIM_VOTACAO`): neutro, sem número nem nome. */
+export const AVISO_DIA_VOTACAO = VOTACAO_PRORROGADA
+  ? `Hoje é dia de votação. A votação foi prorrogada até as ${HORA_FIM_VOTACAO} (horário de Brasília); até lá, esta área fica sem pesquisas. Em seguida começa a divulgação dos resultados.`
+  : `Hoje é dia de votação. Até as ${HORA_FIM_VOTACAO} (horário de Brasília), esta área fica sem pesquisas; às ${HORA_FIM_VOTACAO} começa a divulgação dos resultados.`;

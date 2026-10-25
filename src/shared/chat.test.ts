@@ -298,11 +298,16 @@ describe('chat: utilidades', () => {
     dif('17:42', '17:43');
     for (const t of ['😮', '🔥🔥', '👏', '17:42', '50,1%']) expect(chaveDuplicada(t)).not.toBe('');
   });
-  it('dia da eleição: sem mensagens de 0h às 17h de Brasília', () => {
+  it('dia da eleição: sem mensagens de 0h até o fim da votação (19h de Brasília, prorrogada)', () => {
+    expect(DIA_ELEICAO_17H).toBe(Date.UTC(2026, 9, 25, 22, 0, 0)); // 19h de Brasília (o nome ficou do horário original)
     expect(bloqueioDiaEleicao(DIA_ELEICAO_INICIO - 1)).toBeNull();
-    expect(bloqueioDiaEleicao(DIA_ELEICAO_INICIO)).toMatch(/17h/);
-    expect(bloqueioDiaEleicao(DIA_ELEICAO_17H - 1)).toMatch(/17h/);
+    expect(bloqueioDiaEleicao(DIA_ELEICAO_INICIO)).toBe('A sala abre às 19h, quando terminar a votação.');
+    expect(bloqueioDiaEleicao(DIA_ELEICAO_17H - 1)).toMatch(/19h/);
     expect(bloqueioDiaEleicao(DIA_ELEICAO_17H)).toBeNull();
+    // 17h e 18h de 25/10 ainda são votação; 19h já não
+    expect(bloqueioDiaEleicao(Date.UTC(2026, 9, 25, 20, 0, 0))).not.toBeNull();
+    expect(bloqueioDiaEleicao(Date.UTC(2026, 9, 25, 21, 0, 0))).not.toBeNull();
+    expect(bloqueioDiaEleicao(Date.UTC(2026, 9, 25, 22, 0, 0))).toBeNull();
   });
   it('pessoas arredondadas', () => {
     expect(arredondarPessoasSala(7)).toBe(7);

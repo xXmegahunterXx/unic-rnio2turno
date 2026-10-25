@@ -7,16 +7,17 @@
  * Regras (ARCHITECTURE §1 e §11.10):
  *  - texto puro, curto (alvo ≤ 200 caracteres — o limite do chat do YouTube; nunca mais de 380), sempre com o endereço;
  *  - candidatos na ORDEM DA URNA (menor número primeiro), mesmo formato para os dois, sem "lidera", sem adjetivo;
- *  - nenhum nome antes das 17h de 25/10: na fase 'pre' só a contagem regressiva e, no dia da votação (0h–17h de
- *    Brasília, pelo relógio REAL), só "a apuração começa às 17h" (Lei 9.504/97, art. 39, § 5º);
+ *  - nenhum nome antes do fim da votação (25/10, 19h de Brasília — `FIM_VOTACAO`; a votação foi prorrogada até as
+ *    19h): na fase 'pre' só a contagem regressiva e, no dia da votação (0h–19h de Brasília, pelo relógio REAL), só o
+ *    horário do fim da votação e a contagem até ele (Lei 9.504/97, art. 39, § 5º);
  *  - simulação: "[SIMULAÇÃO]" na frente e SEMPRE "Candidato A/B", sem partido (mesmo com os nomes reais no painel);
  *  - Presidente numa UF: nunca "eleito" (o resultado de um estado não elege ninguém);
  *  - chave 'texto-bots' desligada no painel: só o endereço do site.
  */
 import type { LiveStatus, Race, Summary, UF } from './types';
 import { UFS } from './types';
-import { INICIO_APURACAO, UF_NOMES, UFS_GOV_2T } from './constants';
-import { diaDeVotacaoAntesDas17 } from './diaVotacao';
+import { BRT_OFFSET_MS, INICIO_APURACAO, UF_NOMES, UFS_GOV_2T } from './constants';
+import { FIM_VOTACAO, HORA_FIM_VOTACAO, VOTACAO_PRORROGADA, diaDeVotacaoAntesDas17 } from './diaVotacao';
 import { pctTotalizadas, pctValidos, validos } from './calc';
 import { fmtHora, fmtInt, fmtPct, normalize } from './format';
 import { anonimizarRace } from './anon';
@@ -42,7 +43,7 @@ export const TEXTO_PLACAR = {
 /** Endereço exibido quando o servidor não tem PUBLIC_URL. */
 export const DOMINIO_TEXTO_PADRAO = 'sintonia2026.com.br';
 
-/** 0h de 25/10/2026 em Brasília e o "dia da votação antes das 17h" (relógio REAL): fonte única em diaVotacao.ts. */
+/** 0h de 25/10/2026 em Brasília e o "dia da votação" até o fim dela, 19h (relógio REAL): fonte única em diaVotacao.ts. */
 export { INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from './diaVotacao';
 
 export const PREFIXO_SIMULACAO_TEXTO = '[SIMULAÇÃO] ';
@@ -160,31 +161,61 @@ function caber(versoes: string[]): string {
   return `${menor.slice(0, TEXTO_PLACAR.max - 1).replace(/\s+\S*$/, '')}…`;
 }
 
-/** Resposta do `GET /api/texto/placar`. Puro (testado: tamanho, ordem da urna, sem nome antes das 17h). */
+/** "19h", "17h30" (Brasília) de um instante. Puro. */
+function horaBrasilia(ms: number): string {
+  if (ms === FIM_VOTACAO) return HORA_FIM_VOTACAO;
+  const d = new Date(ms + BRT_OFFSET_MS);
+  const m = d.getUTCMinutes();
+  return `${d.getUTCHours()}h${m ? String(m).padStart(2, '0') : ''}`;
+}
+
+/** Resposta do `GET /api/texto/placar`. Puro (testado: tamanho, ordem da urna, sem nome antes do fim da votação). */
 export function textoPlacarBot(e: EntradaTextoPlacar): string {
   const dom = e.dominio || DOMINIO_TEXTO_PADRAO;
   if (!e.ligado) return dom;
   const fim = `Acompanhe seção por seção: ${dom}`;
   const fimCurto = dom;
 
-  // dia da votação, antes das 17h: nada de nome nem número de candidato, nem na simulação
+  // dia da votação, até o fim dela (19h): nada de nome nem número de candidato, nem na simulação — só o horário do fim
+  // da votação e a contagem até ele (relógio REAL)
   if (diaDeVotacaoAntesDas17(e.agora)) {
-    return caber([`A apuração do 2º turno começa hoje, às 17h (horário de Brasília). ${fim}`, `A apuração começa às 17h (Brasília) · ${fimCurto}`]);
+    const faltam = ` Faltam ${tempoQueFalta(FIM_VOTACAO - e.agora)}.`;
+    if (VOTACAO_PRORROGADA) {
+      return caber([
+        `A votação do 2º turno foi prorrogada até as ${HORA_FIM_VOTACAO} (horário de Brasília); a apuração começa em seguida.${faltam} ${fim}`,
+        `Votação prorrogada até as ${HORA_FIM_VOTACAO} (Brasília); a apuração começa em seguida.${faltam} ${fimCurto}`,
+        `Votação até as ${HORA_FIM_VOTACAO} (Brasília) · ${fimCurto}`,
+      ]);
+    }
+    return caber([
+      `A apuração do 2º turno começa hoje, às ${HORA_FIM_VOTACAO} (horário de Brasília).${faltam} ${fim}`,
+      `A apuração começa às ${HORA_FIM_VOTACAO} (Brasília).${faltam} ${fimCurto}`,
+      `A apuração começa às ${HORA_FIM_VOTACAO} (Brasília) · ${fimCurto}`,
+    ]);
   }
 
   const sim = !!e.status?.simulacao;
   const pre = (txt: string) => (sim ? `${PREFIXO_SIMULACAO_TEXTO}${txt}` : txt);
   const cab = cabecalhoTexto(e.race, e.uf);
 
-  // antes da apuração: só a contagem regressiva (sem nomes)
+  // antes da apuração: só a contagem regressiva (sem nomes). Fora da simulação, a divulgação nunca começa antes do fim
+  // da votação (prorrogada até as 19h): a contagem e o horário apontam o mais tarde dos dois. A simulação segue o próprio
+  // relógio (o início dela é `inicioApuracao`).
   if (!e.status || e.status.fase === 'pre') {
-    const falta = e.status ? e.status.inicioApuracao - e.status.simNow : INICIO_APURACAO - e.agora;
-    const quando = 'começa em 25/10, às 17h (horário de Brasília)';
-    const faltam = falta > 0 ? ` Faltam ${tempoQueFalta(falta)}.` : '';
+    const inicio = e.status ? e.status.inicioApuracao : INICIO_APURACAO;
+    const alvo = sim ? inicio : Math.max(inicio, FIM_VOTACAO);
+    const falta = alvo - (e.status ? e.status.simNow : e.agora);
+    // o horário já passou e a fase ainda é 'pre' (fonte sem dados): aguardando, nunca "começa às…" no passado
+    if (falta <= 0) {
+      return caber([pre(`${cab}: aguardando as primeiras seções totalizadas. ${fim}`), pre(`${cab}: aguardando os primeiros dados · ${fimCurto}`)]);
+    }
+    const hora = horaBrasilia(alvo);
+    const quando = `começa em 25/10, às ${hora} (horário de Brasília)`;
+    const faltam = ` Faltam ${tempoQueFalta(falta)}.`;
     return caber([
       pre(`${cab}: a apuração ${quando}.${faltam} ${fim}`),
       pre(`${cab}: a apuração ${quando}.${faltam} ${fimCurto}`),
-      pre(`Apuração do 2º turno: 25/10, às 17h (Brasília).${faltam} ${fimCurto}`),
+      pre(`Apuração do 2º turno: 25/10, às ${hora} (Brasília).${faltam} ${fimCurto}`),
     ]);
   }
 

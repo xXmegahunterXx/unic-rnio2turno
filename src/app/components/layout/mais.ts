@@ -4,6 +4,7 @@
  */
 import type { IconName } from '@/app/ui/Icon';
 import { nEstadosGov } from '@/shared/gov2t';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 
 /** Ícones extras do menu "Mais" (desenhados em layout/IconesExtras.tsx). */
 export type IconeExtra = 'tv' | 'codigo' | 'megafone' | 'carta' | 'chat';
@@ -30,8 +31,8 @@ export const MAIS: GrupoMais[] = [
     itens: [
       { to: '/pesquisas', label: 'Pesquisas do 2º turno', desc: 'Registradas no TSE, com a fonte de cada número', icon: 'lista', match: (p) => p.startsWith('/pesquisas') },
       { to: '/curiosidades', label: 'Curiosidades', desc: 'Recordes e fatos do 1º turno', icon: 'grafico', match: (p) => p.startsWith('/curiosidades') },
-      { to: '/ao-vivo', label: 'Chat ao vivo', desc: 'Sala da apuração, moderada (abre às 17h de 25/10)', icon: 'chat', match: (p) => p.startsWith('/ao-vivo') },
-      { to: '/palpite', label: 'Palpite do 2º turno', desc: 'Crave o % de cada um até as 17h de 25/10', icon: 'relogio', match: (p) => p.startsWith('/palpite') },
+      { to: '/ao-vivo', label: 'Chat ao vivo', desc: `Sala da apuração, moderada (abre às ${HORA_FIM_VOTACAO} de 25/10)`, icon: 'chat', match: (p) => p.startsWith('/ao-vivo') },
+      { to: '/palpite', label: 'Palpite do 2º turno', desc: `Compare com o resultado a partir das ${HORA_FIM_VOTACAO} de 25/10`, icon: 'relogio', match: (p) => p.startsWith('/palpite') },
       { to: '/cenarios', label: 'E se…? Monte seu cenário', desc: 'Calculadora do 2º turno, não é previsão', icon: 'troca', match: (p) => p.startsWith('/cenarios') },
       { to: '/governadores', label: 'Governadores', desc: `2º turno em ${nEstadosGov()}`, icon: 'grade', match: (p) => p.startsWith('/governadores') },
       { to: '/tv', label: 'Modo TV', desc: 'Tela cheia para transmissão', icon: 'tv' },

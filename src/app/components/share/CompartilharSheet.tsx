@@ -21,7 +21,7 @@
  * existe e o `navigator.share` sai dentro do gesto do usuário — o Safari recusa o compartilhamento se houver espera.
  * Os dados ficam "congelados" do momento em que o sheet abriu (texto e imagem sempre batem).
  *
- * Dia da votação (0h–17h de 25/10, pelo relógio do SERVIDOR do status em cache): conteúdo com candidato (sem a marca
+ * Dia da votação (0h–19h de 25/10, até o fim da votação, pelo relógio do SERVIDOR do status em cache): conteúdo com candidato (sem a marca
  * `generico`) sai como o convite da apuração — só texto e link, sem imagem, nome, número ou percentual (`trocaPeloConvite`).
  */
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -180,7 +180,7 @@ export function CompartilharSheet({
       if (!aberto) return null;
       const status = qc.getQueryData<LiveStatus>(['status']);
       const recebidoEm = qc.getQueryState(['status'])?.dataUpdatedAt;
-      // dia da votação, antes das 17h: o conteúdo com candidato vira o convite (sem imagem, nome, número ou percentual)
+      // dia da votação, antes do fim dela (19h): o conteúdo com candidato vira o convite (sem imagem, nome, número ou percentual)
       const convite = trocaPeloConvite(relogioServidor(status, recebidoEm), generico);
       const t = convite ? TEXTO_DIA_VOTACAO : comPrefixoSimulacao(texto, simulado);
       const tags = normalizarHashtags(convite ? HASHTAGS.apuracao : hashtags);

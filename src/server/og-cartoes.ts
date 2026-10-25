@@ -20,6 +20,7 @@ import type { CorCandidato, LocalResumo, Race, SecaoResumo, Summary, UF } from '
 import { corCandidato, coresIdentidadePresidente, coresPresidente } from '../shared/cores';
 import { pctTotalizadas, pctValidos, validos } from '../shared/calc';
 import { UF_NOMES } from '../shared/constants';
+import { HORA_FIM_VOTACAO } from '../shared/diaVotacao';
 import { fmtInt, fmtPP, fmtPct } from '../shared/format';
 import { asDisputasGov } from '../shared/gov2t';
 import { C, OG_H, OG_W, corOg, fundo, h, iniciais, marca, pill, tintaOg, type Estilo, type No } from './og';
@@ -596,7 +597,7 @@ export function layoutGovernadores(inp: OgGovernadoresInput): No {
       { flexDirection: 'column', gap: vaoLinhasGov(Math.min(inp.disputas.length, MAX_LINHAS_GOV)), marginTop: -8 },
       ...inp.disputas.slice(0, MAX_LINHAS_GOV).map((d) => linhaGov(d, !!inp.anonimizado)),
     ),
-    rodapeEsq: inp.simulacao ? 'SIMULAÇÃO · dados fictícios' : inp.primeiroTurno ? 'Resultado do 1º turno · 2º turno em 25/10, a partir das 17h' : 'Fonte: TSE',
+    rodapeEsq: inp.simulacao ? 'SIMULAÇÃO · dados fictícios' : inp.primeiroTurno ? `Resultado do 1º turno · 2º turno em 25/10, a partir das ${HORA_FIM_VOTACAO}` : 'Fonte: TSE',
     rodapeDir: inp.dominio ?? null,
   });
 }

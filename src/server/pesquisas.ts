@@ -10,8 +10,9 @@
  *    `STATE_DIR/pesquisas.json`, gravado de forma atômica (state-store.ts) a cada mudança. Outra instância no mesmo
  *    STATE_DIR (plano B de réplicas) relê o arquivo quando ele muda (conferido no máximo a cada 5 s).
  *  - PÚBLICA: `GET /api/pesquisas` → `PesquisasPublicas` (semente + painel, sem repetir id nem registro, mais recentes
- *    primeiro), com ETag e cache curto (navegador 30 s; borda 30 s + `stale-if-error`) que NUNCA atravessa a 0h de 25/10:
- *    das 0h às 17h do dia da votação a lista sai vazia (`suspensas: true`) e às 17h volta.
+ *    primeiro), com ETag e cache curto (navegador 30 s; borda 30 s + `stale-if-error`) que NUNCA atravessa a 0h de 25/10
+ *    nem o fim da votação: das 0h às 19h do dia da votação (`FIM_VOTACAO`; a votação foi prorrogada até as 19h) a lista
+ *    sai vazia (`suspensas: true`) e no fim da votação volta.
  *  - CARTÕES: `GET /api/og/pesquisa.png?id=<id>&formato=og|x|feed|story` (og-pesquisa.ts; sem id, a capa genérica).
  *    A rota está em OG_COM_CANDIDATO (meta-tags.ts): no dia da votação responde o convite genérico (og-rotas.ts).
  *  - PAINEL (sessão + CSRF do admin): `GET /api/admin/pesquisas` → `PesquisasAdmin`; `POST /api/admin/pesquisas`
@@ -20,8 +21,7 @@
 import { statSync } from 'node:fs';
 import type { Context, Hono } from 'hono';
 import type { HttpBindings } from '@hono/node-server';
-import { INICIO_APURACAO } from '../shared/constants';
-import { INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from '../shared/diaVotacao';
+import { FIM_VOTACAO, INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from '../shared/diaVotacao';
 import {
   CARGOS_PESQUISA,
   LIMITES_PESQUISA,
@@ -60,12 +60,13 @@ export const TTL_PESQUISAS_S = 30;
 /** Imagem de uma pesquisa (o conteúdo vai no `v=` das meta tags e na chave do cache: edição = imagem nova). */
 export const TTL_OG_PESQUISA_S = 300;
 
-/** Instantes que o cache nunca atravessa: 0h de 25/10 (a área some) e 17h (a área volta). */
-const VIRADAS = [INICIO_DIA_VOTACAO, INICIO_APURACAO] as const;
+/** Instantes que o cache nunca atravessa: 0h de 25/10 (a área some) e o fim da votação, 19h (a área volta). */
+const VIRADAS = [INICIO_DIA_VOTACAO, FIM_VOTACAO] as const;
 
 /**
  * `Cache-Control` + `Cloudflare-CDN-Cache-Control` para um conteúdo que vale `ttl` segundos, encurtado para nunca
- * atravessar a próxima virada (0h ou 17h de 25/10): perto dela, sem `stale-*` (a cópia velha não pode sair depois).
+ * atravessar a próxima virada (0h de 25/10 ou o fim da votação, 19h): perto dela, sem `stale-*` (a cópia velha não pode
+ * sair depois).
  */
 export function cabecalhosAteVirada(agora: number, ttl: number, borda: boolean, ligada = true): Record<string, string> {
   const prox = VIRADAS.find((v) => v > agora);

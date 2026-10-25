@@ -2,9 +2,9 @@
  * Palpite do 2º turno (motor viral INDIVIDUAL): regras puras, sem React nem DOM — testadas em nucleo.test.ts.
  *
  * Até as 23h59 de 24/10 (Brasília) a pessoa crava o % dos votos válidos de cada finalista de Presidente (um divisor só:
- * os dois somam 100%). No dia da votação (25/10, 0h–17h) o palpite fica travado e NÃO é compartilhado nem divulgado
- * (Lei 9.504/97, art. 39, § 5º — a sala do chat também fecha nesse horário). Depois do resultado oficial do TSE, a
- * página mostra a diferença em pontos percentuais ("Errei por Z p.p." ou "Na mosca").
+ * os dois somam 100%). No dia da votação (25/10, de 0h ao fim da votação, 19h — prorrogada; eram 17h) o palpite fica
+ * travado e NÃO é compartilhado nem divulgado (Lei 9.504/97, art. 39, § 5º — a sala do chat também fecha nesse horário).
+ * Depois do resultado oficial do TSE, a página mostra a diferença em pontos percentuais ("Errei por Z p.p." ou "Na mosca").
  *
  * LGPD e lei eleitoral (ARCHITECTURE §1): o palpite NUNCA vai ao servidor e nunca é somado ao de outras pessoas (um
  * agregado de palpites seria enquete — Lei 9.504/97, art. 33, § 5º). Fica no aparelho (localStorage, só conveniência) e
@@ -15,7 +15,7 @@
  * 504 = 50,4% para ele e 49,6% para o outro. Inteiros: nada de erro de arredondamento entre os dois lados.
  */
 import { pctTotalizadas, pctValidos, validos } from '@/shared/calc';
-import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO } from '@/shared/diaVotacao';
 import type { Candidate, LiveStatus, Race, Summary } from '@/shared/types';
 
 /** Limites do divisor (décimos): 30,0% a 70,0% para cada lado — simétrico em torno de 50%. */
@@ -29,8 +29,11 @@ export const PALPITE_INICIAL = 500;
  * propaganda (art. 39, § 5º) — consulte o advogado antes de mudar.
  */
 export const FIM_PALPITES = Date.UTC(2026, 9, 25, 3, 0, 0);
-/** Fim da votação (17h de Brasília em 25/10): entre FIM_PALPITES e ele, o palpite não é compartilhado nem divulgado. */
-export const FIM_VOTACAO = INICIO_APURACAO;
+/**
+ * Fim da votação (19h de Brasília em 25/10; a votação foi prorrogada, eram 17h): entre FIM_PALPITES e ele, o palpite não
+ * é compartilhado nem divulgado. Fonte única em src/shared/diaVotacao.ts (reexportado aqui por compatibilidade).
+ */
+export { FIM_VOTACAO };
 /** Prazo por extenso (o mesmo em toda a interface). */
 export const PRAZO_PALPITES_TEXTO = 'as 23h59 de 24/10';
 /** Diferença (arredondada a 1 casa) abaixo da qual o palpite é "na mosca". */
@@ -161,8 +164,9 @@ export function deslocamentoRelogio(wallNow: number | undefined, recebidoEm: num
 export const prazoPalpite = (agora: number, fim = FIM_PALPITES): 'aberto' | 'fechado' => (agora < fim ? 'aberto' : 'fechado');
 
 /**
- * Fase: 'aberto' (dá para cravar e compartilhar), 'votacao' (25/10 de 0h às 17h: travado, sem compartilhar e sem chamada
- * na home/apuração) ou 'fechado' (depois das 17h: comparar e compartilhar o palpite e o resultado).
+ * Fase: 'aberto' (dá para cravar e compartilhar), 'votacao' (25/10 de 0h ao fim da votação, 19h: travado, sem
+ * compartilhar e sem chamada na home/apuração) ou 'fechado' (depois do fim da votação: comparar e compartilhar o palpite
+ * e o resultado).
  */
 export function fasePalpite(agora: number): 'aberto' | 'votacao' | 'fechado' {
   if (agora < FIM_PALPITES) return 'aberto';

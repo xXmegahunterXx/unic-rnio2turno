@@ -5,7 +5,7 @@
  */
 import type { ChatPublico, MensagemChat } from '@/shared/chat';
 import { LIMITES_CHAT } from '@/shared/chat';
-import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO } from '@/shared/diaVotacao';
 import { fmtCompact, fmtInt } from '@/shared/format';
 
 /** Tempo sem consultar a partir do qual a aba recomeça a lista (o servidor lembra as removidas por 30 min). */
@@ -90,9 +90,9 @@ export function intervaloConsulta(pub: Pick<ChatPublico, 'aberta' | 'intervaloS'
 }
 
 /**
- * Até a próxima consulta (ms), acordando na hora da abertura: com a sala fechada antes das 17h de 25/10 (relógio do
- * SERVIDOR), a consulta seguinte nunca passa da abertura + 1 s + um sorteio de até 15 s (`sorteio` em [0, 1): as abas
- * abertas no site inteiro não chegam todas no mesmo segundo).
+ * Até a próxima consulta (ms), acordando na hora da abertura: com a sala fechada antes do fim da votação (19h de 25/10,
+ * `FIM_VOTACAO`; eram 17h até a prorrogação), pelo relógio do SERVIDOR, a consulta seguinte nunca passa da abertura
+ * + 1 s + um sorteio de até 15 s (`sorteio` em [0, 1): as abas abertas no site inteiro não chegam todas no mesmo segundo).
  */
 export function proximaConsulta(
   pub: Pick<ChatPublico, 'aberta' | 'intervaloS'> | null,
@@ -102,13 +102,13 @@ export function proximaConsulta(
   sorteio: number,
 ): number {
   const ms = intervaloConsulta(pub, interesse, falhas);
-  if (!pub || pub.aberta || falhas > 0 || agoraServidor >= INICIO_APURACAO) return ms;
-  return Math.min(ms, INICIO_APURACAO - agoraServidor + 1000 + Math.round(Math.min(1, Math.max(0, sorteio)) * 15_000));
+  if (!pub || pub.aberta || falhas > 0 || agoraServidor >= FIM_VOTACAO) return ms;
+  return Math.min(ms, FIM_VOTACAO - agoraServidor + 1000 + Math.round(Math.min(1, Math.max(0, sorteio)) * 15_000));
 }
 
 /**
  * Fase da sala para o widget: 'demo' (build estático, sala desligada), 'conectando' (antes da 1ª resposta), 'aberta'
- * (recebendo mensagens), 'antes' (fechada antes das 17h de 25/10: a pílula diz quando abre) e 'fechada' (fechada depois
+ * (recebendo mensagens), 'antes' (fechada antes do fim da votação, 19h de 25/10: a pílula diz quando abre) e 'fechada' (fechada depois
  * da hora marcada: a moderação fechou ou a noite acabou — a pílula some).
  */
 export type FaseChat = 'demo' | 'conectando' | 'aberta' | 'antes' | 'fechada';
@@ -117,7 +117,7 @@ export function faseChat(pub: Pick<ChatPublico, 'aberta'> | null, indisponivel: 
   if (indisponivel) return 'demo';
   if (!pub) return 'conectando';
   if (pub.aberta) return 'aberta';
-  return agoraServidor < INICIO_APURACAO ? 'antes' : 'fechada';
+  return agoraServidor < FIM_VOTACAO ? 'antes' : 'fechada';
 }
 
 const DIA_MS = 86_400_000;
@@ -126,10 +126,10 @@ const diaBrasilia = (t: number) => Math.floor((t - 3 * 3_600_000) / DIA_MS);
 const DIAS_SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
 
 /**
- * Quando a sala abre, curto, para a pílula: "abre hoje, 17h", "abre amanhã, 17h", "abre domingo, 17h" (até 6 dias
- * antes) ou "abre 25/10, 17h". Depois da hora: null.
+ * Quando a sala abre (o fim da votação, `FIM_VOTACAO`), curto, para a pílula: "abre hoje, 19h", "abre amanhã, 19h",
+ * "abre domingo, 19h" (até 6 dias antes) ou "abre 25/10, 19h". Depois da hora: null.
  */
-export function textoAbertura(agora: number, inicio = INICIO_APURACAO): string | null {
+export function textoAbertura(agora: number, inicio = FIM_VOTACAO): string | null {
   if (!Number.isFinite(agora) || agora >= inicio) return null;
   const dias = diaBrasilia(inicio) - diaBrasilia(agora);
   const d = new Date(inicio - 3 * 3_600_000);
@@ -146,7 +146,7 @@ export function textoAbertura(agora: number, inicio = INICIO_APURACAO): string |
 }
 
 /** Contagem até a abertura (dias, horas, minutos, segundos; tudo 0 depois da hora). */
-export function contagemAbertura(agora: number, inicio = INICIO_APURACAO): { dias: number; horas: number; minutos: number; segundos: number; ms: number } {
+export function contagemAbertura(agora: number, inicio = FIM_VOTACAO): { dias: number; horas: number; minutos: number; segundos: number; ms: number } {
   const ms = Math.max(0, inicio - (Number.isFinite(agora) ? agora : inicio));
   const s = Math.floor(ms / 1000);
   return { dias: Math.floor(s / 86_400), horas: Math.floor((s % 86_400) / 3600), minutos: Math.floor((s % 3600) / 60), segundos: s % 60, ms };
@@ -300,7 +300,7 @@ export const POPUP = {
   margem: 20,
   /** respiro entre o cabeçalho do site e o topo do popup */
   folgaTopo: 16,
-  /** pílula da doca minimizada (≥ 1760 px): área vigiada no canto (cabe "Chat ao vivo · abre domingo, 17h") */
+  /** pílula da doca minimizada (≥ 1760 px): área vigiada no canto (cabe "Chat ao vivo · abre domingo, 19h") */
   pilulaLargura: 300,
   pilulaAltura: 44,
 } as const;
@@ -404,7 +404,7 @@ export function lerPrefGuardada(v: string | null | undefined): PrefPopup | null 
 
 /**
  * Aberto ou minimizado agora. Com a sala aberta: a escolha desta visita, senão a guardada, senão ABERTO (padrão do
- * computador). Com a sala fechada (antes de 25/10 17h, demo, fechada pela moderação): minimizado, salvo escolha desta
+ * computador). Com a sala fechada (antes do fim da votação, 25/10 19h, demo, fechada pela moderação): minimizado, salvo escolha desta
  * visita feita com a sala fechada — uma escolha feita com a sala fechada (abrir para ver a contagem e minimizar) não
  * vale quando ela abre, e vice-versa.
  */

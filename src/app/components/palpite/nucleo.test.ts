@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INICIO_APURACAO } from '@/shared/constants';
+import { FIM_VOTACAO as FIM_VOTACAO_SHARED } from '@/shared/diaVotacao';
 import type { Candidate, Race, Summary } from '@/shared/types';
 import { pesoTextoX } from '@/app/lib/share';
 import { LIMITE_TEXTO } from '@/app/components/share/textos';
@@ -123,17 +124,21 @@ describe('armazenamento (só no aparelho)', () => {
 });
 
 describe('prazo (relógio do servidor)', () => {
-  it('aberto até 0h de 25/10 (exclusive); no dia da votação, até as 17h, travado e sem compartilhar', () => {
+  it('aberto até 0h de 25/10 (exclusive); no dia da votação, até as 19h (prorrogada), travado e sem compartilhar', () => {
     const zeroH = Date.UTC(2026, 9, 25, 3, 0, 0); // 0h de Brasília
+    const dezenoveH = Date.UTC(2026, 9, 25, 22, 0, 0); // 19h de Brasília
     expect(FIM_PALPITES).toBe(zeroH);
-    expect(FIM_VOTACAO).toBe(INICIO_APURACAO);
+    expect(FIM_VOTACAO).toBe(FIM_VOTACAO_SHARED);
+    expect(FIM_VOTACAO).toBe(dezenoveH);
     expect(prazoPalpite(zeroH - 1)).toBe('aberto');
     expect(prazoPalpite(zeroH)).toBe('fechado');
     expect(prazoPalpite(INICIO_APURACAO + 3_600_000)).toBe('fechado');
     expect(fasePalpite(zeroH - 1)).toBe('aberto');
     expect(fasePalpite(zeroH)).toBe('votacao');
-    expect(fasePalpite(INICIO_APURACAO - 1)).toBe('votacao');
-    expect(fasePalpite(INICIO_APURACAO)).toBe('fechado');
+    // 17h (começo da leitura do TSE) já não fecha a fase: a votação segue até as 19h
+    expect(fasePalpite(INICIO_APURACAO)).toBe('votacao');
+    expect(fasePalpite(dezenoveH - 1)).toBe('votacao');
+    expect(fasePalpite(dezenoveH)).toBe('fechado');
   });
   it('deslocamento do relógio pelo status; valores absurdos ignorados', () => {
     expect(deslocamentoRelogio(1_000_500, 1_000_000)).toBe(500);
@@ -206,9 +211,14 @@ describe('textos (neutros, ordem da urna, cabem no X)', () => {
 });
 
 describe('sem palpite salvo depois do prazo: o texto segue a fase real', () => {
-  it('votação (0h–17h de 25/10): "começa às 17h"; apurando: "em andamento"; encerrada: "terminou"', () => {
-    expect(textoSemPalpite(true, 'pre').titulo).toBe('A apuração começa às 17h');
-    expect(textoSemPalpite(true, 'pre').texto).toMatch(/17h \(horário de Brasília\), quando termina a votação/);
+  it('votação (0h–19h de 25/10): "vai até as 19h"; apurando: "em andamento"; encerrada: "terminou"', () => {
+    expect(textoSemPalpite(true, 'pre').titulo).toBe('A votação vai até as 19h');
+    expect(textoSemPalpite(true, 'pre').texto).toMatch(/19h \(horário de Brasília\), quando termina a votação, começa a divulgação/);
+    expect(textoSemPalpite(true, 'pre').botao).toBe('Ver a contagem regressiva');
+    // 17h–19h (votação prorrogada, fonte já no TSE): sem prometer contagem regressiva nem "em andamento"
+    expect(textoSemPalpite(true, 'apurando').titulo).toBe('A votação vai até as 19h');
+    expect(textoSemPalpite(true, 'apurando').botao).toBe('Ir para a apuração');
+    for (const f of ['pre', 'apurando'] as const) expect(JSON.stringify(textoSemPalpite(true, f))).not.toMatch(/17h/);
     expect(textoSemPalpite(false, 'apurando').titulo).toBe('A apuração do 2º turno está em andamento');
     expect(textoSemPalpite(false, 'encerrada').titulo).toBe('A apuração do 2º turno terminou');
     expect(textoSemPalpite(false, 'encerrada').botao).toBe('Ver o resultado');

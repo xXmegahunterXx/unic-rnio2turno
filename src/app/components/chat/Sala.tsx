@@ -2,7 +2,8 @@
  * "Sala da apuração": o chat ao vivo moderado (mensagens, fixada, reações, envio e regras sempre à vista). Usada no
  * popup do computador (variante 'painel'), na folha inferior do celular e na página /ao-vivo — a moldura (posição,
  * altura, minimizar) é de quem usa (ChatFlutuante, AoVivoPage); aqui fica o conteúdo, ocupando a altura toda que receber.
- * Antes de abrir (fechada antes das 17h de 25/10), a sala mostra a contagem até a abertura e as regras.
+ * Antes de abrir (fechada antes do fim da votação, 19h de 25/10 — `FIM_VOTACAO`), a sala mostra a contagem até a abertura
+ * e as regras.
  *
  * Regras de neutralidade: nada aqui usa cor de candidato (apelidos em tons neutros); reações são neutras e nunca
  * ligadas a candidato; a única publicidade é "Sala oferecida por" (OferecimentoChat), numa faixa própria: no topo da sala
@@ -17,6 +18,8 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Link, useLocation } from 'react-router-dom';
 import { AVISO_REGISTRO_CHAT, EMOJI_REACAO, LIMITES_CHAT, REACOES, REGRAS_CHAT, REGRAS_CHAT_CURTA, ROTULO_REACAO, avaliarApelido, type MensagemChat, type ReacaoId } from '@/shared/chat';
 import { fmtHora, fmtInt } from '@/shared/format';
+import { INICIO_APURACAO } from '@/shared/constants';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { useMediaQuery } from '@/app/lib/useMediaQuery';
 import { cn } from '@/app/lib/cn';
 import { Icon } from '@/app/ui/Icon';
@@ -87,7 +90,7 @@ export function Sala({
   const compactaPagina = (useMediaQuery('(max-width: 639px), (max-height: 800px)') && variante === 'pagina') || compacta;
   const pagina = variante === 'pagina';
   const folha = variante === 'folha';
-  // fechada antes das 17h de 25/10: contagem e regras no lugar das mensagens (e o pé sem a linha de regras repetida)
+  // fechada antes do fim da votação (19h de 25/10): contagem e regras no lugar das mensagens (e o pé sem a linha de regras repetida)
   const antes = faseChat(s.pub, s.indisponivel, agoraServidor()) === 'antes';
   const anuncio = !!s.pub?.aberta && !semAnuncio;
   return (
@@ -326,7 +329,7 @@ function Vazia({ fechada, bloqueio, falhou }: { fechada: boolean; bloqueio: stri
         <>
           <p className="mt-3.5 font-semibold text-fg">A sala está fechada</p>
           <p className="mt-1 max-w-[17rem] text-pretty text-[13px] leading-relaxed text-fg-muted">
-            {bloqueio ?? 'Ela abre na noite da apuração, 25 de outubro, a partir das 17h (horário de Brasília).'}
+            {bloqueio ?? `Ela abre na noite da apuração, 25 de outubro, a partir das ${HORA_FIM_VOTACAO} (horário de Brasília), quando termina a votação.`}
           </p>
         </>
       ) : (
@@ -342,14 +345,15 @@ function Vazia({ fechada, bloqueio, falhou }: { fechada: boolean; bloqueio: stri
 }
 
 /**
- * Sala fechada antes das 17h de 25/10: a contagem até a abertura (relógio do servidor) e, fora da página /ao-vivo (que
- * tem as regras ao lado), as regras da sala inteiras. Nas páginas da apuração, o topo da página já tem a contagem grande:
- * aqui fica só a frase (duas contagens lado a lado não ajudam).
+ * Sala fechada antes do fim da votação (19h de 25/10): a contagem até a abertura (relógio do servidor) e, fora da página
+ * /ao-vivo (que tem as regras ao lado), as regras da sala inteiras. Nas páginas da apuração, antes das 17h o topo da
+ * página já tem a contagem grande: aqui fica só a frase (duas contagens lado a lado não ajudam). Entre 17h e 19h
+ * (votação prorrogada) o topo já não tem contagem: as caixas voltam.
  */
 function AntesDeAbrir({ pagina }: { pagina: boolean }) {
   const { pathname } = useLocation();
-  const semCaixas = !pagina && !!paginaDaSala(pathname);
   const [agora, setAgora] = useState(agoraServidor);
+  const semCaixas = !pagina && !!paginaDaSala(pathname) && agora < INICIO_APURACAO;
   const c = contagemAbertura(agora);
   // menos de 1 hora: segundos; antes, minutos bastam (atualiza a cada 10 s)
   const perto = c.ms < 3_600_000;
@@ -370,7 +374,9 @@ function AntesDeAbrir({ pagina }: { pagina: boolean }) {
       ];
   return (
     <div className={cn('flex min-h-full flex-col justify-center text-center', pagina ? 'px-6 py-10' : 'px-4 py-5')}>
-      <p className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-fg-subtle">{semCaixas ? 'A sala abre no domingo' : 'A sala abre em'}</p>
+      <p className="text-[11.5px] font-semibold uppercase tracking-[0.13em] text-fg-subtle">
+        {semCaixas ? (abre?.startsWith('abre hoje') ? 'A sala abre hoje' : 'A sala abre no domingo') : 'A sala abre em'}
+      </p>
       <div className={cn('mt-2.5 flex items-stretch justify-center gap-2', semCaixas && 'hidden')} role="timer" aria-live="off" aria-label={abre ? `A sala ${abre}` : 'A sala abre em instantes'}>
         {partes.map(([n, rotulo]) => (
           <span key={rotulo} className="flex min-w-[64px] flex-col items-center rounded-2xl border border-line bg-surface-2/70 px-2.5 py-2">
@@ -380,8 +386,8 @@ function AntesDeAbrir({ pagina }: { pagina: boolean }) {
         ))}
       </div>
       <p className="mx-auto mt-3 max-w-[19rem] text-pretty text-[13px] leading-relaxed text-fg-muted">
-        Domingo, 25 de outubro, às 17h (horário de Brasília), quando terminar a votação. Antes disso, a sala não recebe
-        mensagens.
+        Domingo, 25 de outubro, às {HORA_FIM_VOTACAO} (horário de Brasília), quando terminar a votação. Antes disso, a sala não
+        recebe mensagens.
       </p>
       {pagina ? null : (
         <div className="mt-4 rounded-2xl border border-line bg-surface p-3.5 text-left">

@@ -7,7 +7,7 @@
  * contratante, registro no TSE, período da coleta, entrevistas, margem de erro e nível de confiança —, mais o aviso
  * "Pesquisa não é resultado". Sem anúncio (nenhuma faixa "Oferecimento"), sem foto, sem média nem projeção. Candidatos
  * na ordem da urna, com as cores que vêm dos dados (Presidente: identidade; governador: turquesa/âmbar). Números como o
- * instituto divulgou (`fmtPctPesquisa`). No dia da votação (0h–17h de 25/10) a rota responde o convite genérico
+ * instituto divulgou (`fmtPctPesquisa`). No dia da votação (0h–19h de 25/10) a rota responde o convite genérico
  * (OG_COM_CANDIDATO, og-rotas.ts).
  */
 import {

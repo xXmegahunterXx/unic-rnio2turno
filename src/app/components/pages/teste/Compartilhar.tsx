@@ -6,7 +6,7 @@
  *    computador, o X. Os links levam a origem (`utm_source`, I08) — nunca o resultado.
  *      · "Desafio" (padrão): não diz o resultado; convida a fazer o teste. Link: /teste.
  *      · "Meu resultado" (opt-in explícito, com aviso): a sintonia com cada candidato. Link: /teste (nunca o resultado).
- *        No dia da votação (0h–17h de 25/10, relógio do servidor) essa versão some: só o "Desafio" (sem candidato).
+ *        No dia da votação (0h–19h de 25/10, relógio do servidor) essa versão some: só o "Desafio" (sem candidato).
  *  - `PainelDuelo` — "Desafie alguém": o link leva as respostas de quem convida DEPOIS DO "#" (o navegador não envia essa
  *    parte a servidor algum), e quem abrir o link verá essas respostas na comparação. Por isso as ações só liberam
  *    depois de a pessoa marcar que entendeu — e o aviso é mais forte para o X, onde o link fica público.
@@ -19,6 +19,7 @@ import { useId, useMemo, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AFIRMACOES, type ResultadoSintonia } from '@/app/content/afirmacoes';
 import type { Candidate } from '@/shared/types';
+import { HORA_FIM_VOTACAO } from '@/shared/diaVotacao';
 import { cn } from '@/app/lib/cn';
 import { compartilharLink, copiarTexto, prefereWhatsapp, textoComLink, urlAbsoluta, urlCompartilhada, whatsappUrl, xIntentUrl } from '@/app/lib/share';
 import { buttonClasses } from '@/app/ui/Button';
@@ -148,7 +149,7 @@ export interface PainelCompartilharProps {
 
 export function PainelCompartilhar({ resultado, candidatos, fotos, n, rapido, carregando, className }: PainelCompartilharProps) {
   const [modoEscolhido, setModo] = useState<ModoCompartilhar>('desafio');
-  // dia da votação, antes das 17h: a sintonia com cada candidato não sai da página (só o desafio, sem candidato)
+  // dia da votação, antes do fim dela (19h): a sintonia com cada candidato não sai da página (só o desafio, sem candidato)
   const diaDeVotacao = useDiaDeVotacao();
   const modo: ModoCompartilhar = diaDeVotacao ? 'desafio' : modoEscolhido;
   const idT = useId();
@@ -175,7 +176,7 @@ export function PainelCompartilhar({ resultado, candidatos, fotos, n, rapido, ca
       {diaDeVotacao ? (
         <p className="flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[12.5px] leading-snug text-fg-muted">
           <Icon name="info" size={15} className="mt-px shrink-0 text-brand-fg" />
-          <span>Hoje, até as 17h, o compartilhamento sai sem o seu resultado: só o desafio, que convida a fazer o teste.</span>
+          <span>Hoje, até as {HORA_FIM_VOTACAO}, quando termina a votação, o compartilhamento sai sem o seu resultado: só o desafio, que convida a fazer o teste.</span>
         </p>
       ) : (
         <Segmented<ModoCompartilhar>

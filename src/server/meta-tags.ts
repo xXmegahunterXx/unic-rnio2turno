@@ -14,12 +14,13 @@
  * (SP): 1º turno e apuração do 2º turno" (antes), "Apuração ao vivo em Campinas (SP) · 2º turno 2026" (durante),
  * "Resultado do 2º turno 2026 em Campinas (SP)" (depois) — sem nome de candidato no título; nomes e números só na
  * descrição, na ordem da urna (antes da apuração, o 1º turno oficial; durante e depois, o placar — na fonte TSE, só o que
- * já está em cache: meta-placar.ts). No dia da votação, das 0h às 17h, nenhuma descrição leva nome ou número de
- * candidato. Parâmetros de origem do link (`utm_*`, `h`, `via`) nunca mudam o canônico, a chave do cache nem a imagem.
+ * já está em cache: meta-placar.ts). No dia da votação, das 0h até o fim da votação (19h, `FIM_VOTACAO`; a votação foi
+ * prorrogada até as 19h), nenhuma descrição leva nome ou número de candidato. Parâmetros de origem do link (`utm_*`,
+ * `h`, `via`) nunca mudam o canônico, a chave do cache nem a imagem.
  */
 import { pctTotalizadas, pctValidos } from '../shared/calc';
 import { APP_NAME, UF_NOMES } from '../shared/constants';
-import { INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from '../shared/diaVotacao';
+import { HORA_FIM_VOTACAO, INICIO_DIA_VOTACAO, diaDeVotacaoAntesDas17 } from '../shared/diaVotacao';
 import { fmtInt, fmtPct } from '../shared/format';
 import { SIGLAS_GOV_2T, asDisputasGov } from '../shared/gov2t';
 import type { CandidatoFicha, CargoDataset } from '../shared/dataset';
@@ -84,7 +85,7 @@ export interface ContextoMeta {
   placarMunicipio?(race: string, uf: UF, cod: string): PlacarMeta | null;
   /** Fase da apuração agora ('pre' → as páginas de apuração mostram o 1º turno). */
   fase?(): Fase;
-  /** Relógio de parede (epoch ms; padrão Date.now): no dia da votação, antes das 17h, as descrições ficam sem nomes. */
+  /** Relógio de parede (epoch ms; padrão Date.now): no dia da votação, até o fim dela (19h), as descrições ficam sem nomes. */
   agora?(): number;
   /** Ficha do candidato; `existe` diz se o índice conhece o sequencial ('sem-indice' = não dá para saber). */
   ficha?(sq: string): { lida: ComVersao<CandidatoFicha> | null; existe: 'existe' | 'nao-existe' | 'sem-indice' };
@@ -143,9 +144,9 @@ export const PARAMS_RELEVANTES = ['race', 'uf', 'fato', 'f', 'tema', 'c', 'p'] a
  */
 export const PARAMS_ORIGEM = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'h', 'via'] as const;
 
-/** 0h de 25/10/2026 em Brasília: do início do dia da votação até as 17h, nenhuma descrição leva nome ou número de candidato. */
+/** 0h de 25/10/2026 em Brasília: do início do dia da votação até o fim dela (19h), nenhuma descrição leva nome ou número de candidato. */
 export { INICIO_DIA_VOTACAO } from '../shared/diaVotacao';
-/** Dia da votação, antes do início da apuração (0h–17h de 25/10, Brasília)? Fonte única: src/shared/diaVotacao.ts. */
+/** Dia da votação, antes do fim da votação (0h–19h de 25/10, Brasília; `FIM_VOTACAO`)? Fonte única: src/shared/diaVotacao.ts. */
 export const diaDeVotacao = diaDeVotacaoAntesDas17;
 
 /** Momento de uma página de apuração (I07): a corrida de 1º turno é sempre o resultado oficial; senão, a fase pública. */
@@ -164,14 +165,14 @@ export function consultaNormalizada(q: URLSearchParams): string {
 }
 
 /**
- * Prévia genérica do dia da votação (0h–17h de 25/10): a imagem de convite de og-audiencia.ts sem número (`?m=0`):
+ * Prévia genérica do dia da votação (0h–19h de 25/10, até o fim da votação): a imagem de convite de og-audiencia.ts sem número (`?m=0`):
  * "Eleições 2026 · 2º turno / Apuração ao vivo", sem foto, nome, número ou percentual de candidato.
  */
 export const OG_GENERICA_DIA_VOTACAO = '/api/og/audiencia.png?m=0';
 export const ALT_GENERICA_DIA_VOTACAO = 'Sintonia · apuração do 2º turno de 2026 ao vivo';
 /**
- * Imagens de prévia que mostram candidato (foto, nome, número ou percentual): genéricas no dia da votação, antes das 17h
- * — nas meta tags (aqui) e nas próprias rotas (og-rotas.ts responde o convite genérico: um cartão já guardado por um
+ * Imagens de prévia que mostram candidato (foto, nome, número ou percentual): genéricas no dia da votação, até o fim dela
+ * (19h) — nas meta tags (aqui) e nas próprias rotas (og-rotas.ts responde o convite genérico: um cartão já guardado por um
  * robô com a URL antiga, ao buscar a imagem de novo, também não recebe candidato).
  */
 export const OG_COM_CANDIDATO = [
@@ -188,7 +189,7 @@ export const OG_COM_CANDIDATO = [
 ];
 
 /**
- * Meta da rota `path` (sem query) com os parâmetros de busca `q`. No dia da votação (0h–17h de 25/10), além das
+ * Meta da rota `path` (sem query) com os parâmetros de busca `q`. No dia da votação (0h–19h de 25/10), além das
  * descrições sem nomes, a IMAGEM de prévia (a que aparece no WhatsApp e no X) também sai sem candidato: é a que circula
  * com o link. Para desfazer, basta mudar `diaDeVotacao`.
  */
@@ -232,7 +233,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       return null;
     }
   };
-  // dia da votação (0h–17h de 25/10): descrições sem nome nem número de candidato
+  // dia da votação (0h–19h de 25/10, até o fim da votação): descrições sem nome nem número de candidato
   const comNomes = !diaDeVotacao(tentar(() => ctx.agora?.()) ?? Date.now());
   /** Texto do placar da corrida `r` (no Brasil ou na UF), se houver número e nomes forem permitidos agora. */
   const placarTexto = (r: string, uf?: UF) => {
@@ -271,7 +272,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       const t = placarTexto(corridaDoPlacar(raceId, mom));
       const resto: Record<MomentoMeta, string> = {
         t1: 'Resultado oficial do 1º turno, com mapa por estado e por município, zonas e seções.',
-        pre: 'Em 25/10, a partir das 17h, a apuração do 2º turno ao vivo: estado por estado, cidade por cidade, seção por seção.',
+        pre: `Em 25/10, a partir das ${HORA_FIM_VOTACAO}, a apuração do 2º turno ao vivo: estado por estado, cidade por cidade, seção por seção.`,
         apurando: 'Resultados do 2º turno seção por seção, com mapa por estado, gráfico da apuração e o que falta apurar.',
         encerrada: 'Resultado do 2º turno seção por seção, com mapa por estado, gráfico da apuração e comparação com o 1º turno.',
       };
@@ -307,7 +308,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
         const t = placarTexto(corridaDoPlacar(raceUf, mom), uf);
         const resto: Record<MomentoMeta, string> = {
           t1: `Resultado oficial do 1º turno ${ondeUf} por município, com mapa e a tabela completa.`,
-          pre: `Resultado do 1º turno ${ondeUf} por município e, em 25/10, a partir das 17h, a apuração do 2º turno ao vivo.`,
+          pre: `Resultado do 1º turno ${ondeUf} por município e, em 25/10, a partir das ${HORA_FIM_VOTACAO}, a apuração do 2º turno ao vivo.`,
           apurando: `Resultado por município ${ondeUf}, com mapa, gráfico da apuração e eventos da noite.`,
           encerrada: `Resultado por município ${ondeUf}, com mapa, gráfico da apuração e comparação com o 1º turno.`,
         };
@@ -431,7 +432,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       titulo: `Pesquisas do 2º turno · ${APP_NAME}`,
       descricao: comNomes
         ? `${AVISO_PESQUISAS} Cada pesquisa com instituto, contratante, registro, período da coleta, entrevistas, margem de erro e nível de confiança.`
-        : 'Pesquisas eleitorais registradas no TSE. No dia da votação, até as 17h, a área fica sem pesquisas.',
+        : `Pesquisas eleitorais registradas no TSE. No dia da votação, até as ${HORA_FIM_VOTACAO}, a área fica sem pesquisas.`,
       imagem: '/api/og/pesquisa.png',
       imagemAlt: 'Pesquisas do 2º turno · Sintonia',
       imagemVersao: 'v1',
@@ -601,11 +602,11 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
       const sit = situacaoTexto(r?.situacao, f.genero);
       const res = r ? ` No 1º turno de 2026: ${fmtInt(r.votos)} votos (${fmtPct(r.pct)} dos válidos)${sit ? `, ${sit}` : ''}.` : '';
       return pagina({
-        // dia da votação (0h–17h): o título (o que o cartão do link mostra no WhatsApp e no X) sem nome nem partido
+        // dia da votação (0h–19h): o título (o que o cartão do link mostra no WhatsApp e no X) sem nome nem partido
         titulo: comNomes
           ? `${f.nomeUrna} (${f.partido}) · ${cargo}${f.uf === 'BR' ? '' : ` · ${onde}`} · Ficha do candidato · ${APP_NAME}`
           : `Ficha de candidato · ${cargo}${f.uf === 'BR' ? '' : ` · ${onde}`} · ${APP_NAME}`,
-        // dia da votação (0h–17h): sem o partido (com o cargo, ele identifica o finalista), o número nem o resultado
+        // dia da votação (0h–19h): sem o partido (com o cargo, ele identifica o finalista), o número nem o resultado
         descricao: comNomes
           ? `${cargo} · ${onde} · ${f.partido} ${f.numero}.${res} Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`
           : `${cargo} · ${onde}. Dados públicos do TSE: ocupação, escolaridade e patrimônio declarado.`,
@@ -615,7 +616,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
         canonico: `/candidato/${f.sqcand}`,
       });
     }
-    // sem índice de candidatos no servidor: cartão genérico (a SPA resolve); no dia da votação (0h–17h), sem o nome
+    // sem índice de candidatos no servidor: cartão genérico (a SPA resolve); no dia da votação (0h–19h), sem o nome
     let nome: string | null = null;
     for (const r of comNomes ? ctx.races.values() : []) {
       const c = r.candidatos.find((x) => !x.agregado && x.sqcand === s1);
@@ -639,7 +640,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
     if (fato) {
       return pagina({
         titulo: `${fato.titulo} · Curiosidades do 1º turno · ${APP_NAME}`,
-        // dia da votação (0h–17h): sem o texto do fato (vários citam os finalistas com nome e percentual)
+        // dia da votação (0h–19h): sem o texto do fato (vários citam os finalistas com nome e percentual)
         descricao: comNomes ? cortar(`${fato.texto} Fonte: TSE.`, 280) : `${fato.titulo}: fato do 1º turno calculado com os dados oficiais do TSE.`,
         imagem: `/api/og/curiosidade.png?f=${fato.id}`,
         imagemAlt: `${fato.titulo} · curiosidade do 1º turno de 2026`,
@@ -663,7 +664,7 @@ function metaDaRotaBase(path: string, q: URLSearchParams, ctx: ContextoMeta): Me
     if (cen) {
       return pagina({
         titulo: `Cenário hipotético do 2º turno · E se…? · ${APP_NAME}`,
-        // dia da votação (0h–17h): sem o placar hipotético (nomes e percentuais)
+        // dia da votação (0h–19h): sem o placar hipotético (nomes e percentuais)
         descricao: comNomes
           ? `Cenário hipotético montado a partir do resultado oficial do 1º turno · não é pesquisa nem previsão. Neste cenário: ${cen.placar}. Monte o seu.`
           : 'Cenário hipotético montado a partir do resultado oficial do 1º turno · não é pesquisa nem previsão. Monte o seu.',

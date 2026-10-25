@@ -22,8 +22,9 @@
  * vigia do healthcheck não fecham a sala na noite. Sem o arquivo, a sala nasce FECHADA (padrão seguro). Com réplicas,
  * cada uma teria a sua sala: o chat pressupõe 1 instância (a topologia recomendada, ARCHITECTURE §12.5).
  *
- * Dia da eleição: em produção, de 0h às 17h de 25/10 (Brasília) a sala não recebe mensagens (propaganda no dia da
- * eleição é crime — Lei 9.504/97, art. 39, § 5º), mesmo aberta no painel; às 17h volta sozinha. Antes de 25/10 a sala
+ * Dia da eleição: em produção, de 0h de 25/10 até o fim da votação (19h de Brasília, `FIM_VOTACAO`; a votação foi
+ * prorrogada até as 19h) a sala não recebe mensagens (propaganda no dia da eleição é crime — Lei 9.504/97, art. 39,
+ * § 5º), mesmo aberta no painel; no fim da votação volta sozinha. Antes de 25/10 a sala
  * funciona normalmente quando o painel a abre (decisão do dono, 21/10: sala liberada já na reta final da campanha).
  */
 import { randomBytes } from 'node:crypto';
@@ -55,6 +56,7 @@ import {
   type ReacaoId,
   type RespostaEnvio,
 } from '../shared/chat';
+import { HORA_FIM_VOTACAO } from '../shared/diaVotacao';
 import type { LoadedDataset } from '../engine/api';
 import { LimiteJanela, numeroDe } from './anuncios';
 import { casaEtag, corpoCodificado, etagFraco, hashCurto, negociar, type CorpoPronto } from './http-cache';
@@ -195,7 +197,7 @@ export const comandoChatSchema = z.discriminatedUnion('acao', [
 
 export interface OpcoesSalaChat {
   now?: () => number;
-  /** produção: vale o bloqueio do dia da eleição (0h–17h de 25/10) */
+  /** produção: vale o bloqueio do dia da eleição (0h–19h de 25/10, até o fim da votação) */
   producao?: boolean;
   /** nomes de candidatos (dataset): recusados no apelido */
   nomesCandidatos?: readonly string[];
@@ -203,7 +205,7 @@ export interface OpcoesSalaChat {
   municipios?: readonly string[];
   /** registro cifrado dos envios ligado (chat-registro.ts): a sala avisa nas regras */
   registro?: boolean;
-  /** produção com CHAT_ENSAIO=1 (cópia de ensaio); o bloqueio de 0h–17h de 25/10 vale sempre */
+  /** produção com CHAT_ENSAIO=1 (cópia de ensaio); o bloqueio de 0h–19h de 25/10 (fim da votação) vale sempre */
   ensaio?: boolean;
   /**
    * Sala TRAVADA fechada (motivo para o painel): ex.: CHAT_REGISTRO_CHAVE configurada mas ilegível — o dono decidiu
@@ -230,7 +232,7 @@ const configSalaSchema = z.object({
 });
 
 /** LEGADO (até 21/10 a sala só abria na noite da apuração); mantido só para compatibilidade de importação. */
-export const BLOQUEIO_ANTES_DA_ELEICAO = 'A sala abre em 25 de outubro, às 17h (horário de Brasília), quando terminar a votação.';
+export const BLOQUEIO_ANTES_DA_ELEICAO = `A sala abre em 25 de outubro, às ${HORA_FIM_VOTACAO} (horário de Brasília), quando terminar a votação.`;
 
 const zerarReacoes = (): Record<ReacaoId, number> => ({ fogo: 0, uau: 0, palmas: 0, olhos: 0 });
 
@@ -385,7 +387,7 @@ export class SalaChat {
   bloqueio(): string | null {
     if (!this.producao) return null;
     const agora = this.now();
-    // só o bloqueio legal do dia da eleição (0h–17h de 25/10); antes disso a sala vale como o painel deixar
+    // só o bloqueio legal do dia da eleição (0h–19h de 25/10, até o fim da votação); antes disso a sala vale como o painel deixar
     return bloqueioDiaEleicao(agora);
   }
 

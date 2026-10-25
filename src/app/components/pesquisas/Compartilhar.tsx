@@ -3,7 +3,7 @@
  * no mesmo desenho do cartão do servidor (src/server/og-pesquisa.ts): os dois candidatos na ordem da urna com os
  * percentuais grandes (o mesmo corpo para os dois), votos válidos e brancos/indecisos quando divulgados, e — NO RODAPÉ —
  * TODAS as informações obrigatórias (Res. TSE 23.600/2019, art. 10) e o aviso "Pesquisa não é resultado". Sem anúncio
- * (nenhuma faixa "Oferecimento"), sem foto. No dia da votação (0h–17h de 25/10) o sheet troca tudo pelo convite da
+ * (nenhuma faixa "Oferecimento"), sem foto. No dia da votação (0h–19h de 25/10) o sheet troca tudo pelo convite da
  * apuração (`trocaPeloConvite`: o conteúdo NÃO é marcado `generico`).
  */
 import { BotaoCompartilhar } from '@/app/components/share/BotaoCompartilhar';

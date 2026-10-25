@@ -3,8 +3,8 @@
  * (faixa entre a contagem regressiva e o 1º turno). Sem candidato: ilustração só com a cor da marca ("?% × ?%"),
  * nunca as cores dos candidatos — como a chamada da calculadora de cenários.
  *
- * À 0h de 25/10 (relógio do servidor) os palpites fecham; no dia da votação, até as 17h, a chamada some (art. 39, § 5º).
- * Depois das 17h a chamada só aparece para quem cravou um palpite
+ * À 0h de 25/10 (relógio do servidor) os palpites fecham; no dia da votação, até o fim dela (19h), a chamada some (art. 39,
+ * § 5º). Depois do fim da votação a chamada só aparece para quem cravou um palpite
  * neste aparelho ("veja por quanto errou"); sem palpite, nada.
  */
 import { Link } from 'react-router-dom';
@@ -53,7 +53,7 @@ export function ChamadaPalpite({ variante = 'secao', className }: { variante?: '
   const [salvo] = usePalpiteSalvo();
   const fase = fasePalpite(agora);
   const aberto = fase === 'aberto';
-  // dia da votação (0h–17h): nenhuma chamada de palpite na home nem na apuração (art. 39, § 5º)
+  // dia da votação (0h–19h): nenhuma chamada de palpite na home nem na apuração (art. 39, § 5º)
   if (fase === 'votacao' || (!aberto && !salvo)) return null;
 
   const titulo = aberto ? (salvo ? 'Seu palpite está cravado' : 'Qual é o seu palpite?') : 'Seu palpite × o resultado';
